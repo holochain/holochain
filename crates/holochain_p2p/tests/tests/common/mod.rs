@@ -5,11 +5,9 @@ use holochain_p2p::*;
 use holochain_types::prelude::*;
 // The countersigning publish handler is v2-native; shadow the legacy
 // `ChainOp` re-export pulled in via `holochain_types::prelude::*`.
-use holochain_types::dht_v2::ChainOp;
-// `WireLinkOps.creates` carries the v2 `SignedAction`; project the legacy
-// `CreateLink` fixture through `from_legacy_action` to build one.
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
-use holochain_zome_types::dht_v2::from_legacy_action;
+// `WireLinkOps.creates` carries the v2 `SignedAction`, built directly from a
+// `CreateLink` fixture's fields.
+use holochain_types::dht_v2::{ActionData, ActionHeader, ChainOp, CreateLinkData};
 use kitsune2_api::*;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::{Arc, Mutex};
@@ -113,12 +111,25 @@ impl HcP2pHandler for Handler {
     ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>> {
         Box::pin(async move {
             self.calls.lock().unwrap().push("get_links".into());
+            let create_link = fixt!(CreateLink);
+            let action = Action {
+                header: ActionHeader {
+                    author: create_link.author.clone(),
+                    timestamp: create_link.timestamp,
+                    action_seq: create_link.action_seq,
+                    prev_action: Some(create_link.prev_action.clone()),
+                },
+                data: ActionData::CreateLink(CreateLinkData {
+                    base_address: create_link.base_address.clone(),
+                    target_address: create_link.target_address.clone(),
+                    zome_index: create_link.zome_index,
+                    link_type: create_link.link_type,
+                    tag: create_link.tag.clone(),
+                }),
+            };
             Ok(WireLinkOps {
                 creates: vec![Judged::new(
-                    SignedAction::new(
-                        from_legacy_action(&LegacyAction::CreateLink(fixt!(CreateLink))),
-                        fixt!(Signature),
-                    ),
+                    SignedAction::new(action, fixt!(Signature)),
                     ValidationStatus::Valid,
                 )],
                 deletes: Vec::new(),

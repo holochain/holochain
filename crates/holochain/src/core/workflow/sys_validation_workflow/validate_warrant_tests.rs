@@ -17,11 +17,12 @@ use ::fixt::prelude::*;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
-// `sign_action` fixtures are built from the legacy per-variant `Create`
-// action; `from_legacy_action` converts to the v2 shape actually signed.
+// `sign_action` fixtures seed the legacy per-variant `Create` action struct;
+// the shared `ToV2Action` helper projects it onto the v2 `Action` that is
+// actually authored, hashed, and signed.
+use super::validate_op_tests::ToV2Action;
 use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
-use holochain_zome_types::dht_v2::from_legacy_action;
+use holochain_zome_types::dht_v2::Action;
 
 /// Test that a valid ChainFork warrant is accepted when both actions:
 /// - Have the same author
@@ -177,7 +178,7 @@ async fn validate_chain_fork_warrant_rejected_action_seq_differs() {
         visibility: EntryVisibility::Public,
     });
     create1.entry_hash = fixt!(EntryHash);
-    let action1 = test_case.sign_action(LegacyAction::Create(create1)).await;
+    let action1 = test_case.sign_action(create1.to_v2()).await;
 
     let mut create2 = fixt!(Create);
     create2.author = test_case.chain_author.clone();
@@ -190,7 +191,7 @@ async fn validate_chain_fork_warrant_rejected_action_seq_differs() {
         visibility: EntryVisibility::Public,
     });
     create2.entry_hash = fixt!(EntryHash);
-    let action2 = test_case.sign_action(LegacyAction::Create(create2)).await;
+    let action2 = test_case.sign_action(create2.to_v2()).await;
 
     let warrant_op = test_case
         .create_chain_fork_warrant(&action1, &action2)
@@ -432,7 +433,7 @@ impl ChainForkWarrantTestCase {
             visibility: EntryVisibility::Public,
         });
         create1.entry_hash = fixt!(EntryHash);
-        let action1 = self.sign_action(LegacyAction::Create(create1)).await;
+        let action1 = self.sign_action(create1.to_v2()).await;
 
         // Second action (different entry hash makes it a different action)
         let mut create2 = fixt!(Create);
@@ -446,7 +447,7 @@ impl ChainForkWarrantTestCase {
             visibility: EntryVisibility::Public,
         });
         create2.entry_hash = fixt!(EntryHash); // Different entry hash
-        let action2 = self.sign_action(LegacyAction::Create(create2)).await;
+        let action2 = self.sign_action(create2.to_v2()).await;
 
         (action1, action2, prev_action_hash)
     }
@@ -469,7 +470,7 @@ impl ChainForkWarrantTestCase {
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        let action1 = self.sign_action(LegacyAction::Create(create1)).await;
+        let action1 = self.sign_action(create1.to_v2()).await;
 
         // Second action with different author
         let mut create2 = fixt!(Create);
@@ -482,7 +483,7 @@ impl ChainForkWarrantTestCase {
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        let action2 = self.sign_action(LegacyAction::Create(create2)).await;
+        let action2 = self.sign_action(create2.to_v2()).await;
 
         (action1, action2)
     }
@@ -500,7 +501,7 @@ impl ChainForkWarrantTestCase {
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        let action1 = self.sign_action(LegacyAction::Create(create1)).await;
+        let action1 = self.sign_action(create1.to_v2()).await;
 
         // Second action with DIFFERENT prev_action
         let mut create2 = fixt!(Create);
@@ -513,13 +514,13 @@ impl ChainForkWarrantTestCase {
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        let action2 = self.sign_action(LegacyAction::Create(create2)).await;
+        let action2 = self.sign_action(create2.to_v2()).await;
 
         (action1, action2)
     }
 
-    async fn sign_action(&self, action: LegacyAction) -> SignedActionHashed {
-        let action_hashed = holo_hash::HoloHashed::from_content_sync(from_legacy_action(&action));
+    async fn sign_action(&self, action: Action) -> SignedActionHashed {
+        let action_hashed = holo_hash::HoloHashed::from_content_sync(action);
         SignedActionHashed::sign(&self.keystore, action_hashed)
             .await
             .unwrap()
@@ -537,7 +538,7 @@ impl ChainForkWarrantTestCase {
             visibility: EntryVisibility::Public,
         });
         create.entry_hash = fixt!(EntryHash);
-        self.sign_action(LegacyAction::Create(create)).await
+        self.sign_action(create.to_v2()).await
     }
 
     /// Insert an action as a warranted dependency that has been validated with the

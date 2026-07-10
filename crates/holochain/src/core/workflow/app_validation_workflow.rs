@@ -126,8 +126,8 @@ use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
     RegisterUpdate, StoreEntry, StoreRecord,
 };
 use holochain_zome_types::dht_v2::{
-    to_legacy_signed_action, ActionData, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
-    SignedActionHashed, UpdateData,
+    ActionData, CreateData, CreateLinkData, DeleteData, DeleteLinkData, SignedActionHashed,
+    UpdateData,
 };
 use parking_lot::Mutex;
 use std::collections::HashSet;
@@ -459,7 +459,7 @@ pub async fn record_to_op(
         ChainOpType::StoreEntry => {
             let entry = entry.ok_or_else(|| {
                 AppValidationError::DhtOpError(DhtOpError::ActionWithoutEntry(Box::new(
-                    to_legacy_signed_action(&sah).action().clone(),
+                    sah.hashed.content.clone(),
                 )))
             })?;
             Op::StoreEntry(StoreEntry { action: sah, entry })
@@ -486,10 +486,9 @@ pub async fn record_to_op(
                     link_add_address, ..
                 }) => link_add_address.clone(),
                 _ => {
-                    let legacy_action = to_legacy_signed_action(&sah).action().clone();
                     return Err(AppValidationError::DhtOpError(DhtOpError::OpActionMismatch(
                         op_type,
-                        (&legacy_action).into(),
+                        sah.hashed.content.data.action_type(),
                     ))
                     .into());
                 }
@@ -507,17 +506,6 @@ pub async fn record_to_op(
     };
 
     Ok((op, dht_op_hash, hidden_entry))
-}
-
-/// The legacy `ActionType` a v2 action projects to, for the
-/// `DhtOpError::OpActionMismatch` diagnostic below (which is defined against the
-/// legacy discriminant — a different enum from v2's own `ActionType`).
-/// Error-message-only: never used to decide validation outcomes.
-fn legacy_action_type(action: &Action) -> ActionType {
-    let hashed = HoloHashed::from_content_sync(action.clone());
-    let sah = SignedActionHashed::with_presigned(hashed, Signature::from([0u8; 64]));
-    let legacy_action = to_legacy_signed_action(&sah).action().clone();
-    (&legacy_action).into()
 }
 
 /// Build the v2 `Op` (the wasm `validate` callback's input) from a sys-validated
@@ -542,17 +530,16 @@ async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppVal
             })
         }
         ChainOp::CreateEntry(_, op_entry) => {
-            let entry = match op_entry {
-                OpEntry::Present(entry) => entry,
-                OpEntry::Hidden | OpEntry::ActionOnly => {
-                    return Err(
-                        AppValidationError::DhtOpError(DhtOpError::ActionWithoutEntry(Box::new(
-                            to_legacy_signed_action(&sah).action().clone(),
-                        )))
-                        .into(),
-                    );
-                }
-            };
+            let entry =
+                match op_entry {
+                    OpEntry::Present(entry) => entry,
+                    OpEntry::Hidden | OpEntry::ActionOnly => {
+                        return Err(AppValidationError::DhtOpError(
+                            DhtOpError::ActionWithoutEntry(Box::new(sah.hashed.content.clone())),
+                        )
+                        .into());
+                    }
+                };
             Op::StoreEntry(StoreEntry { action: sah, entry })
         }
         ChainOp::AgentActivity(_) => Op::RegisterAgentActivity(RegisterAgentActivity {
@@ -563,7 +550,7 @@ async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppVal
             let ActionData::Update(update) = &action.data else {
                 return Err(AppValidationError::DhtOpError(DhtOpError::OpActionMismatch(
                     ChainOpType::RegisterUpdatedContent,
-                    legacy_action_type(action),
+                    action.data.action_type(),
                 ))
                 .into());
             };
@@ -602,7 +589,7 @@ async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppVal
             else {
                 return Err(AppValidationError::DhtOpError(DhtOpError::OpActionMismatch(
                     ChainOpType::RegisterRemoveLink,
-                    legacy_action_type(action),
+                    action.data.action_type(),
                 ))
                 .into());
             };

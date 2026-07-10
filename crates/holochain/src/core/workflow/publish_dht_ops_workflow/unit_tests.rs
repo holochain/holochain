@@ -16,10 +16,27 @@ use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_state::test_utils::test_dht_store;
 use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
-use holochain_zome_types::dht_v2::from_legacy_action;
+use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
+    Action, ActionData, ActionHeader, CreateData,
+};
 use std::sync::Arc;
 use std::time::Duration;
+
+/// Project a fixturated legacy `Create` struct into a v2 `Action`.
+fn v2_create(c: Create) -> Action {
+    Action {
+        header: ActionHeader {
+            author: c.author,
+            timestamp: c.timestamp,
+            action_seq: c.action_seq,
+            prev_action: Some(c.prev_action),
+        },
+        data: ActionData::Create(CreateData {
+            entry_type: c.entry_type,
+            entry_hash: c.entry_hash,
+        }),
+    }
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn no_ops_to_publish() {
@@ -278,8 +295,7 @@ async fn private_entries_are_not_published() {
             visibility: EntryVisibility::Private,
         }),
     };
-    let action = Action::Create(create_action.clone());
-    let v2_action = from_legacy_action(&action);
+    let v2_action = v2_create(create_action);
 
     let register_agent_activity_op = DhtOpHashed::from_content_sync(DhtOp::from(
         ChainOp::AgentActivity(SignedAction::new(v2_action.clone(), fixt!(Signature))),
@@ -363,9 +379,7 @@ async fn verify_published_recently(dht_store: &DhtStore, op_hash: DhtOpHash) {
 async fn create_op(dht_store: &DhtStore, author: AgentPubKey) -> StateMutationResult<DhtOpHash> {
     let mut create_action = fixt!(Create);
     create_action.author = author;
-    let action = Action::Create(create_action);
-
-    let signed = SignedAction::new(from_legacy_action(&action), fixt!(Signature));
+    let signed = SignedAction::new(v2_create(create_action), fixt!(Signature));
     let op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(signed)));
 
     let op_hash = op.as_hash().clone();

@@ -24,31 +24,78 @@ use holochain_types::{
     wire_ops::{RenderedOp, RenderedOps, WireOps},
 };
 use holochain_wasm_test_utils::TestWasm;
-// The wasm `validate(op: Op)` callback decodes the v2 `Op`; `LegacyAction` is
-// the per-variant enum the fixturated `Create`/`Delete`/`CreateLink` structs
-// plug into before being projected to the v2 `Action` via `from_legacy_action`.
-// `MustGetAgentActivityResponse` (unlike the `Op`/`Record` model) still
-// carries its activity as legacy `RegisterAgentActivity`/`SignedActionHashed`
-// (see `crate::core::ribosome::host_fn::must_get_agent_activity`), so that one
-// stays imported from the legacy `op` module and is bridged with
-// `to_legacy_signed_action`.
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+// The wasm `validate(op: Op)` callback decodes the v2 `Op`; the fixturated
+// `Create`/`Delete`/`CreateLink` structs are projected into v2 `Action`s by
+// the `v2_*` helpers below.
+use holochain_zome_types::action::{Create, CreateLink, Delete};
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    ActionData, DeleteData, Op, RegisterCreateLink, RegisterDelete,
+    Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, Op,
+    RegisterCreateLink, RegisterDelete,
 };
-use holochain_zome_types::dht_v2::{from_legacy_action, to_legacy_signed_action, SignedAction};
+use holochain_zome_types::dht_v2::SignedAction;
 use holochain_zome_types::{
     chain::{ChainFilter, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
+    dht_v2::RegisterAgentActivity,
     entry::MustGetActionInput,
     fixt::{CreateFixturator, DeleteFixturator, SignatureFixturator},
     judged::Judged,
-    op::RegisterAgentActivity,
     record::SignedActionHashed,
     validate::ValidationStatus,
 };
 use matches::assert_matches;
 use std::{sync::Arc, time::Duration};
+
+/// Project a fixturated legacy `Create` struct into a v2 `Action`.
+fn v2_create(c: Create) -> Action {
+    Action {
+        header: ActionHeader {
+            author: c.author,
+            timestamp: c.timestamp,
+            action_seq: c.action_seq,
+            prev_action: Some(c.prev_action),
+        },
+        data: ActionData::Create(CreateData {
+            entry_type: c.entry_type,
+            entry_hash: c.entry_hash,
+        }),
+    }
+}
+
+/// Project a fixturated legacy `Delete` struct into a v2 `Action`.
+fn v2_delete(d: Delete) -> Action {
+    Action {
+        header: ActionHeader {
+            author: d.author,
+            timestamp: d.timestamp,
+            action_seq: d.action_seq,
+            prev_action: Some(d.prev_action),
+        },
+        data: ActionData::Delete(DeleteData {
+            deletes_address: d.deletes_address,
+            deletes_entry_address: d.deletes_entry_address,
+        }),
+    }
+}
+
+/// Project a fixturated legacy `CreateLink` struct into a v2 `Action`.
+fn v2_create_link(c: CreateLink) -> Action {
+    Action {
+        header: ActionHeader {
+            author: c.author,
+            timestamp: c.timestamp,
+            action_seq: c.action_seq,
+            prev_action: Some(c.prev_action),
+        },
+        data: ActionData::CreateLink(CreateLinkData {
+            base_address: c.base_address,
+            target_address: c.target_address,
+            zome_index: c.zome_index,
+            link_type: c.link_type,
+            tag: c.tag,
+        }),
+    }
+}
 
 // test app validation with a must get action where the original action of
 // a delete is not in the cache db and then added to it
@@ -92,12 +139,12 @@ async fn validation_callback_must_get_action() {
     // a create by alice
     let mut create = fixt!(Create);
     create.author = alice.clone();
-    let create_action = LegacyAction::Create(create.clone());
+    let create_action = v2_create(create.clone());
     // a delete by bob that references alice's create
     let mut delete = fixt!(Delete);
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
-    let delete_action_v2 = from_legacy_action(&LegacyAction::Delete(delete.clone()));
+    let delete_action_v2 = v2_delete(delete.clone());
     let delete_action_signed_hashed =
         SignedActionHashed::new_unchecked(delete_action_v2, fixt!(Signature));
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
@@ -120,7 +167,7 @@ async fn validation_callback_must_get_action() {
 
     // Record the action to be must-got during validation into the DhtStore,
     // which the cascade's local read consults.
-    let signed = SignedAction::new(from_legacy_action(&create_action), fixt!(Signature));
+    let signed = SignedAction::new(create_action.clone(), fixt!(Signature));
     let dht_op = DhtOp::from(ChainOp::AgentActivity(signed));
     let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
     test_space
@@ -180,19 +227,17 @@ async fn validation_callback_awaiting_deps_hashes() {
     // a create by alice, signed with alice's real key
     let mut create = fixt!(Create);
     create.author = alice.clone();
-    let create_action = LegacyAction::Create(create.clone());
+    let create_action = v2_create(create.clone());
     let create_action_signed_hashed =
-        SignedActionHashed::sign(&keystore, from_legacy_action(&create_action).into_hashed())
+        SignedActionHashed::sign(&keystore, create_action.clone().into_hashed())
             .await
             .unwrap();
     // a delete by bob that references alice's create
     let mut delete = fixt!(Delete);
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
-    let delete_action_signed_hashed = SignedActionHashed::new_unchecked(
-        from_legacy_action(&LegacyAction::Delete(delete.clone())),
-        fixt!(Signature),
-    );
+    let delete_action_signed_hashed =
+        SignedActionHashed::new_unchecked(v2_delete(delete.clone()), fixt!(Signature));
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
     });
@@ -294,9 +339,9 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     let mut create = fixt!(Create);
     create.author = alice.clone();
     create.action_seq = 0;
-    let create_action = LegacyAction::Create(create.clone());
+    let create_action = v2_create(create.clone());
     let create_action_signed_hashed =
-        SignedActionHashed::sign(&keystore, from_legacy_action(&create_action).into_hashed())
+        SignedActionHashed::sign(&keystore, create_action.clone().into_hashed())
             .await
             .unwrap();
     // a delete by alice that references the create
@@ -307,7 +352,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     // that must_get_agent_activity returns
     delete.prev_action = create_action.clone().to_hash();
     delete.deletes_address = create_action.clone().to_hash();
-    let delete_action_v2 = from_legacy_action(&LegacyAction::Delete(delete.clone()));
+    let delete_action_v2 = v2_delete(delete.clone());
     let delete_action_signed_hashed =
         SignedActionHashed::sign(&keystore, delete_action_v2.clone().into_hashed())
             .await
@@ -335,11 +380,11 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 
             Ok(vec![MustGetAgentActivityResponse::activity(vec![
                 RegisterAgentActivity {
-                    action: to_legacy_signed_action(&create_action_signed_hashed),
+                    action: create_action_signed_hashed.clone(),
                     cached_entry: None,
                 },
                 RegisterAgentActivity {
-                    action: to_legacy_signed_action(&delete_action_signed_hashed),
+                    action: delete_action_signed_hashed.clone(),
                     cached_entry: None,
                 },
             ])])
@@ -410,7 +455,7 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
     let mut create = fixt!(Create);
     create.author = alice.clone();
     create.action_seq = 0;
-    let create_action = from_legacy_action(&LegacyAction::Create(create.clone()));
+    let create_action = v2_create(create.clone());
     let create_entry = fixt!(Entry);
     let create_entry_hash = create_action.entry_hash().unwrap().clone();
     // A CreateLink to be validated that does a must_get_valid_record to the invalid Create
@@ -421,7 +466,7 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
     // This link type will lead to a must_get_valid_record in the validate callback.
     create_link.link_type = 2.into();
     create_link.base_address = create_action.to_hash().into();
-    let create_link_action = from_legacy_action(&LegacyAction::CreateLink(create_link));
+    let create_link_action = v2_create_link(create_link);
     let create_link_signed_hashed =
         SignedActionHashed::new_unchecked(create_link_action, fixt!(Signature));
     let create_link_op = Op::RegisterCreateLink(RegisterCreateLink {

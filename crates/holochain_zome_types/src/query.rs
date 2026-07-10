@@ -388,7 +388,9 @@ impl ChainQueryFilter {
             .filter(|action| {
                 self.action_type
                     .as_ref()
-                    .map(|action_types| action_types.contains(&action.action().action_type()))
+                    .map(|action_types| {
+                        action_types.contains(&legacy_action_type(&action.action().data))
+                    })
                     .unwrap_or(true)
                     && self
                         .entry_type
@@ -414,121 +416,11 @@ impl ChainQueryFilter {
     }
 
     /// Filter a vector of records according to the query.
+    ///
+    /// A [`Record`] is an [`ActionHashedContainer`], so this is just
+    /// [`Self::filter_actions`] specialised to records.
     pub fn filter_records(&self, records: Vec<Record>) -> Vec<Record> {
-        let actions = self.filter_signed_actions(
-            records
-                .iter()
-                .map(|record| record.signed_action.clone())
-                .collect(),
-        );
-        let action_hashset = actions
-            .iter()
-            .map(|action| action.as_hash().clone())
-            .collect::<HashSet<ActionHash>>();
-        records
-            .into_iter()
-            .filter(|record| action_hashset.contains(record.action_address()))
-            .collect()
-    }
-
-    /// Fork disambiguation for v2 [`SignedActionHashed`], used by
-    /// [`Self::filter_records`]. Mirrors [`Self::disambiguate_forks`], which
-    /// operates on any [`ActionHashedContainer`] (currently only implemented
-    /// for the legacy per-variant action shape).
-    fn disambiguate_forks_v2(&self, actions: Vec<SignedActionHashed>) -> Vec<SignedActionHashed> {
-        match &self.sequence_range {
-            ChainQueryFilterRange::Unbounded => actions,
-            ChainQueryFilterRange::ActionSeqRange(start, end) => actions
-                .into_iter()
-                .filter(|action| {
-                    let seq = action.hashed.content.header.action_seq;
-                    *start <= seq && seq <= *end
-                })
-                .collect(),
-            ChainQueryFilterRange::ActionHashRange(start, end) => {
-                let mut action_hashmap = actions
-                    .into_iter()
-                    .map(|action| (action.as_hash().clone(), action))
-                    .collect::<HashMap<ActionHash, SignedActionHashed>>();
-                let mut filtered_actions = Vec::new();
-                let mut maybe_next_action = action_hashmap.remove(end);
-                while let Some(next_action) = maybe_next_action {
-                    maybe_next_action = next_action
-                        .hashed
-                        .content
-                        .header
-                        .prev_action
-                        .as_ref()
-                        .and_then(|prev_action| action_hashmap.remove(prev_action));
-                    let is_start = next_action.as_hash() == start;
-                    filtered_actions.push(next_action);
-
-                    // This comes after the push to make the range inclusive.
-                    if is_start {
-                        break;
-                    }
-                }
-                filtered_actions
-            }
-            ChainQueryFilterRange::ActionHashTerminated(end, n) => {
-                let mut action_hashmap = actions
-                    .iter()
-                    .map(|action| (action.as_hash().clone(), action.clone()))
-                    .collect::<HashMap<ActionHash, SignedActionHashed>>();
-                let mut filtered_actions = Vec::new();
-                let mut maybe_next_action = action_hashmap.remove(end);
-                let mut i = 0;
-                while let Some(next_action) = maybe_next_action {
-                    maybe_next_action = next_action
-                        .hashed
-                        .content
-                        .header
-                        .prev_action
-                        .as_ref()
-                        .and_then(|prev_action| action_hashmap.remove(prev_action));
-                    filtered_actions.push(next_action.clone());
-
-                    // This comes after the push to make the range inclusive.
-                    if i == *n {
-                        break;
-                    }
-                    i += 1;
-                }
-                filtered_actions
-            }
-        }
-    }
-
-    /// Type/entry filtering for v2 [`SignedActionHashed`], used by
-    /// [`Self::filter_records`]. Mirrors [`Self::filter_actions`].
-    fn filter_signed_actions(&self, actions: Vec<SignedActionHashed>) -> Vec<SignedActionHashed> {
-        self.disambiguate_forks_v2(actions)
-            .into_iter()
-            .filter(|action| {
-                let data = &action.hashed.content.data;
-                self.action_type
-                    .as_ref()
-                    .map(|action_types| action_types.contains(&legacy_action_type(data)))
-                    .unwrap_or(true)
-                    && self
-                        .entry_type
-                        .as_ref()
-                        .map(|entry_types| {
-                            entry_type_of(data)
-                                .map(|entry_type| entry_types.contains(entry_type))
-                                .unwrap_or(false)
-                        })
-                        .unwrap_or(true)
-                    && self
-                        .entry_hashes
-                        .as_ref()
-                        .map(|entry_hashes| match data.entry_hash() {
-                            Some(entry_hash) => entry_hashes.contains(entry_hash),
-                            None => false,
-                        })
-                        .unwrap_or(true)
-            })
-            .collect()
+        self.filter_actions(records)
     }
 }
 
@@ -547,15 +439,6 @@ fn legacy_action_type(data: &ActionData) -> ActionType {
         ActionData::DeleteLink(_) => ActionType::DeleteLink,
         ActionData::CloseChain(_) => ActionType::CloseChain,
         ActionData::OpenChain(_) => ActionType::OpenChain,
-    }
-}
-
-/// The entry type referenced by a v2 [`ActionData`] variant, if any.
-fn entry_type_of(data: &ActionData) -> Option<&EntryType> {
-    match data {
-        ActionData::Create(d) => Some(&d.entry_type),
-        ActionData::Update(d) => Some(&d.entry_type),
-        _ => None,
     }
 }
 
@@ -626,9 +509,61 @@ mod tests {
     use holo_hash::fixt::EntryHashFixturator;
     use holo_hash::HasHash;
 
-    /// Create three Actions with various properties.
-    /// Also return the EntryTypes used to construct the first two actions.
-    fn fixtures() -> [ActionHashed; 7] {
+    /// Create v2 hashed actions with various properties. The v2 `Action`s are
+    /// built directly (header + `ActionData`), seeded from the per-variant
+    /// fixturators, so the content-derived hashes match the production
+    /// authoring path.
+    fn fixtures() -> [HoloHashed<Action>; 7] {
+        use crate::dht_v2::{ActionData, ActionHeader, CreateData, CreateLinkData, UpdateData};
+
+        fn create_to_v2(c: Create) -> Action {
+            Action {
+                header: ActionHeader {
+                    author: c.author,
+                    timestamp: c.timestamp,
+                    action_seq: c.action_seq,
+                    prev_action: Some(c.prev_action),
+                },
+                data: ActionData::Create(CreateData {
+                    entry_type: c.entry_type,
+                    entry_hash: c.entry_hash,
+                }),
+            }
+        }
+        fn update_to_v2(u: Update) -> Action {
+            Action {
+                header: ActionHeader {
+                    author: u.author,
+                    timestamp: u.timestamp,
+                    action_seq: u.action_seq,
+                    prev_action: Some(u.prev_action),
+                },
+                data: ActionData::Update(UpdateData {
+                    original_action_address: u.original_action_address,
+                    original_entry_address: u.original_entry_address,
+                    entry_type: u.entry_type,
+                    entry_hash: u.entry_hash,
+                }),
+            }
+        }
+        fn create_link_to_v2(cl: CreateLink) -> Action {
+            Action {
+                header: ActionHeader {
+                    author: cl.author,
+                    timestamp: cl.timestamp,
+                    action_seq: cl.action_seq,
+                    prev_action: Some(cl.prev_action),
+                },
+                data: ActionData::CreateLink(CreateLinkData {
+                    base_address: cl.base_address,
+                    target_address: cl.target_address,
+                    zome_index: cl.zome_index,
+                    link_type: cl.link_type,
+                    tag: cl.tag,
+                }),
+            }
+        }
+
         let entry_type_1 = EntryType::App(fixt!(AppEntryDef));
         let entry_type_2 = EntryType::AgentPubKey;
 
@@ -638,31 +573,31 @@ mod tests {
         h0.entry_type = entry_type_1.clone();
         h0.action_seq = 0;
         h0.entry_hash = entry_hash_0.clone();
-        let hh0 = ActionHashed::from_content_sync(h0);
+        let hh0: HoloHashed<Action> = HoloHashed::from_content_sync(create_to_v2(h0));
 
         let mut h1 = fixt!(Update);
         h1.entry_type = entry_type_2.clone();
         h1.action_seq = 1;
         h1.prev_action = hh0.as_hash().clone();
-        let hh1 = ActionHashed::from_content_sync(h1);
+        let hh1: HoloHashed<Action> = HoloHashed::from_content_sync(update_to_v2(h1));
 
         let mut h2 = fixt!(CreateLink);
         h2.action_seq = 2;
         h2.prev_action = hh1.as_hash().clone();
-        let hh2 = ActionHashed::from_content_sync(h2);
+        let hh2: HoloHashed<Action> = HoloHashed::from_content_sync(create_link_to_v2(h2));
 
         let mut h3 = fixt!(Create);
         h3.entry_type = entry_type_2.clone();
         h3.action_seq = 3;
         h3.prev_action = hh2.as_hash().clone();
-        let hh3 = ActionHashed::from_content_sync(h3);
+        let hh3: HoloHashed<Action> = HoloHashed::from_content_sync(create_to_v2(h3));
 
         // Cheeky forker!
         let mut h3a = fixt!(Create);
         h3a.entry_type = entry_type_1.clone();
         h3a.action_seq = 3;
         h3a.prev_action = hh2.as_hash().clone();
-        let hh3a = ActionHashed::from_content_sync(h3a);
+        let hh3a: HoloHashed<Action> = HoloHashed::from_content_sync(create_to_v2(h3a));
 
         let mut h4 = fixt!(Update);
         h4.entry_type = entry_type_1.clone();
@@ -670,17 +605,17 @@ mod tests {
         h4.entry_hash = entry_hash_0;
         h4.action_seq = 4;
         h4.prev_action = hh3.as_hash().clone();
-        let hh4 = ActionHashed::from_content_sync(h4);
+        let hh4: HoloHashed<Action> = HoloHashed::from_content_sync(update_to_v2(h4));
 
         let mut h5 = fixt!(CreateLink);
         h5.action_seq = 5;
         h5.prev_action = hh4.as_hash().clone();
-        let hh5 = ActionHashed::from_content_sync(h5);
+        let hh5: HoloHashed<Action> = HoloHashed::from_content_sync(create_link_to_v2(h5));
 
         [hh0, hh1, hh2, hh3, hh3a, hh4, hh5]
     }
 
-    fn map_query(query: &ChainQueryFilter, actions: &[ActionHashed]) -> Vec<bool> {
+    fn map_query(query: &ChainQueryFilter, actions: &[HoloHashed<Action>]) -> Vec<bool> {
         let filtered = query.filter_actions(actions.to_vec());
         actions
             .iter()
@@ -731,9 +666,11 @@ mod tests {
     fn filter_by_action_type() {
         let actions = fixtures();
 
-        let query_1 = ChainQueryFilter::new().action_type(actions[0].action_type());
-        let query_2 = ChainQueryFilter::new().action_type(actions[1].action_type());
-        let query_3 = ChainQueryFilter::new().action_type(actions[2].action_type());
+        // `ChainQueryFilter` filters against the legacy per-variant
+        // `ActionType`; the fixtures are Create (0), Update (1) and CreateLink (2).
+        let query_1 = ChainQueryFilter::new().action_type(ActionType::Create);
+        let query_2 = ChainQueryFilter::new().action_type(ActionType::Update);
+        let query_3 = ChainQueryFilter::new().action_type(ActionType::CreateLink);
 
         assert_eq!(
             map_query(&query_1, &actions),
@@ -836,7 +773,7 @@ mod tests {
         assert_eq!(
             map_query(
                 &ChainQueryFilter::new()
-                    .action_type(actions[0].action_type())
+                    .action_type(ActionType::Create)
                     .entry_type(actions[0].entry_type().unwrap().clone())
                     .sequence_range(ChainQueryFilterRange::ActionSeqRange(0, 0)),
                 &actions
@@ -847,7 +784,7 @@ mod tests {
         assert_eq!(
             map_query(
                 &ChainQueryFilter::new()
-                    .action_type(actions[1].action_type())
+                    .action_type(ActionType::Update)
                     .entry_type(actions[0].entry_type().unwrap().clone())
                     .sequence_range(ChainQueryFilterRange::ActionSeqRange(0, 999)),
                 &actions
@@ -874,8 +811,8 @@ mod tests {
         assert_eq!(
             map_query(
                 &ChainQueryFilter::new()
-                    .action_type(actions[0].action_type())
-                    .action_type(actions[1].action_type()),
+                    .action_type(ActionType::Create)
+                    .action_type(ActionType::Update),
                 &actions
             ),
             [true, true, false, true, true, true, false].to_vec()
@@ -884,7 +821,7 @@ mod tests {
         // Filter for create actions only
         assert_eq!(
             map_query(
-                &ChainQueryFilter::new().action_type(actions[0].action_type()),
+                &ChainQueryFilter::new().action_type(ActionType::Create),
                 &actions
             ),
             [true, false, false, true, true, false, false].to_vec()

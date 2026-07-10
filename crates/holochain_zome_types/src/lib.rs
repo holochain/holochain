@@ -72,7 +72,7 @@ pub mod fixt;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 
-pub use action::Action;
+pub use dht_v2::Action;
 pub use entry::Entry;
 
 /// Re-exported dependencies

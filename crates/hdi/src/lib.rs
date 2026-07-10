@@ -25,7 +25,7 @@
 //! - entry type definitions
 //! - link type definitions
 //! - a validation callback that constrains the kinds of data that can validly be called entries
-//!   and links of those types (see also [`Op`](crate::prelude::holochain_integrity_types::Op)).
+//!   and links of those types (see also [`Op`](crate::prelude::Op)).
 //!
 //! **The coordination zomes comprise the application's controller layer** — the code that actually
 //! writes and retrieves data, handles countersigning sessions and sends and receives messages

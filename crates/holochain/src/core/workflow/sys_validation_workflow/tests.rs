@@ -12,11 +12,10 @@ use {
     crate::core::workflow::sys_validation_workflow::types::Outcome, ::fixt::fixt,
     holochain_zome_types::fixt::EntryFixturator, std::convert::TryInto,
 };
-// The ops constructed by hand in this module are built from legacy per-variant
-// `Action` fixtures (`fixt!(Create)`, `fixt!(Dna)`, ...) and projected to v2 via
-// `from_legacy_action`, so `Action` (otherwise the v2 struct via the ambient
-// preludes) is pinned to the legacy shape here.
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
+// The ops constructed by hand in this module seed the legacy per-variant action
+// structs (`fixt!(Create)`, `fixt!(Dna)`, ...) and project each to the v2
+// `Action` (header + `ActionData`) via the shared `ToV2Action` helper.
+use super::validate_op_tests::ToV2Action;
 use holochain_zome_types::dht_v2::SignedAction;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -50,10 +49,7 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
     let mut mismatched_action = fixt!(Create);
     mismatched_action.author = bob_pubkey.clone();
     let op: DhtOp = ChainOp::CreateEntry(
-        SignedAction::new(
-            from_legacy_action(&Action::Create(mismatched_action)),
-            fixt!(Signature),
-        ),
+        SignedAction::new(mismatched_action.to_v2(), fixt!(Signature)),
         OpEntry::Present(fixt!(Entry)),
     )
     .into();
@@ -129,10 +125,10 @@ async fn sys_validation_produces_forked_chain_warrant() {
     // Create Alice's genesis action (Dna action at seq 0)
     let mut dna_action = fixt!(Dna);
     dna_action.author = alice_pubkey.clone();
-    let dna_action = Action::Dna(dna_action);
+    let dna_action = dna_action.to_v2();
     let signed_dna_action = SignedActionHashed::sign(
         &keystore,
-        holo_hash::HoloHashed::from_content_sync(from_legacy_action(&dna_action)),
+        holo_hash::HoloHashed::from_content_sync(dna_action),
     )
     .await
     .unwrap();
@@ -164,18 +160,18 @@ async fn sys_validation_produces_forked_chain_warrant() {
     });
     forked_create.entry_hash = forked_entry.to_hash();
 
-    let original_action = Action::Create(original_create);
-    let forked_action = Action::Create(forked_create);
+    let original_action = original_create.to_v2();
+    let forked_action = forked_create.to_v2();
 
     let signed_original = SignedActionHashed::sign(
         &keystore,
-        holo_hash::HoloHashed::from_content_sync(from_legacy_action(&original_action)),
+        holo_hash::HoloHashed::from_content_sync(original_action),
     )
     .await
     .unwrap();
     let signed_forked = SignedActionHashed::sign(
         &keystore,
-        holo_hash::HoloHashed::from_content_sync(from_legacy_action(&forked_action)),
+        holo_hash::HoloHashed::from_content_sync(forked_action),
     )
     .await
     .unwrap();
@@ -302,10 +298,10 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
     // Create Alice's genesis action (Dna action at seq 0)
     let mut dna_action = fixt!(Dna);
     dna_action.author = alice_pubkey.clone();
-    let dna_action = Action::Dna(dna_action);
+    let dna_action = dna_action.to_v2();
     let signed_dna_action = SignedActionHashed::sign(
         &keystore,
-        holo_hash::HoloHashed::from_content_sync(from_legacy_action(&dna_action)),
+        holo_hash::HoloHashed::from_content_sync(dna_action),
     )
     .await
     .unwrap();
@@ -337,21 +333,17 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
     });
     create2.entry_hash = entry2.to_hash();
 
-    let action1 = Action::Create(create1);
-    let action2 = Action::Create(create2);
+    let action1 = create1.to_v2();
+    let action2 = create2.to_v2();
 
-    let signed_action1 = SignedActionHashed::sign(
-        &keystore,
-        holo_hash::HoloHashed::from_content_sync(from_legacy_action(&action1)),
-    )
-    .await
-    .unwrap();
-    let signed_action2 = SignedActionHashed::sign(
-        &keystore,
-        holo_hash::HoloHashed::from_content_sync(from_legacy_action(&action2)),
-    )
-    .await
-    .unwrap();
+    let signed_action1 =
+        SignedActionHashed::sign(&keystore, holo_hash::HoloHashed::from_content_sync(action1))
+            .await
+            .unwrap();
+    let signed_action2 =
+        SignedActionHashed::sign(&keystore, holo_hash::HoloHashed::from_content_sync(action2))
+            .await
+            .unwrap();
 
     let action1_hash = signed_action1.as_hash().clone();
     let action2_hash = signed_action2.as_hash().clone();

@@ -17,14 +17,8 @@ pub use holochain_state::source_chain::SourceChainResult;
 use holochain_types::dht_v2::{ChainOp, DhtOp, OpEntry};
 use holochain_types::prelude::*;
 use holochain_zome_types::dht_v2::{
-    from_legacy_action, ActionData, CreateData, DnaData, SignedAction, UpdateData,
+    build_action_set, ActionData, CreateData, DnaData, SignedAction, UpdateData,
 };
-// Signature verification and the countersigning action-set check operate on
-// the legacy action representation: every signature in the system is over
-// the legacy serialized bytes, which differ from the v2 projection, and the
-// v2 -> legacy conversion is lossy on weight, so it cannot reconstruct the
-// signed bytes. `LegacyAction` pins those code paths.
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
 use std::sync::Arc;
 
 mod error;
@@ -45,19 +39,13 @@ pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Verify the signature for this action.
 ///
-/// Signatures are computed and checked over the v2 `Action` projection:
-/// this projects `action` to v2 internally and verifies `sig` against those
-/// bytes, regardless of which representation the caller holds `action` in.
-pub async fn verify_action_signature(
-    sig: &Signature,
-    action: &LegacyAction,
-) -> SysValidationResult<()> {
-    let v2 = from_legacy_action(action);
-    if v2.signer().verify_signature(sig, &v2).await? {
+/// Signatures are computed and checked over the v2 `Action` bytes.
+pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysValidationResult<()> {
+    if action.signer().verify_signature(sig, action).await? {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::CounterfeitAction((*sig).clone(), Box::new(v2)),
+            ValidationOutcome::CounterfeitAction((*sig).clone(), Box::new(action.clone())),
         ))
     }
 }
@@ -85,37 +73,20 @@ pub async fn verify_warrant_signature(
 }
 
 /// Verify the countersigning session contains the specified action.
-///
-/// Countersigning session actions are built with `EntryRateWeight` (a legacy
-/// concept the v2 model discards), so this stays on the legacy
-/// representation throughout.
 pub fn check_countersigning_session_data_contains_action(
     entry_hash: EntryHash,
     session_data: &CounterSigningSessionData,
-    action: NewEntryActionRef<'_>,
+    action: &Action,
 ) -> SysValidationResult<()> {
-    let weight = match action {
-        NewEntryActionRef::Create(h) => h.weight.clone(),
-        NewEntryActionRef::Update(h) => h.weight.clone(),
-    };
-    let action_is_in_session = session_data
-        .build_action_set(entry_hash, weight)
+    let action_is_in_session = build_action_set(session_data, entry_hash)
         .map_err(SysValidationError::from)?
         .iter()
-        .any(|session_action| match (&action, session_action) {
-            (NewEntryActionRef::Create(create), LegacyAction::Create(session_create)) => {
-                create == &session_create
-            }
-            (NewEntryActionRef::Update(update), LegacyAction::Update(session_update)) => {
-                update == &session_update
-            }
-            _ => false,
-        });
+        .any(|session_action| session_action == action);
     if !action_is_in_session {
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::ActionNotInCounterSigningSession(
                 Box::new(session_data.to_owned()),
-                Box::new(action.to_new_entry_action()),
+                Box::new(action.clone()),
             ),
         ))
     } else {
@@ -164,7 +135,7 @@ pub async fn check_countersigning_preflight_response_signature(
 pub async fn check_countersigning_session_data(
     entry_hash: EntryHash,
     session_data: &CounterSigningSessionData,
-    action: NewEntryActionRef<'_>,
+    action: &Action,
 ) -> SysValidationResult<()> {
     session_data.check_integrity()?;
     check_countersigning_session_data_contains_action(entry_hash, session_data, action)?;

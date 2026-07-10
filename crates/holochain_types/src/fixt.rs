@@ -76,6 +76,41 @@ fn new_entry_record(entry: Entry, action_type: ActionType, index: usize) -> Reco
     }
 }
 
+/// Project a legacy [`NewEntryAction`] (a `Create` or `Update` struct) onto the
+/// v2 [`Action`] shape, building [`ActionData`] directly. Seeds fixtures only;
+/// production authoring builds v2 actions natively.
+fn new_entry_action_to_v2(new_entry_action: NewEntryAction) -> Action {
+    use holochain_zome_types::dht_v2::{ActionHeader, CreateData, UpdateData};
+    match new_entry_action {
+        NewEntryAction::Create(c) => Action {
+            header: ActionHeader {
+                author: c.author,
+                timestamp: c.timestamp,
+                action_seq: c.action_seq,
+                prev_action: Some(c.prev_action),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: c.entry_type,
+                entry_hash: c.entry_hash,
+            }),
+        },
+        NewEntryAction::Update(u) => Action {
+            header: ActionHeader {
+                author: u.author,
+                timestamp: u.timestamp,
+                action_seq: u.action_seq,
+                prev_action: Some(u.prev_action),
+            },
+            data: ActionData::Update(UpdateData {
+                original_action_address: u.original_action_address,
+                original_entry_address: u.original_entry_address,
+                entry_type: u.entry_type,
+                entry_hash: u.entry_hash,
+            }),
+        },
+    }
+}
+
 type NewEntryRecord = (Entry, ActionType);
 
 // NB: Record is defined in holochain_zome_types, but I don't know if it's possible to define
@@ -86,7 +121,7 @@ fixturator!(
     vanilla fn record_with_no_entry(Signature, Action);
     curve NewEntryAction {
         let s = SignatureFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        record_with_no_entry(s, crate::dht_v2::from_legacy_action(&get_fixt_curve!().into()))
+        record_with_no_entry(s, new_entry_action_to_v2(get_fixt_curve!()))
     };
     curve Entry {
         let et = match get_fixt_curve!() {

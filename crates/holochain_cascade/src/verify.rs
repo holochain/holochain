@@ -113,18 +113,17 @@ pub(crate) async fn verify_activity_signatures(
 ) -> (Vec<RegisterAgentActivity>, Vec<WarrantOp>) {
     let mut verified_activity = Vec::with_capacity(activity.len());
     for ra in activity {
-        // `ra.action` is legacy; project to v2 and verify over those bytes,
-        // the same bytes the action was signed over.
-        let action = holochain_types::dht_v2::from_legacy_action(ra.action.action());
-        match action
+        // Verify over the v2 signed action — the same v2 bytes it was signed over.
+        let action = &ra.action.hashed.content;
+        let verified = action
             .signer()
-            .verify_signature(ra.action.signature(), &action)
-            .await
-        {
+            .verify_signature(ra.action.signature(), action)
+            .await;
+        match verified {
             Ok(true) => verified_activity.push(ra),
             Ok(false) => {
                 tracing::warn!(
-                    signer = ?action.signer(),
+                    signer = ?ra.action.hashed.content.signer(),
                     "Activity record signature failed verification; dropping"
                 );
             }

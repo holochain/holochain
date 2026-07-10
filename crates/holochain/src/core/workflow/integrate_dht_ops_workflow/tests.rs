@@ -8,10 +8,27 @@ use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::SysOutcome;
 use holochain_state::test_utils::test_dht_store;
 use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
-use holochain_zome_types::dht_v2::from_legacy_action;
+use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
+    Action, ActionData, ActionHeader, CreateData,
+};
 use kitsune2_api::StoredOp;
 use std::sync::Arc;
+
+/// Project a fixturated legacy `Create` struct into a v2 `Action`.
+fn v2_create(c: Create) -> Action {
+    Action {
+        header: ActionHeader {
+            author: c.author,
+            timestamp: c.timestamp,
+            action_seq: c.action_seq,
+            prev_action: Some(c.prev_action),
+        },
+        data: ActionData::Create(CreateData {
+            entry_type: c.entry_type,
+            entry_hash: c.entry_hash,
+        }),
+    }
+}
 
 // TESTS BEGIN HERE
 
@@ -161,7 +178,7 @@ fn make_store_entry_op(author: AgentPubKey) -> (DhtOp, DhtOpHashed) {
     let mut action = fixt!(Create);
     action.author = author;
     action.entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-    let v2_action = from_legacy_action(&LegacyAction::Create(action));
+    let v2_action = v2_create(action);
     let signed = SignedAction::new(v2_action, fixt!(Signature));
     let op: DhtOp = ChainOp::CreateEntry(signed, OpEntry::Present(entry)).into();
     let hashed = DhtOpHashed::from_content_sync(op.clone());
@@ -177,7 +194,7 @@ fn make_store_record_op_pair() -> (DhtOp, DhtOpHashed) {
     let mut action = fixt!(Create);
     action.author = fixt!(AgentPubKey);
     action.entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-    let v2_action = from_legacy_action(&LegacyAction::Create(action));
+    let v2_action = v2_create(action);
     let signed = SignedAction::new(v2_action, fixt!(Signature));
     let op: DhtOp = ChainOp::CreateRecord(signed, OpEntry::Present(entry)).into();
     let hashed = DhtOpHashed::from_content_sync(op.clone());

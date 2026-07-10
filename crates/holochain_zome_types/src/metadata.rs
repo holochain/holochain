@@ -1,5 +1,5 @@
 //! Metadata types for use in wasm
-use crate::record::Record;
+use crate::dht_v2::Record;
 use crate::record::SignedActionHashed;
 use crate::validate::ValidationStatus;
 use crate::Entry;

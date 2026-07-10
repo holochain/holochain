@@ -4,15 +4,9 @@ use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
 pub use error::*;
-// The query-read overlay machinery in `query.rs` still consumes the legacy
-// per-variant `Record`. This explicit import shadows the v2 re-export pulled
-// in via `crate::prelude::*` so the rest of this module keeps resolving
-// `Record` to its legacy shape.
 // Authoring and op production are v2-native throughout: actions are built
 // directly (via `v2::build_action` and friends), staged in the (v2) scratch,
-// and turned into ops via `v2::produce_ops_from_record` — no legacy
-// conversion is on this path. The legacy per-variant `Action` enum is only
-// needed by the test module's fixtures, so that import is test-gated.
+// and turned into ops via `v2::produce_ops_from_record`.
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
@@ -25,9 +19,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_state_types::SourceChainDump;
 use holochain_types::dht_v2 as v2;
 use holochain_types::prelude::SignedActionHashedExt;
-#[cfg(test)]
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
-use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
 use kitsune2_api::DhtArc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -1155,7 +1146,8 @@ pub async fn genesis(
     Ok(())
 }
 
-pub type CurrentCountersigningSessionOpt = Option<(Record, EntryHash, CounterSigningSessionData)>;
+pub type CurrentCountersigningSessionOpt =
+    Option<(v2::Record, EntryHash, CounterSigningSessionData)>;
 
 /// Dump the entire source chain from the DhtStore.
 ///
@@ -2161,19 +2153,21 @@ mod tests {
             let entry = Entry::App(fixt!(AppEntryBytes));
             let entry_hashed = EntryHashed::from_content_sync(entry);
 
-            let action = Action::Create(Create {
-                author: alice.clone(),
-                timestamp: Timestamp::now(),
-                action_seq: chain_top.seq + 1,
-                prev_action: chain_top.action.as_hash().clone(),
-                entry_type: app_entry_type.clone(),
-                entry_hash: entry_hashed.hash.clone(),
-                weight: EntryRateWeight::default(),
-            });
-            let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+            let v2_action = v2::Action {
+                header: v2::ActionHeader {
+                    author: alice.clone(),
+                    timestamp: Timestamp::now(),
+                    action_seq: chain_top.seq + 1,
+                    prev_action: Some(chain_top.action.as_hash().clone()),
+                },
+                data: v2::ActionData::Create(v2::CreateData {
+                    entry_type: app_entry_type.clone(),
+                    entry_hash: entry_hashed.hash.clone(),
+                }),
+            };
             let sig = alice.sign(&keystore, &v2_action).await.unwrap();
             let signed_action = v2::SignedActionHashed::with_presigned(
-                HoloHashed::from_content_sync(v2_action),
+                HoloHashed::from_content_sync(v2_action.clone()),
                 sig,
             );
 
@@ -2186,7 +2180,7 @@ mod tests {
                 .unwrap();
             chain.flush(vec![DhtArc::Empty]).await.unwrap();
 
-            action
+            v2_action
         };
 
         // Add an app entry to the scratch space
@@ -2196,18 +2190,20 @@ mod tests {
             let entry = Entry::App(fixt!(AppEntryBytes));
             let entry_hashed = EntryHashed::from_content_sync(entry);
 
-            let action = Action::Update(Update {
-                author: alice.clone(),
-                timestamp: Timestamp::now(),
-                action_seq: chain_top.seq + 2,
-                prev_action: create_action.to_hash(),
-                original_action_address: create_action.to_hash(),
-                original_entry_address: create_action.entry_hash().unwrap().clone(),
-                entry_type: app_entry_type.clone(),
-                entry_hash: entry_hashed.hash.clone(),
-                weight: EntryRateWeight::default(),
-            });
-            let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+            let v2_action = v2::Action {
+                header: v2::ActionHeader {
+                    author: alice.clone(),
+                    timestamp: Timestamp::now(),
+                    action_seq: chain_top.seq + 2,
+                    prev_action: Some(create_action.to_hash()),
+                },
+                data: v2::ActionData::Update(v2::UpdateData {
+                    original_action_address: create_action.to_hash(),
+                    original_entry_address: create_action.entry_hash().unwrap().clone(),
+                    entry_type: app_entry_type.clone(),
+                    entry_hash: entry_hashed.hash.clone(),
+                }),
+            };
             let sig = alice.sign(&keystore, &v2_action).await.unwrap();
             let signed_action = v2::SignedActionHashed::with_presigned(
                 HoloHashed::from_content_sync(v2_action),
@@ -2335,16 +2331,18 @@ mod tests {
         // Commit a Create with a PRIVATE entry to the DhtStore via flush.
         let chain_top = chain.chain_head_nonempty().unwrap();
         let private_entry_hashed = EntryHashed::from_content_sync(Entry::App(fixt!(AppEntryBytes)));
-        let private_create = Action::Create(Create {
-            author: alice.clone(),
-            timestamp: Timestamp::now(),
-            action_seq: chain_top.seq + 1,
-            prev_action: chain_top.action.as_hash().clone(),
-            entry_type: private_entry_type.clone(),
-            entry_hash: private_entry_hashed.hash.clone(),
-            weight: EntryRateWeight::default(),
-        });
-        let v2_private_create = holochain_zome_types::dht_v2::from_legacy_action(&private_create);
+        let v2_private_create = v2::Action {
+            header: v2::ActionHeader {
+                author: alice.clone(),
+                timestamp: Timestamp::now(),
+                action_seq: chain_top.seq + 1,
+                prev_action: Some(chain_top.action.as_hash().clone()),
+            },
+            data: v2::ActionData::Create(v2::CreateData {
+                entry_type: private_entry_type.clone(),
+                entry_hash: private_entry_hashed.hash.clone(),
+            }),
+        };
         let sig = alice.sign(&keystore, &v2_private_create).await.unwrap();
         let private_sah = v2::SignedActionHashed::with_presigned(
             HoloHashed::from_content_sync(v2_private_create),
@@ -2366,16 +2364,18 @@ mod tests {
         // Add an uncommitted public Create to the scratch.
         let chain_top = chain.chain_head_nonempty().unwrap();
         let public_entry_hashed = EntryHashed::from_content_sync(Entry::App(fixt!(AppEntryBytes)));
-        let public_create = Action::Create(Create {
-            author: alice.clone(),
-            timestamp: Timestamp::now(),
-            action_seq: chain_top.seq + 1,
-            prev_action: chain_top.action.as_hash().clone(),
-            entry_type: public_entry_type.clone(),
-            entry_hash: public_entry_hashed.hash.clone(),
-            weight: EntryRateWeight::default(),
-        });
-        let v2_public_create = holochain_zome_types::dht_v2::from_legacy_action(&public_create);
+        let v2_public_create = v2::Action {
+            header: v2::ActionHeader {
+                author: alice.clone(),
+                timestamp: Timestamp::now(),
+                action_seq: chain_top.seq + 1,
+                prev_action: Some(chain_top.action.as_hash().clone()),
+            },
+            data: v2::ActionData::Create(v2::CreateData {
+                entry_type: public_entry_type.clone(),
+                entry_hash: public_entry_hashed.hash.clone(),
+            }),
+        };
         let sig = alice.sign(&keystore, &v2_public_create).await.unwrap();
         let public_sah = v2::SignedActionHashed::with_presigned(
             HoloHashed::from_content_sync(v2_public_create),

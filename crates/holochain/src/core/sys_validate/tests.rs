@@ -44,15 +44,28 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::test_utils::valid_arbitrary_chain;
 use holochain_types::test_utils::ActionRefMut;
-// This module builds legacy per-variant actions directly (fixtures like
-// `fixt!(Create)`), so `Action` is pinned to the legacy per-variant enum for
-// this whole file. The production checks under test (`check_new_entry_action`,
-// etc.) and the `DhtOpSender` trait (`send_store_record`/`send_store_entry`)
-// take the v2 `Action`/`Record`, so actions are projected via
-// `from_legacy_action(&action)` at those call sites.
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
+// This module seeds the legacy per-variant `Create`/`CreateLink` action structs
+// (fixtures like `fixt!(Create)`) and projects each onto the v2 `Action`
+// (header + `ActionData`) that the checks under test consume.
+use holochain_zome_types::dht_v2::{Action, ActionData, ActionHeader, CreateData, CreateLinkData};
 use matches::assert_matches;
 use std::time::Duration;
+
+/// Project a legacy `Create` struct onto its v2 [`Action`] shape.
+fn create_to_v2(c: &Create) -> Action {
+    Action {
+        header: ActionHeader {
+            author: c.author.clone(),
+            timestamp: c.timestamp,
+            action_seq: c.action_seq,
+            prev_action: Some(c.prev_action.clone()),
+        },
+        data: ActionData::Create(CreateData {
+            entry_type: c.entry_type.clone(),
+            entry_hash: c.entry_hash.clone(),
+        }),
+    }
+}
 
 /// Entry type in the action matches the entry variant
 #[test]
@@ -95,10 +108,10 @@ fn check_entry_hash_test() {
         vec![1, 3, 5],
     ))));
     let hash = EntryHash::with_data_sync(&entry);
-    let action: Action = ec.clone().into();
+    let action = create_to_v2(&ec);
 
     // First check it should have an entry
-    assert_matches!(check_new_entry_action(&from_legacy_action(&action)), Ok(()));
+    assert_matches!(check_new_entry_action(&action), Ok(()));
     // Safe to unwrap if new entry
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(
@@ -109,23 +122,27 @@ fn check_entry_hash_test() {
     );
 
     ec.entry_hash = hash;
-    let action: Action = ec.clone().into();
+    let action = create_to_v2(&ec);
 
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(check_entry_hash(eh, &entry), Ok(()));
-    assert_matches!(
-        check_new_entry_action(&from_legacy_action(&Action::CreateLink(CreateLink {
+    let create_link = Action {
+        header: ActionHeader {
             author: fixt!(AgentPubKey),
             timestamp: Timestamp::now(),
             action_seq: 8,
-            prev_action: fixt!(ActionHash),
+            prev_action: Some(fixt!(ActionHash)),
+        },
+        data: ActionData::CreateLink(CreateLinkData {
             base_address: fixt!(EntryHash).into(),
             target_address: fixt!(EntryHash).into(),
             zome_index: 0.into(),
             link_type: LinkType::new(3),
             tag: ().into(),
-            weight: RateWeight::default(),
-        }))),
+        }),
+    };
+    assert_matches!(
+        check_new_entry_action(&create_link),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::NotNewEntry(_)
         ))
@@ -155,8 +172,7 @@ async fn incoming_ops_filters_private_entry() {
         entry_hash: EntryHash::with_data_sync(&private_entry),
         weight: EntryRateWeight::default(),
     };
-    let action = Action::Create(create);
-    let v2_action = from_legacy_action(&action);
+    let v2_action = create_to_v2(&create);
     let signature = author.sign(&keystore, &v2_action).await.unwrap();
 
     // `send_store_entry`/`send_store_record` (below) take the v2 `Record`, so
@@ -192,21 +208,24 @@ fn create_entry_op_rejects_private_entry() {
     use holochain_types::dht_v2::OpEntry;
     use holochain_types::dht_v2::SignedAction;
 
-    let private_create = Action::Create(Create {
-        author: fixt!(AgentPubKey),
-        timestamp: Timestamp::now(),
-        action_seq: 5,
-        prev_action: fixt!(ActionHash),
-        entry_type: EntryType::App(AppEntryDef::new(
-            0.into(),
-            0.into(),
-            EntryVisibility::Private,
-        )),
-        entry_hash: fixt!(EntryHash),
-        weight: EntryRateWeight::default(),
-    });
+    let private_create = Action {
+        header: ActionHeader {
+            author: fixt!(AgentPubKey),
+            timestamp: Timestamp::now(),
+            action_seq: 5,
+            prev_action: Some(fixt!(ActionHash)),
+        },
+        data: ActionData::Create(CreateData {
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Private,
+            )),
+            entry_hash: fixt!(EntryHash),
+        }),
+    };
     let sa = SignedAction::new(
-        from_legacy_action(&private_create),
+        private_create,
         holochain_zome_types::signature::Signature::from([0u8; 64]),
     );
 

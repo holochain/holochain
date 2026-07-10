@@ -4,11 +4,7 @@ use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use holochain_types::prelude::Signature;
 use holochain_types::wire_ops::{RenderedOp, RenderedOps};
 // This test module seeds the op-cache/limbo pipeline directly with v2
-// `ChainOp`/`DhtOp`; pin `Action` to its v2 shape. The handful of fixture
-// builders that still feed `RenderedOp`/`RenderedOps` (the cascade/cache
-// wire-rendering layer, which this op-pipeline swap doesn't touch) locally
-// shadow this with the legacy `Action` shape they project through
-// `from_legacy_action`.
+// `ChainOp`/`DhtOp`, building v2 actions (header + `ActionData`) directly.
 use holochain_zome_types::dht_v2::{
     Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
     SignedAction, UpdateData,
@@ -1277,32 +1273,30 @@ fn build_rendered_store_record_for_move(seed: u8) -> (RenderedOps, holo_hash::Ac
     use holo_hash::{ActionHash, EntryHash};
     use holochain_serialized_bytes::UnsafeBytes;
     use holochain_types::prelude::{AppEntryBytes, Entry, EntryHashed};
-    // `RenderedOp::new` projects a legacy action through `from_legacy_action`
-    // below; pin `Action`/`Create` to their legacy shape for that build.
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::{Action, Create};
-
     let author = AgentPubKey::from_raw_36(vec![seed; 36]);
     let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
     let entry = Entry::App(AppEntryBytes(
         holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
     ));
     let sig = Signature::from([seed; 64]);
-    let action = Action::Create(Create {
-        author,
-        timestamp: Timestamp::from_micros(seed as i64 * 1000),
-        action_seq: 1,
-        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-        entry_type: EntryType::App(AppEntryDef::new(
-            0.into(),
-            0.into(),
-            EntryVisibility::Public,
-        )),
-        entry_hash: entry_hash.clone(),
-        weight: Default::default(),
-    });
+    // `RenderedOp::new` takes the wire's v2 action; build it directly.
+    let v2_action = Action {
+        header: ActionHeader {
+            author,
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 1,
+            prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36])),
+        },
+        data: ActionData::Create(CreateData {
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: entry_hash.clone(),
+        }),
+    };
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash);
-    // `RenderedOp::new` takes the wire's v2 action.
-    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
     let rendered =
         RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord).expect("rendered op build");
     let action_hash = rendered.action.as_hash().clone();
@@ -1646,33 +1640,31 @@ fn build_rendered_store_entry(
     use holo_hash::{ActionHash, EntryHash};
     use holochain_serialized_bytes::UnsafeBytes;
     use holochain_types::prelude::{AppEntryBytes, Entry, EntryHashed};
-    // `RenderedOp::new` projects a legacy action through `from_legacy_action`
-    // below; pin `Action`/`Create` to their legacy shape for that build.
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::{Action, Create};
-
     let author = AgentPubKey::from_raw_36(vec![seed; 36]);
     let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
     let entry = Entry::App(AppEntryBytes(
         holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
     ));
     let sig = Signature::from([seed; 64]);
-    let action = Action::Create(Create {
-        author,
-        timestamp: Timestamp::from_micros(seed as i64 * 1000),
-        action_seq: 1,
-        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-        entry_type: EntryType::App(AppEntryDef::new(
-            0.into(),
-            0.into(),
-            EntryVisibility::Public,
-        )),
-        entry_hash: entry_hash.clone(),
-        weight: Default::default(),
-    });
-    let action_hash = holo_hash::ActionHash::with_data_sync(&action);
+    // `RenderedOp::new` takes the wire's v2 action; build it directly.
+    let v2_action = Action {
+        header: ActionHeader {
+            author,
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 1,
+            prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36])),
+        },
+        data: ActionData::Create(CreateData {
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: entry_hash.clone(),
+        }),
+    };
+    let action_hash = holo_hash::ActionHash::with_data_sync(&v2_action);
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash.clone());
-    // `RenderedOp::new` takes the wire's v2 action.
-    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
     let rendered =
         RenderedOp::new(v2_action, sig, None, ChainOpType::StoreEntry).expect("rendered op");
     let ops = RenderedOps {
@@ -1760,33 +1752,31 @@ fn build_rendered_store_record_ops(
     use holo_hash::{ActionHash, EntryHash};
     use holochain_serialized_bytes::UnsafeBytes;
     use holochain_types::prelude::{AppEntryBytes, Entry, EntryHashed};
-    // `RenderedOp::new` projects a legacy action through `from_legacy_action`
-    // below; pin `Action`/`Create` to their legacy shape for that build.
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::{Action, Create};
-
     let author = AgentPubKey::from_raw_36(vec![seed; 36]);
     let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
     let entry = Entry::App(AppEntryBytes(
         holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
     ));
     let sig = Signature::from([seed; 64]);
-    let action = Action::Create(Create {
-        author,
-        timestamp: Timestamp::from_micros(seed as i64 * 1000),
-        action_seq: 1,
-        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-        entry_type: EntryType::App(AppEntryDef::new(
-            0.into(),
-            0.into(),
-            EntryVisibility::Public,
-        )),
-        entry_hash: entry_hash.clone(),
-        weight: Default::default(),
-    });
-    let action_hash = holo_hash::ActionHash::with_data_sync(&action);
+    // `RenderedOp::new` takes the wire's v2 action; build it directly.
+    let v2_action = Action {
+        header: ActionHeader {
+            author,
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 1,
+            prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36])),
+        },
+        data: ActionData::Create(CreateData {
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: entry_hash.clone(),
+        }),
+    };
+    let action_hash = holo_hash::ActionHash::with_data_sync(&v2_action);
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash.clone());
-    // `RenderedOp::new` takes the wire's v2 action.
-    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
     let rendered =
         RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord).expect("rendered op");
     let ops = RenderedOps {
@@ -2003,12 +1993,6 @@ async fn get_record_details_assembles_record_deletes_and_updates() {
 /// The fixture mirrors `cache.rs`'s `build_rendered_create_link` but exposes
 /// the base and the create-link action hash.
 fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHash, ActionHash) {
-    // `RenderedOp::new` projects a legacy action through `from_legacy_action`
-    // below; pin `Action`/`CreateLink` to their legacy shape for that build.
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::{
-        Action, CreateLink,
-    };
-
     let author = AgentPubKey::from_raw_36(vec![seed; 36]);
     let base = AnyLinkableHash::from_raw_36_and_type(
         vec![seed.wrapping_add(50); 36],
@@ -2019,21 +2003,22 @@ fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHa
         holo_hash::hash_type::AnyLinkable::Entry,
     );
     let sig = Signature::from([seed; 64]);
-    let action = Action::CreateLink(CreateLink {
-        author,
-        timestamp: Timestamp::from_micros(seed as i64 * 1000),
-        action_seq: 2,
-        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(70); 36]),
-        base_address: base.clone(),
-        target_address: target,
-        zome_index: 0.into(),
-        link_type: 0.into(),
-        tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
-        weight: Default::default(),
-    });
-
-    // `RenderedOp::new` takes the wire's v2 action.
-    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+    // `RenderedOp::new` takes the wire's v2 action; build it directly.
+    let v2_action = Action {
+        header: ActionHeader {
+            author,
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 2,
+            prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(70); 36])),
+        },
+        data: ActionData::CreateLink(CreateLinkData {
+            base_address: base.clone(),
+            target_address: target,
+            zome_index: 0.into(),
+            link_type: 0.into(),
+            tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
+        }),
+    };
     let rendered =
         RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterAddLink).expect("rendered op");
     let create_link_hash = rendered.action.as_hash().clone();
@@ -2052,24 +2037,21 @@ fn build_rendered_delete_link_for(
     base: &AnyLinkableHash,
     seed: u8,
 ) -> RenderedOps {
-    // `RenderedOp::new` projects a legacy action through `from_legacy_action`
-    // below; pin `Action`/`DeleteLink` to their legacy shape for that build.
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::{
-        Action, DeleteLink,
-    };
-
     let author = AgentPubKey::from_raw_36(vec![seed.wrapping_add(1); 36]);
     let sig = Signature::from([seed.wrapping_add(1); 64]);
-    let action = Action::DeleteLink(DeleteLink {
-        author,
-        timestamp: Timestamp::from_micros(seed as i64 * 1000 + 500),
-        action_seq: 3,
-        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(90); 36]),
-        base_address: base.clone(),
-        link_add_address: create_link_hash,
-    });
-    // `RenderedOp::new` takes the wire's v2 action.
-    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+    // `RenderedOp::new` takes the wire's v2 action; build it directly.
+    let v2_action = Action {
+        header: ActionHeader {
+            author,
+            timestamp: Timestamp::from_micros(seed as i64 * 1000 + 500),
+            action_seq: 3,
+            prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(90); 36])),
+        },
+        data: ActionData::DeleteLink(DeleteLinkData {
+            base_address: base.clone(),
+            link_add_address: create_link_hash,
+        }),
+    };
     let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterRemoveLink)
         .expect("rendered op");
     RenderedOps {
@@ -2278,29 +2260,25 @@ async fn integrate_link_op(
 }
 
 fn build_cached_create_link(base: &holo_hash::AnyLinkableHash, seed: u8) -> RenderedOps {
-    // `RenderedOp::new` projects a legacy action through `from_legacy_action`
-    // below; pin `Action`/`CreateLink` to their legacy shape for that build.
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::{
-        Action, CreateLink,
+    // `RenderedOp::new` takes the wire's v2 action; build it directly.
+    let v2_action = Action {
+        header: ActionHeader {
+            author: AgentPubKey::from_raw_36(vec![seed; 36]),
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 2,
+            prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(60); 36])),
+        },
+        data: ActionData::CreateLink(CreateLinkData {
+            base_address: base.clone(),
+            target_address: holo_hash::AnyLinkableHash::from_raw_36_and_type(
+                vec![seed.wrapping_add(20); 36],
+                holo_hash::hash_type::AnyLinkable::Entry,
+            ),
+            zome_index: 0.into(),
+            link_type: 0.into(),
+            tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
+        }),
     };
-
-    let action = Action::CreateLink(CreateLink {
-        author: AgentPubKey::from_raw_36(vec![seed; 36]),
-        timestamp: Timestamp::from_micros(seed as i64 * 1000),
-        action_seq: 2,
-        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(60); 36]),
-        base_address: base.clone(),
-        target_address: holo_hash::AnyLinkableHash::from_raw_36_and_type(
-            vec![seed.wrapping_add(20); 36],
-            holo_hash::hash_type::AnyLinkable::Entry,
-        ),
-        zome_index: 0.into(),
-        link_type: 0.into(),
-        tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
-        weight: Default::default(),
-    });
-    // `RenderedOp::new` takes the wire's v2 action.
-    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
     let rendered = RenderedOp::new(
         v2_action,
         Signature::from([seed; 64]),
@@ -2430,38 +2408,33 @@ async fn authority_delete_links_returns_integrated_deletes() {
 
 #[tokio::test]
 async fn integrate_upgrades_cached_op_to_locally_validated() {
-    // `RenderedOp::new` projects a legacy action through `from_legacy_action`
-    // below; pin `Action`/`CreateLink` to their legacy shape for that build.
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::{
-        Action, CreateLink,
-    };
-
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let base = AnyLinkableHash::from_raw_36_and_type(
         vec![13u8; 36],
         holo_hash::hash_type::AnyLinkable::Entry,
     );
 
-    // One action + signature, used to build BOTH the cached RenderedOps and
+    // One v2 action + signature, used to build BOTH the cached RenderedOps and
     // the incoming DhtOpHashed, so they share the same op hash.
-    let action = Action::CreateLink(CreateLink {
-        author: AgentPubKey::from_raw_36(vec![6u8; 36]),
-        timestamp: Timestamp::from_micros(6000),
-        action_seq: 2,
-        prev_action: ActionHash::from_raw_36(vec![66u8; 36]),
-        base_address: base.clone(),
-        target_address: AnyLinkableHash::from_raw_36_and_type(
-            vec![26u8; 36],
-            holo_hash::hash_type::AnyLinkable::Entry,
-        ),
-        zome_index: 0.into(),
-        link_type: 0.into(),
-        tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
-        weight: Default::default(),
-    });
+    let v2_action = Action {
+        header: ActionHeader {
+            author: AgentPubKey::from_raw_36(vec![6u8; 36]),
+            timestamp: Timestamp::from_micros(6000),
+            action_seq: 2,
+            prev_action: Some(ActionHash::from_raw_36(vec![66u8; 36])),
+        },
+        data: ActionData::CreateLink(CreateLinkData {
+            base_address: base.clone(),
+            target_address: AnyLinkableHash::from_raw_36_and_type(
+                vec![26u8; 36],
+                holo_hash::hash_type::AnyLinkable::Entry,
+            ),
+            zome_index: 0.into(),
+            link_type: 0.into(),
+            tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
+        }),
+    };
     let sig = Signature::from([6u8; 64]);
-    // `RenderedOp::new` takes the wire's v2 action.
-    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
 
     // Cache the op first (locally_validated = 0). The authority read excludes it.
     let rendered = RenderedOps {
@@ -2780,12 +2753,10 @@ mod publish_query {
     use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator, DnaHashFixturator};
     use holochain_types::fixt::SignatureFixturator;
     use holochain_types::prelude::*;
-    // Disambiguates names brought in ambiguously by `super::*` (v2) and
-    // `holochain_types::prelude::*` (legacy for the op-pipeline types, v2 for
-    // `Action`): this module seeds v2 `ChainOp`s built from a legacy `Create`
-    // fixture, so pin each explicitly to the shape it needs.
+    // Disambiguate op-pipeline names brought in by `holochain_types::prelude::*`;
+    // this module seeds v2 `ChainOp`s built from a `Create` fixture.
     use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, WarrantOp};
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
+    use holochain_zome_types::dht_v2::{ActionData, ActionHeader, CreateData};
     use holochain_zome_types::fixt::{
         AppEntryBytesFixturator, AppEntryDefFixturator, CreateFixturator,
     };
@@ -2819,8 +2790,18 @@ mod publish_query {
         .next()
         .unwrap();
 
-        let v2_action =
-            holochain_zome_types::dht_v2::from_legacy_action(&Action::Create(action.clone()));
+        let v2_action = Action {
+            header: ActionHeader {
+                author: action.author,
+                timestamp: action.timestamp,
+                action_seq: action.action_seq,
+                prev_action: Some(action.prev_action),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: action.entry_type,
+                entry_hash: action.entry_hash,
+            }),
+        };
         let signed_action = SignedAction::new(v2_action, fixt!(Signature));
 
         let op = if facts.store_entry {

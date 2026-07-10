@@ -13,8 +13,9 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_state::prelude::*;
 use holochain_trace::test_run;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
-use holochain_zome_types::action;
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
+    Action, ActionData, ActionHeader, DnaData,
+};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
@@ -88,25 +89,27 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let action = LegacyAction::Dna(action::Dna {
-        author: agent.clone(),
-        timestamp: Timestamp::now(),
-        hash: dna.clone(),
-    });
-    let v2_action = holochain_types::dht_v2::from_legacy_action(&action);
+    let v2_action = Action {
+        header: ActionHeader {
+            author: agent.clone(),
+            timestamp: Timestamp::now(),
+            action_seq: 0,
+            prev_action: None,
+        },
+        data: ActionData::Dna(DnaData {
+            dna_hash: dna.clone(),
+        }),
+    };
     let shh = SignedActionHashed::sign(
         &keystore,
-        holo_hash::HoloHashed::from_content_sync(v2_action),
+        holo_hash::HoloHashed::from_content_sync(v2_action.clone()),
     )
     .await
     .unwrap();
     // The publish wire carries the v2 op form.
     let v2_op = holochain_types::dht_v2::DhtOp::ChainOp(Box::new(
         holochain_types::dht_v2::ChainOp::CreateRecord(
-            holochain_types::dht_v2::SignedAction::new(
-                holochain_types::dht_v2::from_legacy_action(&action),
-                shh.signature().clone(),
-            ),
+            holochain_types::dht_v2::SignedAction::new(v2_action, shh.signature().clone()),
             holochain_types::dht_v2::OpEntry::ActionOnly,
         ),
     ));

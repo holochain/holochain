@@ -117,57 +117,44 @@ mod tests {
     use super::*;
     use crate::test_keystore::test_keystore;
     use holo_hash::DnaHash;
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::{
-        Action as LegacyAction, Dna,
-    };
-    use holochain_zome_types::dht_v2::from_legacy_action;
+    use holochain_zome_types::dht_v2::{Action, ActionData, ActionHeader, DnaData};
 
     /// Mirrors the two production call sites this crate's `sign`/
-    /// `verify_signature` feed: `holochain_state`'s source chain signs over
-    /// the v2 action content, and
-    /// `holochain::core::sys_validate::verify_action_signature` verifies
-    /// against the v2 action content. A signature produced this way must
-    /// verify against the v2 action and must NOT verify against the legacy
-    /// bytes directly — the two representations serialize differently, which
-    /// is exactly the invariant this test pins.
+    /// `verify_signature` feed: `holochain_state`'s source chain signs over the
+    /// v2 action content, and
+    /// `holochain::core::sys_validate::verify_action_signature` verifies against
+    /// the same v2 action content. A signature produced this way must verify
+    /// against the v2 action.
     // `test_keystore()` spawns lair onto a blocking task, which requires a
     // multi-threaded runtime.
     #[tokio::test(flavor = "multi_thread")]
-    async fn v2_projected_signature_round_trips_and_rejects_legacy_bytes() {
+    async fn v2_signature_round_trips() {
         let keystore = test_keystore();
         let author = holo_hash::AgentPubKey::new_random(&keystore).await.unwrap();
 
-        let legacy = LegacyAction::Dna(Dna {
-            author: author.clone(),
-            timestamp: holochain_zome_types::timestamp::Timestamp::now(),
-            hash: DnaHash::from_raw_36(vec![7u8; 36]),
-        });
+        let action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: holochain_zome_types::timestamp::Timestamp::now(),
+                action_seq: 0,
+                prev_action: None,
+            },
+            data: ActionData::Dna(DnaData {
+                dna_hash: DnaHash::from_raw_36(vec![7u8; 36]),
+            }),
+        };
 
         // Sign over the v2 action, as the source chain does.
-        let v2 = from_legacy_action(&legacy);
-        let signature = legacy.signer().sign(&keystore, &v2).await.unwrap();
+        let signature = action.signer().sign(&keystore, &action).await.unwrap();
 
-        // Verify, exactly as `verify_action_signature` does: project again
-        // and check over the same v2 bytes.
-        let v2_check = from_legacy_action(&legacy);
+        // Verify, exactly as `verify_action_signature` does, over the same bytes.
         assert!(
-            v2_check
+            action
                 .signer()
-                .verify_signature(&signature, &v2_check)
+                .verify_signature(&signature, &action)
                 .await
                 .unwrap(),
-            "a signature computed over the v2 projection must verify against it"
-        );
-
-        // The legacy and v2 serializations differ, so the same signature
-        // must not verify against the legacy bytes.
-        assert!(
-            !legacy
-                .signer()
-                .verify_signature(&signature, &legacy)
-                .await
-                .unwrap(),
-            "a v2-projected signature must not verify against the legacy bytes"
+            "a signature computed over the v2 action must verify against it"
         );
     }
 }

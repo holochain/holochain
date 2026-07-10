@@ -43,7 +43,6 @@ pub mod zome_io;
 
 pub mod trace;
 
-pub use action::Action;
 pub use entry::Entry;
 pub use prelude::*;
 

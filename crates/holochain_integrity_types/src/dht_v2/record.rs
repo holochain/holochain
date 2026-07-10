@@ -97,6 +97,26 @@ impl Record {
     }
 }
 
+impl crate::action::ActionSequenceAndHash for Record {
+    fn action_seq(&self) -> u32 {
+        self.action().action_seq()
+    }
+
+    fn address(&self) -> &ActionHash {
+        self.action_address()
+    }
+}
+
+impl crate::action::ActionHashedContainer for Record {
+    fn action(&self) -> &Action {
+        Record::action(self)
+    }
+
+    fn action_hash(&self) -> &ActionHash {
+        self.action_address()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

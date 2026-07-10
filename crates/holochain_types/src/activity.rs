@@ -116,7 +116,7 @@ impl From<AgentActivityResponse> for AgentActivity {
     }
 }
 
-/// A helper trait to allow [Record]s, [SignedActionHashed]s, and [ActionHashed]s to be converted into [ChainItems]
+/// A helper trait to allow [Record]s, [SignedActionHashed]s, and [ActionHashed](holo_hash::HoloHashed)s to be converted into [ChainItems]
 /// without needing to know which source type is being operated on.
 pub trait ChainItemsSource {
     /// Convert a source type into a [ChainItems] value.
@@ -129,7 +129,7 @@ impl ChainItemsSource for Vec<Record> {
     }
 }
 
-impl ChainItemsSource for Vec<ActionHashed> {
+impl ChainItemsSource for Vec<holo_hash::HoloHashed<Action>> {
     fn to_chain_items(self) -> ChainItems {
         ChainItems::Hashes(
             self.into_iter()

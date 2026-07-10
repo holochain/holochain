@@ -275,10 +275,11 @@ mod tests {
         test_utils::retry_fn_until_timeout,
     };
     use ::fixt::fixt;
-    use hdk::prelude::{LegacyActionFixturator, SignatureFixturator};
+    use hdk::prelude::SignatureFixturator;
     use holo_hash::ActionHash;
     use holochain_serialized_bytes::SerializedBytes;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::fixt::ActionFixturator;
     use holochain_zome_types::{
         action::ChainTopOrdering,
         entry::{AppEntryBytes, AppEntryDefLocation, CreateInput, EntryDefLocation},
@@ -449,7 +450,7 @@ mod tests {
 
         // `record_incoming_ops` is v2-native; this arbitrary op only needs to
         // exist unvalidated in limbo, so build it directly as v2.
-        let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&fixt!(LegacyAction));
+        let v2_action = fixt!(Action);
         let op = holochain_types::dht_v2::ChainOp::AgentActivity(
             holochain_zome_types::dht_v2::SignedAction::new(v2_action, fixt!(Signature)),
         );

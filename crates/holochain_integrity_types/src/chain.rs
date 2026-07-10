@@ -100,7 +100,7 @@ pub struct MustGetAgentActivityInput {
 impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     /// Create a new filter using this [`ActionHash`] as
     /// the starting position and walking the chain
-    /// towards the genesis [`Action`](crate::action::Action).
+    /// towards the genesis [`Action`](crate::dht_v2::Action).
     pub fn new(chain_top: H) -> Self {
         Self {
             chain_top,

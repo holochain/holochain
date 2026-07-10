@@ -3,7 +3,7 @@ use super::*;
 use holochain_integrity_types::MigrationTarget;
 
 /// Data specific to the
-/// [`Op::RegisterAgentActivity`](holochain_integrity_types::op::Op::RegisterAgentActivity)
+/// [`Op::RegisterAgentActivity`](holochain_integrity_types::dht_v2::op::Op::RegisterAgentActivity)
 /// operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpActivity<UnitType, LT> {
@@ -149,7 +149,7 @@ pub enum OpActivity<UnitType, LT> {
         action: Action,
     },
     /// This operation registers the Action for an
-    /// [`Action::Dna`](holochain_integrity_types::action::Action::Dna) to the author's chain.
+    /// [`Action::Dna`](holochain_integrity_types::dht_v2::ActionData::Dna) to the author's chain.
     Dna {
         /// The hash of the DNA
         dna_hash: DnaHash,
@@ -157,7 +157,7 @@ pub enum OpActivity<UnitType, LT> {
         action: Action,
     },
     /// This operation registers the Action for an
-    /// [`Action::OpenChain`](holochain_integrity_types::action::Action::OpenChain) to the author's
+    /// [`Action::OpenChain`](holochain_integrity_types::dht_v2::ActionData::OpenChain) to the author's
     /// chain and contains the previous chain's [`MigrationTarget`].
     OpenChain {
         /// Target for the previous chain that we are migrating from
@@ -168,7 +168,7 @@ pub enum OpActivity<UnitType, LT> {
         action: Action,
     },
     /// This operation registers the Action for an
-    /// [`Action::CloseChain`](holochain_integrity_types::action::Action::CloseChain) to the
+    /// [`Action::CloseChain`](holochain_integrity_types::dht_v2::ActionData::CloseChain) to the
     /// author's chain and contains the new chain's [`MigrationTarget`] if applicable.
     CloseChain {
         /// Target for the new chain that we are migrating to
@@ -177,7 +177,7 @@ pub enum OpActivity<UnitType, LT> {
         action: Action,
     },
     /// This operation registers the Action for an
-    /// [`Action::AgentValidationPkg`](holochain_integrity_types::action::Action::AgentValidationPkg)
+    /// [`Action::AgentValidationPkg`](holochain_integrity_types::dht_v2::ActionData::AgentValidationPkg)
     /// to the author's chain and contains the membrane proof if there is one.
     AgentValidationPkg {
         /// The membrane proof proving that the agent is allowed to participate in this DNA
@@ -186,7 +186,7 @@ pub enum OpActivity<UnitType, LT> {
         action: Action,
     },
     /// This operation registers the Action for an
-    /// [`Action::InitZomesComplete`](holochain_integrity_types::action::Action::InitZomesComplete)
+    /// [`Action::InitZomesComplete`](holochain_integrity_types::dht_v2::ActionData::InitZomesComplete)
     /// to the author's chain.
     InitZomesComplete {
         /// The InitZomesComplete action

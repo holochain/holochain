@@ -113,8 +113,9 @@ pub mod test {
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
-    use holochain_zome_types::dht_v2::from_legacy_action;
+    use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
+        Action, ActionData, ActionHeader, CreateData,
+    };
     use holochain_zome_types::fixt::{CreateFixturator, SignatureFixturator};
     use unwrap_to::unwrap_to;
 
@@ -123,6 +124,22 @@ pub mod test {
     struct Something(#[serde(with = "serde_bytes")] Vec<u8>);
 
     test_entry_impl!(Something);
+
+    /// Project a fixturated legacy `Create` struct into a v2 `Action`.
+    fn v2_create(c: Create) -> Action {
+        Action {
+            header: ActionHeader {
+                author: c.author,
+                timestamp: c.timestamp,
+                action_seq: c.action_seq,
+                prev_action: Some(c.prev_action),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: c.entry_type,
+                entry_hash: c.entry_hash,
+            }),
+        }
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg_attr(target_os = "windows", ignore = "fails on windows")]
@@ -145,7 +162,7 @@ pub mod test {
         let mut create = fixt!(Create);
         create.weight = Default::default();
         let entry_hash = create.entry_hash.clone();
-        let action = from_legacy_action(&LegacyAction::Create(create));
+        let action = v2_create(create);
         let action_hash = action.to_hash();
 
         let rendered = holochain_types::wire_ops::RenderedOp::new(

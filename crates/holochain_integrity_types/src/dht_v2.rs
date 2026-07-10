@@ -26,7 +26,7 @@ use crate::{
 };
 use holo_hash::{
     ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash, HashableContent,
-    HashableContentBytes,
+    HashableContentBytes, HoloHashed,
 };
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
@@ -124,6 +124,24 @@ impl TryFrom<i64> for ActionType {
             10 => Ok(OpenChain),
             other => Err(other),
         }
+    }
+}
+
+impl core::fmt::Display for ActionType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let name = match self {
+            ActionType::Dna => "Dna",
+            ActionType::AgentValidationPkg => "AgentValidationPkg",
+            ActionType::InitZomesComplete => "InitZomesComplete",
+            ActionType::Create => "Create",
+            ActionType::Update => "Update",
+            ActionType::Delete => "Delete",
+            ActionType::CreateLink => "CreateLink",
+            ActionType::DeleteLink => "DeleteLink",
+            ActionType::CloseChain => "CloseChain",
+            ActionType::OpenChain => "OpenChain",
+        };
+        f.write_str(name)
     }
 }
 
@@ -475,77 +493,30 @@ impl crate::record::SignedHashed<Action> {
     }
 }
 
-/// Project a legacy [`crate::action::Action`] onto the v2 [`Action`]
-/// (a flat [`ActionHeader`] + [`ActionData`] envelope), dropping the legacy
-/// `weight` field that the v2 model deliberately discards.
+/// The v2 `ActionHashed` shape: a content-addressed v2 [`Action`].
 ///
-/// This is **total** over every legacy variant. It is the action-only core
-/// shared by three callers, which therefore all agree on the v2 form (and so
-/// on the content-derived v2 hash):
-/// - `holochain_zome_types::dht_v2::from_legacy_signed_action` (a higher layer,
-///   so not linkable from here), which wraps this with the carried-over hash +
-///   signature during the dual-write transition;
-/// - the `HashableContent` impls for the legacy `Action` (and its per-variant
-///   refs) in [`crate::action`], which hash this projection so every
-///   `ActionHash` is content-derived v2;
-/// - host and wasm code alike, since both compile this same projection.
-pub fn from_legacy_action(action: &crate::action::Action) -> Action {
-    use crate::action::Action as LegacyAction;
+/// Mirrors the legacy `holochain_integrity_types::action::ActionHashed`
+/// (`HoloHashed<legacy::Action>`) so the shared agent-activity machinery
+/// (`ActionSequenceAndHash` / `ActionHashedContainer`) runs directly on v2
+/// actions.
+impl crate::action::ActionSequenceAndHash for HoloHashed<Action> {
+    fn action_seq(&self) -> u32 {
+        self.content.action_seq()
+    }
 
-    let header = ActionHeader {
-        author: action.author().clone(),
-        timestamp: action.timestamp(),
-        action_seq: action.action_seq(),
-        prev_action: action.prev_action().cloned(),
-    };
+    fn address(&self) -> &ActionHash {
+        &self.hash
+    }
+}
 
-    let data = match action {
-        LegacyAction::Dna(d) => ActionData::Dna(DnaData {
-            dna_hash: d.hash.clone(),
-        }),
-        LegacyAction::AgentValidationPkg(d) => {
-            ActionData::AgentValidationPkg(AgentValidationPkgData {
-                membrane_proof: d.membrane_proof.clone(),
-            })
-        }
-        LegacyAction::InitZomesComplete(_) => {
-            ActionData::InitZomesComplete(InitZomesCompleteData {})
-        }
-        LegacyAction::Create(d) => ActionData::Create(CreateData {
-            entry_type: d.entry_type.clone(),
-            entry_hash: d.entry_hash.clone(),
-        }),
-        LegacyAction::Update(d) => ActionData::Update(UpdateData {
-            original_action_address: d.original_action_address.clone(),
-            original_entry_address: d.original_entry_address.clone(),
-            entry_type: d.entry_type.clone(),
-            entry_hash: d.entry_hash.clone(),
-        }),
-        LegacyAction::Delete(d) => ActionData::Delete(DeleteData {
-            deletes_address: d.deletes_address.clone(),
-            deletes_entry_address: d.deletes_entry_address.clone(),
-        }),
-        LegacyAction::CreateLink(d) => ActionData::CreateLink(CreateLinkData {
-            base_address: d.base_address.clone(),
-            target_address: d.target_address.clone(),
-            zome_index: d.zome_index,
-            link_type: d.link_type,
-            tag: d.tag.clone(),
-        }),
-        LegacyAction::DeleteLink(d) => ActionData::DeleteLink(DeleteLinkData {
-            base_address: d.base_address.clone(),
-            link_add_address: d.link_add_address.clone(),
-        }),
-        LegacyAction::CloseChain(d) => ActionData::CloseChain(CloseChainData {
-            new_target: d.new_target.clone(),
-        }),
-        LegacyAction::OpenChain(d) => ActionData::OpenChain(OpenChainData {
-            prev_target: d.prev_target.clone(),
-            close_hash: d.close_hash.clone(),
-        }),
-    };
+impl crate::action::ActionHashedContainer for HoloHashed<Action> {
+    fn action(&self) -> &Action {
+        &self.content
+    }
 
-    Action { header, data }
+    fn action_hash(&self) -> &ActionHash {
+        &self.hash
+    }
 }
 
 #[cfg(test)]
@@ -605,185 +576,6 @@ mod tests {
             dna_hash: DnaHash::from_raw_36(vec![0u8; 36]),
         };
         let _ = InitZomesCompleteData {};
-    }
-
-    #[test]
-    fn from_legacy_action_is_total_and_maps_header_and_fields() {
-        use crate::action::{
-            Action as LegacyAction, AgentValidationPkg, CloseChain, Create, CreateLink, Delete,
-            DeleteLink, Dna, InitZomesComplete, MigrationTarget, OpenChain, Update,
-        };
-        use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
-        use holochain_timestamp::Timestamp;
-
-        let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
-        let ts = Timestamp::from_micros(1_234);
-        let seq = 7u32;
-        let prev = ActionHash::from_raw_36(vec![2u8; 36]);
-
-        // One representative of every legacy variant, paired with the
-        // `ActionType` the projection must produce.
-        let cases: Vec<(LegacyAction, ActionType)> = vec![
-            (
-                LegacyAction::Dna(Dna {
-                    author: author.clone(),
-                    timestamp: ts,
-                    hash: DnaHash::from_raw_36(vec![3u8; 36]),
-                }),
-                ActionType::Dna,
-            ),
-            (
-                LegacyAction::AgentValidationPkg(AgentValidationPkg {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    membrane_proof: None,
-                }),
-                ActionType::AgentValidationPkg,
-            ),
-            (
-                LegacyAction::InitZomesComplete(InitZomesComplete {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                }),
-                ActionType::InitZomesComplete,
-            ),
-            (
-                LegacyAction::Create(Create {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    entry_type: EntryType::AgentPubKey,
-                    entry_hash: EntryHash::from_raw_36(vec![4u8; 36]),
-                    weight: Default::default(),
-                }),
-                ActionType::Create,
-            ),
-            (
-                LegacyAction::Update(Update {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    original_action_address: ActionHash::from_raw_36(vec![5u8; 36]),
-                    original_entry_address: EntryHash::from_raw_36(vec![6u8; 36]),
-                    entry_type: EntryType::AgentPubKey,
-                    entry_hash: EntryHash::from_raw_36(vec![7u8; 36]),
-                    weight: Default::default(),
-                }),
-                ActionType::Update,
-            ),
-            (
-                LegacyAction::Delete(Delete {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    deletes_address: ActionHash::from_raw_36(vec![8u8; 36]),
-                    deletes_entry_address: EntryHash::from_raw_36(vec![9u8; 36]),
-                    weight: Default::default(),
-                }),
-                ActionType::Delete,
-            ),
-            (
-                LegacyAction::CreateLink(CreateLink {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    base_address: AnyLinkableHash::from_raw_36_and_type(
-                        vec![10u8; 36],
-                        holo_hash::hash_type::AnyLinkable::Entry,
-                    ),
-                    target_address: AnyLinkableHash::from_raw_36_and_type(
-                        vec![11u8; 36],
-                        holo_hash::hash_type::AnyLinkable::Entry,
-                    ),
-                    zome_index: ZomeIndex(1),
-                    link_type: 2.into(),
-                    tag: crate::link::LinkTag(vec![0xAA, 0xBB]),
-                    weight: Default::default(),
-                }),
-                ActionType::CreateLink,
-            ),
-            (
-                LegacyAction::DeleteLink(DeleteLink {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    base_address: AnyLinkableHash::from_raw_36_and_type(
-                        vec![12u8; 36],
-                        holo_hash::hash_type::AnyLinkable::Entry,
-                    ),
-                    link_add_address: ActionHash::from_raw_36(vec![13u8; 36]),
-                }),
-                ActionType::DeleteLink,
-            ),
-            (
-                LegacyAction::CloseChain(CloseChain {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    new_target: Some(MigrationTarget::Dna(DnaHash::from_raw_36(vec![14u8; 36]))),
-                }),
-                ActionType::CloseChain,
-            ),
-            (
-                LegacyAction::OpenChain(OpenChain {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    prev_target: MigrationTarget::Dna(DnaHash::from_raw_36(vec![15u8; 36])),
-                    close_hash: ActionHash::from_raw_36(vec![16u8; 36]),
-                }),
-                ActionType::OpenChain,
-            ),
-        ];
-
-        for (legacy, expected_type) in cases {
-            let v2 = from_legacy_action(&legacy);
-
-            // Discriminant is total + correct.
-            assert_eq!(v2.data.action_type(), expected_type);
-
-            // Header maps via the legacy accessors (Dna has seq 0 / no prev).
-            assert_eq!(&v2.header.author, legacy.author());
-            assert_eq!(v2.header.timestamp, legacy.timestamp());
-            assert_eq!(v2.header.action_seq, legacy.action_seq());
-            assert_eq!(v2.header.prev_action.as_ref(), legacy.prev_action());
-
-            // Spot-check a few payloads carried across without the weight.
-            match (&v2.data, &legacy) {
-                (ActionData::Create(d), LegacyAction::Create(l)) => {
-                    assert_eq!(d.entry_type, l.entry_type);
-                    assert_eq!(d.entry_hash, l.entry_hash);
-                }
-                (ActionData::Update(d), LegacyAction::Update(l)) => {
-                    assert_eq!(d.original_action_address, l.original_action_address);
-                    assert_eq!(d.original_entry_address, l.original_entry_address);
-                    assert_eq!(d.entry_hash, l.entry_hash);
-                }
-                (ActionData::CreateLink(d), LegacyAction::CreateLink(l)) => {
-                    assert_eq!(d.base_address, l.base_address);
-                    assert_eq!(d.target_address, l.target_address);
-                    assert_eq!(d.zome_index, l.zome_index);
-                    assert_eq!(d.link_type, l.link_type);
-                    assert_eq!(d.tag, l.tag);
-                }
-                (ActionData::OpenChain(d), LegacyAction::OpenChain(l)) => {
-                    assert_eq!(d.prev_target, l.prev_target);
-                    assert_eq!(d.close_hash, l.close_hash);
-                }
-                _ => {}
-            }
-        }
     }
 
     #[test]

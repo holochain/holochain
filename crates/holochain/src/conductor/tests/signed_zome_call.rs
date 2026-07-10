@@ -303,7 +303,7 @@ async fn cap_grant_info_call() {
     let delete_list = chain.query(delete_query.clone()).await.unwrap();
 
     // ensure that delete_address is same as cap_grant_address
-    if let Action::Delete(delete) = delete_list[0].action().clone() {
+    if let ActionData::Delete(delete) = &delete_list[0].action().data {
         let delete_action_address = delete.deletes_address.clone();
         assert_eq!(delete_action_address, grant_action_hash);
     } else {

@@ -516,7 +516,7 @@ impl DhtStore<DbRead<Dht>> {
     /// `ChainFork` warrant.
     pub async fn find_fork_for_action(
         &self,
-        action: &holochain_zome_types::action::Action,
+        action: &holochain_zome_types::dht_v2::Action,
     ) -> StateQueryResult<Option<(holo_hash::ActionHash, holochain_types::prelude::Signature)>>
     {
         let Some(prev) = action.header.prev_action.as_ref() else {
@@ -1404,18 +1404,16 @@ impl DhtStore<DbRead<Dht>> {
     /// actions classified into valid/rejected, with chain status, highest
     /// observed, and warrants. Store-only (no scratch).
     ///
-    /// Builds on legacy `Record`/`ActionHashed` internally — see
-    /// `build_agent_activity_response_full` for why — converting to v2 only
-    /// at the `ChainItems::Full` boundary when `include_full_records` is set.
+    /// Works natively on v2 records/actions: the `ChainItems::Full` case builds
+    /// v2 [`Record`](holochain_zome_types::record::Record)s and the hashes case
+    /// the v2 `HoloHashed<Action>` shape, both of which the shared
+    /// `build_agent_activity_response` machinery accepts.
     pub async fn get_agent_activity(
         &self,
         author: &holo_hash::AgentPubKey,
         filter: &ChainQueryFilter,
         options: &crate::dht_store::GetAgentActivityOptions,
     ) -> StateQueryResult<AgentActivityResponse> {
-        use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
-        use holochain_zome_types::dht_v2::to_legacy_signed_action;
-
         let items = self
             .db()
             .get_agent_activity(author.clone(), options.include_full_records)
@@ -1436,13 +1434,13 @@ impl DhtStore<DbRead<Dht>> {
             let mut valid = Vec::new();
             let mut rejected = Vec::new();
             for item in items {
-                let record = Record::new(to_legacy_signed_action(&item.action), item.entry);
+                let record = v2_record_from_parts(item.action, item.entry);
                 match item.validation_status {
                     RecordValidity::Accepted => valid.push(record),
                     RecordValidity::Rejected => rejected.push(record),
                 }
             }
-            Ok(build_agent_activity_response_full(
+            Ok(build_agent_activity_response(
                 author.clone(),
                 valid,
                 rejected,
@@ -1454,7 +1452,7 @@ impl DhtStore<DbRead<Dht>> {
             let mut valid = Vec::new();
             let mut rejected = Vec::new();
             for item in items {
-                let action_hashed = to_legacy_signed_action(&item.action).hashed;
+                let action_hashed = item.action.hashed;
                 match item.validation_status {
                     RecordValidity::Accepted => valid.push(action_hashed),
                     RecordValidity::Rejected => rejected.push(action_hashed),
@@ -1495,9 +1493,6 @@ impl DhtStore<DbRead<Dht>> {
         options: &crate::dht_store::GetAgentActivityOptions,
         scratch: &SyncScratch,
     ) -> StateQueryResult<AgentActivityResponse> {
-        use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
-        use holochain_zome_types::dht_v2::to_legacy_signed_action;
-
         let items = self
             .db()
             .get_agent_activity(author.clone(), options.include_full_records)
@@ -1550,14 +1545,13 @@ impl DhtStore<DbRead<Dht>> {
             for item in items {
                 match item.validation_status {
                     RecordValidity::Accepted => store_valid_activity.push(RegisterAgentActivity {
-                        action: to_legacy_signed_action(&item.action),
+                        action: item.action,
                         cached_entry: None,
                     }),
                     // The rejected list is Records, and keeps the store row's entry.
-                    RecordValidity::Rejected => rejected.push(Record::new(
-                        to_legacy_signed_action(&item.action),
-                        item.entry,
-                    )),
+                    RecordValidity::Rejected => {
+                        rejected.push(v2_record_from_parts(item.action, item.entry))
+                    }
                 }
             }
             // Merge store and scratch valid activity, dedup by action hash.
@@ -1565,11 +1559,11 @@ impl DhtStore<DbRead<Dht>> {
             // Valid records carry no entry here, mirroring the cascade's
             // `cached_entry: None` convention on the requester path (the entry is
             // filled separately by the cascade); rejected records above keep theirs.
-            let merged_valid: Vec<Record> = merged_activity
+            let merged_valid: Vec<holochain_zome_types::record::Record> = merged_activity
                 .into_iter()
-                .map(|a| Record::new(a.action, None))
+                .map(|a| v2_record_from_parts(a.action, None))
                 .collect();
-            Ok(build_agent_activity_response_full(
+            Ok(build_agent_activity_response(
                 author.clone(),
                 merged_valid,
                 rejected,
@@ -1583,21 +1577,19 @@ impl DhtStore<DbRead<Dht>> {
             for item in items {
                 match item.validation_status {
                     RecordValidity::Accepted => store_valid_activity.push(RegisterAgentActivity {
-                        action: to_legacy_signed_action(&item.action),
+                        action: item.action,
                         cached_entry: None,
                     }),
-                    RecordValidity::Rejected => {
-                        rejected_hashed.push(to_legacy_signed_action(&item.action).hashed)
-                    }
+                    RecordValidity::Rejected => rejected_hashed.push(item.action.hashed),
                 }
             }
             // Merge store and scratch valid activity, dedup by action hash.
             let merged_activity = merge_agent_activity(vec![store_valid_activity, scratch_valid]);
-            // Convert to ActionHashed for build_agent_activity_response.
-            let merged_valid: Vec<holochain_zome_types::action::ActionHashed> = merged_activity
-                .into_iter()
-                .map(|a| a.action.hashed)
-                .collect();
+            let merged_valid: Vec<holo_hash::HoloHashed<holochain_zome_types::dht_v2::Action>> =
+                merged_activity
+                    .into_iter()
+                    .map(|a| a.action.hashed)
+                    .collect();
             Ok(build_agent_activity_response(
                 author.clone(),
                 merged_valid,
@@ -1619,8 +1611,6 @@ impl DhtStore<DbRead<Dht>> {
         author: &holo_hash::AgentPubKey,
         filter: &ChainFilter,
     ) -> StateQueryResult<MustGetAgentActivityResponse> {
-        use holochain_zome_types::dht_v2::to_legacy_signed_action;
-
         // A take of zero is a degenerate filter.
         if filter.get_take() == Some(0) {
             return Err(crate::query::StateQueryError::InvalidInput(
@@ -1673,8 +1663,8 @@ impl DhtStore<DbRead<Dht>> {
             .get_filtered_agent_activity(author.clone(), chain_top_seq, resolved_until_seq)
             .await?
             .into_iter()
-            .map(|v2| RegisterAgentActivity {
-                action: to_legacy_signed_action(&v2),
+            .map(|action| RegisterAgentActivity {
+                action,
                 cached_entry: None,
             })
             .collect();
@@ -1742,8 +1732,6 @@ impl DhtStore<DbRead<Dht>> {
         filter: &ChainFilter,
         scratch: &SyncScratch,
     ) -> StateQueryResult<MustGetAgentActivityResponse> {
-        use holochain_zome_types::dht_v2::to_legacy_signed_action;
-
         // A take of zero is a degenerate filter.
         if filter.get_take() == Some(0) {
             return Err(crate::query::StateQueryError::InvalidInput(
@@ -1821,8 +1809,8 @@ impl DhtStore<DbRead<Dht>> {
             .get_filtered_agent_activity(author.clone(), chain_top_seq, resolved_until_seq)
             .await?
             .into_iter()
-            .map(|v2| RegisterAgentActivity {
-                action: to_legacy_signed_action(&v2),
+            .map(|action| RegisterAgentActivity {
+                action,
                 cached_entry: None,
             })
             .collect();
@@ -2187,15 +2175,12 @@ impl DhtStore<DbRead<Dht>> {
         author: &AgentPubKey,
     ) -> StateQueryResult<holochain_state_types::SourceChainDump> {
         use holochain_state_types::{SourceChainDump, SourceChainDumpRecord};
-        use holochain_zome_types::dht_v2::to_legacy_signed_action;
 
         // All actions for this author in seq order (v2 SignedActionHashed).
         let v2_actions = self.db().get_actions_by_author(author.clone()).await?;
 
         let mut records = Vec::with_capacity(v2_actions.len());
-        for v2_sah in &v2_actions {
-            // Convert to the v1 SignedActionHashed.
-            let sah = to_legacy_signed_action(v2_sah);
+        for sah in &v2_actions {
             let action_address = sah.as_hash().clone();
             let signature = sah.signature().clone();
             let action = sah.action().clone();
@@ -2393,8 +2378,7 @@ impl DhtStore<DbRead<Dht>> {
                 let Some(v2_sah) = self.db().get_action(action_hash).await? else {
                     continue;
                 };
-                let action = holochain_zome_types::dht_v2::to_legacy_signed_action(&v2_sah);
-                let Some(entry_hash) = action.action().entry_hash().cloned() else {
+                let Some(entry_hash) = v2_sah.hashed.content.data.entry_hash().cloned() else {
                     continue;
                 };
                 // Skip grants whose entry was updated or deleted by the author.
@@ -2464,6 +2448,18 @@ fn v2_entry_type(action: &holochain_zome_types::dht_v2::Action) -> Option<&Entry
         holochain_zome_types::dht_v2::ActionData::Update(d) => Some(&d.entry_type),
         _ => None,
     }
+}
+
+/// Build a v2 [`Record`](holochain_zome_types::record::Record) from a signed
+/// action and an optional entry, deriving the [`RecordEntry`] slot from the
+/// action's entry visibility (mirroring the legacy `Record::new`).
+fn v2_record_from_parts(
+    sah: holochain_zome_types::record::SignedActionHashed,
+    entry: Option<holochain_types::prelude::Entry>,
+) -> holochain_zome_types::record::Record {
+    let visibility = v2_entry_type(&sah.hashed.content).map(|et| et.visibility());
+    let record_entry = holochain_zome_types::record::RecordEntry::new(visibility, entry);
+    holochain_zome_types::record::Record::new(sah, record_entry)
 }
 
 /// Whether `action`'s entry (if any) is declared private.
@@ -2806,11 +2802,7 @@ fn agent_activity_from_scratch(
             true
         })
         .map(|sah| RegisterAgentActivity {
-            // `RegisterAgentActivity` (`holochain_integrity_types::op`) is a
-            // legacy-island type; convert this v2 scratch action to legacy.
-            // Op/action hashes are content-derived v2 regardless, so this is
-            // hash-preserving.
-            action: holochain_zome_types::dht_v2::to_legacy_signed_action(sah),
+            action: sah.clone(),
             // Entries are not cached in scratch activity (mirrors cascade TODO).
             cached_entry: None,
         })
@@ -3308,7 +3300,13 @@ fn check_agent_activity_completeness(
     }
 }
 
-/// Assemble the legacy [`AgentActivityResponse`] from the classified lists.
+/// Assemble the [`AgentActivityResponse`] from the classified lists.
+///
+/// Generic over the item shape via [`ActionHashedContainer`]: the
+/// `include_full_records` case passes v2
+/// [`Record`](holochain_zome_types::record::Record)s (whose `Vec` renders as
+/// [`ChainItems::Full`]) and the hashes case passes the v2 `HoloHashed<Action>`
+/// shape (rendering as [`ChainItems::Hashes`]).
 fn build_agent_activity_response<T>(
     agent: holo_hash::AgentPubKey,
     valid: Vec<T>,
@@ -3330,15 +3328,11 @@ where
     // A chain whose head is a `CloseChain` action is reported as `Closed`. This
     // only upgrades a `Valid` status; `compute_chain_status` returns `Forked`
     // and `Invalid` ahead of `Valid`, so higher-priority states are preserved.
-    // `T::action()` (from `ActionHashedContainer`, implemented only for the
-    // legacy `Action` shape) always returns a legacy action.
     let status = match status {
         ChainStatus::Valid(head)
             if matches!(
-                valid.last().map(|v| v.action()),
-                Some(
-                    holochain_zome_types::dependencies::holochain_integrity_types::action::Action::CloseChain(_)
-                )
+                valid.last().map(|v| &v.action().data),
+                Some(ActionData::CloseChain(_))
             ) =>
         {
             ChainStatus::Closed(head)
@@ -3360,86 +3354,6 @@ where
     };
     // Warrant gating is owned entirely by the caller, which passes an empty
     // `warrants` when `include_warrants` is false; this fn passes it through.
-    AgentActivityResponse {
-        agent,
-        valid_activity,
-        rejected_activity,
-        warrants,
-        status,
-        highest_observed,
-    }
-}
-
-/// Assemble the [`AgentActivityResponse`] for the `include_full_records`
-/// case, whose `ChainItems::Full` variant holds v2
-/// [`Record`](holochain_zome_types::record::Record)s.
-///
-/// [`build_agent_activity_response`]'s generic machinery (chain-status,
-/// highest-observed, fork exclusion, `ChainQueryFilter::filter_actions`) is
-/// bound on `ActionHashedContainer`/`ActionSequenceAndHash`, which the
-/// already-migrated `holochain_integrity_types` crate implements only for the
-/// legacy `Record`/`ActionHashed` shape — not the v2 `Action` shape — so it
-/// cannot run directly on v2 records. This mirrors that machinery on legacy
-/// `Record`s (reusing the same `compute_chain_status`/`compute_highest_observed`
-/// helpers) and converts to v2 `Record`s only at the very end, once filtering
-/// is complete, via [`from_legacy_signed_action`](holochain_zome_types::dht_v2::from_legacy_signed_action).
-/// `RecordEntry` is shared unchanged between the legacy and v2 record shapes,
-/// so the entry carries across without conversion.
-fn build_agent_activity_response_full(
-    agent: holo_hash::AgentPubKey,
-    valid: Vec<holochain_zome_types::dependencies::holochain_integrity_types::record::Record>,
-    rejected: Vec<holochain_zome_types::dependencies::holochain_integrity_types::record::Record>,
-    warrants: Vec<SignedWarrant>,
-    filter: &ChainQueryFilter,
-    options: &crate::dht_store::GetAgentActivityOptions,
-) -> AgentActivityResponse {
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
-
-    let (status, valid, rejected) = compute_chain_status(valid.into_iter(), rejected.into_iter());
-
-    let status = match status {
-        ChainStatus::Valid(head)
-            if matches!(
-                valid.last().map(|v| v.action()),
-                Some(LegacyAction::CloseChain(_))
-            ) =>
-        {
-            ChainStatus::Closed(head)
-        }
-        other => other,
-    };
-
-    let highest_observed = compute_highest_observed(&valid, &rejected);
-
-    let to_v2_record =
-        |r: holochain_zome_types::dependencies::holochain_integrity_types::record::Record| {
-            let v2_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(&r.signed_action);
-            holochain_zome_types::record::Record::new(v2_sah, r.entry)
-        };
-
-    let valid_activity = if options.include_valid_activity {
-        ChainItems::Full(
-            filter
-                .filter_actions(valid)
-                .into_iter()
-                .map(to_v2_record)
-                .collect(),
-        )
-    } else {
-        ChainItems::NotRequested
-    };
-    let rejected_activity = if options.include_rejected_activity {
-        ChainItems::Full(
-            filter
-                .filter_actions(rejected)
-                .into_iter()
-                .map(to_v2_record)
-                .collect(),
-        )
-    } else {
-        ChainItems::NotRequested
-    };
-
     AgentActivityResponse {
         agent,
         valid_activity,
@@ -6837,65 +6751,67 @@ mod tests {
     // it. These are ported from the pre-v2 cascade `get_agent_activity_query`
     // unit tests and exercise `build_agent_activity_response` directly.
 
-    // `build_agent_activity_response` (unlike the (v2) DhtStore reads exercised
-    // elsewhere in this file) is generic over any `T: ActionHashedContainer +
-    // Clone` with `Vec<T>: ChainItemsSource`; the legacy `ActionHashed` (=
-    // `HoloHashed<legacy Action>`) is the only type satisfying both bounds
-    // (legacy `Record` implements `ActionHashedContainer` but not
-    // `ChainItemsSource`; v2 `Record` is the reverse), so these helpers build
-    // a bare hashed legacy action rather than a full `Record`.
-    type LegacyActionHashed =
-        holochain_zome_types::dependencies::holochain_integrity_types::action::ActionHashed;
-    // Shadow the module-level v2 `Action` for this block only: these helpers
-    // exercise `build_agent_activity_response`, which is generic over the
-    // legacy `ActionHashed` shape (see the comment above).
-    type LegacyAction =
-        holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::Create as LegacyCreate;
+    // `build_agent_activity_response` is generic over any
+    // `T: ActionHashedContainer + Clone` with `Vec<T>: ChainItemsSource`; the v2
+    // `HoloHashed<Action>` shape satisfies both, so these helpers build a bare
+    // hashed v2 action. Only the resulting chain status is asserted, so the
+    // `ChainItems` rendering (hashes vs full) is irrelevant here.
+    use holochain_zome_types::dht_v2::{CloseChainData, DnaData};
 
-    fn mk_record(action: LegacyAction) -> LegacyActionHashed {
-        LegacyActionHashed::from_content_sync(action)
-    }
-
-    fn mk_dna(author: &AgentPubKey) -> LegacyActionHashed {
-        mk_record(LegacyAction::Dna(
-            holochain_zome_types::dependencies::holochain_integrity_types::action::Dna {
-                author: author.clone(),
-                timestamp: Timestamp::from_micros(0),
-                hash: holo_hash::DnaHash::from_raw_36(vec![0u8; 36]),
-            },
-        ))
-    }
-
-    fn mk_create(author: &AgentPubKey, seq: u32) -> LegacyActionHashed {
-        mk_record(LegacyAction::Create(LegacyCreate {
-            author: author.clone(),
-            timestamp: Timestamp::from_micros(seq as i64 * 1000),
-            action_seq: seq,
-            prev_action: ActionHash::from_raw_36(vec![seq as u8; 36]),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash: EntryHash::from_raw_36(vec![seq as u8; 36]),
-            weight: Default::default(),
-        }))
-    }
-
-    fn mk_close(author: &AgentPubKey, seq: u32) -> LegacyActionHashed {
-        mk_record(LegacyAction::CloseChain(
-            holochain_zome_types::dependencies::holochain_integrity_types::action::CloseChain {
+    fn v2_action(
+        author: &AgentPubKey,
+        seq: u32,
+        prev: Option<ActionHash>,
+        data: ActionData,
+    ) -> HoloHashed<Action> {
+        HoloHashed::from_content_sync(Action {
+            header: ActionHeader {
                 author: author.clone(),
                 timestamp: Timestamp::from_micros(seq as i64 * 1000),
                 action_seq: seq,
-                prev_action: ActionHash::from_raw_36(vec![seq as u8; 36]),
-                new_target: None,
+                prev_action: prev,
             },
-        ))
+            data,
+        })
     }
 
-    fn status_of(valid: Vec<LegacyActionHashed>, rejected: Vec<LegacyActionHashed>) -> ChainStatus {
+    fn mk_dna(author: &AgentPubKey) -> HoloHashed<Action> {
+        v2_action(
+            author,
+            0,
+            None,
+            ActionData::Dna(DnaData {
+                dna_hash: holo_hash::DnaHash::from_raw_36(vec![0u8; 36]),
+            }),
+        )
+    }
+
+    fn mk_create(author: &AgentPubKey, seq: u32) -> HoloHashed<Action> {
+        v2_action(
+            author,
+            seq,
+            Some(ActionHash::from_raw_36(vec![seq as u8; 36])),
+            ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: EntryHash::from_raw_36(vec![seq as u8; 36]),
+            }),
+        )
+    }
+
+    fn mk_close(author: &AgentPubKey, seq: u32) -> HoloHashed<Action> {
+        v2_action(
+            author,
+            seq,
+            Some(ActionHash::from_raw_36(vec![seq as u8; 36])),
+            ActionData::CloseChain(CloseChainData { new_target: None }),
+        )
+    }
+
+    fn status_of(valid: Vec<HoloHashed<Action>>, rejected: Vec<HoloHashed<Action>>) -> ChainStatus {
         let agent = AgentPubKey::from_raw_36(vec![0u8; 36]);
         let options = GetAgentActivityOptions {
             include_valid_activity: true,

@@ -31,11 +31,13 @@ use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use holochain_types::prelude::SystemSignal;
 use holochain_types::prelude::{ChainItems, SignedActionHashedExt};
 use holochain_types::signal::Signal;
+use holochain_zome_types::action::Create;
 use holochain_zome_types::cell::CellId;
 use holochain_zome_types::countersigning::PreflightResponse;
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
-use holochain_zome_types::dht_v2::from_legacy_action;
-use holochain_zome_types::prelude::{CreateBase, EntryRateWeight};
+use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
+    Action, ActionData, ActionHeader, CreateData,
+};
+use holochain_zome_types::prelude::CreateBase;
 use holochain_zome_types::query::{ChainHead, ChainStatus};
 use matches::assert_matches;
 use std::ops::Add;
@@ -43,6 +45,22 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast::{Receiver, Sender};
+
+/// Project a fixturated legacy `Create` struct into a v2 `Action`.
+fn v2_create(c: Create) -> Action {
+    Action {
+        header: ActionHeader {
+            author: c.author,
+            timestamp: c.timestamp,
+            action_seq: c.action_seq,
+            prev_action: Some(c.prev_action),
+        },
+        data: ActionData::Create(CreateData {
+            entry_type: c.entry_type,
+            entry_hash: c.entry_hash,
+        }),
+    }
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn accept_countersigning_request_creates_state() {
@@ -1933,19 +1951,18 @@ impl TestHarness {
         entry_hash: EntryHash,
     ) -> SignedAction {
         // `insert_action`/`insert_op_authored` write the still-legacy
-        // `DbKindAuthored` mirror (Phase 6), so the fixture is built as a
-        // legacy action first and then projected to v2 via
-        // `from_legacy_action` for signing, matching the v2 signature basis
-        // used everywhere else. The DhtStore writes below (the real op
-        // pipeline) build the v2 op directly from the same `signed`.
-        let my_action = LegacyAction::from_countersigning_data(
+        // `DbKindAuthored` mirror (Phase 6). The countersigning action is built
+        // directly as a v2 `Action` via `from_countersigning_data` and signed
+        // over the v2 bytes, matching the v2 signature basis used everywhere
+        // else. The DhtStore writes below (the real op pipeline) build the v2
+        // op directly from the same `signed`.
+        let my_action = holochain_zome_types::dht_v2::from_countersigning_data(
             entry_hash.clone(),
             session_data,
             self.author.clone(),
-            EntryRateWeight::default(),
         )
         .unwrap();
-        let v2_action = from_legacy_action(&my_action);
+        let v2_action = my_action.clone();
         let v2_hashed = holo_hash::HoloHashed::from_content_sync(v2_action.clone());
         let sah = SignedActionHashed::sign(&self.keystore, v2_hashed)
             .await
@@ -2271,8 +2288,7 @@ impl RemoteAgent {
     }
 
     fn other_activity_response(&self) -> AgentActivityResponse {
-        let legacy_action = LegacyAction::Create(fixt!(Create));
-        let action = from_legacy_action(&legacy_action);
+        let action = v2_create(fixt!(Create));
 
         AgentActivityResponse {
             agent: self.agent.clone(),

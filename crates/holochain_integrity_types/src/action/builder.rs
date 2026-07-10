@@ -101,10 +101,6 @@ macro_rules! builder_variant {
             type Unweighed = action::$name<()>;
             type Weight = $weight;
 
-            fn into_action(self) -> action::Action {
-                action::Action::$name(self)
-            }
-
             fn unweighed(self) -> action::$name<()> {
                 action::$name::<()> {
                     weight: (),
@@ -173,10 +169,6 @@ macro_rules! builder_variant {
         impl ActionWeighed for action::$name {
             type Unweighed = action::$name;
             type Weight = ();
-
-            fn into_action(self) -> action::Action {
-                action::Action::$name(self)
-            }
 
             fn unweighed(self) -> Self::Unweighed {
                 self
@@ -297,10 +289,6 @@ impl Dna {
 impl ActionWeighed for Dna {
     type Unweighed = Dna;
     type Weight = ();
-
-    fn into_action(self) -> action::Action {
-        action::Action::Dna(self)
-    }
 
     fn unweighed(self) -> Self::Unweighed {
         self

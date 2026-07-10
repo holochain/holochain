@@ -7,12 +7,10 @@ use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-// The guest decodes v2 `RegisterAgentActivity`; the cascade/network response
-// still carries legacy ops (`MustGetAgentActivityResponse::Activity.activity:
-// Vec<RegisterAgentActivity>` is legacy, defined in `holochain_types` and not
-// migrated in this pass), so this is the last-mile conversion boundary.
+// The guest decodes v2 `RegisterAgentActivity`, which is exactly the payload
+// `MustGetAgentActivityResponse::Activity` now carries, so the response passes
+// through without conversion.
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::op::RegisterAgentActivity as V2RegisterAgentActivity;
-use holochain_zome_types::dht_v2::from_legacy_signed_action;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -68,14 +66,7 @@ pub fn must_get_agent_activity(
                 use MustGetAgentActivityResponse::*;
 
                 let result: Result<_, RuntimeError> = match (result, &call_context.host_context) {
-                    (Activity {activity, warrants: _}, _) => {
-                        Ok(activity
-                            .into_iter()
-                            .map(|legacy| V2RegisterAgentActivity {
-                                action: from_legacy_signed_action(&legacy.action),
-                                cached_entry: legacy.cached_entry,
-                            })
-                            .collect())},
+                    (Activity {activity, warrants: _}, _) => Ok(activity),
                     (
                         IncompleteChain
                         | ChainTopNotFound(_)

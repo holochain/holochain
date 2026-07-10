@@ -36,34 +36,9 @@ pub trait ChainItem: Clone + PartialEq + Eq + std::fmt::Debug + Send + Sync {
 /// Alias for getting the associated hash type of a ChainItem
 pub type ChainItemHash<I> = <I as ChainItem>::Hash;
 
-impl ChainItem for ActionHashed {
-    type Hash = ActionHash;
-
-    fn seq(&self) -> u32 {
-        self.action_seq()
-    }
-
-    fn get_timestamp(&self) -> Timestamp {
-        self.timestamp()
-    }
-
-    fn get_hash(&self) -> &Self::Hash {
-        self.as_hash()
-    }
-
-    fn prev_hash(&self) -> Option<&Self::Hash> {
-        self.prev_action()
-    }
-
-    fn to_display(&self) -> String {
-        format!("{}", self.content)
-    }
-}
-
 // `SignedActionHashed` here is the v2 `SignedHashed<Action>` (a flat
 // `ActionHeader` + `ActionData` envelope), so this impl reads the header
-// fields directly rather than delegating to the legacy `ActionHashed`
-// accessors used by the `impl ChainItem for ActionHashed` above.
+// fields directly.
 impl ChainItem for SignedActionHashed {
     type Hash = ActionHash;
 

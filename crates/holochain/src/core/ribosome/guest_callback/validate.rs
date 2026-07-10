@@ -132,11 +132,29 @@ mod test {
     // The bare names below (via `holochain_types::prelude::*`) resolve to the
     // legacy per-variant `Op`/`RegisterAgentActivity`; these explicit v2
     // imports are what `ValidateInvocation::new` actually takes.
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
     use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-        from_legacy_action, Op, RegisterAgentActivity,
+        Action, ActionData, ActionHeader, CreateLinkData, Op, RegisterAgentActivity,
     };
     use rand::seq::SliceRandom;
+
+    /// Project a fixturated legacy `CreateLink` struct into a v2 `Action`.
+    fn v2_create_link(c: CreateLink) -> Action {
+        Action {
+            header: ActionHeader {
+                author: c.author,
+                timestamp: c.timestamp,
+                action_seq: c.action_seq,
+                prev_action: Some(c.prev_action),
+            },
+            data: ActionData::CreateLink(CreateLinkData {
+                base_address: c.base_address,
+                target_address: c.target_address,
+                zome_index: c.zome_index,
+                link_type: c.link_type,
+                tag: c.tag,
+            }),
+        }
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn validate_callback_result_fold() {
@@ -197,7 +215,7 @@ mod test {
             ZomesToInvoke::All,
             &Op::RegisterAgentActivity(RegisterAgentActivity {
                 action: SignedActionHashed::new_unchecked(
-                    from_legacy_action(&LegacyAction::CreateLink(fixt!(CreateLink))),
+                    v2_create_link(fixt!(CreateLink)),
                     fixt!(Signature),
                 ),
                 cached_entry: None,
@@ -214,7 +232,7 @@ mod test {
             ZomesToInvoke::All,
             &Op::RegisterAgentActivity(RegisterAgentActivity {
                 action: SignedActionHashed::new_unchecked(
-                    from_legacy_action(&LegacyAction::CreateLink(fixt!(CreateLink))),
+                    v2_create_link(fixt!(CreateLink)),
                     fixt!(Signature),
                 ),
                 cached_entry: None,
@@ -232,7 +250,7 @@ mod test {
     async fn validate_invocation_host_input() {
         let op = Op::RegisterAgentActivity(RegisterAgentActivity {
             action: SignedActionHashed::new_unchecked(
-                from_legacy_action(&LegacyAction::CreateLink(fixt!(CreateLink))),
+                v2_create_link(fixt!(CreateLink)),
                 fixt!(Signature),
             ),
             cached_entry: None,
@@ -273,11 +291,46 @@ mod slow_tests {
     // The bare names below (via `holochain_types::prelude::*`) resolve to the
     // legacy per-variant `Op`/`RegisterAgentActivity`/`StoreRecord`; these
     // explicit v2 imports are what `ValidateInvocation::new` actually takes.
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
     use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-        from_legacy_action, Op, RegisterAgentActivity, StoreRecord,
+        Action, ActionData, ActionHeader, CreateData, CreateLinkData, Op, RegisterAgentActivity,
+        StoreRecord,
     };
     use std::sync::Arc;
+
+    /// Project a fixturated legacy `Create` struct into a v2 `Action`.
+    fn v2_create(c: Create) -> Action {
+        Action {
+            header: ActionHeader {
+                author: c.author,
+                timestamp: c.timestamp,
+                action_seq: c.action_seq,
+                prev_action: Some(c.prev_action),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: c.entry_type,
+                entry_hash: c.entry_hash,
+            }),
+        }
+    }
+
+    /// Project a fixturated legacy `CreateLink` struct into a v2 `Action`.
+    fn v2_create_link(c: CreateLink) -> Action {
+        Action {
+            header: ActionHeader {
+                author: c.author,
+                timestamp: c.timestamp,
+                action_seq: c.action_seq,
+                prev_action: Some(c.prev_action),
+            },
+            data: ActionData::CreateLink(CreateLinkData {
+                base_address: c.base_address,
+                target_address: c.target_address,
+                zome_index: c.zome_index,
+                link_type: c.link_type,
+                tag: c.tag,
+            }),
+        }
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {
@@ -285,7 +338,7 @@ mod slow_tests {
             ZomesToInvoke::One(IntegrityZome::from(TestWasm::Foo).erase_type()),
             &Op::RegisterAgentActivity(RegisterAgentActivity {
                 action: SignedActionHashed::new_unchecked(
-                    from_legacy_action(&LegacyAction::CreateLink(fixt!(CreateLink))),
+                    v2_create_link(fixt!(CreateLink)),
                     fixt!(Signature),
                 ),
                 cached_entry: None,
@@ -308,7 +361,7 @@ mod slow_tests {
             ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateValid).erase_type()),
             &Op::RegisterAgentActivity(RegisterAgentActivity {
                 action: SignedActionHashed::new_unchecked(
-                    from_legacy_action(&LegacyAction::CreateLink(fixt!(CreateLink))),
+                    v2_create_link(fixt!(CreateLink)),
                     fixt!(Signature),
                 ),
                 cached_entry: None,
@@ -374,7 +427,7 @@ mod slow_tests {
             ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalidParams).erase_type()),
             &Op::RegisterAgentActivity(RegisterAgentActivity {
                 action: SignedActionHashed::new_unchecked(
-                    from_legacy_action(&LegacyAction::CreateLink(fixt!(CreateLink))),
+                    v2_create_link(fixt!(CreateLink)),
                     fixt!(Signature),
                 ),
                 cached_entry: None,
@@ -436,9 +489,7 @@ mod slow_tests {
         let op = Op::StoreRecord(StoreRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(
-                    HoloHashed::from_content_sync(from_legacy_action(&LegacyAction::Create(
-                        action,
-                    ))),
+                    HoloHashed::from_content_sync(v2_create(action)),
                     Signature(vec![7; SIGNATURE_BYTES].try_into().unwrap()),
                 ),
                 RecordEntry::Present(entry),

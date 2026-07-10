@@ -4,19 +4,14 @@
 
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_zome_types::action::conversions::WrongActionError;
+use holochain_zome_types::dht_v2::{Action, ActionType};
 use holochain_zome_types::op::ChainOpType;
-use holochain_zome_types::prelude::*;
 use thiserror::Error;
-
-// The `ActionWithoutEntry`/`OpActionMismatch` diagnostics carry the legacy
-// per-variant `Action`/`ActionType`. They are error-message payloads only (never
-// used to decide an outcome); the surviving `app_validation_workflow` projects
-// its v2 action to this legacy shape via `to_legacy_signed_action` when raising
-// them. Shadows the v2 `Action` re-exported by `prelude::*`.
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
 
 #[derive(Debug, Error)]
 pub enum DhtOpError {
+    // These diagnostics carry the v2 `Action`/`ActionType`. They are
+    // error-message payloads only (never used to decide an outcome).
     #[error(
         "Tried to create a DhtOp from a Record that requires an Entry. Action type {:?}", .0
     )]

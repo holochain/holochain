@@ -118,12 +118,10 @@ use holochain_state::prelude::*;
 // shadow the legacy re-exports pulled in via `holochain_state::prelude::*`.
 // The couple of sites that build a fresh warrant `DhtOp` from scratch
 // (`make_invalid_chain_warrant_op`, `make_fork_warrant_op_inner`) return the
-// legacy `DhtOpHashed` explicitly, fully-qualified. `to_legacy_signed_action`
-// remains for the structural checks that stay legacy (countersigning weight).
+// legacy `DhtOpHashed` explicitly, fully-qualified.
 use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use holochain_zome_types::dht_v2::{
-    from_legacy_action, to_legacy_signed_action, ActionData, CreateLinkData, DeleteData,
-    DeleteLinkData, UpdateData,
+    build_action_set, ActionData, CreateLinkData, DeleteData, DeleteLinkData, UpdateData,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -831,21 +829,11 @@ fn get_dependencies_from_ops(
                                 OpEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
                                     // Discard errors here because we'll check later whether the input is valid. If it's not then it
                                     // won't matter that we've skipped fetching deps for it
-                                    if let Ok(entry_rate_weight) =
-                                        action_to_entry_rate_weight(action)
-                                    {
-                                        make_action_set_for_session_data(
-                                            entry_rate_weight,
-                                            entry,
-                                            session_data,
-                                        )
+                                    make_action_set_for_session_data(entry, session_data)
                                         .unwrap_or_else(|_| vec![])
                                         .into_iter()
                                         .map(|action| action.into_hash())
                                         .collect::<Vec<_>>()
-                                    } else {
-                                        vec![]
-                                    }
                                 }
                                 _ => vec![],
                             };
@@ -958,26 +946,12 @@ pub(crate) async fn validate_op(
     }
 }
 
-/// The `EntryRateWeight` a v2 `Create`/`Update` action carries, for feeding the
-/// still-legacy countersigning-session weight machinery (`build_action_set`).
-/// The v2 model has retired rate-limiting weight, so this is always the default
-/// value — the same value a legacy round trip would produce, since every
-/// v2-authored action's legacy projection defaults its `weight` field.
-fn action_to_entry_rate_weight(action: &Action) -> SysValidationResult<EntryRateWeight> {
-    action
-        .entry_data()
-        .map(|_| EntryRateWeight::default())
-        .ok_or_else(|| SysValidationError::NonEntryAction(Box::new(action.clone())))
-}
-
 fn make_action_set_for_session_data(
-    entry_rate_weight: EntryRateWeight,
     entry: &Entry,
     session_data: &CounterSigningSessionData,
 ) -> SysValidationResult<Vec<ActionHash>> {
     let entry_hash = EntryHash::with_data_sync(entry);
-    Ok(session_data
-        .build_action_set(entry_hash, entry_rate_weight)?
+    Ok(build_action_set(session_data, entry_hash)?
         .into_iter()
         .map(|action| ActionHash::with_data_sync(&action))
         .collect())
@@ -1012,11 +986,7 @@ async fn validate_chain_op(
             if let OpEntry::Present(entry) = op_entry {
                 // Retrieve for all other actions on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = entry {
-                    for action_hash in make_action_set_for_session_data(
-                        action_to_entry_rate_weight(action)?,
-                        entry,
-                        session_data,
-                    )? {
+                    for action_hash in make_action_set_for_session_data(entry, session_data)? {
                         // Just require that we are holding all the other actions
                         let validation_dependencies =
                             validation_dependencies.lock().expect("poisoned");
@@ -1042,11 +1012,7 @@ async fn validate_chain_op(
 
             // Check and hold for all other actions on countersigned entry.
             if let Entry::CounterSign(session_data, _) = entry {
-                for action_hash in make_action_set_for_session_data(
-                    action_to_entry_rate_weight(action)?,
-                    entry,
-                    session_data,
-                )? {
+                for action_hash in make_action_set_for_session_data(entry, session_data)? {
                     // Just require that we are holding all the other actions
                     let validation_dependencies = validation_dependencies.lock().expect("poisoned");
                     validation_dependencies
@@ -1360,25 +1326,12 @@ async fn sys_validate_record_inner(
 
     match maybe_entry {
         Some(Entry::CounterSign(session, _)) => {
-            // The countersigning session's per-agent action set is built by the
-            // still-legacy, weight-bearing `build_action_set`; project `action`
-            // to the legacy shape purely to read `entry_rate_data`. The weight
-            // lost in the v2 round trip is not a correctness problem here, since
-            // every v2-authored action carries the default, zero weight already.
-            let legacy_action = to_legacy_signed_action(&presigned_v2(&action))
-                .action()
-                .clone();
-            if let Some(weight) = legacy_action.entry_rate_data() {
-                let entry_hash = EntryHash::with_data_sync(maybe_entry.unwrap());
-                for legacy_session_action in session.build_action_set(entry_hash, weight)? {
-                    let v2_session_action = from_legacy_action(&legacy_session_action);
-                    validate(&v2_session_action, maybe_entry, cascade.clone()).await?;
-                }
-                Ok(())
-            } else {
-                tracing::error!("Got countersigning entry without rate assigned. This should be impossible. But, let's see what happens.");
-                validate(&action, maybe_entry, cascade.clone()).await
+            // Validate every per-agent action the countersigning session implies.
+            let entry_hash = EntryHash::with_data_sync(maybe_entry.unwrap());
+            for session_action in build_action_set(session, entry_hash)? {
+                validate(&session_action, maybe_entry, cascade.clone()).await?;
             }
+            Ok(())
         }
         _ => validate(&action, maybe_entry, cascade).await,
     }
@@ -1459,16 +1412,6 @@ fn store_record(action: &Action, validation_dependencies: SysValDeps) -> SysVali
     Ok(())
 }
 
-/// Wrap a bare v2 action in a throwaway signed-and-hashed form, for feeding the
-/// structural checks that still operate on the legacy per-variant shape via
-/// `to_legacy_signed_action` (the countersigning session weight machinery). The
-/// placeholder signature is never read by those checks — only field values
-/// (entry type, referenced hashes) are.
-fn presigned_v2(action: &Action) -> SignedActionHashed {
-    let hashed = holo_hash::HoloHashed::from_content_sync(action.clone());
-    SignedActionHashed::with_presigned(hashed, Signature::from([0u8; 64]))
-}
-
 async fn store_entry(
     action: &Action,
     entry: &Entry,
@@ -1499,17 +1442,12 @@ async fn store_entry(
 
     // Additional checks if this is a countersigned entry.
     if let Entry::CounterSign(session_data, _) = entry {
-        let legacy_action = to_legacy_signed_action(&presigned_v2(action))
-            .action()
-            .clone();
-        let legacy_ref = NewEntryActionRef::try_from(&legacy_action)
-            .map_err(|_| ValidationOutcome::NotNewEntry(Box::new(action.clone())))?;
-        check_countersigning_session_data(
-            EntryHash::with_data_sync(entry),
-            session_data,
-            legacy_ref,
-        )
-        .await?;
+        // Only Create/Update actions carry a countersigned entry.
+        if !matches!(action.data, ActionData::Create(_) | ActionData::Update(_)) {
+            return Err(ValidationOutcome::NotNewEntry(Box::new(action.clone())).into());
+        }
+        check_countersigning_session_data(EntryHash::with_data_sync(entry), session_data, action)
+            .await?;
     }
     Ok(())
 }

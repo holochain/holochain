@@ -33,14 +33,11 @@ use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::judged::Judged;
 use holochain_zome_types::record::SignedActionHashed;
 use holochain_zome_types::timestamp::Timestamp;
-// The test fixturators (`fixt!(Create)`, `Action::Create(..)`, etc.) build the
-// legacy per-variant `Action` enum, so `Action` is pinned to that legacy type
-// here (it would otherwise resolve to the v2 struct via the ambient preludes).
-// The v2 op-pipeline types (`ChainOp`/`DhtOp`) and signing
-// (`SignedActionHashed::sign`) operate on the v2 `Action`, so actions are
-// converted at that boundary via `from_legacy_action`.
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
-use holochain_zome_types::dht_v2::from_legacy_action;
+// The fixturators (`fixt!(Create)`, ...) seed the legacy per-variant action
+// structs; the shared `ToV2Action` helper projects each onto the flat v2
+// `ActionHeader` + `ActionData` envelope that is authored, hashed, and signed.
+use super::validate_op_tests::ToV2Action;
+use holochain_zome_types::dht_v2::Action;
 use std::collections::HashSet;
 use std::sync::Arc;
 use {
@@ -65,10 +62,7 @@ async fn validate_op_with_no_dependency() {
         timestamp: Timestamp::now(),
         hash: test_case.dna_hash(),
     };
-    let op = ChainOp::AgentActivity(SignedAction::new(
-        from_legacy_action(&Action::Dna(dna_action)),
-        fixt!(Signature),
-    ));
+    let op = ChainOp::AgentActivity(SignedAction::new(dna_action.to_v2(), fixt!(Signature)));
 
     let op_hash = test_case.save_op_to_dht(op.into()).await.unwrap();
 
@@ -100,11 +94,9 @@ async fn validate_op_with_dependency_held_in_dht_store() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case
-        .sign_action(Action::Create(prev_create_action.clone()))
-        .await;
+    let previous_action = test_case.sign_action(prev_create_action.to_v2()).await;
     let previous_op = ChainOp::AgentActivity(SignedAction::new(
-        from_legacy_action(&Action::Create(prev_create_action)),
+        prev_create_action.to_v2(),
         fixt!(Signature),
     ));
     test_case
@@ -123,11 +115,8 @@ async fn validate_op_with_dependency_held_in_dht_store() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::AgentActivity(SignedAction::new(
-        from_legacy_action(&Action::Create(create_action)),
-        fixt!(Signature),
-    ))
-    .into();
+    let op =
+        ChainOp::AgentActivity(SignedAction::new(create_action.to_v2(), fixt!(Signature))).into();
 
     let op_hash = test_case.save_op_to_dht(op).await.unwrap();
 
@@ -160,9 +149,7 @@ async fn validate_op_with_dependency_not_held() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case
-        .sign_action(Action::Create(prev_create_action.clone()))
-        .await;
+    let previous_action = test_case.sign_action(prev_create_action.to_v2()).await;
 
     // Op to validate, to go in the dht database
     let mut create_action = fixt!(Create);
@@ -175,11 +162,8 @@ async fn validate_op_with_dependency_not_held() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::AgentActivity(SignedAction::new(
-        from_legacy_action(&Action::Create(create_action)),
-        fixt!(Signature),
-    ))
-    .into();
+    let op =
+        ChainOp::AgentActivity(SignedAction::new(create_action.to_v2(), fixt!(Signature))).into();
 
     let op_hash = test_case.save_op_to_dht(op).await.unwrap();
 
@@ -229,9 +213,7 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
     validation_package_action.author = test_case.agent.clone();
     validation_package_action.action_seq = 10;
     let previous_action = test_case
-        .sign_action(Action::AgentValidationPkg(
-            validation_package_action.clone(),
-        ))
+        .sign_action(validation_package_action.to_v2())
         .await;
 
     // Op to validate, to go in the dht database
@@ -245,11 +227,8 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::AgentActivity(SignedAction::new(
-        from_legacy_action(&Action::Create(create_action)),
-        fixt!(Signature),
-    ))
-    .into();
+    let op =
+        ChainOp::AgentActivity(SignedAction::new(create_action.to_v2(), fixt!(Signature))).into();
 
     test_case.save_op_to_dht(op).await.unwrap();
 
@@ -290,12 +269,10 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
     validation_package_action.author = test_case.agent.clone();
     validation_package_action.action_seq = 10;
     let previous_action = test_case
-        .sign_action(Action::AgentValidationPkg(
-            validation_package_action.clone(),
-        ))
+        .sign_action(validation_package_action.to_v2())
         .await;
     let previous_op = ChainOp::AgentActivity(SignedAction::new(
-        from_legacy_action(&Action::AgentValidationPkg(validation_package_action)),
+        validation_package_action.to_v2(),
         fixt!(Signature),
     ));
     test_case
@@ -314,11 +291,8 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::AgentActivity(SignedAction::new(
-        from_legacy_action(&Action::Create(create_action)),
-        fixt!(Signature),
-    ))
-    .into();
+    let op =
+        ChainOp::AgentActivity(SignedAction::new(create_action.to_v2(), fixt!(Signature))).into();
     test_case.save_op_to_dht(op).await.unwrap();
 
     test_case.run().await;
@@ -357,12 +331,9 @@ async fn validate_valid_warrant_with_cached_dependency() {
         visibility: EntryVisibility::Public,
     });
     create.action_seq = 0; // Not allowed to have a 0 seq number for a Create
-    let warranted_action = test_case.sign_action(Action::Create(create.clone())).await;
+    let warranted_action = test_case.sign_action(create.to_v2()).await;
     let warranted_op = ChainOp::CreateRecord(
-        SignedAction::new(
-            from_legacy_action(&Action::Create(create)),
-            fixt!(Signature),
-        ),
+        SignedAction::new(create.to_v2(), fixt!(Signature)),
         OpEntry::Present(entry),
     );
     test_case
@@ -439,7 +410,7 @@ async fn validate_valid_warrant_with_fetched_dependency() {
         visibility: EntryVisibility::Public,
     });
     create.action_seq = 0; // Not allowed to have a 0 seq number for a Create
-    let warranted_action = test_case.sign_action(Action::Create(create.clone())).await;
+    let warranted_action = test_case.sign_action(create.to_v2()).await;
 
     network.expect_get().return_once({
         let warranted_action = warranted_action.clone();
@@ -531,12 +502,9 @@ async fn reject_invalid_warrant() {
         visibility: EntryVisibility::Public,
     });
     create.action_seq = 30;
-    let valid_action = test_case.sign_action(Action::Create(create.clone())).await;
+    let valid_action = test_case.sign_action(create.to_v2()).await;
     let valid_op = ChainOp::CreateRecord(
-        SignedAction::new(
-            from_legacy_action(&Action::Create(create)),
-            fixt!(Signature),
-        ),
+        SignedAction::new(create.to_v2(), fixt!(Signature)),
         OpEntry::Present(entry),
     );
     let valid_op_hash = DhtOpHashed::from_content_sync(DhtOp::from(valid_op.clone())).hash;
@@ -636,12 +604,9 @@ async fn validate_warrant_with_validated_dependency() {
         visibility: EntryVisibility::Public,
     });
     create.action_seq = 30;
-    let valid_action = test_case.sign_action(Action::Create(create.clone())).await;
+    let valid_action = test_case.sign_action(create.to_v2()).await;
     let valid_op = ChainOp::CreateRecord(
-        SignedAction::new(
-            from_legacy_action(&Action::Create(create)),
-            fixt!(Signature),
-        ),
+        SignedAction::new(create.to_v2(), fixt!(Signature)),
         OpEntry::Present(entry),
     );
     let valid_op_hash = DhtOpHashed::from_content_sync(DhtOp::from(valid_op.clone())).hash;
@@ -712,12 +677,9 @@ async fn avoid_duplicate_warrant() {
         visibility: EntryVisibility::Public,
     });
     create.action_seq = 0; // Not allowed for a create op
-    let valid_action = test_case.sign_action(Action::Create(create.clone())).await;
+    let valid_action = test_case.sign_action(create.to_v2()).await;
     let invalid_op = ChainOp::CreateRecord(
-        SignedAction::new(
-            from_legacy_action(&Action::Create(create)),
-            fixt!(Signature),
-        ),
+        SignedAction::new(create.to_v2(), fixt!(Signature)),
         OpEntry::Present(entry),
     );
     test_case.save_op_to_dht(invalid_op.into()).await.unwrap();
@@ -831,7 +793,7 @@ impl TestCase {
     }
 
     async fn sign_action(&self, action: Action) -> SignedActionHashed {
-        let action_hashed = holo_hash::HoloHashed::from_content_sync(from_legacy_action(&action));
+        let action_hashed = holo_hash::HoloHashed::from_content_sync(action);
         SignedActionHashed::sign(&self.keystore, action_hashed)
             .await
             .unwrap()
