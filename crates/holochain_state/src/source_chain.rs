@@ -595,9 +595,9 @@ impl SourceChain<DbWrite<Dht>> {
         }
     }
 
-    /// Checks if the current [`AgentPubKey`] of the source chain is valid and returns its [`Create`] action.
+    /// Checks if the current [`AgentPubKey`] of the source chain is valid and returns its [`Create`](v2::ActionData::Create) action.
     ///
-    /// Valid means that there's no [`Update`] or [`Delete`] action for the key on the chain.
+    /// Valid means that there's no [`Update`](v2::ActionData::Update) or [`Delete`](v2::ActionData::Delete) action for the key on the chain.
     /// Returns the create action if it is valid, and an [`SourceChainError::InvalidAgentKey`] otherwise.
     ///
     /// Returns the `Action` from [`DhtStore::valid_create_agent_key_action`],
@@ -618,7 +618,7 @@ impl SourceChain<DbWrite<Dht>> {
     /// Deletes the current [`AgentPubKey`] of the source chain if it is valid and returns a [`SourceChainError::InvalidAgentKey`]
     /// otherwise.
     ///
-    /// The agent key is valid if there are no [`Update`] or [`Delete`] actions for that key on the chain.
+    /// The agent key is valid if there are no [`Update`](v2::ActionData::Update) or [`Delete`](v2::ActionData::Delete) actions for that key on the chain.
     pub async fn delete_valid_agent_pub_key(&self) -> SourceChainResult<()> {
         let valid_create_agent_key_action = self.valid_create_agent_key_action().await?;
 

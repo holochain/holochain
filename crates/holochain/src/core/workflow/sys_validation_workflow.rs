@@ -27,19 +27,19 @@
 //!    - Check that the previous action is never a [`ActionData::CloseChain`], since this is always required to be the last action in a chain.
 //!    - Run the [store record checks](#store-record-checks).
 //! - For a [`ChainOp::UpdateEntry`]
-//!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
+//!    - The [`UpdateData::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`UpdateData::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
 //!    - If there is an [`Entry`], then the [store entry checks](#store-entry-checks) are run.
 //! - For a [`ChainOp::UpdateRecord`]
-//!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
+//!    - The [`UpdateData::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`UpdateData::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
 //!    - If there is an [`Entry`], then the [store entry checks](#store-entry-checks) are run.
 //! - For a [`ChainOp::DeleteRecord`]
-//!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`ActionData::Create`] or [`ActionData::Update`].
+//!    - The [`DeleteData::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`ActionData::Create`] or [`ActionData::Update`].
 //! - For a [`ChainOp::DeleteEntry`]
-//!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`ActionData::Create`] or [`ActionData::Update`].
+//!    - The [`DeleteData::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`ActionData::Create`] or [`ActionData::Update`].
 //! - For a [`ChainOp::CreateLink`]
-//!   - The size of the [`CreateLink::tag`] must be less than or equal to the maximum size that is accepted for this link tag. This is specified in the constant [`MAX_TAG_SIZE`].
+//!   - The size of the [`CreateLinkData::tag`] must be less than or equal to the maximum size that is accepted for this link tag. This is specified in the constant [`MAX_TAG_SIZE`].
 //! - For a [`ChainOp::DeleteLink`]
-//!   - The [`DeleteLink::link_add_address`] reference to the [`Action`] of the link being deleted must point to an [`Action`] that can be found locally. That action being deleted must also
+//!   - The [`DeleteLinkData::link_add_address`] reference to the [`Action`] of the link being deleted must point to an [`Action`] that can be found locally. That action being deleted must also
 //!     be a [`ActionData::CreateLink`].
 //!
 //! A [`WarrantOp`] is produced as a proof that an agent broke the rules of the DHT. That may be the
@@ -72,7 +72,7 @@
 //! - The entry type specified in the [`Action`] must match the entry type specified in the [`Entry`].
 //! - The entry hash specified in the [`Action`] must match the entry hash specified in the [`Entry`], which will be hashed as part of the check to obtain a value that is deterministic.
 //! - The size of the [`Entry`] must be less than or equal to the maximum size that is accepted for this entry type. This is specified in the constant [`MAX_ENTRY_SIZE`].
-//! - If the [`Action`] is an [`ActionData::Update`], then the [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
+//! - If the [`Action`] is an [`ActionData::Update`], then the [`UpdateData::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`UpdateData::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
 //! - If the [`Entry`] is an [`Entry::CounterSign`], then the pre-flight response signatures are checked.
 //!
 //! #### Workflow description
