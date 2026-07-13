@@ -3,7 +3,6 @@ pub mod event;
 
 pub(crate) mod wire;
 
-pub use wire::WireDhtOpData;
 pub use wire::WireMessage;
 
 /// Error type for Holochain P2p.

@@ -43,3 +43,12 @@ pub use crate::zome::*;
 pub use crate::zome_io::ExternIO;
 pub use crate::zome_io::*;
 pub use holochain_integrity_types::prelude::*;
+
+// Bring the validation `Op` and its variant structs into the prelude so
+// validators and inline zomes decode the `Op` the host encodes, and
+// `MustGetAgentActivityResponse` carries the `RegisterAgentActivity` payload
+// directly.
+pub use crate::dht_v2::{
+    Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
+    RegisterUpdate, StoreEntry, StoreRecord,
+};

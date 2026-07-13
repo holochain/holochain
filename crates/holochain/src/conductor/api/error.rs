@@ -5,7 +5,6 @@ use crate::conductor::CellError;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::workflow::WorkflowError;
 use holo_hash::DnaHash;
-use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
@@ -36,10 +35,6 @@ pub enum ConductorApiError {
     /// Serialization error
     #[error("Serialization error while using a InterfaceApi: {0:?}")]
     SerializationError(#[from] SerializationError),
-
-    /// Database error
-    #[error(transparent)]
-    DatabaseError(#[from] DatabaseError),
 
     /// Workflow error.
     #[error(transparent)]
@@ -90,9 +85,6 @@ pub enum ConductorApiError {
 
     #[error(transparent)]
     StateMutationError(#[from] holochain_state::mutations::StateMutationError),
-
-    #[error(transparent)]
-    RusqliteError(#[from] rusqlite::Error),
 
     #[error(transparent)]
     RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),

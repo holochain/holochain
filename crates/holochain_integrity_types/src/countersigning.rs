@@ -407,7 +407,8 @@ pub enum ActionBase {
 /// Base data for Create actions.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub struct CreateBase {
-    entry_type: EntryType,
+    /// The entry type of the create.
+    pub entry_type: EntryType,
 }
 
 impl CreateBase {
@@ -426,40 +427,6 @@ pub struct UpdateBase {
     pub original_entry_address: EntryHash,
     /// The entry type of the update.
     pub entry_type: EntryType,
-}
-
-impl Action {
-    /// Construct an Action from the ActionBase and associated session data.
-    pub fn from_countersigning_data(
-        entry_hash: EntryHash,
-        session_data: &CounterSigningSessionData,
-        author: AgentPubKey,
-        weight: EntryRateWeight,
-    ) -> Result<Self, CounterSigningError> {
-        let agent_state = session_data.agent_state_for_agent(&author)?;
-        Ok(match &session_data.preflight_request().action_base {
-            ActionBase::Create(base) => Action::Create(Create {
-                author,
-                timestamp: session_data.to_timestamp(),
-                action_seq: agent_state.action_seq + 1,
-                prev_action: agent_state.chain_top.clone(),
-                entry_type: base.entry_type.clone(),
-                weight,
-                entry_hash,
-            }),
-            ActionBase::Update(base) => Action::Update(Update {
-                author,
-                timestamp: session_data.to_timestamp(),
-                action_seq: agent_state.action_seq + 1,
-                prev_action: agent_state.chain_top.clone(),
-                original_action_address: base.original_action_address.clone(),
-                original_entry_address: base.original_entry_address.clone(),
-                entry_type: base.entry_type.clone(),
-                weight,
-                entry_hash,
-            }),
-        })
-    }
 }
 
 /// All the data required for a countersigning session.
@@ -516,31 +483,6 @@ impl CounterSigningSessionData {
             },
             None => Err(CounterSigningError::AgentIndexOutOfBounds),
         }
-    }
-
-    /// Attempt to map countersigning session data to a set of actions.
-    /// A given countersigning session always maps to the same ordered set of actions or an error.
-    /// Note the actions are not signed as the intent is to build actions for other agents without their private keys.
-    pub fn build_action_set(
-        &self,
-        entry_hash: EntryHash,
-        weight: EntryRateWeight,
-    ) -> Result<Vec<Action>, CounterSigningError> {
-        let mut actions = vec![];
-        let mut build_actions = |countersigning_agents: &CounterSigningAgents| -> Result<(), _> {
-            for (agent, _role) in countersigning_agents.iter() {
-                actions.push(Action::from_countersigning_data(
-                    entry_hash.clone(),
-                    self,
-                    agent.clone(),
-                    weight.clone(),
-                )?);
-            }
-            Ok(())
-        };
-        build_actions(&self.preflight_request.signing_agents)?;
-        build_actions(&self.preflight_request.optional_signing_agents)?;
-        Ok(actions)
     }
 
     /// Fallible constructor.

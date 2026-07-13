@@ -171,26 +171,6 @@ impl TryFrom<core::time::Duration> for Timestamp {
     }
 }
 
-#[cfg(feature = "sqlite")]
-impl rusqlite::ToSql for Timestamp {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-        Ok(rusqlite::types::ToSqlOutput::Owned(self.0.into()))
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl rusqlite::types::FromSql for Timestamp {
-    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
-        match value {
-            // NB: if you have a NULLable Timestamp field in a DB, use `Option<Timestamp>`.
-            //     otherwise, you'll get an InvalidType error, because we don't handle null
-            //     values here.
-            rusqlite::types::ValueRef::Integer(i) => Ok(Self::from_micros(i)),
-            _ => Err(rusqlite::types::FromSqlError::InvalidType),
-        }
-    }
-}
-
 /// It's an interval bounded by timestamps that are not infinite.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq, Hash)]
 pub struct InclusiveTimestampInterval {

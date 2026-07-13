@@ -1190,11 +1190,6 @@ pub trait RibosomeImplT: std::fmt::Debug + Send + Sync {
     }
 }
 
-/// Placeholder for weighing. Currently produces zero weight.
-pub fn weigh_placeholder() -> EntryRateWeight {
-    EntryRateWeight::default()
-}
-
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;

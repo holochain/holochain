@@ -1,21 +1,19 @@
 use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::{TriggerReceiver, TriggerSender};
-use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::countersigning_workflow::{
     accept_countersigning_request, countersigning_workflow, CountersigningSessionState,
     CountersigningWorkspace, SessionCompletionDecision, SessionResolutionSummary,
 };
 use crate::core::workflow::countersigning_workflow::{countersigning_success, WorkComplete};
 use crate::core::workflow::WorkflowResult;
-use crate::prelude::CreateFixturator;
 use crate::prelude::EntryFixturator;
 use crate::prelude::SignatureFixturator;
 use crate::prelude::SignedAction;
 use crate::prelude::{ActionBase, PreflightBytes, PreflightRequest, PreflightRequestAcceptance};
-use crate::prelude::{ActionHashed, CounterSigningAgentState, SignedActionHashed};
+use crate::prelude::{CounterSigningAgentState, SignedActionHashed};
 use fixt::prelude::*;
-use hdk::prelude::{Action, Entry, EntryTypeFixturator, Record};
 use hdk::prelude::{CounterSigningSessionTimes, Timestamp};
+use hdk::prelude::{Entry, EntryTypeFixturator, Record, RecordEntry};
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
@@ -28,12 +26,13 @@ use holochain_state::prelude::{AppEntryBytesFixturator, HeadInfo};
 use holochain_state::prelude::{StateMutationError, StateMutationResult};
 use holochain_state::source_chain;
 use holochain_types::activity::AgentActivityResponse;
-use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use holochain_types::prelude::SystemSignal;
 use holochain_types::prelude::{ChainItems, SignedActionHashedExt};
 use holochain_types::signal::Signal;
 use holochain_zome_types::cell::CellId;
 use holochain_zome_types::countersigning::PreflightResponse;
+use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
 use holochain_zome_types::prelude::CreateBase;
 use holochain_zome_types::query::{ChainHead, ChainStatus};
 use matches::assert_matches;
@@ -1868,7 +1867,6 @@ impl TestHarness {
             self.test_space.space.clone(),
             self.workspace.clone(),
             self.network.clone(),
-            self.keystore.clone(),
             CellId::new(self.dna_hash.clone(), self.author.clone()),
             self.signal_tx.clone(),
             self.countersigning_tx.clone(),
@@ -1931,30 +1929,30 @@ impl TestHarness {
         entry: Entry,
         entry_hash: EntryHash,
     ) -> SignedAction {
-        let my_action = Action::from_countersigning_data(
+        // Build the countersigning action via `from_countersigning_data` and
+        // sign over its bytes, matching the signature basis used everywhere
+        // else. The DhtStore writes below build the op from the same `signed`.
+        let my_action = holochain_zome_types::dht_v2::from_countersigning_data(
             entry_hash.clone(),
             session_data,
             self.author.clone(),
-            weigh_placeholder(),
         )
         .unwrap();
-        let hashed = ActionHashed::from_content_sync(my_action.clone());
+        let action = my_action.clone();
+        let hashed = holo_hash::HoloHashed::from_content_sync(action.clone());
         let sah = SignedActionHashed::sign(&self.keystore, hashed)
             .await
             .unwrap();
+        let signature = sah.signature().clone();
 
-        let signed = SignedAction::from(sah.clone());
+        let signed = SignedAction::new(action, signature.clone());
 
-        // Sign the op with the real action signature. The store record is
-        // reconstructed from this op, and the completion path verifies the
+        // Build the `StoreEntry`/`CreateEntry` op for the DhtStore writes below.
+        // It carries the real action signature: the store record is
+        // reconstructed from this op and the completion path verifies the
         // record's signature, so a fixt signature would be rejected.
-        let store_entry_op = ChainOp::StoreEntry(
-            sah.signature().clone(),
-            my_action.clone().try_into().unwrap(),
-            entry.clone(),
-        );
-        let dht_op = DhtOp::ChainOp(Box::new(store_entry_op));
-        let dht_op = DhtOpHashed::from_content_sync(dht_op);
+        let store_entry_op = ChainOp::CreateEntry(signed.clone(), OpEntry::Present(entry.clone()));
+        let dht_op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(store_entry_op)));
 
         // Write the commit to the DhtStore so the store-backed session reads
         // (`current_countersigning_session`, chain head) see it.
@@ -1984,7 +1982,7 @@ impl TestHarness {
         // mirror it here — withheld like the session's other ops — otherwise the
         // committed session head is invisible to the store reads.
         let agent_activity_op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
-            ChainOp::RegisterAgentActivity(sah.signature().clone(), my_action.clone()),
+            ChainOp::AgentActivity(signed.clone()),
         )));
         self.test_space
             .space
@@ -2239,18 +2237,17 @@ impl RemoteAgent {
         entry_hash: &EntryHash,
         keystore: MetaLairClient,
     ) -> SignedAction {
-        let action = Action::from_countersigning_data(
+        let action = holochain_zome_types::dht_v2::from_countersigning_data(
             entry_hash.clone(),
             session_data,
             self.agent.clone(),
-            weigh_placeholder(),
         )
         .unwrap();
 
-        let hashed = ActionHashed::from_content_sync(action.clone());
+        let hashed = holo_hash::HoloHashed::from_content_sync(action);
         let sah = SignedActionHashed::sign(&keystore, hashed).await.unwrap();
 
-        SignedAction::from(sah)
+        SignedAction::new(sah.hashed.content.clone(), sah.signature().clone())
     }
 
     fn no_activity_response(&self) -> AgentActivityResponse {
@@ -2265,13 +2262,13 @@ impl RemoteAgent {
     }
 
     fn other_activity_response(&self) -> AgentActivityResponse {
-        let action = Action::Create(fixt!(Create));
+        let action = fixt!(Action, CreateAction);
 
         AgentActivityResponse {
             agent: self.agent.clone(),
             valid_activity: ChainItems::Full(vec![Record::new(
                 SignedActionHashed::new_unchecked(action, fixt!(Signature)),
-                Some(fixt!(Entry)),
+                RecordEntry::Present(fixt!(Entry)),
             )]),
             rejected_activity: ChainItems::NotRequested,
             status: ChainStatus::Valid(ChainHead {
@@ -2304,10 +2301,10 @@ impl RemoteAgent {
             agent: self.agent.clone(),
             valid_activity: ChainItems::Full(vec![Record::new(
                 SignedActionHashed::with_presigned(
-                    ActionHashed::from_content_sync(signed_action.into_data()),
+                    holo_hash::HoloHashed::from_content_sync(signed_action.into_data()),
                     signature,
                 ),
-                Some(entry),
+                RecordEntry::Present(entry),
             )]),
             rejected_activity: ChainItems::NotRequested,
             status: ChainStatus::Valid(ChainHead {

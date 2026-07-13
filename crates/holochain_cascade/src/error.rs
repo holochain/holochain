@@ -3,7 +3,6 @@
 use holo_hash::{ActionHash, AnyDhtHash};
 use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use holochain_zome_types::action::conversions::WrongActionError;
@@ -12,9 +11,6 @@ use tokio::task::JoinError;
 
 #[derive(Error, Debug)]
 pub enum CascadeError {
-    #[error(transparent)]
-    DatabaseError(#[from] DatabaseError),
-
     #[error(transparent)]
     ActionError(#[from] ActionError),
 

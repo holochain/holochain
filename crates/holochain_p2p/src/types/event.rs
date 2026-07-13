@@ -84,9 +84,7 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
 
     /// A remote node is publishing data in a range we claim to be holding.
     ///
-    /// Ops arrive in the v2 wire form ([`holochain_types::dht_v2::DhtOp`]); the
-    /// receiving conductor reconstructs the legacy form for the migration-era
-    /// ingest pipeline.
+    /// Ops arrive as [`holochain_types::dht_v2::DhtOp`].
     fn handle_publish(
         &self,
         dna_hash: DnaHash,
@@ -149,7 +147,7 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
     fn handle_publish_countersign(
         &self,
         dna_hash: DnaHash,
-        op: holochain_types::dht_op::ChainOp,
+        op: ChainOp,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Messages between agents that drive a countersigning session.

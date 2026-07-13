@@ -14,18 +14,17 @@ use holo_hash::{
 };
 use holochain_data::kind::Dht;
 use holochain_data::DbRead;
-use holochain_types::chain::ChainItem;
-use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::dht_v2::DhtOpHashed;
 use holochain_types::prelude::{
     ActionHashedContainer, AgentActivityResponse, ChainItems, ChainItemsSource,
     MustGetAgentActivityResponse, RegisterAgentActivity, ScheduledFn, Timestamp,
 };
 use holochain_types::warrant::WarrantOp;
 use holochain_zome_types::chain::{ChainFilter, LimitConditions};
-use holochain_zome_types::dht_v2::RecordValidity;
+use holochain_zome_types::dht_v2::{ActionData, RecordValidity};
 use holochain_zome_types::prelude::{
     Action, CapGrant, CapSecret, ChainFork, ChainHead, ChainQueryFilter, ChainStatus, EntryType,
-    HighestObserved, SignedWarrant,
+    EntryVisibility, HighestObserved, SignedWarrant,
 };
 use holochain_zome_types::validate::ValidationStatus;
 use std::collections::{HashMap, HashSet};
@@ -384,11 +383,10 @@ impl DhtStore<DbRead<Dht>> {
             Some(r) => r,
             None => return Ok(None),
         };
-        let (sah, entry) = record.clone().into_inner();
-        Ok(match (sah.action().entry_hash(), entry.into_option()) {
-            (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
-                Some((record, entry_hash.clone(), *cs))
-            }
+        let entry_hash = record.action().data.entry_hash().cloned();
+        let entry = record.entry.clone().into_option();
+        Ok(match (entry_hash, entry) {
+            (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => Some((record, entry_hash, *cs)),
             _ => None,
         })
     }
@@ -518,10 +516,10 @@ impl DhtStore<DbRead<Dht>> {
     /// `ChainFork` warrant.
     pub async fn find_fork_for_action(
         &self,
-        action: &holochain_zome_types::action::Action,
+        action: &holochain_zome_types::dht_v2::Action,
     ) -> StateQueryResult<Option<(holo_hash::ActionHash, holochain_types::prelude::Signature)>>
     {
-        let Some(prev) = action.prev_action() else {
+        let Some(prev) = action.header.prev_action.as_ref() else {
             return Ok(None);
         };
         let incoming_hash = holo_hash::ActionHash::with_data_sync(action);
@@ -531,7 +529,7 @@ impl DhtStore<DbRead<Dht>> {
             .get_actions_by_prev_hash(prev, &incoming_hash)
             .await?;
 
-        let incoming_author = action.author();
+        let incoming_author = &action.header.author;
         if let Some(sibling) = siblings.into_iter().next() {
             let existing_author = &sibling.hashed.content.header.author;
             if existing_author != incoming_author {
@@ -567,17 +565,17 @@ impl DhtStore<DbRead<Dht>> {
         hash: &holo_hash::ActionHash,
         author: Option<&holo_hash::AgentPubKey>,
     ) -> StateQueryResult<Option<holochain_zome_types::record::Record>> {
-        let Some(v2_action) = self.db().get_action(hash.clone()).await? else {
+        let Some(sah) = self.db().get_action(hash.clone()).await? else {
             return Ok(None);
         };
-        let action = holochain_zome_types::dht_v2::to_legacy_signed_action(&v2_action);
-        let entry = match action.action().entry_hash() {
-            Some(entry_hash) if private_entry_visible_to(&action, author) => {
+        let action = &sah.hashed.content;
+        let entry = match action.data.entry_hash().cloned() {
+            Some(entry_hash) if private_entry_visible_to(action, author) => {
                 match self.db().get_entry(entry_hash.clone(), author).await? {
                     Some(entry) => Some(entry),
                     // A public entry referenced but unavailable means "no
                     // record"; an absent private entry is simply `Hidden`.
-                    None if action_entry_is_private(&action) => None,
+                    None if action_entry_is_private(action) => None,
                     None => return Ok(None),
                 }
             }
@@ -587,8 +585,13 @@ impl DhtStore<DbRead<Dht>> {
             Some(_) => None,
             None => None,
         };
+        let record_entry = holochain_zome_types::record::RecordEntry::new(
+            action_entry_type(action).map(|et| et.visibility()),
+            entry,
+        );
         Ok(Some(holochain_zome_types::record::Record::new(
-            action, entry,
+            sah,
+            record_entry,
         )))
     }
 
@@ -634,13 +637,17 @@ impl DhtStore<DbRead<Dht>> {
             }
             None => creates.into_iter().next(),
         };
-        let Some(v2_sah) = chosen else {
+        let Some(sah) = chosen else {
             return Ok(None);
         };
-        let action = holochain_zome_types::dht_v2::to_legacy_signed_action(&v2_sah);
         let entry = self.db().get_entry(entry_hash.clone(), author).await?;
+        let record_entry = holochain_zome_types::record::RecordEntry::new(
+            action_entry_type(&sah.hashed.content).map(|et| et.visibility()),
+            entry,
+        );
         Ok(Some(holochain_zome_types::record::Record::new(
-            action, entry,
+            sah,
+            record_entry,
         )))
     }
 
@@ -656,35 +663,16 @@ impl DhtStore<DbRead<Dht>> {
         let Some(entry) = self.db().get_entry(entry_hash.clone(), author).await? else {
             return Ok(None);
         };
-        let to_legacy = holochain_zome_types::dht_v2::to_legacy_signed_action;
         let actions = self
             .db()
             .get_create_actions_for_entry(entry_hash, author, RecordValidity::Accepted)
-            .await?
-            .iter()
-            .map(to_legacy)
-            .collect();
+            .await?;
         let rejected_actions = self
             .db()
             .get_create_actions_for_entry(entry_hash, author, RecordValidity::Rejected)
-            .await?
-            .iter()
-            .map(to_legacy)
-            .collect();
-        let deletes = self
-            .db()
-            .get_delete_actions_for_entry(entry_hash)
-            .await?
-            .iter()
-            .map(to_legacy)
-            .collect();
-        let updates = self
-            .db()
-            .get_update_actions_for_entry(entry_hash)
-            .await?
-            .iter()
-            .map(to_legacy)
-            .collect();
+            .await?;
+        let deletes = self.db().get_delete_actions_for_entry(entry_hash).await?;
+        let updates = self.db().get_update_actions_for_entry(entry_hash).await?;
         let entry_dht_status = if self
             .db()
             .get_live_entry_creates(entry_hash, author)
@@ -706,17 +694,12 @@ impl DhtStore<DbRead<Dht>> {
     }
 
     /// Retrieve the signed action for `hash` if present, without CRUD
-    /// resolution. Returns the legacy `SignedActionHashed` (converted from the
-    /// stored v2 action).
+    /// resolution.
     pub async fn retrieve_action(
         &self,
         hash: &holo_hash::ActionHash,
     ) -> StateQueryResult<Option<holochain_zome_types::record::SignedActionHashed>> {
-        Ok(self
-            .db()
-            .get_action(hash.clone())
-            .await?
-            .map(|v2| holochain_zome_types::dht_v2::to_legacy_signed_action(&v2)))
+        Ok(self.db().get_action(hash.clone()).await?)
     }
 
     /// The signed action carried by the integrated chain op `op_hash`, if the
@@ -792,21 +775,22 @@ impl DhtStore<DbRead<Dht>> {
                 None => return Ok(None),
             },
         };
+        let action_content = &action.hashed.content;
 
         // Resolve the entry (if the action references one). A private entry is
         // only attached for its own author — see `private_entry_visible_to`.
-        let entry = match action.action().entry_hash() {
-            Some(entry_hash) if private_entry_visible_to(&action, author) => {
+        let entry = match action_content.data.entry_hash().cloned() {
+            Some(entry_hash) if private_entry_visible_to(action_content, author) => {
                 // Try the store first, then the scratch (scratch entries are
                 // this agent's own data; the visibility guard above already
                 // ensures we only reach here for the author of a private entry).
-                match self.retrieve_entry(entry_hash, author).await? {
+                match self.retrieve_entry(&entry_hash, author).await? {
                     Some(e) => Some(e),
-                    None => match scratch_entry(scratch, entry_hash)? {
+                    None => match scratch_entry(scratch, &entry_hash)? {
                         Some(e) => Some(e),
                         // Unavailable everywhere: a public entry means "no
                         // record"; an absent private entry is `Hidden`.
-                        None if action_entry_is_private(&action) => None,
+                        None if action_entry_is_private(action_content) => None,
                         None => return Ok(None),
                     },
                 }
@@ -815,9 +799,14 @@ impl DhtStore<DbRead<Dht>> {
             Some(_) => None,
             None => None,
         };
+        let record_entry = holochain_zome_types::record::RecordEntry::new(
+            action_entry_type(action_content).map(|et| et.visibility()),
+            entry,
+        );
 
         Ok(Some(holochain_zome_types::record::Record::new(
-            action, entry,
+            action,
+            record_entry,
         )))
     }
 
@@ -904,26 +893,20 @@ impl DhtStore<DbRead<Dht>> {
                 let authored = store_creates
                     .iter()
                     .find(|sah| &sah.hashed.content.header.author == a)
-                    .map(holochain_zome_types::dht_v2::to_legacy_signed_action);
+                    .cloned();
                 let authored = authored.or_else(|| {
                     scratch_creates
                         .iter()
-                        .find(|sah| sah.action().author() == a)
+                        .find(|sah| &sah.hashed.content.header.author == a)
                         .cloned()
                 });
                 authored
-                    .or_else(|| {
-                        store_creates
-                            .into_iter()
-                            .next()
-                            .map(|sah| holochain_zome_types::dht_v2::to_legacy_signed_action(&sah))
-                    })
+                    .or_else(|| store_creates.into_iter().next())
                     .or_else(|| scratch_creates.into_iter().next())
             }
             None => store_creates
                 .into_iter()
                 .next()
-                .map(|sah| holochain_zome_types::dht_v2::to_legacy_signed_action(&sah))
                 .or_else(|| scratch_creates.into_iter().next()),
         };
 
@@ -936,8 +919,14 @@ impl DhtStore<DbRead<Dht>> {
             .retrieve_entry_with_scratch(entry_hash, author, scratch)
             .await?;
 
+        let record_entry = holochain_zome_types::record::RecordEntry::new(
+            action_entry_type(&action.hashed.content).map(|et| et.visibility()),
+            entry,
+        );
+
         Ok(Some(holochain_zome_types::record::Record::new(
-            action, entry,
+            action,
+            record_entry,
         )))
     }
 
@@ -973,20 +962,8 @@ impl DhtStore<DbRead<Dht>> {
         let Some(record) = self.retrieve_record(hash, author).await? else {
             return Ok(None);
         };
-        let deletes = self
-            .db()
-            .get_delete_actions_for_record(hash)
-            .await?
-            .iter()
-            .map(holochain_zome_types::dht_v2::to_legacy_signed_action)
-            .collect();
-        let updates = self
-            .db()
-            .get_update_actions_for_record(hash)
-            .await?
-            .iter()
-            .map(holochain_zome_types::dht_v2::to_legacy_signed_action)
-            .collect();
+        let deletes = self.db().get_delete_actions_for_record(hash).await?;
+        let updates = self.db().get_update_actions_for_record(hash).await?;
         Ok(Some(holochain_zome_types::metadata::RecordDetails {
             record,
             validation_status,
@@ -1004,8 +981,7 @@ impl DhtStore<DbRead<Dht>> {
     /// exists. A scratch-only record (authored locally but not yet committed and
     /// published) has no such op; it is returned with `Valid` status, since the
     /// author's own uncommitted record is valid from their perspective. This
-    /// mirrors the legacy scratch-overlay behaviour this requester read replaces,
-    /// and lets host functions resolve a just-authored record mid-call — e.g. an
+    /// lets host functions resolve a just-authored record mid-call — e.g. an
     /// `update` reading the `create` it depends on within one zome call. An action
     /// reachable only via a non-record op (no `StoreRecord`, not in the scratch)
     /// still returns `None`.
@@ -1057,19 +1033,13 @@ impl DhtStore<DbRead<Dht>> {
         };
 
         // Store deletes + scratch deletes targeting this action hash.
-        let store_deletes = self.db().get_delete_actions_for_record(hash).await?;
-        let mut deletes: Vec<holochain_zome_types::record::SignedActionHashed> = store_deletes
-            .iter()
-            .map(holochain_zome_types::dht_v2::to_legacy_signed_action)
-            .collect();
+        let mut deletes: Vec<holochain_zome_types::record::SignedActionHashed> =
+            self.db().get_delete_actions_for_record(hash).await?;
         deletes.extend(scratch_deletes_for_record(scratch, hash)?);
 
         // Store updates + scratch updates targeting this action hash.
-        let store_updates = self.db().get_update_actions_for_record(hash).await?;
-        let mut updates: Vec<holochain_zome_types::record::SignedActionHashed> = store_updates
-            .iter()
-            .map(holochain_zome_types::dht_v2::to_legacy_signed_action)
-            .collect();
+        let mut updates: Vec<holochain_zome_types::record::SignedActionHashed> =
+            self.db().get_update_actions_for_record(hash).await?;
         updates.extend(scratch_updates_for_record(scratch, hash)?);
 
         Ok(Some(holochain_zome_types::metadata::RecordDetails {
@@ -1115,36 +1085,28 @@ impl DhtStore<DbRead<Dht>> {
             },
         };
 
-        let to_legacy = holochain_zome_types::dht_v2::to_legacy_signed_action;
-
-        // Accepted creates: store accepted creates + all scratch creates for this entry.
-        let store_accepted = self
+        // Accepted creates: store accepted creates + all scratch creates for
+        // this entry.
+        let mut actions: Vec<holochain_zome_types::record::SignedActionHashed> = self
             .db()
             .get_create_actions_for_entry(entry_hash, author, RecordValidity::Accepted)
             .await?;
-        let mut actions: Vec<holochain_zome_types::record::SignedActionHashed> =
-            store_accepted.iter().map(to_legacy).collect();
         actions.extend(scratch_creates_for_entry(scratch, entry_hash)?);
 
         // Rejected creates: store only (scratch has no validation status).
         let rejected_actions = self
             .db()
             .get_create_actions_for_entry(entry_hash, author, RecordValidity::Rejected)
-            .await?
-            .iter()
-            .map(to_legacy)
-            .collect();
+            .await?;
 
         // Deletes: store + scratch.
-        let store_deletes = self.db().get_delete_actions_for_entry(entry_hash).await?;
         let mut deletes: Vec<holochain_zome_types::record::SignedActionHashed> =
-            store_deletes.iter().map(to_legacy).collect();
+            self.db().get_delete_actions_for_entry(entry_hash).await?;
         deletes.extend(scratch_deletes_for_entry(scratch, entry_hash)?);
 
         // Updates: store + scratch.
-        let store_updates = self.db().get_update_actions_for_entry(entry_hash).await?;
         let mut updates: Vec<holochain_zome_types::record::SignedActionHashed> =
-            store_updates.iter().map(to_legacy).collect();
+            self.db().get_update_actions_for_entry(entry_hash).await?;
         updates.extend(scratch_updates_for_entry(scratch, entry_hash)?);
 
         // Live/Dead: Live if there is any undeleted create in the store-or-scratch
@@ -1170,8 +1132,7 @@ impl DhtStore<DbRead<Dht>> {
     }
 
     /// For `base`, every `CreateLink` (live and tombstoned) matching
-    /// `type_query`/`tag`, paired with its `DeleteLink`s. Returned as legacy
-    /// `SignedActionHashed`s.
+    /// `type_query`/`tag`, paired with its `DeleteLink`s.
     pub async fn get_link_details(
         &self,
         base: &holo_hash::AnyLinkableHash,
@@ -1199,17 +1160,8 @@ impl DhtStore<DbRead<Dht>> {
                     continue;
                 }
             }
-            let deletes = self
-                .db()
-                .get_delete_link_actions(create.as_hash())
-                .await?
-                .iter()
-                .map(holochain_zome_types::dht_v2::to_legacy_signed_action)
-                .collect();
-            out.push((
-                holochain_zome_types::dht_v2::to_legacy_signed_action(&create),
-                deletes,
-            ));
+            let deletes = self.db().get_delete_link_actions(create.as_hash()).await?;
+            out.push((create, deletes));
         }
         Ok(out)
     }
@@ -1269,8 +1221,7 @@ impl DhtStore<DbRead<Dht>> {
                 create_link_hash: sah.as_hash().clone(),
             });
         }
-        // Match the legacy `GetLinksQuery` contract: links are returned in
-        // creation (timestamp) order.
+        // Return links in creation (timestamp) order.
         links.sort_by_key(|l| l.timestamp);
         Ok(links)
     }
@@ -1312,7 +1263,7 @@ impl DhtStore<DbRead<Dht>> {
         let scratch_creates = scratch_create_links_for_base(scratch, base)?;
         for sah in scratch_creates {
             let action = sah.action();
-            let holochain_zome_types::action::Action::CreateLink(cl) = action else {
+            let holochain_zome_types::dht_v2::ActionData::CreateLink(cl) = &action.data else {
                 continue;
             };
             let create_hash = sah.as_hash();
@@ -1340,25 +1291,25 @@ impl DhtStore<DbRead<Dht>> {
                 }
             }
             if let Some(author) = &filter.author {
-                if cl.author != *author {
+                if action.header.author != *author {
                     continue;
                 }
             }
             if let Some(before) = filter.before {
-                if cl.timestamp > before {
+                if action.header.timestamp > before {
                     continue;
                 }
             }
             if let Some(after) = filter.after {
-                if cl.timestamp < after {
+                if action.header.timestamp < after {
                     continue;
                 }
             }
             store_links.push(holochain_zome_types::link::Link {
-                author: cl.author.clone(),
+                author: action.header.author.clone(),
                 base: cl.base_address.clone(),
                 target: cl.target_address.clone(),
-                timestamp: cl.timestamp,
+                timestamp: action.header.timestamp,
                 zome_index: cl.zome_index,
                 link_type: cl.link_type,
                 tag: cl.tag.clone(),
@@ -1366,8 +1317,7 @@ impl DhtStore<DbRead<Dht>> {
             });
         }
 
-        // Match the legacy `GetLinksQuery` contract: links (store + scratch) are
-        // returned in creation (timestamp) order.
+        // Return links (store + scratch) in creation (timestamp) order.
         store_links.sort_by_key(|l| l.timestamp);
         Ok(store_links)
     }
@@ -1420,7 +1370,7 @@ impl DhtStore<DbRead<Dht>> {
         let scratch_creates = scratch_create_links_for_base(scratch, base)?;
         for sah in scratch_creates {
             let action = sah.action();
-            let holochain_zome_types::action::Action::CreateLink(cl) = action else {
+            let holochain_zome_types::dht_v2::ActionData::CreateLink(cl) = &action.data else {
                 continue;
             };
             let create_hash = sah.as_hash();
@@ -1433,18 +1383,14 @@ impl DhtStore<DbRead<Dht>> {
                     continue;
                 }
             }
-            // Collect deletes: store deletes + scratch deletes targeting this create.
-            let mut deletes: Vec<holochain_zome_types::record::SignedActionHashed> = self
-                .db()
-                .get_delete_link_actions(create_hash)
-                .await?
-                .iter()
-                .map(holochain_zome_types::dht_v2::to_legacy_signed_action)
-                .collect();
+            // Collect deletes: store deletes + scratch deletes targeting this
+            // create.
+            let mut deletes: Vec<holochain_zome_types::record::SignedActionHashed> =
+                self.db().get_delete_link_actions(create_hash).await?;
             if let Some(scratch_deletes) = scratch_dl_by_create.get(create_hash) {
                 deletes.extend(scratch_deletes.iter().cloned());
             }
-            store_details.push((sah, deletes));
+            store_details.push((sah.clone(), deletes));
         }
 
         Ok(store_details)
@@ -1452,16 +1398,18 @@ impl DhtStore<DbRead<Dht>> {
 
     /// Agent activity for `author`: the integrated `RegisterAgentActivity`
     /// actions classified into valid/rejected, with chain status, highest
-    /// observed, and warrants. Store-only (no scratch). Returns legacy types.
+    /// observed, and warrants. Store-only (no scratch).
+    ///
+    /// The `ChainItems::Full` case builds
+    /// [`Record`](holochain_zome_types::record::Record)s and the hashes case
+    /// the `HoloHashed<Action>` shape, both of which the shared
+    /// `build_agent_activity_response` machinery accepts.
     pub async fn get_agent_activity(
         &self,
         author: &holo_hash::AgentPubKey,
         filter: &ChainQueryFilter,
         options: &crate::dht_store::GetAgentActivityOptions,
     ) -> StateQueryResult<AgentActivityResponse> {
-        use holochain_zome_types::dht_v2::to_legacy_signed_action;
-        use holochain_zome_types::record::Record;
-
         let items = self
             .db()
             .get_agent_activity(author.clone(), options.include_full_records)
@@ -1482,7 +1430,7 @@ impl DhtStore<DbRead<Dht>> {
             let mut valid = Vec::new();
             let mut rejected = Vec::new();
             for item in items {
-                let record = Record::new(to_legacy_signed_action(&item.action), item.entry);
+                let record = record_from_parts(item.action, item.entry);
                 match item.validation_status {
                     RecordValidity::Accepted => valid.push(record),
                     RecordValidity::Rejected => rejected.push(record),
@@ -1500,7 +1448,7 @@ impl DhtStore<DbRead<Dht>> {
             let mut valid = Vec::new();
             let mut rejected = Vec::new();
             for item in items {
-                let action_hashed = to_legacy_signed_action(&item.action).hashed;
+                let action_hashed = item.action.hashed;
                 match item.validation_status {
                     RecordValidity::Accepted => valid.push(action_hashed),
                     RecordValidity::Rejected => rejected.push(action_hashed),
@@ -1541,9 +1489,6 @@ impl DhtStore<DbRead<Dht>> {
         options: &crate::dht_store::GetAgentActivityOptions,
         scratch: &SyncScratch,
     ) -> StateQueryResult<AgentActivityResponse> {
-        use holochain_zome_types::dht_v2::to_legacy_signed_action;
-        use holochain_zome_types::record::Record;
-
         let items = self
             .db()
             .get_agent_activity(author.clone(), options.include_full_records)
@@ -1596,14 +1541,13 @@ impl DhtStore<DbRead<Dht>> {
             for item in items {
                 match item.validation_status {
                     RecordValidity::Accepted => store_valid_activity.push(RegisterAgentActivity {
-                        action: to_legacy_signed_action(&item.action),
+                        action: item.action,
                         cached_entry: None,
                     }),
                     // The rejected list is Records, and keeps the store row's entry.
-                    RecordValidity::Rejected => rejected.push(Record::new(
-                        to_legacy_signed_action(&item.action),
-                        item.entry,
-                    )),
+                    RecordValidity::Rejected => {
+                        rejected.push(record_from_parts(item.action, item.entry))
+                    }
                 }
             }
             // Merge store and scratch valid activity, dedup by action hash.
@@ -1611,9 +1555,9 @@ impl DhtStore<DbRead<Dht>> {
             // Valid records carry no entry here, mirroring the cascade's
             // `cached_entry: None` convention on the requester path (the entry is
             // filled separately by the cascade); rejected records above keep theirs.
-            let merged_valid: Vec<Record> = merged_activity
+            let merged_valid: Vec<holochain_zome_types::record::Record> = merged_activity
                 .into_iter()
-                .map(|a| Record::new(a.action, None))
+                .map(|a| record_from_parts(a.action, None))
                 .collect();
             Ok(build_agent_activity_response(
                 author.clone(),
@@ -1629,21 +1573,19 @@ impl DhtStore<DbRead<Dht>> {
             for item in items {
                 match item.validation_status {
                     RecordValidity::Accepted => store_valid_activity.push(RegisterAgentActivity {
-                        action: to_legacy_signed_action(&item.action),
+                        action: item.action,
                         cached_entry: None,
                     }),
-                    RecordValidity::Rejected => {
-                        rejected_hashed.push(to_legacy_signed_action(&item.action).hashed)
-                    }
+                    RecordValidity::Rejected => rejected_hashed.push(item.action.hashed),
                 }
             }
             // Merge store and scratch valid activity, dedup by action hash.
             let merged_activity = merge_agent_activity(vec![store_valid_activity, scratch_valid]);
-            // Convert to ActionHashed for build_agent_activity_response.
-            let merged_valid: Vec<holochain_zome_types::action::ActionHashed> = merged_activity
-                .into_iter()
-                .map(|a| a.action.hashed)
-                .collect();
+            let merged_valid: Vec<holo_hash::HoloHashed<holochain_zome_types::dht_v2::Action>> =
+                merged_activity
+                    .into_iter()
+                    .map(|a| a.action.hashed)
+                    .collect();
             Ok(build_agent_activity_response(
                 author.clone(),
                 merged_valid,
@@ -1657,16 +1599,14 @@ impl DhtStore<DbRead<Dht>> {
 
     /// Store-only `must_get_agent_activity`: resolve `filter.chain_top`, scan the
     /// bounded `RegisterAgentActivity` range, exclude forked actions, apply the
-    /// timestamp/take filters, and decide completeness. Returns legacy types.
+    /// timestamp/take filters, and decide completeness.
     /// No scratch, no network, no cross-source merge (the requester layers those
-    /// on in phase 1c).
+    /// on).
     pub async fn must_get_agent_activity(
         &self,
         author: &holo_hash::AgentPubKey,
         filter: &ChainFilter,
     ) -> StateQueryResult<MustGetAgentActivityResponse> {
-        use holochain_zome_types::dht_v2::to_legacy_signed_action;
-
         // A take of zero is a degenerate filter.
         if filter.get_take() == Some(0) {
             return Err(crate::query::StateQueryError::InvalidInput(
@@ -1719,8 +1659,8 @@ impl DhtStore<DbRead<Dht>> {
             .get_filtered_agent_activity(author.clone(), chain_top_seq, resolved_until_seq)
             .await?
             .into_iter()
-            .map(|v2| RegisterAgentActivity {
-                action: to_legacy_signed_action(&v2),
+            .map(|action| RegisterAgentActivity {
+                action,
                 cached_entry: None,
             })
             .collect();
@@ -1788,8 +1728,6 @@ impl DhtStore<DbRead<Dht>> {
         filter: &ChainFilter,
         scratch: &SyncScratch,
     ) -> StateQueryResult<MustGetAgentActivityResponse> {
-        use holochain_zome_types::dht_v2::to_legacy_signed_action;
-
         // A take of zero is a degenerate filter.
         if filter.get_take() == Some(0) {
             return Err(crate::query::StateQueryError::InvalidInput(
@@ -1867,8 +1805,8 @@ impl DhtStore<DbRead<Dht>> {
             .get_filtered_agent_activity(author.clone(), chain_top_seq, resolved_until_seq)
             .await?
             .into_iter()
-            .map(|v2| RegisterAgentActivity {
-                action: to_legacy_signed_action(&v2),
+            .map(|action| RegisterAgentActivity {
+                action,
                 cached_entry: None,
             })
             .collect();
@@ -2011,7 +1949,7 @@ impl DhtStore<DbRead<Dht>> {
     }
 
     /// Authority-serving create-link actions for `base`: locally-validated only,
-    /// each paired with its (legacy) validation status. Returns legacy types.
+    /// each paired with its validation status.
     pub async fn get_authority_link_creates(
         &self,
         base: &holo_hash::AnyLinkableHash,
@@ -2026,17 +1964,12 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_link_creates(base)
             .await?
             .into_iter()
-            .map(|(v2, validity)| {
-                (
-                    holochain_zome_types::dht_v2::to_legacy_signed_action(&v2),
-                    record_validity_to_status(validity),
-                )
-            })
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
     /// Authority-serving delete-link actions targeting `base`'s links:
-    /// locally-validated only, each paired with its (legacy) validation status.
+    /// locally-validated only, each paired with its validation status.
     pub async fn get_authority_delete_links(
         &self,
         base: &holo_hash::AnyLinkableHash,
@@ -2051,17 +1984,12 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_delete_links(base)
             .await?
             .into_iter()
-            .map(|(v2, validity)| {
-                (
-                    holochain_zome_types::dht_v2::to_legacy_signed_action(&v2),
-                    record_validity_to_status(validity),
-                )
-            })
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
     /// Authority-serving `StoreRecord` action for `action_hash` (locally-validated
-    /// only), paired with its (legacy) validation status. Returns legacy types.
+    /// only), paired with its validation status.
     pub async fn get_authority_store_record(
         &self,
         action_hash: &holo_hash::ActionHash,
@@ -2075,16 +2003,11 @@ impl DhtStore<DbRead<Dht>> {
             .db()
             .get_authority_store_record(action_hash)
             .await?
-            .map(|(v2, validity)| {
-                (
-                    holochain_zome_types::dht_v2::to_legacy_signed_action(&v2),
-                    record_validity_to_status(validity),
-                )
-            }))
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity))))
     }
 
     /// Authority-serving deletes targeting record `action_hash` (locally-validated
-    /// only), each paired with its (legacy) validation status.
+    /// only), each paired with its validation status.
     pub async fn get_authority_deletes_for_record(
         &self,
         action_hash: &holo_hash::ActionHash,
@@ -2099,17 +2022,12 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_deletes_for_record(action_hash)
             .await?
             .into_iter()
-            .map(|(v2, validity)| {
-                (
-                    holochain_zome_types::dht_v2::to_legacy_signed_action(&v2),
-                    record_validity_to_status(validity),
-                )
-            })
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
     /// Authority-serving updates targeting record `action_hash` (locally-validated
-    /// only), each paired with its (legacy) validation status.
+    /// only), each paired with its validation status.
     pub async fn get_authority_updates_for_record(
         &self,
         action_hash: &holo_hash::ActionHash,
@@ -2124,17 +2042,12 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_updates_for_record(action_hash)
             .await?
             .into_iter()
-            .map(|(v2, validity)| {
-                (
-                    holochain_zome_types::dht_v2::to_legacy_signed_action(&v2),
-                    record_validity_to_status(validity),
-                )
-            })
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
     /// Authority-serving create actions for entry `entry_hash` (locally-validated
-    /// only), each paired with its (legacy) validation status. Returns legacy types.
+    /// only), each paired with its validation status.
     pub async fn get_authority_entry_creates(
         &self,
         entry_hash: &holo_hash::EntryHash,
@@ -2149,17 +2062,12 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_entry_creates(entry_hash)
             .await?
             .into_iter()
-            .map(|(v2, validity)| {
-                (
-                    holochain_zome_types::dht_v2::to_legacy_signed_action(&v2),
-                    record_validity_to_status(validity),
-                )
-            })
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
     /// Authority-serving deletes targeting entry `entry_hash` (locally-validated
-    /// only), each paired with its (legacy) validation status.
+    /// only), each paired with its validation status.
     pub async fn get_authority_deletes_for_entry(
         &self,
         entry_hash: &holo_hash::EntryHash,
@@ -2174,17 +2082,12 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_deletes_for_entry(entry_hash)
             .await?
             .into_iter()
-            .map(|(v2, validity)| {
-                (
-                    holochain_zome_types::dht_v2::to_legacy_signed_action(&v2),
-                    record_validity_to_status(validity),
-                )
-            })
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
     /// Authority-serving updates targeting entry `entry_hash` (locally-validated
-    /// only), each paired with its (legacy) validation status.
+    /// only), each paired with its validation status.
     pub async fn get_authority_updates_for_entry(
         &self,
         entry_hash: &holo_hash::EntryHash,
@@ -2199,16 +2102,11 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_updates_for_entry(entry_hash)
             .await?
             .into_iter()
-            .map(|(v2, validity)| {
-                (
-                    holochain_zome_types::dht_v2::to_legacy_signed_action(&v2),
-                    record_validity_to_status(validity),
-                )
-            })
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
-    /// Warrants held against `warrantee`'s chain, as legacy signed warrants.
+    /// Warrants held against `warrantee`'s chain, as signed warrants.
     ///
     /// Used by the get authorities to pair a warrant with any `Rejected`
     /// record they serve, so the receiver can verify the rejection without
@@ -2273,15 +2171,12 @@ impl DhtStore<DbRead<Dht>> {
         author: &AgentPubKey,
     ) -> StateQueryResult<holochain_state_types::SourceChainDump> {
         use holochain_state_types::{SourceChainDump, SourceChainDumpRecord};
-        use holochain_zome_types::dht_v2::to_legacy_signed_action;
 
-        // All actions for this author in seq order (v2 SignedActionHashed).
-        let v2_actions = self.db().get_actions_by_author(author.clone()).await?;
+        // All actions for this author in seq order.
+        let actions = self.db().get_actions_by_author(author.clone()).await?;
 
-        let mut records = Vec::with_capacity(v2_actions.len());
-        for v2_sah in &v2_actions {
-            // Convert to the v1 SignedActionHashed.
-            let sah = to_legacy_signed_action(v2_sah);
+        let mut records = Vec::with_capacity(actions.len());
+        for sah in &actions {
             let action_address = sah.as_hash().clone();
             let signature = sah.signature().clone();
             let action = sah.action().clone();
@@ -2333,30 +2228,23 @@ impl DhtStore<DbRead<Dht>> {
         include_entries: bool,
         public_only: bool,
     ) -> StateQueryResult<Vec<holochain_zome_types::record::Record>> {
-        use holochain_zome_types::dht_v2::to_legacy_signed_action;
-        use holochain_zome_types::prelude::EntryVisibility;
-
-        let v2_actions = self.db().get_actions_by_author(author.clone()).await?;
-
-        // Convert each action to its v1 form once, and decide which entries to
-        // attach. Collect the entry hashes that actually need fetching so they
-        // can be read in a single batch rather than one-at-a-time (an N+1 over
-        // the chain length).
         let sahs: Vec<holochain_zome_types::record::SignedActionHashed> =
-            v2_actions.iter().map(to_legacy_signed_action).collect();
+            self.db().get_actions_by_author(author.clone()).await?;
+
+        // Decide which entries to attach. Collect the entry hashes that
+        // actually need fetching so they can be read in a single batch rather
+        // than one-at-a-time (an N+1 over the chain length).
         let mut wanted_entry_hashes: Vec<EntryHash> = Vec::new();
         // For each action, `Some(hash)` means "attach this entry if present";
         // `None` means "no entry" (condition not met, or no entry hash).
         let attach: Vec<Option<EntryHash>> = sahs
             .iter()
             .map(|sah| {
-                let private_entry = sah
-                    .action()
-                    .entry_type()
-                    .is_some_and(|e| *e.visibility() == EntryVisibility::Private);
+                let action = &sah.hashed.content;
+                let private_entry = action_entry_is_private(action);
 
                 if include_entries && (!private_entry || !public_only) {
-                    if let Some(entry_hash) = sah.action().entry_hash() {
+                    if let Some(entry_hash) = action.data.entry_hash() {
                         wanted_entry_hashes.push(entry_hash.clone());
                         return Some(entry_hash.clone());
                     }
@@ -2380,7 +2268,11 @@ impl DhtStore<DbRead<Dht>> {
             .zip(attach)
             .map(|(sah, want)| {
                 let entry = want.and_then(|h| entries.get(&h).cloned());
-                holochain_zome_types::record::Record::new(sah, entry)
+                let record_entry = holochain_zome_types::record::RecordEntry::new(
+                    action_entry_type(&sah.hashed.content).map(|et| et.visibility()),
+                    entry,
+                );
+                holochain_zome_types::record::Record::new(sah, record_entry)
             })
             .collect();
 
@@ -2408,13 +2300,14 @@ impl DhtStore<DbRead<Dht>> {
         // `action_type` but not `entry_type`, so filter on `Create` + the entry
         // hash with an `AgentPubKey` entry-type guard.
         let actions = self.db().get_actions_by_author(author.clone()).await?;
-        let create = actions.iter().find_map(|v2_sah| {
-            let action = holochain_zome_types::dht_v2::to_legacy_signed_action(v2_sah)
-                .action()
-                .clone();
-            let is_agent_key_create = matches!(action, Action::Create(_))
-                && action.entry_type() == Some(&EntryType::AgentPubKey)
-                && action.entry_hash() == Some(&agent_key_entry_hash);
+        let create = actions.iter().find_map(|sah| {
+            let action = sah.hashed.content.clone();
+            let is_agent_key_create = match &action.data {
+                ActionData::Create(d) => {
+                    d.entry_type == EntryType::AgentPubKey && d.entry_hash == agent_key_entry_hash
+                }
+                _ => false,
+            };
             is_agent_key_create.then_some(action)
         });
 
@@ -2478,11 +2371,10 @@ impl DhtStore<DbRead<Dht>> {
             let mut candidate_hashes: Vec<EntryHash> = Vec::new();
             for row in rows {
                 let action_hash = ActionHash::from_raw_36(row.action_hash);
-                let Some(v2_sah) = self.db().get_action(action_hash).await? else {
+                let Some(sah) = self.db().get_action(action_hash).await? else {
                     continue;
                 };
-                let action = holochain_zome_types::dht_v2::to_legacy_signed_action(&v2_sah);
-                let Some(entry_hash) = action.action().entry_hash().cloned() else {
+                let Some(entry_hash) = sah.hashed.content.data.entry_hash().cloned() else {
                     continue;
                 };
                 // Skip grants whose entry was updated or deleted by the author.
@@ -2545,10 +2437,30 @@ impl DhtStore<DbRead<Dht>> {
     }
 }
 
+/// The action's declared entry type, if it creates or updates an entry.
+fn action_entry_type(action: &holochain_zome_types::dht_v2::Action) -> Option<&EntryType> {
+    match &action.data {
+        holochain_zome_types::dht_v2::ActionData::Create(d) => Some(&d.entry_type),
+        holochain_zome_types::dht_v2::ActionData::Update(d) => Some(&d.entry_type),
+        _ => None,
+    }
+}
+
+/// Build a [`Record`](holochain_zome_types::record::Record) from a signed
+/// action and an optional entry, deriving the [`RecordEntry`] slot from the
+/// action's entry visibility.
+fn record_from_parts(
+    sah: holochain_zome_types::record::SignedActionHashed,
+    entry: Option<holochain_types::prelude::Entry>,
+) -> holochain_zome_types::record::Record {
+    let visibility = action_entry_type(&sah.hashed.content).map(|et| et.visibility());
+    let record_entry = holochain_zome_types::record::RecordEntry::new(visibility, entry);
+    holochain_zome_types::record::Record::new(sah, record_entry)
+}
+
 /// Whether `action`'s entry (if any) is declared private.
-fn action_entry_is_private(action: &holochain_zome_types::record::SignedActionHashed) -> bool {
-    action.action().entry_visibility()
-        == Some(&holochain_zome_types::prelude::EntryVisibility::Private)
+fn action_entry_is_private(action: &holochain_zome_types::dht_v2::Action) -> bool {
+    action_entry_type(action).map(|et| et.visibility()) == Some(&EntryVisibility::Private)
 }
 
 /// Whether the requesting `author` may have `action`'s entry attached to the
@@ -2556,17 +2468,16 @@ fn action_entry_is_private(action: &holochain_zome_types::record::SignedActionHa
 /// only when the caller is the action's author. A private entry must never be
 /// served to a different author — not even when the caller holds a *same-hash*
 /// private entry of their own (the entry hash is shared by content, but the
-/// privacy is per author). This restores the legacy requester read's
-/// entry-visibility hiding that the by-hash `get_entry` lookup alone does not
-/// provide.
+/// privacy is per author). This provides the entry-visibility hiding that the
+/// by-hash `get_entry` lookup alone does not.
 fn private_entry_visible_to(
-    action: &holochain_zome_types::record::SignedActionHashed,
+    action: &holochain_zome_types::dht_v2::Action,
     author: Option<&holo_hash::AgentPubKey>,
 ) -> bool {
-    !action_entry_is_private(action) || author == Some(action.action().author())
+    !action_entry_is_private(action) || author == Some(&action.header.author)
 }
 
-/// Map the v2 record validity to the legacy validation status served on the wire.
+/// Map the record validity to the validation status served on the wire.
 fn record_validity_to_status(v: RecordValidity) -> ValidationStatus {
     match v {
         RecordValidity::Accepted => ValidationStatus::Valid,
@@ -2574,277 +2485,276 @@ fn record_validity_to_status(v: RecordValidity) -> ValidationStatus {
     }
 }
 
-/// Look up a [`SignedActionHashed`] by `hash` in the scratch space.
-///
-/// Returns `Ok(None)` when the action is not present. Maps
-/// [`SyncScratchError`](crate::scratch::SyncScratchError) into
-/// [`StateQueryError`](crate::query::StateQueryError) via the existing `From` impl.
-fn scratch_action(
-    scratch: &SyncScratch,
-    hash: &holo_hash::ActionHash,
-) -> StateQueryResult<Option<holochain_zome_types::record::SignedActionHashed>> {
-    // Delegate to the `Store` impl on `Scratch` rather than re-scanning, so any
-    // future change to how the scratch resolves an action flows through here.
-    use crate::query::Store;
-    scratch.apply_and_then(|s| s.get_action(hash))
-}
+// Groups every helper that reads directly out of the scratch
+// (`crate::scratch::Scratch`, see `scratch.rs`).
+mod scratch_reads {
+    use super::{StateQueryResult, SyncScratch};
+    use holochain_zome_types::dht_v2::ActionData;
+    use holochain_zome_types::record::SignedActionHashed;
 
-/// Look up an [`Entry`] by `hash` in the scratch space.
-///
-/// Entries in the scratch are authored by this agent and are therefore always
-/// visible, regardless of the `author` parameter. (Analogue: the legacy
-/// `Scratch::get_public_or_authored_entry` ignores `author` for the same
-/// reason.)
-fn scratch_entry(
-    scratch: &SyncScratch,
-    hash: &holo_hash::EntryHash,
-) -> StateQueryResult<Option<holochain_types::prelude::Entry>> {
-    // Delegate to the `Store` impl on `Scratch` (which likewise returns the
-    // entry regardless of author — scratch data is this agent's own).
-    use crate::query::Store;
-    scratch.apply_and_then(|s| s.get_entry(hash))
-}
-
-/// The action hashes tombstoned by a `Delete` in this (locked) scratch — the
-/// `deletes_address` of every scratch `Delete`. Operates on a `&Scratch` so it
-/// can be reused inside an existing `apply`/`apply_and_then` closure without
-/// re-locking.
-fn delete_targets_in(
-    s: &crate::scratch::Scratch,
-) -> std::collections::HashSet<holo_hash::ActionHash> {
-    s.actions()
-        .filter_map(|sah| match sah.action() {
-            holochain_zome_types::action::Action::Delete(d) => Some(d.deletes_address.clone()),
-            _ => None,
+    /// Look up a [`SignedActionHashed`] by `hash` in the scratch space.
+    ///
+    /// Returns `Ok(None)` when the action is not present. Maps
+    /// [`SyncScratchError`](crate::scratch::SyncScratchError) into
+    /// [`StateQueryError`](crate::query::StateQueryError) via the existing `From` impl.
+    pub(super) fn scratch_action(
+        scratch: &SyncScratch,
+        hash: &holo_hash::ActionHash,
+    ) -> StateQueryResult<Option<SignedActionHashed>> {
+        scratch.apply_and_then(|s| {
+            Ok::<_, crate::query::StateQueryError>(
+                s.actions()
+                    .find(|sah| sah.action_address() == hash)
+                    .cloned(),
+            )
         })
-        .collect()
-}
+    }
 
-/// The action hashes tombstoned by a pending scratch `Delete`.
-fn scratch_delete_targets(
-    scratch: &SyncScratch,
-) -> StateQueryResult<std::collections::HashSet<holo_hash::ActionHash>> {
-    scratch.apply_and_then(|s| Ok::<_, crate::query::StateQueryError>(delete_targets_in(s)))
-}
+    /// Look up an [`Entry`] by `hash` in the scratch space.
+    ///
+    /// Entries in the scratch are authored by this agent and are therefore always
+    /// visible, regardless of the `author` parameter.
+    pub(super) fn scratch_entry(
+        scratch: &SyncScratch,
+        hash: &holo_hash::EntryHash,
+    ) -> StateQueryResult<Option<holochain_types::prelude::Entry>> {
+        // Delegate to the `Store` impl on `Scratch` (which likewise returns the
+        // entry regardless of author — scratch data is this agent's own).
+        use crate::query::Store;
+        scratch.apply_and_then(|s| s.get_entry(hash))
+    }
 
-/// Return all `Create`/`Update` actions in the scratch whose `entry_hash()`
-/// equals `entry_hash` and that are not targeted by a scratch `Delete`.
-///
-/// This is the scratch-side analogue of
-/// [`get_live_entry_creates`](holochain_data::DbRead::get_live_entry_creates):
-/// it collects candidates and filters out any that have a pending delete
-/// tombstone in the same scratch.
-fn scratch_live_entry_creates(
-    scratch: &SyncScratch,
-    entry_hash: &holo_hash::EntryHash,
-) -> StateQueryResult<Vec<holochain_zome_types::record::SignedActionHashed>> {
-    scratch.apply_and_then(|s| {
-        // Action hashes of all scratch Deletes, so tombstoned creates are excluded.
-        let deleted_addresses = delete_targets_in(s);
-
-        let creates: Vec<holochain_zome_types::record::SignedActionHashed> = s
-            .actions()
-            .filter(|sah| {
-                // Must be a Create or Update referencing this entry hash.
-                let references_entry = sah.action().entry_hash() == Some(entry_hash);
-                if !references_entry {
-                    return false;
-                }
-                matches!(
-                    sah.action(),
-                    holochain_zome_types::action::Action::Create(_)
-                        | holochain_zome_types::action::Action::Update(_)
-                )
-            })
-            .filter(|sah| {
-                // Exclude if a Delete in the scratch targets this action.
-                !deleted_addresses.contains(sah.action_address())
-            })
-            .cloned()
-            .collect();
-
-        Ok::<Vec<_>, crate::query::StateQueryError>(creates)
-    })
-}
-
-/// Return all `Delete` scratch actions whose `deletes_address` equals `hash`
-/// (record-level tombstones for `get_record_details`).
-fn scratch_deletes_for_record(
-    scratch: &SyncScratch,
-    hash: &holo_hash::ActionHash,
-) -> StateQueryResult<Vec<holochain_zome_types::record::SignedActionHashed>> {
-    scratch.apply_and_then(|s| {
-        let out = s
-            .actions()
-            .filter(|sah| match sah.action() {
-                holochain_zome_types::action::Action::Delete(d) => &d.deletes_address == hash,
-                _ => false,
-            })
-            .cloned()
-            .collect();
-        Ok::<Vec<_>, crate::query::StateQueryError>(out)
-    })
-}
-
-/// Return all `Update` scratch actions whose `original_action_address` equals
-/// `hash` (record-level updates for `get_record_details`).
-fn scratch_updates_for_record(
-    scratch: &SyncScratch,
-    hash: &holo_hash::ActionHash,
-) -> StateQueryResult<Vec<holochain_zome_types::record::SignedActionHashed>> {
-    scratch.apply_and_then(|s| {
-        let out = s
-            .actions()
-            .filter(|sah| match sah.action() {
-                holochain_zome_types::action::Action::Update(u) => {
-                    &u.original_action_address == hash
-                }
-                _ => false,
-            })
-            .cloned()
-            .collect();
-        Ok::<Vec<_>, crate::query::StateQueryError>(out)
-    })
-}
-
-/// Return all `Delete` scratch actions whose `deletes_entry_address` equals
-/// `entry_hash` (entry-level tombstones for `get_entry_details`).
-fn scratch_deletes_for_entry(
-    scratch: &SyncScratch,
-    entry_hash: &holo_hash::EntryHash,
-) -> StateQueryResult<Vec<holochain_zome_types::record::SignedActionHashed>> {
-    scratch.apply_and_then(|s| {
-        let out = s
-            .actions()
-            .filter(|sah| match sah.action() {
-                holochain_zome_types::action::Action::Delete(d) => {
-                    &d.deletes_entry_address == entry_hash
-                }
-                _ => false,
-            })
-            .cloned()
-            .collect();
-        Ok::<Vec<_>, crate::query::StateQueryError>(out)
-    })
-}
-
-/// Return all `Update` scratch actions whose `original_entry_address` equals
-/// `entry_hash` (entry-level updates for `get_entry_details`).
-fn scratch_updates_for_entry(
-    scratch: &SyncScratch,
-    entry_hash: &holo_hash::EntryHash,
-) -> StateQueryResult<Vec<holochain_zome_types::record::SignedActionHashed>> {
-    scratch.apply_and_then(|s| {
-        let out = s
-            .actions()
-            .filter(|sah| match sah.action() {
-                holochain_zome_types::action::Action::Update(u) => {
-                    &u.original_entry_address == entry_hash
-                }
-                _ => false,
-            })
-            .cloned()
-            .collect();
-        Ok::<Vec<_>, crate::query::StateQueryError>(out)
-    })
-}
-
-/// Return all `Create`/`Update` scratch actions whose new-entry side
-/// (`entry_hash()`) equals `entry_hash`. This is the accepted-creates analogue
-/// for `get_entry_details` — the new entry being introduced, not the one being
-/// replaced.
-///
-/// Unlike [`scratch_live_entry_creates`], this does **not** exclude tombstoned
-/// creates: `EntryDetails.actions` lists every create regardless of deletes
-/// (liveness is reported separately via `entry_dht_status`).
-fn scratch_creates_for_entry(
-    scratch: &SyncScratch,
-    entry_hash: &holo_hash::EntryHash,
-) -> StateQueryResult<Vec<holochain_zome_types::record::SignedActionHashed>> {
-    scratch.apply_and_then(|s| {
-        let out = s
-            .actions()
-            .filter(|sah| {
-                matches!(
-                    sah.action(),
-                    holochain_zome_types::action::Action::Create(_)
-                        | holochain_zome_types::action::Action::Update(_)
-                ) && sah.action().entry_hash() == Some(entry_hash)
-            })
-            .cloned()
-            .collect();
-        Ok::<Vec<_>, crate::query::StateQueryError>(out)
-    })
-}
-
-/// Return all scratch `CreateLink` actions whose `base_address` equals `base`.
-///
-/// Used by the requester path to collect pending authored links for a base.
-fn scratch_create_links_for_base(
-    scratch: &SyncScratch,
-    base: &holo_hash::AnyLinkableHash,
-) -> StateQueryResult<Vec<holochain_zome_types::record::SignedActionHashed>> {
-    scratch.apply_and_then(|s| {
-        let out = s
-            .actions()
-            .filter(|sah| match sah.action() {
-                holochain_zome_types::action::Action::CreateLink(cl) => &cl.base_address == base,
-                _ => false,
-            })
-            .cloned()
-            .collect();
-        Ok::<Vec<_>, crate::query::StateQueryError>(out)
-    })
-}
-
-/// Return the `link_add_address` of every `DeleteLink` in the scratch — the
-/// `ActionHash`es of the `CreateLink` actions they tombstone.
-///
-/// Used by `get_links_with_scratch` to exclude store links tombstoned by a
-/// pending scratch `DeleteLink`.
-fn scratch_delete_link_targets(
-    scratch: &SyncScratch,
-) -> StateQueryResult<std::collections::HashSet<holo_hash::ActionHash>> {
-    scratch.apply_and_then(|s| {
-        let out = s
-            .actions()
-            .filter_map(|sah| match sah.action() {
-                holochain_zome_types::action::Action::DeleteLink(dl) => {
-                    Some(dl.link_add_address.clone())
-                }
+    /// The action hashes tombstoned by a `Delete` in this (locked) scratch — the
+    /// `deletes_address` of every scratch `Delete`. Operates on a `&Scratch` so it
+    /// can be reused inside an existing `apply`/`apply_and_then` closure without
+    /// re-locking.
+    fn delete_targets_in(
+        s: &crate::scratch::Scratch,
+    ) -> std::collections::HashSet<holo_hash::ActionHash> {
+        s.actions()
+            .filter_map(|sah| match &sah.action().data {
+                ActionData::Delete(d) => Some(d.deletes_address.clone()),
                 _ => None,
             })
-            .collect();
-        Ok::<_, crate::query::StateQueryError>(out)
-    })
-}
+            .collect()
+    }
 
-/// Build a map from `CreateLink` action hash → scratch `DeleteLink` actions
-/// that tombstone it. Used by `get_link_details_with_scratch` to augment each
-/// create's delete list with pending scratch deletes.
-fn scratch_delete_links_by_create(
-    scratch: &SyncScratch,
-) -> StateQueryResult<
-    std::collections::HashMap<
-        holo_hash::ActionHash,
-        Vec<holochain_zome_types::record::SignedActionHashed>,
-    >,
-> {
-    scratch.apply_and_then(|s| {
-        let mut map: std::collections::HashMap<
-            holo_hash::ActionHash,
-            Vec<holochain_zome_types::record::SignedActionHashed>,
-        > = std::collections::HashMap::new();
-        for sah in s.actions() {
-            if let holochain_zome_types::action::Action::DeleteLink(dl) = sah.action() {
-                map.entry(dl.link_add_address.clone())
-                    .or_default()
-                    .push(sah.clone());
+    /// The action hashes tombstoned by a pending scratch `Delete`.
+    pub(super) fn scratch_delete_targets(
+        scratch: &SyncScratch,
+    ) -> StateQueryResult<std::collections::HashSet<holo_hash::ActionHash>> {
+        scratch.apply_and_then(|s| Ok::<_, crate::query::StateQueryError>(delete_targets_in(s)))
+    }
+
+    /// Return all `Create`/`Update` actions in the scratch whose `entry_hash()`
+    /// equals `entry_hash` and that are not targeted by a scratch `Delete`.
+    ///
+    /// This is the scratch-side analogue of
+    /// [`get_live_entry_creates`](holochain_data::DbRead::get_live_entry_creates):
+    /// it collects candidates and filters out any that have a pending delete
+    /// tombstone in the same scratch.
+    pub(super) fn scratch_live_entry_creates(
+        scratch: &SyncScratch,
+        entry_hash: &holo_hash::EntryHash,
+    ) -> StateQueryResult<Vec<SignedActionHashed>> {
+        scratch.apply_and_then(|s| {
+            // Action hashes of all scratch Deletes, so tombstoned creates are excluded.
+            let deleted_addresses = delete_targets_in(s);
+
+            let creates: Vec<SignedActionHashed> = s
+                .actions()
+                .filter(|sah| {
+                    // Must be a Create or Update referencing this entry hash.
+                    let references_entry = sah.action().entry_hash() == Some(entry_hash);
+                    if !references_entry {
+                        return false;
+                    }
+                    matches!(
+                        sah.action().data,
+                        ActionData::Create(_) | ActionData::Update(_)
+                    )
+                })
+                .filter(|sah| {
+                    // Exclude if a Delete in the scratch targets this action.
+                    !deleted_addresses.contains(sah.action_address())
+                })
+                .cloned()
+                .collect();
+
+            Ok::<Vec<_>, crate::query::StateQueryError>(creates)
+        })
+    }
+
+    /// Return all `Delete` scratch actions whose `deletes_address` equals `hash`
+    /// (record-level tombstones for `get_record_details`).
+    pub(super) fn scratch_deletes_for_record(
+        scratch: &SyncScratch,
+        hash: &holo_hash::ActionHash,
+    ) -> StateQueryResult<Vec<SignedActionHashed>> {
+        scratch.apply_and_then(|s| {
+            let out = s
+                .actions()
+                .filter(|sah| match &sah.action().data {
+                    ActionData::Delete(d) => &d.deletes_address == hash,
+                    _ => false,
+                })
+                .cloned()
+                .collect();
+            Ok::<Vec<_>, crate::query::StateQueryError>(out)
+        })
+    }
+
+    /// Return all `Update` scratch actions whose `original_action_address` equals
+    /// `hash` (record-level updates for `get_record_details`).
+    pub(super) fn scratch_updates_for_record(
+        scratch: &SyncScratch,
+        hash: &holo_hash::ActionHash,
+    ) -> StateQueryResult<Vec<SignedActionHashed>> {
+        scratch.apply_and_then(|s| {
+            let out = s
+                .actions()
+                .filter(|sah| match &sah.action().data {
+                    ActionData::Update(u) => &u.original_action_address == hash,
+                    _ => false,
+                })
+                .cloned()
+                .collect();
+            Ok::<Vec<_>, crate::query::StateQueryError>(out)
+        })
+    }
+
+    /// Return all `Delete` scratch actions whose `deletes_entry_address` equals
+    /// `entry_hash` (entry-level tombstones for `get_entry_details`).
+    pub(super) fn scratch_deletes_for_entry(
+        scratch: &SyncScratch,
+        entry_hash: &holo_hash::EntryHash,
+    ) -> StateQueryResult<Vec<SignedActionHashed>> {
+        scratch.apply_and_then(|s| {
+            let out = s
+                .actions()
+                .filter(|sah| match &sah.action().data {
+                    ActionData::Delete(d) => &d.deletes_entry_address == entry_hash,
+                    _ => false,
+                })
+                .cloned()
+                .collect();
+            Ok::<Vec<_>, crate::query::StateQueryError>(out)
+        })
+    }
+
+    /// Return all `Update` scratch actions whose `original_entry_address` equals
+    /// `entry_hash` (entry-level updates for `get_entry_details`).
+    pub(super) fn scratch_updates_for_entry(
+        scratch: &SyncScratch,
+        entry_hash: &holo_hash::EntryHash,
+    ) -> StateQueryResult<Vec<SignedActionHashed>> {
+        scratch.apply_and_then(|s| {
+            let out = s
+                .actions()
+                .filter(|sah| match &sah.action().data {
+                    ActionData::Update(u) => &u.original_entry_address == entry_hash,
+                    _ => false,
+                })
+                .cloned()
+                .collect();
+            Ok::<Vec<_>, crate::query::StateQueryError>(out)
+        })
+    }
+
+    /// Return all `Create`/`Update` scratch actions whose new-entry side
+    /// (`entry_hash()`) equals `entry_hash`. This is the accepted-creates analogue
+    /// for `get_entry_details` — the new entry being introduced, not the one being
+    /// replaced.
+    ///
+    /// Unlike [`scratch_live_entry_creates`], this does **not** exclude tombstoned
+    /// creates: `EntryDetails.actions` lists every create regardless of deletes
+    /// (liveness is reported separately via `entry_dht_status`).
+    pub(super) fn scratch_creates_for_entry(
+        scratch: &SyncScratch,
+        entry_hash: &holo_hash::EntryHash,
+    ) -> StateQueryResult<Vec<SignedActionHashed>> {
+        scratch.apply_and_then(|s| {
+            let out = s
+                .actions()
+                .filter(|sah| {
+                    matches!(
+                        sah.action().data,
+                        ActionData::Create(_) | ActionData::Update(_)
+                    ) && sah.action().entry_hash() == Some(entry_hash)
+                })
+                .cloned()
+                .collect();
+            Ok::<Vec<_>, crate::query::StateQueryError>(out)
+        })
+    }
+
+    /// Return all scratch `CreateLink` actions whose `base_address` equals `base`.
+    ///
+    /// Used by the requester path to collect pending authored links for a base.
+    pub(super) fn scratch_create_links_for_base(
+        scratch: &SyncScratch,
+        base: &holo_hash::AnyLinkableHash,
+    ) -> StateQueryResult<Vec<SignedActionHashed>> {
+        scratch.apply_and_then(|s| {
+            let out = s
+                .actions()
+                .filter(|sah| match &sah.action().data {
+                    ActionData::CreateLink(cl) => &cl.base_address == base,
+                    _ => false,
+                })
+                .cloned()
+                .collect();
+            Ok::<Vec<_>, crate::query::StateQueryError>(out)
+        })
+    }
+
+    /// Return the `link_add_address` of every `DeleteLink` in the scratch — the
+    /// `ActionHash`es of the `CreateLink` actions they tombstone.
+    ///
+    /// Used by `get_links_with_scratch` to exclude store links tombstoned by a
+    /// pending scratch `DeleteLink`.
+    pub(super) fn scratch_delete_link_targets(
+        scratch: &SyncScratch,
+    ) -> StateQueryResult<std::collections::HashSet<holo_hash::ActionHash>> {
+        scratch.apply_and_then(|s| {
+            let out = s
+                .actions()
+                .filter_map(|sah| match &sah.action().data {
+                    ActionData::DeleteLink(dl) => Some(dl.link_add_address.clone()),
+                    _ => None,
+                })
+                .collect();
+            Ok::<_, crate::query::StateQueryError>(out)
+        })
+    }
+
+    /// Build a map from `CreateLink` action hash → scratch `DeleteLink` actions
+    /// that tombstone it. Used by `get_link_details_with_scratch` to augment each
+    /// create's delete list with pending scratch deletes.
+    pub(super) fn scratch_delete_links_by_create(
+        scratch: &SyncScratch,
+    ) -> StateQueryResult<std::collections::HashMap<holo_hash::ActionHash, Vec<SignedActionHashed>>>
+    {
+        scratch.apply_and_then(|s| {
+            let mut map: std::collections::HashMap<holo_hash::ActionHash, Vec<SignedActionHashed>> =
+                std::collections::HashMap::new();
+            for sah in s.actions() {
+                if let ActionData::DeleteLink(dl) = &sah.action().data {
+                    map.entry(dl.link_add_address.clone())
+                        .or_default()
+                        .push(sah.clone());
+                }
             }
-        }
-        Ok::<_, crate::query::StateQueryError>(map)
-    })
+            Ok::<_, crate::query::StateQueryError>(map)
+        })
+    }
 }
+use scratch_reads::{
+    scratch_action, scratch_create_links_for_base, scratch_creates_for_entry,
+    scratch_delete_link_targets, scratch_delete_links_by_create, scratch_delete_targets,
+    scratch_deletes_for_entry, scratch_deletes_for_record, scratch_entry,
+    scratch_live_entry_creates, scratch_updates_for_entry, scratch_updates_for_record,
+};
 
 // ---- scratch helpers for agent activity ----
 
@@ -2935,7 +2845,7 @@ fn merge_agent_activity(lists: Vec<Vec<RegisterAgentActivity>>) -> Vec<RegisterA
     }
     merged.sort_unstable_by_key(|a| {
         (
-            Reverse(a.action.seq()),
+            Reverse(a.action.action().action_seq()),
             Reverse(a.action.hashed.hash.clone()),
         )
     });
@@ -2967,24 +2877,19 @@ fn chain_op_from_joined_row(
     row: &holochain_data::dht::LimboChainOpJoinedRow,
 ) -> StateQueryResult<DhtOpHashed> {
     use holo_hash::{ActionHash, AgentPubKey};
-    use holochain_types::action::NewEntryAction;
-    use holochain_types::dht_op::{ChainOp, DhtOp};
-    use holochain_types::prelude::{RecordEntry, Signature};
-    use holochain_zome_types::action::Action as LegacyAction;
-    use holochain_zome_types::dht_v2::{
-        to_legacy_signed_action, Action, ActionData, ActionHeader, SignedActionHashed,
-    };
+    use holochain_types::dht_v2::{ChainOp, DhtOp, OpEntry};
+    use holochain_zome_types::dht_v2::{Action, ActionData, ActionHeader, SignedAction};
     use holochain_zome_types::op::ChainOpType;
-    use holochain_zome_types::prelude::Signature as V2Signature;
+    use holochain_zome_types::prelude::{Entry, EntryType, EntryVisibility, Signature};
 
     let op_type = ChainOpType::try_from(row.op_type).map_err(|n| {
         crate::query::StateQueryError::Other(format!("invalid op_type {n} in LimboChainOp row"))
     })?;
 
-    // Decode the v2 Action from the joined columns.
+    // Decode the Action from the joined columns.
     let action_data: ActionData = holochain_serialized_bytes::decode(&row.action_data)
         .map_err(|e| crate::query::StateQueryError::Other(format!("decode ActionData: {e}")))?;
-    let action_v2 = Action {
+    let action = Action {
         header: ActionHeader {
             author: AgentPubKey::from_raw_36(row.action_author.clone()),
             timestamp: holochain_types::prelude::Timestamp::from_micros(row.action_timestamp),
@@ -3002,17 +2907,10 @@ fn chain_op_from_joined_row(
             row.action_signature.len()
         ))
     })?;
-    let action_hash = ActionHash::from_raw_36(row.action_hash.clone());
-    let hashed = holo_hash::HoloHashed::with_pre_hashed(action_v2, action_hash);
-    let v2_signed: SignedActionHashed =
-        SignedActionHashed::with_presigned(hashed, V2Signature(sig_bytes));
-
-    let legacy = to_legacy_signed_action(&v2_signed);
-    let signature: Signature = legacy.signature().clone();
-    let action: LegacyAction = legacy.action().clone();
+    let signed_action = SignedAction::new(action.clone(), Signature(sig_bytes));
 
     // Decode the optional entry blob from the LEFT JOIN.
-    let decoded_entry: Option<holochain_types::prelude::Entry> = row
+    let decoded_entry: Option<Entry> = row
         .entry_blob
         .as_ref()
         .map(|blob| {
@@ -3021,129 +2919,92 @@ fn chain_op_from_joined_row(
         })
         .transpose()?;
 
-    // Helper: build RecordEntry from legacy action + decoded entry.
-    let entry_for_action = |action: &LegacyAction| -> StateQueryResult<RecordEntry> {
-        use holochain_zome_types::entry_def::EntryVisibility;
-        if action.entry_hash().is_none() {
-            return Ok(RecordEntry::NA);
-        }
-        match decoded_entry.clone() {
-            Some(entry) => Ok(RecordEntry::Present(entry)),
-            None => {
-                if action.entry_visibility() == Some(&EntryVisibility::Private) {
-                    Ok(RecordEntry::Hidden)
-                } else {
-                    Ok(RecordEntry::NotStored)
-                }
-            }
+    // Build the `OpEntry` an entry-bearing op variant carries.
+    //
+    // `OpEntry` has only `Present`/`Hidden`/`ActionOnly`. An action with no
+    // entry-bearing data at all (`entry_type: None`) maps to `ActionOnly`, as
+    // does an entry-bearing *public* action whose entry blob isn't locally
+    // present: there is no distinction between "this action has no entry" and
+    // "the entry exists but isn't fetched yet", both just mean "no entry
+    // payload right now". A *private* action's absent entry maps to `Hidden`,
+    // recording that the entry is deliberately withheld, not merely unfetched.
+    let op_entry_for = |entry_type: Option<&EntryType>| -> OpEntry {
+        let Some(entry_type) = entry_type else {
+            return OpEntry::ActionOnly;
+        };
+        match &decoded_entry {
+            Some(entry) => OpEntry::Present(entry.clone()),
+            None if entry_type.visibility() == &EntryVisibility::Private => OpEntry::Hidden,
+            None => OpEntry::ActionOnly,
         }
     };
-
-    // Helper: build RecordEntry for Update ops, honouring private-entry
-    // visibility. Public updates without an entry are NotStored (entry data not
-    // yet local); private updates without an entry are Hidden (the entry is
-    // never shared off-author). Mirrors `entry_for_action` above.
-    let entry_for_update =
-        |update: &holochain_zome_types::action::Update| -> StateQueryResult<RecordEntry> {
-            use holochain_zome_types::entry_def::EntryVisibility;
-            match decoded_entry.clone() {
-                Some(entry) => Ok(RecordEntry::Present(entry)),
-                None => match update.entry_type.visibility() {
-                    EntryVisibility::Private => Ok(RecordEntry::Hidden),
-                    EntryVisibility::Public => Ok(RecordEntry::NotStored),
-                },
-            }
-        };
+    let entry_type = match &action.data {
+        ActionData::Create(d) => Some(&d.entry_type),
+        ActionData::Update(d) => Some(&d.entry_type),
+        _ => None,
+    };
 
     let chain_op = match op_type {
-        ChainOpType::StoreRecord => {
-            let entry = entry_for_action(&action)?;
-            ChainOp::StoreRecord(signature, action, entry)
-        }
+        ChainOpType::StoreRecord => ChainOp::CreateRecord(signed_action, op_entry_for(entry_type)),
         ChainOpType::StoreEntry => {
-            let entry_hash = action.entry_hash().cloned().ok_or_else(|| {
-                crate::query::StateQueryError::Other("StoreEntry action has no entry_hash".into())
-            })?;
-            let entry = decoded_entry.clone().ok_or_else(|| {
-                crate::query::StateQueryError::Other(format!(
-                    "Entry {entry_hash:?} for StoreEntry not found"
-                ))
-            })?;
-            let new_entry_action = NewEntryAction::try_from(action).map_err(|_| {
-                crate::query::StateQueryError::Other(
+            if entry_type.is_none() {
+                return Err(crate::query::StateQueryError::Other(
                     "StoreEntry action is not a Create/Update".into(),
-                )
+                ));
+            }
+            let entry = decoded_entry.clone().ok_or_else(|| {
+                crate::query::StateQueryError::Other("Entry for StoreEntry not found".into())
             })?;
-            ChainOp::StoreEntry(signature, new_entry_action, entry)
+            ChainOp::CreateEntry(signed_action, OpEntry::Present(entry))
         }
-        ChainOpType::RegisterAgentActivity => ChainOp::RegisterAgentActivity(signature, action),
+        ChainOpType::RegisterAgentActivity => ChainOp::AgentActivity(signed_action),
         ChainOpType::RegisterUpdatedContent => {
-            let update = match action {
-                LegacyAction::Update(u) => u,
-                _ => {
-                    return Err(crate::query::StateQueryError::Other(
-                        "RegisterUpdatedContent action is not Update".into(),
-                    ))
-                }
-            };
-            let entry = entry_for_update(&update)?;
-            ChainOp::RegisterUpdatedContent(signature, update, entry)
+            if !matches!(action.data, ActionData::Update(_)) {
+                return Err(crate::query::StateQueryError::Other(
+                    "RegisterUpdatedContent action is not Update".into(),
+                ));
+            }
+            ChainOp::UpdateEntry(signed_action, op_entry_for(entry_type))
         }
         ChainOpType::RegisterUpdatedRecord => {
-            let update = match action {
-                LegacyAction::Update(u) => u,
-                _ => {
-                    return Err(crate::query::StateQueryError::Other(
-                        "RegisterUpdatedRecord action is not Update".into(),
-                    ))
-                }
-            };
-            let entry = entry_for_update(&update)?;
-            ChainOp::RegisterUpdatedRecord(signature, update, entry)
+            if !matches!(action.data, ActionData::Update(_)) {
+                return Err(crate::query::StateQueryError::Other(
+                    "RegisterUpdatedRecord action is not Update".into(),
+                ));
+            }
+            ChainOp::UpdateRecord(signed_action, op_entry_for(entry_type))
         }
         ChainOpType::RegisterDeletedEntryAction => {
-            let delete = match action {
-                LegacyAction::Delete(d) => d,
-                _ => {
-                    return Err(crate::query::StateQueryError::Other(
-                        "RegisterDeletedEntryAction action is not Delete".into(),
-                    ))
-                }
-            };
-            ChainOp::RegisterDeletedEntryAction(signature, delete)
+            if !matches!(action.data, ActionData::Delete(_)) {
+                return Err(crate::query::StateQueryError::Other(
+                    "RegisterDeletedEntryAction action is not Delete".into(),
+                ));
+            }
+            ChainOp::DeleteEntry(signed_action)
         }
         ChainOpType::RegisterDeletedBy => {
-            let delete = match action {
-                LegacyAction::Delete(d) => d,
-                _ => {
-                    return Err(crate::query::StateQueryError::Other(
-                        "RegisterDeletedBy action is not Delete".into(),
-                    ))
-                }
-            };
-            ChainOp::RegisterDeletedBy(signature, delete)
+            if !matches!(action.data, ActionData::Delete(_)) {
+                return Err(crate::query::StateQueryError::Other(
+                    "RegisterDeletedBy action is not Delete".into(),
+                ));
+            }
+            ChainOp::DeleteRecord(signed_action)
         }
         ChainOpType::RegisterAddLink => {
-            let create_link = match action {
-                LegacyAction::CreateLink(c) => c,
-                _ => {
-                    return Err(crate::query::StateQueryError::Other(
-                        "RegisterAddLink action is not CreateLink".into(),
-                    ))
-                }
-            };
-            ChainOp::RegisterAddLink(signature, create_link)
+            if !matches!(action.data, ActionData::CreateLink(_)) {
+                return Err(crate::query::StateQueryError::Other(
+                    "RegisterAddLink action is not CreateLink".into(),
+                ));
+            }
+            ChainOp::CreateLink(signed_action)
         }
         ChainOpType::RegisterRemoveLink => {
-            let delete_link = match action {
-                LegacyAction::DeleteLink(d) => d,
-                _ => {
-                    return Err(crate::query::StateQueryError::Other(
-                        "RegisterRemoveLink action is not DeleteLink".into(),
-                    ))
-                }
-            };
-            ChainOp::RegisterRemoveLink(signature, delete_link)
+            if !matches!(action.data, ActionData::DeleteLink(_)) {
+                return Err(crate::query::StateQueryError::Other(
+                    "RegisterRemoveLink action is not DeleteLink".into(),
+                ));
+            }
+            ChainOp::DeleteLink(signed_action)
         }
     };
 
@@ -3156,9 +3017,8 @@ fn chain_op_from_joined_row(
 fn warrant_from_limbo_row(
     row: &holochain_data::models::dht::LimboWarrantRow,
 ) -> StateQueryResult<DhtOpHashed> {
-    use holochain_types::dht_op::DhtOp;
+    use holochain_types::dht_v2::{DhtOp, WarrantOp};
     use holochain_types::prelude::Signature;
-    use holochain_types::warrant::WarrantOp;
     use holochain_zome_types::warrant::{SignedWarrant, Warrant, WarrantProof};
 
     let proof: WarrantProof = holochain_serialized_bytes::decode(&row.proof)?;
@@ -3173,13 +3033,12 @@ fn warrant_from_limbo_row(
     // WarrantOps from storage without a separate signature column.
     let signature = Signature::from([0u8; 64]);
     let signed_warrant = SignedWarrant::new(warrant, signature);
-    let warrant_op = WarrantOp::from(signed_warrant);
-    let op = DhtOp::WarrantOp(Box::new(warrant_op));
+    let op = DhtOp::WarrantOp(Box::new(WarrantOp(signed_warrant)));
     let op_hash = holo_hash::DhtOpHash::from_raw_36(row.hash.clone());
     Ok(DhtOpHashed::with_pre_hashed(op, op_hash))
 }
 
-/// Reconstruct a legacy [`SignedWarrant`] from an integrated `WarrantRow`.
+/// Reconstruct a [`SignedWarrant`] from an integrated `WarrantRow`.
 fn warrant_row_to_signed_warrant(
     row: holochain_data::models::dht::WarrantRow,
 ) -> StateQueryResult<SignedWarrant> {
@@ -3201,9 +3060,9 @@ fn warrant_row_to_signed_warrant(
 }
 
 /// Highest observed sequence number across the valid and rejected lists, each
-/// assumed sorted ascending by sequence. Mirrors the legacy authority: the hash
-/// list holds the last valid and/or last rejected action, which coincide only
-/// when both share the top sequence.
+/// assumed sorted ascending by sequence. The hash list holds the last valid
+/// and/or last rejected action, which coincide only when both share the top
+/// sequence.
 fn compute_highest_observed<T: ActionSequenceAndHash>(
     valid: &[T],
     rejected: &[T],
@@ -3332,7 +3191,7 @@ fn collect_canonical_chain_hashes(
         if !chain_hashes.insert(current_hash) {
             break;
         }
-        let Some(prev_hash) = current.action.prev_hash() else {
+        let Some(prev_hash) = current.action.action().prev_action() else {
             break;
         };
         let Some(&prev_index) = index_by_hash.get(prev_hash) else {
@@ -3371,10 +3230,10 @@ fn check_agent_activity_completeness(
 ) -> MustGetAgentActivityCompleteness {
     let has_gap = activity
         .windows(2)
-        .any(|w| w[0].action.seq() != w[1].action.seq() + 1);
+        .any(|w| w[0].action.action().action_seq() != w[1].action.action().action_seq() + 1);
     let reaches_genesis = activity
         .last()
-        .map(|last| last.action.seq() == 0)
+        .map(|last| last.action.action().action_seq() == 0)
         .unwrap_or(false);
 
     match &filter.limit_conditions {
@@ -3425,7 +3284,13 @@ fn check_agent_activity_completeness(
     }
 }
 
-/// Assemble the legacy [`AgentActivityResponse`] from the classified lists.
+/// Assemble the [`AgentActivityResponse`] from the classified lists.
+///
+/// Generic over the item shape via [`ActionHashedContainer`]: the
+/// `include_full_records` case passes
+/// [`Record`](holochain_zome_types::record::Record)s (whose `Vec` renders as
+/// [`ChainItems::Full`]) and the hashes case passes the `HoloHashed<Action>`
+/// shape (rendering as [`ChainItems::Hashes`]).
 fn build_agent_activity_response<T>(
     agent: holo_hash::AgentPubKey,
     valid: Vec<T>,
@@ -3450,8 +3315,8 @@ where
     let status = match status {
         ChainStatus::Valid(head)
             if matches!(
-                valid.last().map(|v| v.action()),
-                Some(Action::CloseChain(_))
+                valid.last().map(|v| &v.action().data),
+                Some(ActionData::CloseChain(_))
             ) =>
         {
             ChainStatus::Closed(head)
@@ -3490,32 +3355,42 @@ mod tests {
     use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash, HoloHashed};
     use holochain_data::kind::Dht;
     use holochain_data::DbWrite;
-    use holochain_types::chain::ChainItem;
-    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
     use holochain_types::prelude::MustGetAgentActivityResponse;
     use holochain_types::prelude::Signature;
     use holochain_types::prelude::Timestamp;
-    use holochain_zome_types::action::{Action, Create, EntryType};
+    // This test module seeds the store via the op pipeline
+    // (`ChainOp`/`DhtOpHashed`/`Scratch`), built from the flat `Action`
+    // (`ActionHeader` + `ActionData`) shape. Reads through the `DhtStore`
+    // produce `Record`/`Action` values, asserted via their own accessors.
     use holochain_zome_types::chain::ChainFilter;
+    use holochain_zome_types::dht_v2::{
+        Action, ActionData, ActionHeader, CreateData, SignedAction,
+    };
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::prelude::AppEntryDef;
+    use holochain_zome_types::prelude::EntryType;
     use std::sync::Arc;
 
     fn make_fork_op(author: &AgentPubKey, prev: &ActionHash, seq: u32, seed: u8) -> DhtOpHashed {
-        let action = Action::Create(Create {
-            author: author.clone(),
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: seq,
-            prev_action: prev.clone(),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
-            weight: Default::default(),
-        });
-        let chain_op = ChainOp::RegisterAgentActivity(Signature::from([seed; 64]), action);
+        let action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(seed as i64 * 1000),
+                action_seq: seq,
+                prev_action: Some(prev.clone()),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
+            }),
+        };
+        let signed_action = SignedAction::new(action, Signature::from([seed; 64]));
+        let chain_op = ChainOp::AgentActivity(signed_action);
         DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)))
     }
 
@@ -3525,20 +3400,24 @@ mod tests {
 
     fn make_chain_op(seed: u8, require_validation_receipt: bool) -> (DhtOpHashed, bool) {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
-        let action = Action::Create(Create {
-            author,
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: 1,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
-            weight: Default::default(),
-        });
-        let chain_op = ChainOp::RegisterAgentActivity(Signature::from([seed; 64]), action);
+        let action = Action {
+            header: ActionHeader {
+                author,
+                timestamp: Timestamp::from_micros(seed as i64 * 1000),
+                action_seq: 1,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36])),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
+            }),
+        };
+        let signed_action = SignedAction::new(action, Signature::from([seed; 64]));
+        let chain_op = ChainOp::AgentActivity(signed_action);
         (
             DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op))),
             require_validation_receipt,
@@ -3579,28 +3458,28 @@ mod tests {
             ),
         ));
         let entry_hash = EntryHash::with_data_sync(&entry);
-        let action = Action::Create(Create {
-            author: alice.clone(),
-            timestamp: Timestamp::from_micros(1000),
-            action_seq: 1,
-            prev_action: ActionHash::from_raw_36(vec![3u8; 36]),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Private,
-            )),
-            entry_hash: entry_hash.clone(),
-            weight: Default::default(),
-        });
+        let action = Action {
+            header: ActionHeader {
+                author: alice.clone(),
+                timestamp: Timestamp::from_micros(1000),
+                action_seq: 1,
+                prev_action: Some(ActionHash::from_raw_36(vec![3u8; 36])),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Private,
+                )),
+                entry_hash: entry_hash.clone(),
+            }),
+        };
         let action_hash = ActionHash::with_data_sync(&action);
 
         // Recording the StoreRecord op with the entry present lands the entry in
         // the public `Entry` table — the leak surface.
-        let chain_op = ChainOp::StoreRecord(
-            Signature::from([7u8; 64]),
-            action,
-            RecordEntry::Present(entry.clone()),
-        );
+        let signed_action = SignedAction::new(action, Signature::from([7u8; 64]));
+        let chain_op = ChainOp::CreateRecord(signed_action, OpEntry::Present(entry.clone()));
         let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
         store.record_incoming_ops(vec![(op, false)]).await.unwrap();
 
@@ -3690,15 +3569,18 @@ mod tests {
             )),
         );
         let entry_hash = EntryHash::with_data_sync(&entry);
-        let action = Action::Create(Create {
-            author: author.clone(),
-            timestamp: Timestamp::from_micros(2_000),
-            action_seq: seq,
-            prev_action: ActionHash::from_raw_36(vec![3u8; 36]),
-            entry_type: app_entry_type,
-            entry_hash: entry_hash.clone(),
-            weight: Default::default(),
-        });
+        let action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(2_000),
+                action_seq: seq,
+                prev_action: Some(ActionHash::from_raw_36(vec![3u8; 36])),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: app_entry_type,
+                entry_hash: entry_hash.clone(),
+            }),
+        };
         (entry_hash, entry, action, preflight_request)
     }
 
@@ -3718,9 +3600,10 @@ mod tests {
         entry: &holochain_types::prelude::Entry,
         private_author: Option<&AgentPubKey>,
     ) {
-        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
-            ChainOp::RegisterAgentActivity(Signature::from([7u8; 64]), action),
-        )));
+        let signed_action = SignedAction::new(action, Signature::from([7u8; 64]));
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::AgentActivity(
+            signed_action,
+        ))));
         store
             .test_insert_authored_chain_op(op, None, None, None)
             .await
@@ -3783,19 +3666,22 @@ mod tests {
             ),
         ));
         let entry_hash = EntryHash::with_data_sync(&entry);
-        let action = Action::Create(Create {
-            author: alice.clone(),
-            timestamp: Timestamp::from_micros(2_000),
-            action_seq: 1,
-            prev_action: ActionHash::from_raw_36(vec![3u8; 36]),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                holochain_zome_types::entry_def::EntryVisibility::Public,
-            )),
-            entry_hash: entry_hash.clone(),
-            weight: Default::default(),
-        });
+        let action = Action {
+            header: ActionHeader {
+                author: alice.clone(),
+                timestamp: Timestamp::from_micros(2_000),
+                action_seq: 1,
+                prev_action: Some(ActionHash::from_raw_36(vec![3u8; 36])),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    holochain_zome_types::entry_def::EntryVisibility::Public,
+                )),
+                entry_hash: entry_hash.clone(),
+            }),
+        };
         insert_integrated_head(&store, action, &entry_hash, &entry, None).await;
 
         let result = store
@@ -4009,7 +3895,7 @@ mod tests {
             .unwrap();
         let op = make_chain_op(30, false);
         let action = match op.0.as_content() {
-            DhtOp::ChainOp(c) => c.action().clone(),
+            DhtOp::ChainOp(c) => c.signed_action().data().clone(),
             _ => unreachable!(),
         };
 
@@ -4033,16 +3919,16 @@ mod tests {
 
         // Capture op_a's action hash and signature before moving op_a into the store.
         let expected_hash = match op_a.as_content() {
-            DhtOp::ChainOp(c) => ActionHash::with_data_sync(&c.action()),
+            DhtOp::ChainOp(c) => ActionHash::with_data_sync(c.signed_action().data()),
             _ => unreachable!(),
         };
         let expected_sig = match op_a.as_content() {
-            DhtOp::ChainOp(c) => c.signature().clone(),
+            DhtOp::ChainOp(c) => c.signed_action().signature().clone(),
             _ => unreachable!(),
         };
 
         let action_b = match op_b.as_content() {
-            DhtOp::ChainOp(c) => c.action().clone(),
+            DhtOp::ChainOp(c) => c.signed_action().data().clone(),
             _ => unreachable!(),
         };
 
@@ -4069,7 +3955,7 @@ mod tests {
         let op = make_chain_op(60, true);
         let hash = op.0.as_hash().clone();
         let author = match op.0.as_content() {
-            DhtOp::ChainOp(c) => c.action().author().clone(),
+            DhtOp::ChainOp(c) => c.signed_action().data().author().clone(),
             _ => unreachable!(),
         };
 
@@ -4336,8 +4222,8 @@ mod tests {
             .unwrap();
 
         // The meaningful signal is fork detection: two valid actions at the
-        // same seq yield Forked. (highest_observed mirrors the legacy authority
-        // and reports the top sequence, not necessarily every tip's hash.)
+        // same seq yield Forked. (highest_observed reports the top sequence, not
+        // necessarily every tip's hash.)
         match resp.status {
             ChainStatus::Forked(fork) => assert_eq!(fork.fork_seq, 1),
             other => panic!("expected Forked, got {other:?}"),
@@ -4383,7 +4269,7 @@ mod tests {
     fn make_warrant_for(warrantee: &AgentPubKey, seed: u8) -> DhtOpHashed {
         // `Signature` and `Timestamp` are already in scope from the test
         // module's top-level `use` lines; do not re-import them here.
-        use holochain_types::warrant::WarrantOp;
+        use holochain_types::dht_v2::WarrantOp;
         use holochain_zome_types::op::ChainOpType;
         use holochain_zome_types::prelude::{
             ChainIntegrityWarrant, SignedWarrant, Warrant, WarrantProof,
@@ -4405,7 +4291,7 @@ mod tests {
             ),
             Signature::from([seed.wrapping_add(1); 64]),
         );
-        DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(WarrantOp::from(warrant))))
+        DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(WarrantOp(warrant))))
     }
 
     #[tokio::test]
@@ -4472,7 +4358,7 @@ mod tests {
 
     // ---- get_agent_activity_with_scratch tests ----
 
-    /// Build a scratch `SignedActionHashed` (legacy) for a `Create` by `author`
+    /// Build a scratch `SignedActionHashed` for a `Create` by `author`
     /// at the given `action_seq`, linked from `prev`.
     fn make_scratch_create(
         author: &AgentPubKey,
@@ -4480,20 +4366,25 @@ mod tests {
         prev: &ActionHash,
         seed: u8,
     ) -> holochain_zome_types::record::SignedActionHashed {
-        let action = Action::Create(Create {
-            author: author.clone(),
-            timestamp: Timestamp::from_micros(seed as i64 * 10_000),
-            action_seq: seq,
-            prev_action: prev.clone(),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-            weight: Default::default(),
-        });
-        let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
+        let action = holochain_zome_types::dht_v2::build_action(
+            holochain_zome_types::dht_v2::ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(seed as i64 * 10_000),
+                action_seq: seq,
+                prev_action: Some(prev.clone()),
+            },
+            holochain_zome_types::dht_v2::ActionData::Create(
+                holochain_zome_types::dht_v2::CreateData {
+                    entry_type: EntryType::App(AppEntryDef::new(
+                        0.into(),
+                        0.into(),
+                        EntryVisibility::Public,
+                    )),
+                    entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
+                },
+            ),
+        );
+        let action_hashed = holo_hash::HoloHashed::from_content_sync(action);
         holochain_zome_types::record::SignedActionHashed::with_presigned(
             action_hashed,
             Signature::from([seed; 64]),
@@ -4770,22 +4661,26 @@ mod tests {
         let mut hashes = Vec::new();
         let mut prev = ActionHash::from_raw_36(vec![0u8; 36]);
         for seq in 0..len {
-            let action = Action::Create(Create {
-                author: author.clone(),
-                timestamp: Timestamp::from_micros((seq as i64 + 1) * 1000),
-                action_seq: seq,
-                prev_action: prev.clone(),
-                entry_type: EntryType::App(AppEntryDef::new(
-                    0.into(),
-                    0.into(),
-                    EntryVisibility::Public,
-                )),
-                entry_hash: EntryHash::from_raw_36(vec![(seq as u8).wrapping_add(100); 36]),
-                weight: Default::default(),
-            });
+            let action = Action {
+                header: ActionHeader {
+                    author: author.clone(),
+                    timestamp: Timestamp::from_micros((seq as i64 + 1) * 1000),
+                    action_seq: seq,
+                    prev_action: Some(prev.clone()),
+                },
+                data: ActionData::Create(CreateData {
+                    entry_type: EntryType::App(AppEntryDef::new(
+                        0.into(),
+                        0.into(),
+                        EntryVisibility::Public,
+                    )),
+                    entry_hash: EntryHash::from_raw_36(vec![(seq as u8).wrapping_add(100); 36]),
+                }),
+            };
             let action_hash = holo_hash::ActionHash::with_data_sync(&action);
+            let signed_action = SignedAction::new(action, Signature::from([seq as u8; 64]));
             let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
-                ChainOp::RegisterAgentActivity(Signature::from([seq as u8; 64]), action),
+                ChainOp::AgentActivity(signed_action),
             )));
             prev = action_hash.clone();
             hashes.push(action_hash);
@@ -4832,8 +4727,8 @@ mod tests {
             MustGetAgentActivityResponse::Activity { activity, warrants } => {
                 assert_eq!(activity.len(), 3);
                 // Returned newest-first (seq DESC).
-                assert_eq!(activity[0].action.seq(), 2);
-                assert_eq!(activity[2].action.seq(), 0);
+                assert_eq!(activity[0].action.action().action_seq(), 2);
+                assert_eq!(activity[2].action.action().action_seq(), 0);
                 assert_eq!(warrants.len(), 1);
             }
             other => panic!("expected Activity, got {other:?}"),
@@ -4882,8 +4777,8 @@ mod tests {
         match resp {
             MustGetAgentActivityResponse::Activity { activity, .. } => {
                 assert_eq!(activity.len(), 2);
-                assert_eq!(activity[0].action.seq(), 2);
-                assert_eq!(activity[1].action.seq(), 1);
+                assert_eq!(activity[0].action.action().action_seq(), 2);
+                assert_eq!(activity[1].action.action().action_seq(), 1);
             }
             other => panic!("expected Activity, got {other:?}"),
         }
@@ -4932,8 +4827,8 @@ mod tests {
         match resp {
             MustGetAgentActivityResponse::Activity { activity, .. } => {
                 assert_eq!(activity.len(), 2);
-                assert_eq!(activity[0].action.seq(), 2);
-                assert_eq!(activity[1].action.seq(), 1);
+                assert_eq!(activity[0].action.action().action_seq(), 2);
+                assert_eq!(activity[1].action.action().action_seq(), 1);
             }
             other => panic!("expected Activity, got {other:?}"),
         }
@@ -5057,7 +4952,10 @@ mod tests {
 
         match resp {
             MustGetAgentActivityResponse::Activity { activity, .. } => {
-                let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
+                let seqs: Vec<u32> = activity
+                    .iter()
+                    .map(|a| a.action.action().action_seq())
+                    .collect();
                 assert!(
                     seqs.contains(&3),
                     "scratch action at seq 3 should be in merged activity; got {seqs:?}"
@@ -5107,7 +5005,10 @@ mod tests {
                     3,
                     "store-only read must not include scratch actions"
                 );
-                let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
+                let seqs: Vec<u32> = activity
+                    .iter()
+                    .map(|a| a.action.action().action_seq())
+                    .collect();
                 assert!(
                     !seqs.contains(&3),
                     "scratch action at seq 3 must not appear"
@@ -5199,43 +5100,53 @@ mod tests {
 
     // ---- scratch overlay helpers ----
 
-    /// Build a `SignedActionHashed` (legacy) for a `Create` that references
+    /// Build a `SignedActionHashed` for a `Create` that references
     /// `entry_hash`. Useful for scratch overlay tests.
     fn make_signed_action_for_entry(
         seed: u8,
         entry_hash: EntryHash,
     ) -> holochain_zome_types::record::SignedActionHashed {
-        let action = Action::Create(Create {
-            author: AgentPubKey::from_raw_36(vec![seed; 36]),
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: 1,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash,
-            weight: Default::default(),
-        });
-        let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
+        let action = holochain_zome_types::dht_v2::build_action(
+            holochain_zome_types::dht_v2::ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![seed; 36]),
+                timestamp: Timestamp::from_micros(seed as i64 * 1000),
+                action_seq: 1,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36])),
+            },
+            holochain_zome_types::dht_v2::ActionData::Create(
+                holochain_zome_types::dht_v2::CreateData {
+                    entry_type: EntryType::App(AppEntryDef::new(
+                        0.into(),
+                        0.into(),
+                        EntryVisibility::Public,
+                    )),
+                    entry_hash,
+                },
+            ),
+        );
+        let action_hashed = holo_hash::HoloHashed::from_content_sync(action);
         holochain_zome_types::record::SignedActionHashed::with_presigned(
             action_hashed,
             Signature::from([seed; 64]),
         )
     }
 
-    /// Build a `SignedActionHashed` (legacy) for a `Create` with no entry
+    /// Build a `SignedActionHashed` for a `Create` with no entry
     /// (simulates an action that is in the scratch but whose entry is missing).
     fn make_signed_action_no_entry(seed: u8) -> holochain_zome_types::record::SignedActionHashed {
         // Use a Dna action — it carries no entry hash.
-        use holochain_zome_types::action::Dna;
-        let action = Action::Dna(Dna {
-            author: AgentPubKey::from_raw_36(vec![seed; 36]),
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            hash: holo_hash::DnaHash::from_raw_36(vec![seed; 36]),
-        });
-        let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
+        let action = holochain_zome_types::dht_v2::build_action(
+            holochain_zome_types::dht_v2::ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![seed; 36]),
+                timestamp: Timestamp::from_micros(seed as i64 * 1000),
+                action_seq: 0,
+                prev_action: None,
+            },
+            holochain_zome_types::dht_v2::ActionData::Dna(holochain_zome_types::dht_v2::DnaData {
+                dna_hash: holo_hash::DnaHash::from_raw_36(vec![seed; 36]),
+            }),
+        );
+        let action_hashed = holo_hash::HoloHashed::from_content_sync(action);
         holochain_zome_types::record::SignedActionHashed::with_presigned(
             action_hashed,
             Signature::from([seed; 64]),
@@ -5278,7 +5189,7 @@ mod tests {
             .unwrap();
         let op = make_chain_op(90, false);
         let action = match op.0.as_content() {
-            DhtOp::ChainOp(c) => c.action().clone(),
+            DhtOp::ChainOp(c) => c.signed_action().data().clone(),
             _ => unreachable!(),
         };
         let action_hash = holo_hash::ActionHash::with_data_sync(&action);
@@ -5337,7 +5248,6 @@ mod tests {
     /// entry present only in store → `retrieve_entry_with_scratch` returns it.
     #[tokio::test]
     async fn retrieve_entry_with_scratch_finds_store_entry() {
-        use holochain_types::dht_op::{ChainOp, DhtOp};
         use holochain_types::prelude::{AppEntryBytes, Entry};
 
         let store = crate::dht_store::DhtStore::new_test(dht_id())
@@ -5353,27 +5263,25 @@ mod tests {
         let entry = Entry::App(AppEntryBytes(entry_bytes));
         let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
 
-        let action = Action::Create(Create {
-            author,
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: 1,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash: entry_hash.clone(),
-            weight: Default::default(),
-        });
-        let chain_op = ChainOp::StoreEntry(
-            Signature::from([seed; 64]),
-            action.try_into().unwrap(),
-            entry.clone(),
-        );
-        let op = holochain_types::dht_op::DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
-            chain_op,
-        )));
+        let action = Action {
+            header: ActionHeader {
+                author,
+                timestamp: Timestamp::from_micros(seed as i64 * 1000),
+                action_seq: 1,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36])),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: entry_hash.clone(),
+            }),
+        };
+        let signed_action = SignedAction::new(action, Signature::from([seed; 64]));
+        let chain_op = ChainOp::CreateEntry(signed_action, OpEntry::Present(entry.clone()));
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
         store.record_incoming_ops(vec![(op, false)]).await.unwrap();
 
         let empty_scratch = crate::scratch::Scratch::new().into_sync();
@@ -5500,7 +5408,7 @@ mod tests {
         let seed = 94u8;
         let op = make_chain_op(seed, false);
         let action = match op.0.as_content() {
-            DhtOp::ChainOp(c) => c.action().clone(),
+            DhtOp::ChainOp(c) => c.signed_action().data().clone(),
             _ => unreachable!(),
         };
         let action_hash = holo_hash::ActionHash::with_data_sync(&action);
@@ -5564,29 +5472,27 @@ mod tests {
         entry: holochain_types::prelude::Entry,
     ) -> ActionHash {
         use crate::dht_store::{AppOutcome, SysOutcome};
-        use holochain_types::action::NewEntryAction;
-        use holochain_types::dht_op::{ChainOp, DhtOp};
 
-        let action = Action::Create(Create {
-            author: author.clone(),
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: 1,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash: entry_hash.clone(),
-            weight: Default::default(),
-        });
+        let action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(seed as i64 * 1000),
+                action_seq: 1,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36])),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: entry_hash.clone(),
+            }),
+        };
         let action_hash = holo_hash::ActionHash::with_data_sync(&action);
-        let new_entry_action: NewEntryAction = action.try_into().unwrap();
-        let chain_op =
-            ChainOp::StoreEntry(Signature::from([seed; 64]), new_entry_action, entry.clone());
-        let op = holochain_types::dht_op::DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
-            chain_op,
-        )));
+        let signed_action = SignedAction::new(action, Signature::from([seed; 64]));
+        let chain_op = ChainOp::CreateEntry(signed_action, OpEntry::Present(entry.clone()));
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
         let op_hash = op.as_hash().clone();
         store.record_incoming_ops(vec![(op, false)]).await.unwrap();
         store
@@ -5611,17 +5517,21 @@ mod tests {
         deletes_address: ActionHash,
         deletes_entry_address: EntryHash,
     ) -> crate::scratch::SyncScratch {
-        use holochain_zome_types::action::Delete;
-        let delete = Action::Delete(Delete {
-            author: AgentPubKey::from_raw_36(vec![seed; 36]),
-            timestamp: Timestamp::from_micros(seed as i64 * 2000),
-            action_seq: 2,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(150); 36]),
-            deletes_address,
-            deletes_entry_address,
-            weight: Default::default(),
-        });
-        let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(delete);
+        let delete = holochain_zome_types::dht_v2::build_action(
+            holochain_zome_types::dht_v2::ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![seed; 36]),
+                timestamp: Timestamp::from_micros(seed as i64 * 2000),
+                action_seq: 2,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(150); 36])),
+            },
+            holochain_zome_types::dht_v2::ActionData::Delete(
+                holochain_zome_types::dht_v2::DeleteData {
+                    deletes_address,
+                    deletes_entry_address,
+                },
+            ),
+        );
+        let action_hashed = holo_hash::HoloHashed::from_content_sync(delete);
         let sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
             action_hashed,
             Signature::from([seed; 64]),
@@ -5650,7 +5560,7 @@ mod tests {
         // First insert a RegisterAgentActivity op so the action is in the store.
         let act_op = make_chain_op(seed, false);
         let action = match act_op.0.as_content() {
-            DhtOp::ChainOp(c) => c.action().clone(),
+            DhtOp::ChainOp(c) => c.signed_action().data().clone(),
             _ => unreachable!(),
         };
         let action_hash = holo_hash::ActionHash::with_data_sync(&action);
@@ -5909,31 +5819,27 @@ mod tests {
         entry: holochain_types::prelude::Entry,
     ) -> ActionHash {
         use crate::dht_store::{AppOutcome, SysOutcome};
-        use holochain_types::dht_op::{ChainOp, DhtOp};
-        use holochain_types::prelude::RecordEntry;
 
-        let action = Action::Create(Create {
-            author: author.clone(),
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: 1,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash: entry_hash.clone(),
-            weight: Default::default(),
-        });
+        let action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(seed as i64 * 1000),
+                action_seq: 1,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36])),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: entry_hash.clone(),
+            }),
+        };
         let action_hash = holo_hash::ActionHash::with_data_sync(&action);
-        let chain_op = ChainOp::StoreRecord(
-            Signature::from([seed; 64]),
-            action,
-            RecordEntry::Present(entry),
-        );
-        let op = holochain_types::dht_op::DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
-            chain_op,
-        )));
+        let signed_action = SignedAction::new(action, Signature::from([seed; 64]));
+        let chain_op = ChainOp::CreateRecord(signed_action, OpEntry::Present(entry));
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
         let op_hash = op.as_hash().clone();
         store.record_incoming_ops(vec![(op, false)]).await.unwrap();
         store
@@ -5984,17 +5890,21 @@ mod tests {
         let mut scratch = crate::scratch::Scratch::new();
 
         // Delete targeting the store record's action hash.
-        use holochain_zome_types::action::Delete;
-        let delete = Action::Delete(Delete {
-            author: AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),
-            timestamp: Timestamp::from_micros(seed as i64 * 3000),
-            action_seq: 3,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(160); 36]),
-            deletes_address: action_hash.clone(),
-            deletes_entry_address: entry_hash.clone(),
-            weight: Default::default(),
-        });
-        let delete_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(delete);
+        let delete = holochain_zome_types::dht_v2::build_action(
+            holochain_zome_types::dht_v2::ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),
+                timestamp: Timestamp::from_micros(seed as i64 * 3000),
+                action_seq: 3,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(160); 36])),
+            },
+            holochain_zome_types::dht_v2::ActionData::Delete(
+                holochain_zome_types::dht_v2::DeleteData {
+                    deletes_address: action_hash.clone(),
+                    deletes_entry_address: entry_hash.clone(),
+                },
+            ),
+        );
+        let delete_hashed = holo_hash::HoloHashed::from_content_sync(delete);
         let delete_sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
             delete_hashed,
             Signature::from([seed.wrapping_add(10); 64]),
@@ -6005,23 +5915,27 @@ mod tests {
         );
 
         // Update targeting the store record's action hash.
-        use holochain_zome_types::action::Update;
-        let update = Action::Update(Update {
-            author: AgentPubKey::from_raw_36(vec![seed.wrapping_add(20); 36]),
-            timestamp: Timestamp::from_micros(seed as i64 * 4000),
-            action_seq: 4,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(170); 36]),
-            original_action_address: action_hash.clone(),
-            original_entry_address: entry_hash.clone(),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash: new_entry_hash.clone(),
-            weight: Default::default(),
-        });
-        let update_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(update);
+        let update = holochain_zome_types::dht_v2::build_action(
+            holochain_zome_types::dht_v2::ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![seed.wrapping_add(20); 36]),
+                timestamp: Timestamp::from_micros(seed as i64 * 4000),
+                action_seq: 4,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(170); 36])),
+            },
+            holochain_zome_types::dht_v2::ActionData::Update(
+                holochain_zome_types::dht_v2::UpdateData {
+                    original_action_address: action_hash.clone(),
+                    original_entry_address: entry_hash.clone(),
+                    entry_type: EntryType::App(AppEntryDef::new(
+                        0.into(),
+                        0.into(),
+                        EntryVisibility::Public,
+                    )),
+                    entry_hash: new_entry_hash.clone(),
+                },
+            ),
+        );
+        let update_hashed = holo_hash::HoloHashed::from_content_sync(update);
         let update_sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
             update_hashed,
             Signature::from([seed.wrapping_add(20); 64]),
@@ -6156,27 +6070,22 @@ mod tests {
         // Integrate a RegisterDeletedEntryAction so the store-create is deleted.
         {
             use crate::dht_store::{AppOutcome, SysOutcome};
-            use holochain_types::dht_op::{ChainOp, DhtOp};
-            use holochain_zome_types::action::Delete;
-            let delete_action = Action::Delete(Delete {
-                author: author.clone(),
-                timestamp: Timestamp::from_micros(seed as i64 * 5000),
-                action_seq: 3,
-                prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(180); 36]),
-                deletes_address: store_action_hash.clone(),
-                deletes_entry_address: entry_hash.clone(),
-                weight: Default::default(),
-            });
-            let chain_op = ChainOp::RegisterDeletedEntryAction(
-                Signature::from([seed.wrapping_add(5); 64]),
-                match delete_action {
-                    Action::Delete(d) => d,
-                    _ => unreachable!(),
+            let delete_action = Action {
+                header: ActionHeader {
+                    author: author.clone(),
+                    timestamp: Timestamp::from_micros(seed as i64 * 5000),
+                    action_seq: 3,
+                    prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(180); 36])),
                 },
-            );
-            let op = holochain_types::dht_op::DhtOpHashed::from_content_sync(DhtOp::ChainOp(
-                Box::new(chain_op),
-            ));
+                data: ActionData::Delete(holochain_zome_types::dht_v2::DeleteData {
+                    deletes_address: store_action_hash.clone(),
+                    deletes_entry_address: entry_hash.clone(),
+                }),
+            };
+            let signed_action =
+                SignedAction::new(delete_action, Signature::from([seed.wrapping_add(5); 64]));
+            let chain_op = ChainOp::DeleteEntry(signed_action);
+            let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
             let op_hash = op.as_hash().clone();
             store.record_incoming_ops(vec![(op, false)]).await.unwrap();
             store
@@ -6256,43 +6165,51 @@ mod tests {
         // Update (original_entry_address == entry_hash).
         let mut scratch = crate::scratch::Scratch::new();
 
-        use holochain_zome_types::action::Delete;
-        let delete = Action::Delete(Delete {
-            author: AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),
-            timestamp: Timestamp::from_micros(seed as i64 * 3000),
-            action_seq: 3,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(160); 36]),
-            deletes_address: store_action_hash.clone(),
-            deletes_entry_address: entry_hash.clone(),
-            weight: Default::default(),
-        });
+        let delete = holochain_zome_types::dht_v2::build_action(
+            holochain_zome_types::dht_v2::ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),
+                timestamp: Timestamp::from_micros(seed as i64 * 3000),
+                action_seq: 3,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(160); 36])),
+            },
+            holochain_zome_types::dht_v2::ActionData::Delete(
+                holochain_zome_types::dht_v2::DeleteData {
+                    deletes_address: store_action_hash.clone(),
+                    deletes_entry_address: entry_hash.clone(),
+                },
+            ),
+        );
         scratch.add_action(
             holochain_zome_types::record::SignedActionHashed::with_presigned(
-                holochain_zome_types::action::ActionHashed::from_content_sync(delete),
+                holo_hash::HoloHashed::from_content_sync(delete),
                 Signature::from([seed.wrapping_add(10); 64]),
             ),
             holochain_zome_types::action::ChainTopOrdering::Relaxed,
         );
 
-        use holochain_zome_types::action::Update;
-        let update = Action::Update(Update {
-            author: AgentPubKey::from_raw_36(vec![seed.wrapping_add(20); 36]),
-            timestamp: Timestamp::from_micros(seed as i64 * 4000),
-            action_seq: 4,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(170); 36]),
-            original_action_address: store_action_hash.clone(),
-            original_entry_address: entry_hash.clone(),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash: new_entry_hash.clone(),
-            weight: Default::default(),
-        });
+        let update = holochain_zome_types::dht_v2::build_action(
+            holochain_zome_types::dht_v2::ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![seed.wrapping_add(20); 36]),
+                timestamp: Timestamp::from_micros(seed as i64 * 4000),
+                action_seq: 4,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(170); 36])),
+            },
+            holochain_zome_types::dht_v2::ActionData::Update(
+                holochain_zome_types::dht_v2::UpdateData {
+                    original_action_address: store_action_hash.clone(),
+                    original_entry_address: entry_hash.clone(),
+                    entry_type: EntryType::App(AppEntryDef::new(
+                        0.into(),
+                        0.into(),
+                        EntryVisibility::Public,
+                    )),
+                    entry_hash: new_entry_hash.clone(),
+                },
+            ),
+        );
         scratch.add_action(
             holochain_zome_types::record::SignedActionHashed::with_presigned(
-                holochain_zome_types::action::ActionHashed::from_content_sync(update),
+                holo_hash::HoloHashed::from_content_sync(update),
                 Signature::from([seed.wrapping_add(20); 64]),
             ),
             holochain_zome_types::action::ChainTopOrdering::Relaxed,
@@ -6380,35 +6297,33 @@ mod tests {
         when: i64,
     ) -> holo_hash::ActionHash {
         use crate::dht_store::{AppOutcome, SysOutcome};
-        use holochain_types::dht_op::{ChainOp, DhtOp};
-        use holochain_zome_types::action::CreateLink;
         use holochain_zome_types::link::LinkTag;
 
-        let action = Action::CreateLink(CreateLink {
-            author: AgentPubKey::from_raw_36(vec![seed; 36]),
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: 2,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(60); 36]),
-            base_address: base.clone(),
-            target_address: holo_hash::AnyLinkableHash::from_raw_36_and_type(
-                vec![seed.wrapping_add(20); 36],
-                holo_hash::hash_type::AnyLinkable::Entry,
-            ),
-            zome_index: zome_index.into(),
-            link_type: link_type.into(),
-            tag: LinkTag(tag_bytes),
-            weight: Default::default(),
-        });
-        let create_link = match action {
-            Action::CreateLink(cl) => cl,
-            _ => unreachable!(),
+        let action = Action {
+            header: ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![seed; 36]),
+                timestamp: Timestamp::from_micros(seed as i64 * 1000),
+                action_seq: 2,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(60); 36])),
+            },
+            data: ActionData::CreateLink(holochain_zome_types::dht_v2::CreateLinkData {
+                base_address: base.clone(),
+                target_address: holo_hash::AnyLinkableHash::from_raw_36_and_type(
+                    vec![seed.wrapping_add(20); 36],
+                    holo_hash::hash_type::AnyLinkable::Entry,
+                ),
+                zome_index: zome_index.into(),
+                link_type: link_type.into(),
+                tag: LinkTag(tag_bytes),
+            }),
         };
-        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
-            ChainOp::RegisterAddLink(Signature::from([seed; 64]), create_link),
-        )));
+        let signed_action = SignedAction::new(action, Signature::from([seed; 64]));
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::CreateLink(
+            signed_action,
+        ))));
         let op_hash = op.as_hash().clone();
         let action_hash = match op.as_content() {
-            DhtOp::ChainOp(c) => holo_hash::ActionHash::with_data_sync(&c.action()),
+            DhtOp::ChainOp(c) => holo_hash::ActionHash::with_data_sync(c.signed_action().data()),
             _ => unreachable!(),
         };
         store.record_incoming_ops(vec![(op, false)]).await.unwrap();
@@ -6435,25 +6350,29 @@ mod tests {
         tag_bytes: Vec<u8>,
         seed: u8,
     ) -> holochain_zome_types::record::SignedActionHashed {
-        use holochain_zome_types::action::CreateLink;
         use holochain_zome_types::link::LinkTag;
 
-        let action = Action::CreateLink(CreateLink {
-            author: AgentPubKey::from_raw_36(vec![seed; 36]),
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: 2,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(60); 36]),
-            base_address: base.clone(),
-            target_address: holo_hash::AnyLinkableHash::from_raw_36_and_type(
-                vec![seed.wrapping_add(20); 36],
-                holo_hash::hash_type::AnyLinkable::Entry,
+        let action = holochain_zome_types::dht_v2::build_action(
+            holochain_zome_types::dht_v2::ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![seed; 36]),
+                timestamp: Timestamp::from_micros(seed as i64 * 1000),
+                action_seq: 2,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(60); 36])),
+            },
+            holochain_zome_types::dht_v2::ActionData::CreateLink(
+                holochain_zome_types::dht_v2::CreateLinkData {
+                    base_address: base.clone(),
+                    target_address: holo_hash::AnyLinkableHash::from_raw_36_and_type(
+                        vec![seed.wrapping_add(20); 36],
+                        holo_hash::hash_type::AnyLinkable::Entry,
+                    ),
+                    zome_index: zome_index.into(),
+                    link_type: link_type.into(),
+                    tag: LinkTag(tag_bytes),
+                },
             ),
-            zome_index: zome_index.into(),
-            link_type: link_type.into(),
-            tag: LinkTag(tag_bytes),
-            weight: Default::default(),
-        });
-        let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
+        );
+        let action_hashed = holo_hash::HoloHashed::from_content_sync(action);
         holochain_zome_types::record::SignedActionHashed::with_presigned(
             action_hashed,
             Signature::from([seed; 64]),
@@ -6466,17 +6385,21 @@ mod tests {
         create_link_hash: holo_hash::ActionHash,
         seed: u8,
     ) -> holochain_zome_types::record::SignedActionHashed {
-        use holochain_zome_types::action::DeleteLink;
-
-        let action = Action::DeleteLink(DeleteLink {
-            author: AgentPubKey::from_raw_36(vec![seed; 36]),
-            timestamp: Timestamp::from_micros(seed as i64 * 1000 + 500),
-            action_seq: 3,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(90); 36]),
-            base_address: base.clone(),
-            link_add_address: create_link_hash,
-        });
-        let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
+        let action = holochain_zome_types::dht_v2::build_action(
+            holochain_zome_types::dht_v2::ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![seed; 36]),
+                timestamp: Timestamp::from_micros(seed as i64 * 1000 + 500),
+                action_seq: 3,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_add(90); 36])),
+            },
+            holochain_zome_types::dht_v2::ActionData::DeleteLink(
+                holochain_zome_types::dht_v2::DeleteLinkData {
+                    base_address: base.clone(),
+                    link_add_address: create_link_hash,
+                },
+            ),
+        );
+        let action_hashed = holo_hash::HoloHashed::from_content_sync(action);
         holochain_zome_types::record::SignedActionHashed::with_presigned(
             action_hashed,
             Signature::from([seed; 64]),
@@ -6809,57 +6732,69 @@ mod tests {
     //
     // A chain whose valid head is a `CloseChain` action is reported as `Closed`,
     // but only when the chain is otherwise `Valid`; `Forked`/`Invalid` outrank
-    // it. These are ported from the pre-v2 cascade `get_agent_activity_query`
-    // unit tests and exercise `build_agent_activity_response` directly.
+    // it. These tests exercise `build_agent_activity_response` directly.
 
-    fn mk_record(action: Action) -> holochain_types::prelude::Record {
-        let shh = holochain_zome_types::record::SignedActionHashed::with_presigned(
-            holochain_zome_types::action::ActionHashed::from_content_sync(action),
-            Signature::from([0; 64]),
-        );
-        holochain_types::prelude::Record::new(shh, None)
-    }
+    // `build_agent_activity_response` is generic over any
+    // `T: ActionHashedContainer + Clone` with `Vec<T>: ChainItemsSource`; the
+    // `HoloHashed<Action>` shape satisfies both, so these helpers build a bare
+    // hashed action. Only the resulting chain status is asserted, so the
+    // `ChainItems` rendering (hashes vs full) is irrelevant here.
+    use holochain_zome_types::dht_v2::{CloseChainData, DnaData};
 
-    fn mk_dna(author: &AgentPubKey) -> holochain_types::prelude::Record {
-        mk_record(Action::Dna(holochain_zome_types::action::Dna {
-            author: author.clone(),
-            timestamp: Timestamp::from_micros(0),
-            hash: holo_hash::DnaHash::from_raw_36(vec![0u8; 36]),
-        }))
-    }
-
-    fn mk_create(author: &AgentPubKey, seq: u32) -> holochain_types::prelude::Record {
-        mk_record(Action::Create(Create {
-            author: author.clone(),
-            timestamp: Timestamp::from_micros(seq as i64 * 1000),
-            action_seq: seq,
-            prev_action: ActionHash::from_raw_36(vec![seq as u8; 36]),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash: EntryHash::from_raw_36(vec![seq as u8; 36]),
-            weight: Default::default(),
-        }))
-    }
-
-    fn mk_close(author: &AgentPubKey, seq: u32) -> holochain_types::prelude::Record {
-        mk_record(Action::CloseChain(
-            holochain_zome_types::action::CloseChain {
+    fn mk_action(
+        author: &AgentPubKey,
+        seq: u32,
+        prev: Option<ActionHash>,
+        data: ActionData,
+    ) -> HoloHashed<Action> {
+        HoloHashed::from_content_sync(Action {
+            header: ActionHeader {
                 author: author.clone(),
                 timestamp: Timestamp::from_micros(seq as i64 * 1000),
                 action_seq: seq,
-                prev_action: ActionHash::from_raw_36(vec![seq as u8; 36]),
-                new_target: None,
+                prev_action: prev,
             },
-        ))
+            data,
+        })
     }
 
-    fn status_of(
-        valid: Vec<holochain_types::prelude::Record>,
-        rejected: Vec<holochain_types::prelude::Record>,
-    ) -> ChainStatus {
+    fn mk_dna(author: &AgentPubKey) -> HoloHashed<Action> {
+        mk_action(
+            author,
+            0,
+            None,
+            ActionData::Dna(DnaData {
+                dna_hash: holo_hash::DnaHash::from_raw_36(vec![0u8; 36]),
+            }),
+        )
+    }
+
+    fn mk_create(author: &AgentPubKey, seq: u32) -> HoloHashed<Action> {
+        mk_action(
+            author,
+            seq,
+            Some(ActionHash::from_raw_36(vec![seq as u8; 36])),
+            ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: EntryHash::from_raw_36(vec![seq as u8; 36]),
+            }),
+        )
+    }
+
+    fn mk_close(author: &AgentPubKey, seq: u32) -> HoloHashed<Action> {
+        mk_action(
+            author,
+            seq,
+            Some(ActionHash::from_raw_36(vec![seq as u8; 36])),
+            ActionData::CloseChain(CloseChainData { new_target: None }),
+        )
+    }
+
+    fn status_of(valid: Vec<HoloHashed<Action>>, rejected: Vec<HoloHashed<Action>>) -> ChainStatus {
         let agent = AgentPubKey::from_raw_36(vec![0u8; 36]);
         let options = GetAgentActivityOptions {
             include_valid_activity: true,
@@ -6884,7 +6819,7 @@ mod tests {
         let close = mk_close(&agent, 2);
         let close_head = ChainHead {
             action_seq: 2,
-            hash: close.action_address().clone(),
+            hash: close.as_hash().clone(),
         };
         let status = status_of(vec![mk_dna(&agent), mk_create(&agent, 1), close], vec![]);
         assert_eq!(status, ChainStatus::Closed(close_head));
@@ -6940,14 +6875,19 @@ mod tests {
             seq: u32,
             seed: u8,
         ) -> DhtOpHashed {
-            let action = Action::CloseChain(holochain_zome_types::action::CloseChain {
-                author: author.clone(),
-                timestamp: Timestamp::from_micros(seed as i64 * 1000),
-                action_seq: seq,
-                prev_action: prev.clone(),
-                new_target: None,
-            });
-            let chain_op = ChainOp::RegisterAgentActivity(Signature::from([seed; 64]), action);
+            let action = Action {
+                header: ActionHeader {
+                    author: author.clone(),
+                    timestamp: Timestamp::from_micros(seed as i64 * 1000),
+                    action_seq: seq,
+                    prev_action: Some(prev.clone()),
+                },
+                data: ActionData::CloseChain(holochain_zome_types::dht_v2::CloseChainData {
+                    new_target: None,
+                }),
+            };
+            let signed_action = SignedAction::new(action, Signature::from([seed; 64]));
+            let chain_op = ChainOp::AgentActivity(signed_action);
             DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)))
         }
 

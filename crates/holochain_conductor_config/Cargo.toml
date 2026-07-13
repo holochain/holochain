@@ -14,12 +14,8 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = "1.0"
 ansi_term = "0.12"
-holochain_conductor_api = { version = "^0.7.0-dev.31", path = "../holochain_conductor_api", default-features = false, features = [
-  "sqlite",
-] }
-holochain_types = { version = "^0.7.0-dev.31", path = "../holochain_types", features = [
-  "sqlite",
-] }
+holochain_conductor_api = { version = "^0.7.0-dev.31", path = "../holochain_conductor_api", default-features = false }
+holochain_types = { version = "^0.7.0-dev.31", path = "../holochain_types" }
 holochain_util = { version = "^0.7.0-dev.1", path = "../holochain_util", default-features = false, features = [
   "pw",
 ] }

@@ -2,7 +2,6 @@
 
 use holochain_keystore::{AgentPubKeyExt, LairResult, MetaLairClient};
 use holochain_zome_types::prelude::*;
-use std::str::FromStr;
 
 /// A Warrant DhtOp
 #[derive(
@@ -71,27 +70,5 @@ impl HashableContent for WarrantOp {
 
     fn hashable_content(&self) -> HashableContentBytes {
         self.warrant().hashable_content()
-    }
-}
-
-impl holochain_sqlite::rusqlite::ToSql for WarrantOpType {
-    fn to_sql(
-        &self,
-    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput<'_>>
-    {
-        Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Owned(
-            format!("{self}").into(),
-        ))
-    }
-}
-
-impl holochain_sqlite::rusqlite::types::FromSql for WarrantOpType {
-    fn column_result(
-        value: holochain_sqlite::rusqlite::types::ValueRef<'_>,
-    ) -> holochain_sqlite::rusqlite::types::FromSqlResult<Self> {
-        String::column_result(value).and_then(|string| {
-            WarrantOpType::from_str(&string)
-                .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
-        })
     }
 }

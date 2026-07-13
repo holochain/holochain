@@ -140,7 +140,7 @@ impl HcP2pHandler for UnresponsiveHandler {
     fn handle_publish_countersign(
         &self,
         _dna_hash: DnaHash,
-        _op: holochain_types::dht_op::ChainOp,
+        _op: holochain_types::dht_v2::ChainOp,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(std::future::pending())
     }
@@ -288,13 +288,11 @@ async fn test_remote_signal() {
 fn test_dht_op(
     authored_timestamp: holochain_types::prelude::Timestamp,
 ) -> holochain_types::dht_v2::DhtOp {
-    use holochain_types::dht_v2::{
-        from_legacy_action, ChainOp as V2ChainOp, DhtOp as V2DhtOp, OpEntry, SignedAction,
-    };
+    use holochain_types::dht_v2::{ChainOp as V2ChainOp, DhtOp as V2DhtOp, OpEntry, SignedAction};
+    use holochain_types::fixt::CreateAction;
 
-    let mut create = ::fixt::fixt!(Create);
-    create.timestamp = authored_timestamp;
-    let action = from_legacy_action(&Action::Create(create));
+    let mut action = ::fixt::fixt!(Action, CreateAction);
+    action.header.timestamp = authored_timestamp;
     let signed = SignedAction::new(action, ::fixt::fixt!(Signature));
     V2DhtOp::ChainOp(Box::new(V2ChainOp::CreateRecord(
         signed,

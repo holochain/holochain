@@ -31,4 +31,4 @@ pub use cell::Cell;
 pub use conductor::Conductor;
 pub use conductor::ConductorBuilder;
 pub use conductor::ConductorHandle;
-pub use conductor::{full_integration_dump, integration_dump, wire_rows_to_legacy_ops};
+pub use conductor::{full_integration_dump, integration_dump, wire_rows_to_v2_ops};

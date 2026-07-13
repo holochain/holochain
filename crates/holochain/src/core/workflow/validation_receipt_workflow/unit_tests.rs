@@ -1,10 +1,7 @@
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
-use crate::prelude::CreateFixturator;
-use crate::prelude::DhtOpHashed;
 use crate::prelude::SignatureFixturator;
 use ::fixt::fixt;
-use hdk::prelude::Action;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::HasHash;
@@ -13,6 +10,7 @@ use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_state::test_utils::test_dht_store;
+use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
 use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -380,19 +378,23 @@ async fn create_op_with_status(
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
 
     // The actual op does not matter, just some of the status fields
-    let mut create_action = fixt!(Create);
+    let mut create_action = fixt!(Action, CreateAction);
     let author = author.unwrap_or_else(|| fixt!(AgentPubKey));
-    create_action.author = author.clone();
-    let action = Action::Create(create_action);
-
-    let op =
-        DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(fixt!(Signature), action));
+    create_action.header.author = author.clone();
+    let v2_action = create_action;
+    let signed = holochain_types::dht_v2::SignedAction::new(v2_action, fixt!(Signature));
+    let op = holochain_types::dht_v2::DhtOpHashed::from_content_sync(
+        holochain_types::dht_v2::DhtOp::from(holochain_types::dht_v2::ChainOp::AgentActivity(
+            signed,
+        )),
+    );
 
     let test_op_hash = op.as_hash().clone();
 
     // Write the op through the full validation + integration pipeline so that
     // DhtStore::pending_validation_receipts sees it in integrated +
-    // require_receipt state.
+    // require_receipt state. The hash is derived from the same op content, so
+    // test_op_hash matches.
     dht_store
         .record_incoming_ops(vec![(op, true)])
         .await
@@ -420,7 +422,7 @@ async fn create_op_with_status(
         .integrate_ready_ops(Timestamp::now())
         .await
         .unwrap();
-    // record_incoming_ops sets require_receipt = true, matching the legacy fixture.
+    // record_incoming_ops sets require_receipt = true.
 
     Ok((author, test_op_hash))
 }

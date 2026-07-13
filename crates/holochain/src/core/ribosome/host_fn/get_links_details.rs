@@ -80,9 +80,9 @@ pub mod slow_tests {
     use crate::test_utils::RibosomeTestFixture;
     use holo_hash::ActionHash;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::action::ActionData;
     use holochain_zome_types::link::LinkDetails;
     use holochain_zome_types::record::SignedActionHashed;
-    use holochain_zome_types::Action;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
@@ -144,7 +144,7 @@ pub mod slow_tests {
                 remove_happened = true;
 
                 let link_add_address = unwrap_to
-                    ::unwrap_to!(removes[0].action() => Action::DeleteLink)
+                    ::unwrap_to!(removes[0].hashed.content.data => ActionData::DeleteLink)
                 .link_add_address
                 .clone();
                 assert_eq!(link_add_address, to_remove_hash,);

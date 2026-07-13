@@ -256,22 +256,6 @@ impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
     }
 }
 
-#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
-impl<T: HashType> rusqlite::ToSql for HoloHash<T> {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-        Ok(rusqlite::types::ToSqlOutput::Borrowed(self.as_ref().into()))
-    }
-}
-
-#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
-impl<T: HashType> rusqlite::types::FromSql for HoloHash<T> {
-    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
-        Vec::<u8>::column_result(value).and_then(|bytes| {
-            Self::try_from_raw_39(bytes).map_err(|_| rusqlite::types::FromSqlError::InvalidType)
-        })
-    }
-}
-
 impl<T: HashType> IntoIterator for HoloHash<T> {
     type Item = u8;
     type IntoIter = std::vec::IntoIter<Self::Item>;

@@ -313,7 +313,7 @@ async fn pending_summary(dht_store: &holochain_state::dht_store::DhtStore) -> St
 
 /// Render a stage's pending ops, listing each op hash, so a failing test shows
 /// exactly which ops did not progress.
-fn format_pending_ops(stage: &str, ops: &[holochain_types::dht_op::DhtOpHashed]) -> String {
+fn format_pending_ops(stage: &str, ops: &[holochain_types::dht_v2::DhtOpHashed]) -> String {
     if ops.is_empty() {
         return format!("  pending {stage}-validation: none\n");
     }

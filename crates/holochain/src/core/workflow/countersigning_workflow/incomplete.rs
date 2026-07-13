@@ -272,7 +272,10 @@ pub async fn inner_countersigning_session_incomplete(
         .into_iter()
         .filter(|d| *d != SessionCompletionDecision::Indeterminate)
         .partition_map(|d| match d {
-            SessionCompletionDecision::Complete(sah) => Either::Left((*sah).into()),
+            SessionCompletionDecision::Complete(sah) => Either::Left(SignedAction::new(
+                sah.hashed.content.clone(),
+                sah.signature().clone(),
+            )),
             SessionCompletionDecision::Abandoned => Either::Right(()),
             _ => unreachable!(),
         });
@@ -286,7 +289,10 @@ pub async fn inner_countersigning_session_incomplete(
         session_data.preflight_request().signing_agents.len() - 1
     );
 
-    signatures.push(cs_record.signed_action.clone().into());
+    signatures.push(SignedAction::new(
+        cs_record.action().clone(),
+        cs_record.signature().clone(),
+    ));
 
     if signatures.len() == session_data.preflight_request().signing_agents.len() {
         // We have all the signatures we need to complete the session. We can complete the session

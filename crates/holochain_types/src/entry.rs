@@ -5,9 +5,9 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use crate::dht_op::DhtOpResult;
-use crate::dht_op::RenderedOp;
-use crate::dht_op::RenderedOps;
+use crate::error::DhtOpResult;
+use crate::wire_ops::RenderedOp;
+use crate::wire_ops::RenderedOps;
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::*;
 use holochain_zome_types::warrant::SignedWarrant;

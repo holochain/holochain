@@ -7,6 +7,7 @@ use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
+use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::op::RegisterAgentActivity;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -62,8 +63,7 @@ pub fn must_get_agent_activity(
                 use MustGetAgentActivityResponse::*;
 
                 let result: Result<_, RuntimeError> = match (result, &call_context.host_context) {
-                    (Activity {activity, warrants: _}, _) => {
-                        Ok(activity)},
+                    (Activity {activity, warrants: _}, _) => Ok(activity),
                     (
                         IncompleteChain
                         | ChainTopNotFound(_)

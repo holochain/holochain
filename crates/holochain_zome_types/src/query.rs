@@ -2,7 +2,6 @@
 
 use crate::prelude::*;
 use holo_hash::EntryHash;
-use holo_hash::HasHash;
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
 use holochain_integrity_types::{LinkTag, LinkTypeFilter};
 pub use holochain_serialized_bytes::prelude::*;
@@ -415,21 +414,11 @@ impl ChainQueryFilter {
     }
 
     /// Filter a vector of records according to the query.
+    ///
+    /// A [`Record`] is an [`ActionHashedContainer`], so this is just
+    /// [`Self::filter_actions`] specialised to records.
     pub fn filter_records(&self, records: Vec<Record>) -> Vec<Record> {
-        let actions = self.filter_actions(
-            records
-                .iter()
-                .map(|record| record.action_hashed().clone())
-                .collect(),
-        );
-        let action_hashset = actions
-            .iter()
-            .map(|action| action.as_hash().clone())
-            .collect::<HashSet<ActionHash>>();
-        records
-            .into_iter()
-            .filter(|record| action_hashset.contains(record.action_address()))
-            .collect()
+        self.filter_actions(records)
     }
 }
 
@@ -494,62 +483,65 @@ impl LinkQuery {
 mod tests {
     use super::ChainQueryFilter;
     use crate::action::EntryType;
-    use crate::fixt::AppEntryDefFixturator;
+    use crate::fixt::{AppEntryDefFixturator, CreateAction, CreateLinkAction, UpdateAction};
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::EntryHashFixturator;
     use holo_hash::HasHash;
+    use holochain_integrity_types::dht_v2::ActionHashed;
 
-    /// Create three Actions with various properties.
-    /// Also return the EntryTypes used to construct the first two actions.
+    /// Create hashed actions with various properties. The `Action`s are built
+    /// directly (header + `ActionData`), seeded from the per-variant
+    /// fixturators, so the content-derived hashes match the production
+    /// authoring path.
     fn fixtures() -> [ActionHashed; 7] {
         let entry_type_1 = EntryType::App(fixt!(AppEntryDef));
         let entry_type_2 = EntryType::AgentPubKey;
 
         let entry_hash_0 = fixt!(EntryHash);
 
-        let mut h0 = fixt!(Create);
-        h0.entry_type = entry_type_1.clone();
-        h0.action_seq = 0;
-        h0.entry_hash = entry_hash_0.clone();
-        let hh0 = ActionHashed::from_content_sync(h0);
+        let mut h0 = fixt!(Action, CreateAction);
+        *h0.entry_type_mut().unwrap() = entry_type_1.clone();
+        h0.header.action_seq = 0;
+        *h0.entry_hash_mut().unwrap() = entry_hash_0.clone();
+        let hh0: ActionHashed = ActionHashed::from_content_sync(h0);
 
-        let mut h1 = fixt!(Update);
-        h1.entry_type = entry_type_2.clone();
-        h1.action_seq = 1;
-        h1.prev_action = hh0.as_hash().clone();
-        let hh1 = ActionHashed::from_content_sync(h1);
+        let mut h1 = fixt!(Action, UpdateAction);
+        *h1.entry_type_mut().unwrap() = entry_type_2.clone();
+        h1.header.action_seq = 1;
+        h1.header.prev_action = Some(hh0.as_hash().clone());
+        let hh1: ActionHashed = ActionHashed::from_content_sync(h1);
 
-        let mut h2 = fixt!(CreateLink);
-        h2.action_seq = 2;
-        h2.prev_action = hh1.as_hash().clone();
-        let hh2 = ActionHashed::from_content_sync(h2);
+        let mut h2 = fixt!(Action, CreateLinkAction);
+        h2.header.action_seq = 2;
+        h2.header.prev_action = Some(hh1.as_hash().clone());
+        let hh2: ActionHashed = ActionHashed::from_content_sync(h2);
 
-        let mut h3 = fixt!(Create);
-        h3.entry_type = entry_type_2.clone();
-        h3.action_seq = 3;
-        h3.prev_action = hh2.as_hash().clone();
-        let hh3 = ActionHashed::from_content_sync(h3);
+        let mut h3 = fixt!(Action, CreateAction);
+        *h3.entry_type_mut().unwrap() = entry_type_2.clone();
+        h3.header.action_seq = 3;
+        h3.header.prev_action = Some(hh2.as_hash().clone());
+        let hh3: ActionHashed = ActionHashed::from_content_sync(h3);
 
         // Cheeky forker!
-        let mut h3a = fixt!(Create);
-        h3a.entry_type = entry_type_1.clone();
-        h3a.action_seq = 3;
-        h3a.prev_action = hh2.as_hash().clone();
-        let hh3a = ActionHashed::from_content_sync(h3a);
+        let mut h3a = fixt!(Action, CreateAction);
+        *h3a.entry_type_mut().unwrap() = entry_type_1.clone();
+        h3a.header.action_seq = 3;
+        h3a.header.prev_action = Some(hh2.as_hash().clone());
+        let hh3a: ActionHashed = ActionHashed::from_content_sync(h3a);
 
-        let mut h4 = fixt!(Update);
-        h4.entry_type = entry_type_1.clone();
+        let mut h4 = fixt!(Action, UpdateAction);
+        *h4.entry_type_mut().unwrap() = entry_type_1.clone();
         // same entry content as h0
-        h4.entry_hash = entry_hash_0;
-        h4.action_seq = 4;
-        h4.prev_action = hh3.as_hash().clone();
-        let hh4 = ActionHashed::from_content_sync(h4);
+        *h4.entry_hash_mut().unwrap() = entry_hash_0;
+        h4.header.action_seq = 4;
+        h4.header.prev_action = Some(hh3.as_hash().clone());
+        let hh4: ActionHashed = ActionHashed::from_content_sync(h4);
 
-        let mut h5 = fixt!(CreateLink);
-        h5.action_seq = 5;
-        h5.prev_action = hh4.as_hash().clone();
-        let hh5 = ActionHashed::from_content_sync(h5);
+        let mut h5 = fixt!(Action, CreateLinkAction);
+        h5.header.action_seq = 5;
+        h5.header.prev_action = Some(hh4.as_hash().clone());
+        let hh5: ActionHashed = ActionHashed::from_content_sync(h5);
 
         [hh0, hh1, hh2, hh3, hh3a, hh4, hh5]
     }
@@ -605,9 +597,11 @@ mod tests {
     fn filter_by_action_type() {
         let actions = fixtures();
 
-        let query_1 = ChainQueryFilter::new().action_type(actions[0].action_type());
-        let query_2 = ChainQueryFilter::new().action_type(actions[1].action_type());
-        let query_3 = ChainQueryFilter::new().action_type(actions[2].action_type());
+        // `ChainQueryFilter` filters against `ActionType`; the fixtures are
+        // Create (0), Update (1) and CreateLink (2).
+        let query_1 = ChainQueryFilter::new().action_type(ActionType::Create);
+        let query_2 = ChainQueryFilter::new().action_type(ActionType::Update);
+        let query_3 = ChainQueryFilter::new().action_type(ActionType::CreateLink);
 
         assert_eq!(
             map_query(&query_1, &actions),
@@ -710,7 +704,7 @@ mod tests {
         assert_eq!(
             map_query(
                 &ChainQueryFilter::new()
-                    .action_type(actions[0].action_type())
+                    .action_type(ActionType::Create)
                     .entry_type(actions[0].entry_type().unwrap().clone())
                     .sequence_range(ChainQueryFilterRange::ActionSeqRange(0, 0)),
                 &actions
@@ -721,7 +715,7 @@ mod tests {
         assert_eq!(
             map_query(
                 &ChainQueryFilter::new()
-                    .action_type(actions[1].action_type())
+                    .action_type(ActionType::Update)
                     .entry_type(actions[0].entry_type().unwrap().clone())
                     .sequence_range(ChainQueryFilterRange::ActionSeqRange(0, 999)),
                 &actions
@@ -748,8 +742,8 @@ mod tests {
         assert_eq!(
             map_query(
                 &ChainQueryFilter::new()
-                    .action_type(actions[0].action_type())
-                    .action_type(actions[1].action_type()),
+                    .action_type(ActionType::Create)
+                    .action_type(ActionType::Update),
                 &actions
             ),
             [true, true, false, true, true, true, false].to_vec()
@@ -758,7 +752,7 @@ mod tests {
         // Filter for create actions only
         assert_eq!(
             map_query(
-                &ChainQueryFilter::new().action_type(actions[0].action_type()),
+                &ChainQueryFilter::new().action_type(ActionType::Create),
                 &actions
             ),
             [true, false, false, true, true, false, false].to_vec()

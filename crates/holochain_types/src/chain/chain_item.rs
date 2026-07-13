@@ -36,51 +36,29 @@ pub trait ChainItem: Clone + PartialEq + Eq + std::fmt::Debug + Send + Sync {
 /// Alias for getting the associated hash type of a ChainItem
 pub type ChainItemHash<I> = <I as ChainItem>::Hash;
 
-impl ChainItem for ActionHashed {
-    type Hash = ActionHash;
-
-    fn seq(&self) -> u32 {
-        self.action_seq()
-    }
-
-    fn get_timestamp(&self) -> Timestamp {
-        self.timestamp()
-    }
-
-    fn get_hash(&self) -> &Self::Hash {
-        self.as_hash()
-    }
-
-    fn prev_hash(&self) -> Option<&Self::Hash> {
-        self.prev_action()
-    }
-
-    fn to_display(&self) -> String {
-        format!("{}", self.content)
-    }
-}
-
+// `SignedActionHashed` is a `SignedHashed<Action>` (a flat `ActionHeader` +
+// `ActionData` envelope), so this impl reads the header fields directly.
 impl ChainItem for SignedActionHashed {
     type Hash = ActionHash;
 
     fn seq(&self) -> u32 {
-        self.hashed.seq()
+        self.hashed.content.action_seq()
     }
 
     fn get_timestamp(&self) -> Timestamp {
-        self.hashed.timestamp()
+        self.hashed.content.header.timestamp
     }
 
     fn get_hash(&self) -> &Self::Hash {
-        self.hashed.get_hash()
+        self.hashed.as_hash()
     }
 
     fn prev_hash(&self) -> Option<&Self::Hash> {
-        self.hashed.prev_hash()
+        self.hashed.content.header.prev_action.as_ref()
     }
 
     fn to_display(&self) -> String {
-        format!("{}", self.hashed.content)
+        format!("{:?}", self.hashed.content)
     }
 }
 
@@ -180,7 +158,7 @@ impl From<(PrevActionErrorKind, Action)> for PrevActionError {
             source: inner,
             seq: action.action_seq(),
             action_hash: action.to_hash(),
-            action_display: format!("{action}"),
+            action_display: format!("{action:?}"),
         }
     }
 }

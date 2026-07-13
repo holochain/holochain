@@ -52,8 +52,7 @@ impl<I: DatabaseIdentifier> DbRead<I> {
     /// The returned [`TimedConn`] dereferences to a [`SqliteConnection`] and,
     /// when dropped, records the elapsed time it was held as the
     /// `hc.db.connections.use_time` metric. Read operations route through this
-    /// so that connection-use is measured the same way `holochain_sqlite`
-    /// measured borrowed rusqlite connections.
+    /// so that connection-use is measured like borrowed database connections.
     pub(crate) async fn timed_conn(&self) -> sqlx::Result<TimedConn> {
         let conn = self.pool.acquire().await?;
         Ok(TimedConn::new(conn, self.use_time_metric.clone()))

@@ -1,5 +1,5 @@
 //! The Holochain state crate provides helpers and abstractions for working
-//! with the `holochain_sqlite` crate.
+//! with Holochain's persistent data stores.
 //!
 //! ## Reads
 //! The [`DhtStore`] and [`DhtStoreRead`] types are the main abstractions for
@@ -11,8 +11,7 @@
 //! The [`host_fn_workspace`] module provides abstractions for reading data during workflows.
 //!
 //! ## Writes
-//! The [`mutations`] module is the complete set of functions
-//! for writing data to sqlite in holochain.
+//! The [`mutations`] module provides error types for state write operations.
 //!
 //! ## In-memory
 //! The [`scratch`] module provides the [`Scratch`](crate::scratch::Scratch) type for

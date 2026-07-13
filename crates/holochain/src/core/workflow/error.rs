@@ -10,7 +10,6 @@ use crate::core::SysValidationError;
 use holochain_cascade::error::CascadeError;
 use holochain_keystore::KeystoreError;
 use holochain_p2p::HolochainP2pError;
-use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use thiserror::Error;
@@ -35,9 +34,6 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     CounterSigningError(#[from] CounterSigningError),
-
-    #[error("Database error: {0}")]
-    DatabaseError(#[from] DatabaseError),
 
     #[error(transparent)]
     RibosomeError(#[from] RibosomeError),
@@ -77,9 +73,6 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     KeystoreError(#[from] KeystoreError),
-
-    #[error(transparent)]
-    SqlError(#[from] holochain_sqlite::rusqlite::Error),
 
     #[error(transparent)]
     StateQueryError(#[from] holochain_state::query::StateQueryError),

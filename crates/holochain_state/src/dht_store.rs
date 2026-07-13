@@ -12,7 +12,7 @@ use holochain_data::dht::{
 };
 use holochain_data::kind::Dht;
 use holochain_data::DbWrite;
-use holochain_types::dht_op::{DhtOp, DhtOpHashed};
+use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
 use holochain_types::prelude::{Schedule, ScheduledFn, Timestamp};
 use holochain_zome_types::schedule::ScheduleError;
 
@@ -549,25 +549,24 @@ impl DhtStore<DbWrite<Dht>> {
             match op.into_inner().0 {
                 DhtOp::ChainOp(chain_op) => {
                     let signed_action = chain_op.signed_action();
-                    let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.action());
-                    let sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
+                    let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.data());
+                    let sah = holochain_zome_types::dht_v2::SignedActionHashed::with_presigned(
                         holo_hash::HoloHashed::with_pre_hashed(
-                            signed_action.action().clone(),
+                            signed_action.data().clone(),
                             action_hash.clone(),
                         ),
                         signed_action.signature().clone(),
                     );
-                    let new_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(&sah);
-                    tx.insert_action(&new_sah, None)
+                    tx.insert_action(&sah, None)
                         .await
                         .map_err(StateMutationError::from)?;
 
                     // Insert entry if present.
                     // Network-received ops should never carry private entries.
-                    if let holochain_types::prelude::RecordEntryRef::Present(entry) =
-                        chain_op.entry()
+                    if let Some(holochain_types::dht_v2::OpEntry::Present(entry)) =
+                        chain_op.op_entry()
                     {
-                        let entry_hash = entry_hash_from_chain_op_action(&chain_op)?;
+                        let entry_hash = entry_hash_from_chain_op_action(signed_action.data())?;
                         tx.insert_entry(&entry_hash, entry)
                             .await
                             .map_err(StateMutationError::from)?;
@@ -580,7 +579,7 @@ impl DhtStore<DbWrite<Dht>> {
                     tx.insert_limbo_chain_op(InsertLimboChainOp {
                         op_hash: &op_hash,
                         action_hash: &action_hash,
-                        op_type: i64::from(chain_op.get_type()),
+                        op_type: i64::from(chain_op.op_type()),
                         basis_hash: &basis_hash,
                         storage_center_loc,
                         require_receipt,
@@ -1045,17 +1044,22 @@ where
     }
 }
 
-/// Extract the `EntryHash` from a `ChainOp` that is known to carry an entry.
+/// Extract the `EntryHash` from an `Action` that is known to carry an entry.
 ///
 /// Returns an error if the action does not reference an entry hash, which
-/// would indicate a programmer error (calling this for a `RecordEntry::NA`
+/// would indicate a programmer error (calling this for an `OpEntry::ActionOnly`
 /// variant).
 fn entry_hash_from_chain_op_action(
-    chain_op: &holochain_types::dht_op::ChainOp,
+    action: &holochain_zome_types::dht_v2::Action,
 ) -> StateMutationResult<holo_hash::EntryHash> {
-    chain_op.action().entry_hash().cloned().ok_or_else(|| {
-        StateMutationError::Other("op carries entry but action has no entry_hash".into())
-    })
+    use holochain_zome_types::dht_v2::ActionData;
+    match &action.data {
+        ActionData::Create(d) => Ok(d.entry_hash.clone()),
+        ActionData::Update(d) => Ok(d.entry_hash.clone()),
+        _ => Err(StateMutationError::Other(
+            "op carries entry but action has no entry_hash".into(),
+        )),
+    }
 }
 
 /// Reconstruct a DHT basis hash from a `LimboChainOp` row.
@@ -1211,28 +1215,27 @@ impl DhtStore<DbWrite<Dht>> {
         };
 
         let signed_action = chain_op.signed_action();
-        let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.action());
-        let sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
+        let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.data());
+        let sah = holochain_zome_types::dht_v2::SignedActionHashed::with_presigned(
             holo_hash::HoloHashed::with_pre_hashed(
-                signed_action.action().clone(),
+                signed_action.data().clone(),
                 action_hash.clone(),
             ),
             signed_action.signature().clone(),
         );
-        let new_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(&sah);
 
         let basis_hash = chain_op.dht_basis();
         let storage_center_loc = basis_hash.get_loc();
         let now = Timestamp::now();
 
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
-        tx.insert_action(&new_sah, Some(RecordValidity::Accepted))
+        tx.insert_action(&sah, Some(RecordValidity::Accepted))
             .await
             .map_err(StateMutationError::from)?;
         tx.insert_chain_op(InsertChainOp {
             op_hash: &op_hash,
             action_hash: &action_hash,
-            op_type: i64::from(chain_op.get_type()),
+            op_type: i64::from(chain_op.op_type()),
             basis_hash: &basis_hash,
             storage_center_loc,
             validation_status: RecordValidity::Accepted,
@@ -1286,7 +1289,7 @@ impl DhtStore<DbWrite<Dht>> {
             }
         };
 
-        let action_hash = holo_hash::ActionHash::with_data_sync(chain_op.signed_action().action());
+        let action_hash = holo_hash::ActionHash::with_data_sync(chain_op.signed_action().data());
         let basis_hash = chain_op.dht_basis();
         let storage_center_loc = basis_hash.get_loc();
         let now = Timestamp::now();
@@ -1295,7 +1298,7 @@ impl DhtStore<DbWrite<Dht>> {
         tx.insert_chain_op(InsertChainOp {
             op_hash: &op_hash,
             action_hash: &action_hash,
-            op_type: i64::from(chain_op.get_type()),
+            op_type: i64::from(chain_op.op_type()),
             basis_hash: &basis_hash,
             storage_center_loc,
             validation_status: RecordValidity::Accepted,

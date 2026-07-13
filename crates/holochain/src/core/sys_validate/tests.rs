@@ -35,7 +35,6 @@ use crate::sweettest::SweetConductor;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 use holo_hash::fixt::ActionHashFixturator;
-use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::MockCascade;
@@ -44,7 +43,7 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::test_utils::valid_arbitrary_chain;
 use holochain_types::test_utils::ActionRefMut;
-use holochain_zome_types::Action;
+use holochain_zome_types::fixt::{ActionFixturator, CreateAction, CreateLinkAction};
 use matches::assert_matches;
 use std::time::Duration;
 
@@ -76,20 +75,14 @@ fn check_entry_type_test() {
 /// Hash integrity check. The hash of an entry always matches what's in the action.
 #[test]
 fn check_entry_hash_test() {
-    let mut ec = Create {
-        author: fixt!(AgentPubKey),
-        timestamp: Timestamp::now(),
-        action_seq: 6,
-        prev_action: fixt!(ActionHash),
-        entry_type: EntryType::AgentPubKey,
-        entry_hash: fixt!(EntryHash),
-        weight: EntryRateWeight::default(),
-    };
+    let mut ec = fixt!(Action, CreateAction);
+    *ec.entry_type_mut().unwrap() = EntryType::AgentPubKey;
+    *ec.entry_hash_mut().unwrap() = fixt!(EntryHash);
     let entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
         vec![1, 3, 5],
     ))));
     let hash = EntryHash::with_data_sync(&entry);
-    let action: Action = ec.clone().into();
+    let action = ec.clone();
 
     // First check it should have an entry
     assert_matches!(check_new_entry_action(&action), Ok(()));
@@ -102,24 +95,14 @@ fn check_entry_hash_test() {
         ))
     );
 
-    ec.entry_hash = hash;
-    let action: Action = ec.clone().into();
+    *ec.entry_hash_mut().unwrap() = hash;
+    let action = ec.clone();
 
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(check_entry_hash(eh, &entry), Ok(()));
+    let create_link = fixt!(Action, CreateLinkAction);
     assert_matches!(
-        check_new_entry_action(&Action::CreateLink(CreateLink {
-            author: fixt!(AgentPubKey),
-            timestamp: Timestamp::now(),
-            action_seq: 8,
-            prev_action: fixt!(ActionHash),
-            base_address: fixt!(EntryHash).into(),
-            target_address: fixt!(EntryHash).into(),
-            zome_index: 0.into(),
-            link_type: LinkType::new(3),
-            tag: ().into(),
-            weight: RateWeight::default(),
-        })),
+        check_new_entry_action(&create_link),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::NotNewEntry(_)
         ))
@@ -140,21 +123,20 @@ async fn incoming_ops_filters_private_entry() {
     ))));
     let author = keystore.new_sign_keypair_random().await.unwrap();
     let app_entry_def = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Private);
-    let create = Create {
-        author: author.clone(),
-        timestamp: Timestamp::now(),
-        action_seq: 5,
-        prev_action: fixt!(ActionHash),
-        entry_type: EntryType::App(app_entry_def),
-        entry_hash: EntryHash::with_data_sync(&private_entry),
-        weight: EntryRateWeight::default(),
-    };
-    let action = Action::Create(create);
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = author.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 5;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(app_entry_def);
+    *action.entry_hash_mut().unwrap() = EntryHash::with_data_sync(&private_entry);
     let signature = author.sign(&keystore, &action).await.unwrap();
 
-    let shh =
-        SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature);
-    let record = Record::new(shh, Some(private_entry));
+    let shh = SignedActionHashed::with_presigned(
+        holo_hash::HoloHashed::from_content_sync(action),
+        signature,
+    );
+    let record = Record::new(shh, RecordEntry::Present(private_entry));
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
     ops_sender.send_store_entry(record.clone()).await.unwrap();
@@ -167,6 +149,44 @@ async fn incoming_ops_filters_private_entry() {
     assert_eq!(num_ops, 1);
     let num_entries = space.dht_store.as_read().count_entries().await.unwrap();
     assert_eq!(num_entries, 0);
+}
+
+/// A `CreateEntry` op is the public entry-authority op, so it must never carry
+/// a private entry — even with the entry body withheld. A peer that crafts one
+/// is attempting to announce a private entry's existence to the entry
+/// authority, so sys validation rejects it as a leak. The guard is
+/// `CreateEntry`-specific: a private entry is legitimate on a `CreateRecord`
+/// op, where a withheld body is expected.
+#[test]
+fn create_entry_op_rejects_private_entry() {
+    use holochain_types::dht_v2::ChainOp;
+    use holochain_types::dht_v2::OpEntry;
+    use holochain_types::dht_v2::SignedAction;
+
+    let mut private_create = fixt!(Action, CreateAction);
+    *private_create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
+        0.into(),
+        0.into(),
+        EntryVisibility::Private,
+    ));
+    let sa = SignedAction::new(
+        private_create,
+        holochain_zome_types::signature::Signature::from([0u8; 64]),
+    );
+
+    for withheld in [OpEntry::Hidden, OpEntry::ActionOnly] {
+        assert_matches!(
+            check_entry_visibility(&ChainOp::CreateEntry(sa.clone(), withheld)),
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::PrivateEntryLeaked
+            ))
+        );
+    }
+
+    assert_matches!(
+        check_entry_visibility(&ChainOp::CreateRecord(sa, OpEntry::Hidden)),
+        Ok(())
+    );
 }
 
 /// Test that the valid_chain contrafact matches our chain validation function,
@@ -195,7 +215,7 @@ async fn valid_chain_fact_test() {
     // re-sign it
     last.signed_action = SignedActionHashed::sign(
         &keystore,
-        ActionHashed::from_content_sync(last.action().clone()),
+        holo_hash::HoloHashed::from_content_sync(last.action().clone()),
     )
     .await
     .unwrap();

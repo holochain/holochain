@@ -154,6 +154,7 @@ mod tests {
     use ::fixt::prelude::*;
     use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
 
     // This test ensures the ValidationStatus::Rejected arm is hit and returns a
     // HostShortCircuit carrying ValidateCallbackResult::Invalid with the expected message.
@@ -168,17 +169,16 @@ mod tests {
         } = RibosomeTestFixture::new(TestWasm::Validate).await;
 
         // Build a StoreRecord op for a Create action.
-        let mut create = fixt!(Create);
+        let mut create_action = fixt!(Action, CreateAction);
         // Set author to the cell's agent to keep data coherent.
-        create.author = alice_cell.agent_pubkey().clone();
-        let create_action = Action::Create(create.clone());
+        create_action.header.author = alice_cell.agent_pubkey().clone();
         let create_entry = fixt!(Entry);
         let create_entry_hash = create_action.entry_hash().unwrap().clone();
 
         // Cache the StoreRecord record into the new DhtStore (integrated, as a
         // fetched op would be) and mark it Rejected, so the cascade's
         // DhtStore-backed get_record_details sees it as invalid.
-        let rendered = holochain_types::dht_op::RenderedOp::new(
+        let rendered = holochain_types::wire_ops::RenderedOp::new(
             create_action.clone(),
             fixt!(Signature),
             None,
@@ -186,7 +186,7 @@ mod tests {
         )
         .unwrap();
         let create_op_hash = rendered.op_hash.clone();
-        let rendered_ops = holochain_types::dht_op::RenderedOps {
+        let rendered_ops = holochain_types::wire_ops::RenderedOps {
             entry: Some(holochain_types::prelude::EntryHashed::with_pre_hashed(
                 create_entry,
                 create_entry_hash,

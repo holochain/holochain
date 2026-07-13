@@ -52,10 +52,6 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    DatabaseError(#[from] holochain_sqlite::error::DatabaseError),
-
-    /// ident
-    #[error(transparent)]
     StateQueryError(#[from] holochain_state::query::StateQueryError),
 
     /// ident

@@ -2,6 +2,7 @@ use super::app_validation_workflow;
 use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
 use super::error::WorkflowResult;
+use super::sys_validation_workflow::counterfeit_check_authored_record;
 use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
@@ -19,6 +20,10 @@ use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::IncompleteCommitReason;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
+use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
+    Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
+    RegisterUpdate, StoreEntry, StoreRecord,
+};
 use holochain_zome_types::record::Record;
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -287,6 +292,11 @@ pub async fn inline_validation(
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
         // Loop forwards through all the new records
         for record in scratch_records {
+            // Verifies the signature over the record's action content.
+            counterfeit_check_authored_record(&record)
+                .await
+                .or_else(|outcome_or_err| outcome_or_err.into_workflow_error())?;
+
             sys_validate_record(&record, cascade.clone())
                 .await
                 // If the was en error exit
@@ -301,7 +311,7 @@ pub async fn inline_validation(
     };
 
     for mut chain_record in records {
-        for op_type in action_to_op_types(chain_record.action()) {
+        for op_type in holochain_types::dht_v2::action_to_op_types(chain_record.action()) {
             let outcome =
                 app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;
 
@@ -340,28 +350,31 @@ fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
             record
         }
         Op::StoreEntry(StoreEntry { action, entry }) => {
-            Record::new(SignedActionHashed::raw_from_same_hash(action), Some(entry))
+            record_from_signed_action(action, Some(entry))
         }
         Op::RegisterUpdate(RegisterUpdate {
             update, new_entry, ..
-        }) => Record::new(SignedActionHashed::raw_from_same_hash(update), new_entry),
-        Op::RegisterDelete(RegisterDelete { delete, .. }) => Record::new(
-            SignedActionHashed::raw_from_same_hash(delete),
-            omitted_entry,
-        ),
-        Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Record::new(
-            SignedActionHashed::raw_from_same_hash(action),
-            omitted_entry,
-        ),
-        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => Record::new(
-            SignedActionHashed::raw_from_same_hash(create_link),
-            omitted_entry,
-        ),
-        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => Record::new(
-            SignedActionHashed::raw_from_same_hash(delete_link),
-            omitted_entry,
-        ),
+        }) => record_from_signed_action(update, new_entry),
+        Op::RegisterDelete(RegisterDelete { delete, .. }) => {
+            record_from_signed_action(delete, omitted_entry)
+        }
+        Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
+            record_from_signed_action(action, omitted_entry)
+        }
+        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => {
+            record_from_signed_action(create_link, omitted_entry)
+        }
+        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => {
+            record_from_signed_action(delete_link, omitted_entry)
+        }
     }
+}
+
+/// Builds a [`Record`] from a signed action, deriving the [`RecordEntry`]
+/// classification from the action's entry visibility.
+fn record_from_signed_action(signed_action: SignedActionHashed, entry: Option<Entry>) -> Record {
+    let visibility = signed_action.hashed.content.entry_visibility().copied();
+    Record::new(signed_action, RecordEntry::new(visibility.as_ref(), entry))
 }
 
 fn map_outcome(outcome: Result<Outcome, AppValidationError>) -> WorkflowResult<()> {

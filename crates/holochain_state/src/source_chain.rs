@@ -4,16 +4,21 @@ use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
 pub use error::*;
+// Authoring and op production build actions directly (via `v2::build_action`
+// and friends), stage them in the scratch, and turn them into ops via
+// `v2::produce_ops_from_record`.
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
+use holo_hash::HoloHashed;
 use holochain_data::kind::Dht;
 use holochain_data::{DbRead, DbWrite};
 use holochain_keystore::MetaLairClient;
 use holochain_state_types::SourceChainDump;
+use holochain_types::dht_v2 as v2;
+use holochain_types::prelude::SignedActionHashedExt;
 use kitsune2_api::DhtArc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -129,36 +134,37 @@ impl SourceChain<DbWrite<Dht>> {
         Ok(countersigning_agent_state)
     }
 
+    /// Hash, sign, and stage a fully-built [`v2::Action`] (with its
+    /// optional entry) at the end of the scratch.
     pub async fn put_with_action(
         &self,
-        action: Action,
+        action: v2::Action,
         maybe_entry: Option<Entry>,
         chain_top_ordering: ChainTopOrdering,
     ) -> SourceChainResult<ActionHash> {
-        let action = ActionHashed::from_content_sync(action);
-        let hash = action.as_hash().clone();
-        let action = SignedActionHashed::sign(&self.keystore, action).await?;
-        let record = Record::new(action, maybe_entry);
+        let entry_visibility = action.entry_visibility().copied();
+        let action_hashed = HoloHashed::<v2::Action>::from_content_sync(action);
+        let hash = action_hashed.as_hash().clone();
+        let signed_action = v2::SignedActionHashed::sign(&self.keystore, action_hashed).await?;
+        let record_entry =
+            holochain_zome_types::record::RecordEntry::new(entry_visibility.as_ref(), maybe_entry);
+        let record = v2::Record::new(signed_action, record_entry);
         self.scratch
             .apply(|scratch| insert_record_scratch(scratch, record, chain_top_ordering))?;
         Ok(hash)
     }
 
+    /// Put a new countersigning [`Action`] at the end of the source chain
+    /// for `entry` (which must be an [`Entry::CounterSign`]).
     pub async fn put_countersigned(
         &self,
         entry: Entry,
         chain_top_ordering: ChainTopOrdering,
-        weight: EntryRateWeight,
     ) -> SourceChainResult<ActionHash> {
         let entry_hash = EntryHash::with_data_sync(&entry);
         if let Entry::CounterSign(ref session_data, _) = entry {
             self.put_with_action(
-                Action::from_countersigning_data(
-                    entry_hash,
-                    session_data,
-                    (*self.author).clone(),
-                    weight,
-                )?,
+                v2::from_countersigning_data(entry_hash, session_data, (*self.author).clone())?,
                 Some(entry),
                 chain_top_ordering,
             )
@@ -169,28 +175,16 @@ impl SourceChain<DbWrite<Dht>> {
         }
     }
 
-    /// Put a new record at the end of the source chain, using a ActionBuilder
-    /// for an action type which has no weight data.
-    /// If needing to `put` an action with weight data, use
-    /// [`SourceChain::put_weighed`] instead.
-    pub async fn put<U: ActionUnweighed<Weight = ()>, B: ActionBuilder<U>>(
+    /// Put a new action at the end of the source chain, built from its
+    /// per-variant [`v2::ActionData`] payload.
+    ///
+    /// The header (author, sequence number, and previous action) is filled in
+    /// from the current chain head.
+    pub async fn put(
         &self,
-        action_builder: B,
+        data: v2::ActionData,
         maybe_entry: Option<Entry>,
         chain_top_ordering: ChainTopOrdering,
-    ) -> SourceChainResult<ActionHash> {
-        self.put_weighed(action_builder, maybe_entry, chain_top_ordering, ())
-            .await
-    }
-
-    /// Put a new record at the end of the source chain, using a ActionBuilder
-    /// and the specified weight for rate limiting.
-    pub async fn put_weighed<W, U: ActionUnweighed<Weight = W>, B: ActionBuilder<U>>(
-        &self,
-        action_builder: B,
-        maybe_entry: Option<Entry>,
-        chain_top_ordering: ChainTopOrdering,
-        weight: W,
     ) -> SourceChainResult<ActionHash> {
         let HeadInfo {
             action: prev_action,
@@ -199,8 +193,7 @@ impl SourceChain<DbWrite<Dht>> {
         } = self.chain_head_nonempty()?;
         let action_seq = chain_head_seq + 1;
 
-        // Build the action.
-        let common = ActionBuilderCommon {
+        let header = v2::ActionHeader {
             author: (*self.author).clone(),
             // If the current time is equal to the current chain head timestamp,
             // or even has drifted to be before it, just set the next timestamp
@@ -214,29 +207,12 @@ impl SourceChain<DbWrite<Dht>> {
                 (chain_head_timestamp + std::time::Duration::from_micros(1))?,
             ),
             action_seq,
-            prev_action,
+            prev_action: Some(prev_action),
         };
         self.put_with_action(
-            action_builder.build(common).weighed(weight).into(),
+            v2::build_action(header, data),
             maybe_entry,
             chain_top_ordering,
-        )
-        .await
-    }
-
-    // TODO: when we fully hook up rate limiting, make this test-only
-    // #[cfg(feature = "test_utils")]
-    pub async fn put_weightless<W: Default, U: ActionUnweighed<Weight = W>, B: ActionBuilder<U>>(
-        &self,
-        action_builder: B,
-        maybe_entry: Option<Entry>,
-        chain_top_ordering: ChainTopOrdering,
-    ) -> SourceChainResult<ActionHash> {
-        self.put_weighed(
-            action_builder,
-            maybe_entry,
-            chain_top_ordering,
-            Default::default(),
         )
         .await
     }
@@ -277,7 +253,7 @@ impl SourceChain<DbWrite<Dht>> {
     pub async fn flush(
         &self,
         storage_arcs: Vec<DhtArc>,
-    ) -> SourceChainResult<(Vec<SignedActionHashed>, u32)> {
+    ) -> SourceChainResult<(Vec<v2::SignedActionHashed>, u32)> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok((Vec::new(), 0));
@@ -285,10 +261,17 @@ impl SourceChain<DbWrite<Dht>> {
 
         let (scheduled_fns, actions, ops, entries, records, warrants) =
             self.scratch.apply_and_then(|scratch| {
-                let records: Vec<Record> = scratch.records().collect();
+                let records: Vec<v2::Record> = scratch.records().collect();
 
-                let (actions, ops) =
-                    build_ops_from_actions(scratch.drain_actions().collect::<Vec<_>>())?;
+                // The ops a freshly-authored batch of records produces.
+                // `produce_ops_from_record` is infallible over a well-formed
+                // record.
+                let ops: Vec<v2::HashedChainOp> = records
+                    .iter()
+                    .flat_map(v2::produce_ops_from_record)
+                    .collect();
+
+                let actions = scratch.drain_actions().collect::<Vec<_>>();
 
                 // Drain out any entries.
                 let entries = scratch.drain_entries().collect::<Vec<_>>();
@@ -326,7 +309,7 @@ impl SourceChain<DbWrite<Dht>> {
         // The permit is acquired and released *inside* this async block so it
         // is not held when the relaxed-ordering rebase below recurses into
         // `flush` (which re-acquires it).
-        let chain_flush_result: SourceChainResult<Vec<SignedActionHashed>> = async {
+        let chain_flush_result: SourceChainResult<Vec<v2::SignedActionHashed>> = async {
             let _chain_write_permit = self
                 .dht_store
                 .acquire_chain_write_permit(author.as_ref())
@@ -438,10 +421,8 @@ impl SourceChain<DbWrite<Dht>> {
             let mut inserted_action_hashes = std::collections::HashSet::<ActionHash>::new();
 
             for sah in &actions {
-                let new_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(sah);
-
                 tx.insert_action(
-                    &new_sah,
+                    sah,
                     Some(holochain_zome_types::dht_v2::RecordValidity::Accepted),
                 )
                 .await
@@ -452,44 +433,40 @@ impl SourceChain<DbWrite<Dht>> {
 
                 crate::dht_store::action_indexes::insert_action_indexes(
                     &mut tx,
-                    new_sah.as_hash(),
-                    &new_sah.hashed.content.data,
+                    sah.as_hash(),
+                    &sah.hashed.content.data,
                 )
                 .await
                 .map_err(SourceChainError::other)?;
 
                 // For Create/Update of a CapGrant entry type, insert a CapGrant index row.
                 if let Some((cap_access, tag)) = cap_grant_index_params(sah, &entries) {
-                    tx.insert_cap_grant(new_sah.as_hash(), cap_access, tag.as_deref())
+                    tx.insert_cap_grant(sah.as_hash(), cap_access, tag.as_deref())
                         .await
                         .map_err(SourceChainError::other)?;
                 }
             }
 
-            for (op, op_hash, _op_order, timestamp, _dep) in &ops {
-                let op_as_chain = match op.as_chain_op() {
-                    Some(c) => c,
-                    None => continue, // warrant ops: skip for this slice
-                };
+            for op in &ops {
                 // Skip ops whose action hash was not recorded as successfully inserted.
-                if !inserted_action_hashes.contains(op_as_chain.action_hash()) {
+                if !inserted_action_hashes.contains(op.action_hash()) {
                     continue;
                 }
-                let basis_hash = op_as_chain.dht_basis().clone();
-                let storage_center_loc = basis_hash.get_loc();
+                let storage_center_loc = op.storage_center_loc;
+                let timestamp = op.action.action().timestamp();
 
-                let serialized_size = encoded_chain_op_size(op_as_chain, &actions, &entries);
+                let serialized_size = encoded_chain_op_size(op, &entries);
                 tx.insert_chain_op(holochain_data::dht::InsertChainOp {
-                    op_hash,
-                    action_hash: op_as_chain.action_hash(),
-                    op_type: i64::from(op_as_chain.get_type()),
-                    basis_hash: &basis_hash,
+                    op_hash: &op.op_hash,
+                    action_hash: op.action_hash(),
+                    op_type: i64::from(op.op_type),
+                    basis_hash: &op.basis_hash,
                     storage_center_loc,
                     validation_status: holochain_zome_types::dht_v2::RecordValidity::Accepted,
                     locally_validated: true,
                     require_receipt: false,
-                    when_received: *timestamp,
-                    when_integrated: *timestamp,
+                    when_received: timestamp,
+                    when_integrated: timestamp,
                     serialized_size,
                 })
                 .await
@@ -504,7 +481,7 @@ impl SourceChain<DbWrite<Dht>> {
                 } else {
                     None
                 };
-                tx.insert_chain_op_publish(op_hash, None, None, withhold)
+                tx.insert_chain_op_publish(&op.op_hash, None, None, withhold)
                     .await
                     .map_err(SourceChainError::other)?;
             }
@@ -583,9 +560,9 @@ impl SourceChain<DbWrite<Dht>> {
                         .verify_signature(warrant.signature(), warrant.data())
                         .await
                     {
-                        Ok(true) => warrant_ops.push(DhtOpHashed::from_content_sync(DhtOp::from(
-                            WarrantOp::from(warrant),
-                        ))),
+                        Ok(true) => warrant_ops.push(v2::DhtOpHashed::from_content_sync(
+                            v2::DhtOp::WarrantOp(Box::new(v2::WarrantOp(warrant))),
+                        )),
                         Ok(false) => {
                             tracing::info!(
                                 "Invalid signature of a warrant in the scratch space. Skipping warrant"
@@ -600,6 +577,8 @@ impl SourceChain<DbWrite<Dht>> {
                 }
 
                 let total_warrants = warrant_ops.len() as u32;
+                // Record valid warrants into the DhtStore so
+                // `ops_pending_sys_validation` picks them up via `LimboWarrant`.
                 if !warrant_ops.is_empty() {
                     // Warrants do not require validation receipts, set all to false.
                     let warrant_ops_with_validation_receipt_required_flag =
@@ -616,11 +595,16 @@ impl SourceChain<DbWrite<Dht>> {
         }
     }
 
-    /// Checks if the current [`AgentPubKey`] of the source chain is valid and returns its [`Create`] action.
+    /// Checks if the current [`AgentPubKey`] of the source chain is valid and returns its [`Create`](v2::ActionData::Create) action.
     ///
-    /// Valid means that there's no [`Update`] or [`Delete`] action for the key on the chain.
+    /// Valid means that there's no [`Update`](v2::ActionData::Update) or [`Delete`](v2::ActionData::Delete) action for the key on the chain.
     /// Returns the create action if it is valid, and an [`SourceChainError::InvalidAgentKey`] otherwise.
-    pub async fn valid_create_agent_key_action(&self) -> SourceChainResult<Action> {
+    ///
+    /// Returns the `Action` from [`DhtStore::valid_create_agent_key_action`],
+    /// which is the source of truth.
+    pub async fn valid_create_agent_key_action(
+        &self,
+    ) -> SourceChainResult<holochain_zome_types::prelude::Action> {
         let agent_key = self.agent_pubkey().clone();
         self.dht_store
             .as_read()
@@ -634,15 +618,15 @@ impl SourceChain<DbWrite<Dht>> {
     /// Deletes the current [`AgentPubKey`] of the source chain if it is valid and returns a [`SourceChainError::InvalidAgentKey`]
     /// otherwise.
     ///
-    /// The agent key is valid if there are no [`Update`] or [`Delete`] actions for that key on the chain.
+    /// The agent key is valid if there are no [`Update`](v2::ActionData::Update) or [`Delete`](v2::ActionData::Delete) actions for that key on the chain.
     pub async fn delete_valid_agent_pub_key(&self) -> SourceChainResult<()> {
         let valid_create_agent_key_action = self.valid_create_agent_key_action().await?;
 
-        self.put_weightless(
-            builder::Delete::new(
-                valid_create_agent_key_action.to_hash(),
-                self.agent_pubkey().clone().into(),
-            ),
+        self.put(
+            v2::ActionData::Delete(v2::DeleteData {
+                deletes_address: valid_create_agent_key_action.to_hash(),
+                deletes_entry_address: self.agent_pubkey().clone().into(),
+            }),
             None,
             ChainTopOrdering::Strict,
         )
@@ -768,7 +752,7 @@ where
     // TODO: Maybe we should store data as records in the scratch?
     // TODO: document that this is only the records in the SCRATCH, not the
     //       entire source chain!
-    pub fn scratch_records(&self) -> SourceChainResult<Vec<Record>> {
+    pub fn scratch_records(&self) -> SourceChainResult<Vec<v2::Record>> {
         Ok(self.scratch.apply(|scratch| scratch.records().collect())?)
     }
 
@@ -865,7 +849,13 @@ where
     ///
     /// This returns a Vec rather than an iterator because it is intended to be
     /// used by the `query` host function, which crosses the wasm boundary.
-    pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Record>> {
+    ///
+    /// Returns [`holochain_zome_types::prelude::Record`]s, matching
+    /// [`DhtStore::source_chain_records`], with the scratch overlaid afterwards.
+    pub async fn query(
+        &self,
+        query: QueryFilter,
+    ) -> SourceChainResult<Vec<holochain_zome_types::prelude::Record>> {
         let public_only = self.public_only;
 
         // Fetch the author's committed records from the DhtStore (no filtering
@@ -895,7 +885,14 @@ where
                         Some(eh) if query.include_entries => scratch.get_entry(eh).ok()?,
                         _ => None,
                     };
-                    Some(Record::new(sah.clone(), entry))
+                    let record_entry = holochain_zome_types::record::RecordEntry::new(
+                        sah.action().entry_visibility(),
+                        entry,
+                    );
+                    Some(holochain_zome_types::prelude::Record::new(
+                        sah.clone(),
+                        record_entry,
+                    ))
                 })
                 .collect();
             scratch_records.sort_unstable_by_key(|e| e.action().action_seq());
@@ -916,7 +913,7 @@ where
 
     /// If there is a countersigning session get the
     /// StoreEntry op to send to the entry authorities.
-    pub fn countersigning_op(&self) -> SourceChainResult<Option<ChainOp>> {
+    pub fn countersigning_op(&self) -> SourceChainResult<Option<v2::ChainOp>> {
         let r = self.scratch.apply(|scratch| {
             scratch
                 .entries()
@@ -930,12 +927,15 @@ where
                                 .map(|eh| eh == entry_hash)
                                 .unwrap_or(false)
                         })
-                        .and_then(|shh| {
-                            Some(ChainOp::StoreEntry(
+                        .map(|shh| {
+                            let signed_action = v2::SignedAction::new(
+                                shh.action().clone(),
                                 shh.signature().clone(),
-                                shh.action().clone().try_into().ok()?,
-                                (**entry).clone(),
-                            ))
+                            );
+                            v2::ChainOp::CreateEntry(
+                                signed_action,
+                                v2::OpEntry::Present((**entry).clone()),
+                            )
                         })
                 })
         })?;
@@ -958,71 +958,26 @@ pub fn chain_lock_subject_for_entry(entry: Option<&Entry>) -> SourceChainResult<
     })
 }
 
-#[allow(clippy::complexity)]
-fn build_ops_from_actions(
-    actions: Vec<SignedActionHashed>,
-) -> SourceChainResult<(
-    Vec<SignedActionHashed>,
-    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, Vec<ActionHash>)>,
-)> {
-    // Actions end up back in here.
-    let mut actions_output = Vec::with_capacity(actions.len());
-    // The op related data ends up here.
-    let mut ops = Vec::with_capacity(actions.len());
-
-    // Loop through each action and produce op related data.
-    for shh in actions {
-        // &ActionHash, &Action, EntryHash are needed to produce the ops.
-        let entry_hash = shh.action().entry_hash().cloned();
-        let item = (shh.as_hash(), shh.action(), entry_hash);
-        let ops_inner = produce_op_lites_from_iter(vec![item].into_iter())?;
-
-        // Break apart the SignedActionHashed.
-        let (action, sig) = shh.into_inner();
-        let (action, hash) = action.into_inner();
-
-        // We need to take the action by value and put it back each loop.
-        let mut h = Some(action);
-        for op in ops_inner {
-            let op_type = op.get_type();
-            let op = DhtOpLite::from(op);
-            // Action is required by value to produce the DhtOpHash.
-            let (action, op_hash) =
-                ChainOpUniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
-            let op_order = OpOrder::new(op_type, action.timestamp());
-            let timestamp = action.timestamp();
-            // Put the action back by value.
-            let deps = op_type.sys_validation_dependencies(&action);
-            h = Some(action);
-            // Collect the DhtOpLite, DhtOpHash and OpOrder.
-            ops.push((op, op_hash, op_order, timestamp, deps));
-        }
-
-        // Put the SignedActionHashed back together.
-        let shh = SignedActionHashed::with_presigned(
-            ActionHashed::with_pre_hashed(h.expect("This can't be empty"), hash),
-            sig,
-        );
-        // Put the action back in the list.
-        actions_output.push(shh);
-    }
-    Ok((actions_output, ops))
-}
-
+/// Rebase a batch of actions onto a new chain head, re-signing each one.
 async fn rebase_actions_on(
     keystore: &MetaLairClient,
-    mut actions: Vec<SignedActionHashed>,
+    mut actions: Vec<v2::SignedActionHashed>,
     mut head: HeadInfo,
-) -> Result<Vec<SignedActionHashed>, ScratchError> {
+) -> Result<Vec<v2::SignedActionHashed>, ScratchError> {
     actions.sort_by_key(|shh| shh.action().action_seq());
     for shh in actions.iter_mut() {
         let mut action = shh.action().clone();
-        action.rebase_on(head.action.clone(), head.seq, head.timestamp)?;
+        holochain_zome_types::action::ActionExt::rebase_on(
+            &mut action,
+            head.action.clone(),
+            head.seq,
+            head.timestamp,
+        )?;
         head.seq = action.action_seq();
         head.timestamp = action.timestamp();
-        let hh = ActionHashed::from_content_sync(action);
+        let hh = HoloHashed::<v2::Action>::from_content_sync(action);
         head.action = hh.as_hash().clone();
-        let new_shh = SignedActionHashed::sign(keystore, hh).await?;
+        let new_shh = v2::SignedActionHashed::sign(keystore, hh).await?;
         *shh = new_shh;
     }
     Ok(actions)
@@ -1036,83 +991,73 @@ pub async fn genesis(
     agent_pubkey: AgentPubKey,
     membrane_proof: Option<MembraneProof>,
 ) -> SourceChainResult<()> {
-    let dna_action = Action::Dna(Dna {
+    // The genesis DNA action, uniquely, has no `prev_action`.
+    let dna_header = v2::ActionHeader {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
-        hash: dna_hash,
-    });
-    let dna_action = ActionHashed::from_content_sync(dna_action);
-    let dna_action = SignedActionHashed::sign(&keystore, dna_action).await?;
+        action_seq: 0,
+        prev_action: None,
+    };
+    let dna_action = v2::build_action(dna_header, v2::ActionData::Dna(v2::DnaData { dna_hash }));
+    let dna_action_hashed = HoloHashed::<v2::Action>::from_content_sync(dna_action);
+    let dna_action = v2::SignedActionHashed::sign(&keystore, dna_action_hashed).await?;
     let dna_action_address = dna_action.as_hash().clone();
-    let dna_record = Record::new(dna_action, None);
-    let dna_ops = produce_op_lites_from_records(vec![&dna_record])?;
-    let (dna_action, _) = dna_record.clone().into_inner();
+    let dna_ops =
+        v2::produce_ops_from_record(&v2::Record::new(dna_action.clone(), RecordEntry::NA));
 
     // create the agent validation entry and add it directly to the store
-    let agent_validation_action = Action::AgentValidationPkg(AgentValidationPkg {
+    let agent_validation_header = v2::ActionHeader {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
         action_seq: 1,
-        prev_action: dna_action_address,
-        membrane_proof,
-    });
-    let agent_validation_action = ActionHashed::from_content_sync(agent_validation_action);
+        prev_action: Some(dna_action_address),
+    };
+    let agent_validation_action = v2::build_action(
+        agent_validation_header,
+        v2::ActionData::AgentValidationPkg(v2::AgentValidationPkgData { membrane_proof }),
+    );
+    let agent_validation_action_hashed =
+        HoloHashed::<v2::Action>::from_content_sync(agent_validation_action);
     let agent_validation_action =
-        SignedActionHashed::sign(&keystore, agent_validation_action).await?;
+        v2::SignedActionHashed::sign(&keystore, agent_validation_action_hashed).await?;
     let avh_addr = agent_validation_action.as_hash().clone();
-    let agent_validation_record = Record::new(agent_validation_action, None);
-    let avh_ops = produce_op_lites_from_records(vec![&agent_validation_record])?;
-    let (agent_validation_action, _) = agent_validation_record.clone().into_inner();
+    let avh_ops = v2::produce_ops_from_record(&v2::Record::new(
+        agent_validation_action.clone(),
+        RecordEntry::NA,
+    ));
 
     // create a agent chain record and add it directly to the store
-    let agent_action = Action::Create(Create {
+    let agent_header = v2::ActionHeader {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
         action_seq: 2,
-        prev_action: avh_addr,
-        entry_type: EntryType::AgentPubKey,
-        entry_hash: agent_pubkey.clone().into(),
-        // AgentPubKey is weightless
-        weight: Default::default(),
-    });
-    let agent_action = ActionHashed::from_content_sync(agent_action);
-    let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
-    let agent_record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey.clone())));
-    let agent_ops = produce_op_lites_from_records(vec![&agent_record])?;
-    let (agent_action, agent_entry) = agent_record.clone().into_inner();
-    let agent_entry = agent_entry.into_option();
+        prev_action: Some(avh_addr),
+    };
+    let agent_action = v2::build_action(
+        agent_header,
+        v2::ActionData::Create(v2::CreateData {
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: agent_pubkey.clone().into(),
+        }),
+    );
+    let agent_action_hashed = HoloHashed::<v2::Action>::from_content_sync(agent_action);
+    let agent_action = v2::SignedActionHashed::sign(&keystore, agent_action_hashed).await?;
+    let agent_entry = Some(Entry::Agent(agent_pubkey.clone()));
+    let agent_ops = v2::produce_ops_from_record(&v2::Record::new(
+        agent_action.clone(),
+        RecordEntry::new(
+            agent_action.action().entry_visibility(),
+            agent_entry.clone(),
+        ),
+    ));
 
-    // Pre-compute (op, op_hash, timestamp) tuples for the DhtStore write block.
-    // Each op's hash is derived via ChainOpUniqueForm::op_hash upfront so we can
-    // keep the actions and ops available for the DhtStore write without moving
-    // them into the closure.
-    //
-    // Each triple is (ChainOpLite, DhtOpHash, Timestamp) for one op.
-    let mut ops_with_hashes_for_new_db: Vec<(ChainOpLite, DhtOpHash, Timestamp)> = Vec::new();
-    {
-        // Process each (signed_action, ops) pair to compute op hashes.
-        // We clone the action here (cheap because Action uses Arc<[u8]> for large fields)
-        // and let ChainOpUniqueForm::op_hash consume the clone.
-        let pairs: &[(&SignedActionHashed, &[ChainOpLite])] = &[
-            (&dna_action, &dna_ops),
-            (&agent_validation_action, &avh_ops),
-            (&agent_action, &agent_ops),
-        ];
-        for (shh, ops) in pairs {
-            let mut action_opt: Option<Action> = Some(shh.action().clone());
-            for op in *ops {
-                let op_type = op.get_type();
-                let (action_back, op_hash) = ChainOpUniqueForm::op_hash(
-                    op_type,
-                    action_opt.take().expect("action must be present"),
-                )
-                .map_err(SourceChainError::other)?;
-                let timestamp = action_back.timestamp();
-                action_opt = Some(action_back);
-                ops_with_hashes_for_new_db.push(((*op).clone(), op_hash, timestamp));
-            }
-        }
-    }
+    // The ops for all three genesis records, with hashes and basis already
+    // computed by `produce_ops_from_record`.
+    let ops_with_hashes_for_new_db: Vec<v2::HashedChainOp> = dna_ops
+        .into_iter()
+        .chain(avh_ops)
+        .chain(agent_ops)
+        .collect();
 
     // Clone the actions and agent entry for the DhtStore write block below.
     let dna_action_for_new_db = dna_action.clone();
@@ -1139,15 +1084,14 @@ pub async fn genesis(
         }
 
         // Insert all three genesis actions.
-        let genesis_actions: &[&SignedActionHashed] = &[
+        let genesis_actions: &[&v2::SignedActionHashed] = &[
             &dna_action_for_new_db,
             &agent_validation_action_for_new_db,
             &agent_action_for_new_db,
         ];
         for sah in genesis_actions {
-            let new_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(sah);
             tx.insert_action(
-                &new_sah,
+                sah,
                 Some(holochain_zome_types::dht_v2::RecordValidity::Accepted),
             )
             .await
@@ -1155,43 +1099,37 @@ pub async fn genesis(
         }
 
         // Insert chain ops for all three genesis actions.
-        for (op, op_hash, timestamp) in &ops_with_hashes_for_new_db {
-            let basis_hash = op.dht_basis().clone();
-            let storage_center_loc = basis_hash.get_loc();
+        let genesis_entries_slice: Vec<holochain_types::EntryHashed> = agent_entry_for_new_db
+            .as_ref()
+            .map(|e| {
+                vec![holochain_types::EntryHashed::with_pre_hashed(
+                    e.clone(),
+                    agent_entry_hash.clone(),
+                )]
+            })
+            .unwrap_or_default();
+        for op in &ops_with_hashes_for_new_db {
+            let storage_center_loc = op.storage_center_loc;
+            let timestamp = op.action.action().timestamp();
 
-            let genesis_actions_slice: Vec<SignedActionHashed> = vec![
-                dna_action_for_new_db.clone(),
-                agent_validation_action_for_new_db.clone(),
-                agent_action_for_new_db.clone(),
-            ];
-            let genesis_entries_slice: Vec<holochain_types::EntryHashed> = agent_entry_for_new_db
-                .as_ref()
-                .map(|e| {
-                    vec![holochain_types::EntryHashed::with_pre_hashed(
-                        e.clone(),
-                        agent_entry_hash.clone(),
-                    )]
-                })
-                .unwrap_or_default();
-            let serialized_size =
-                encoded_chain_op_size(op, &genesis_actions_slice, &genesis_entries_slice);
+            let serialized_size = encoded_chain_op_size(op, &genesis_entries_slice);
             tx.insert_chain_op(holochain_data::dht::InsertChainOp {
-                op_hash,
+                op_hash: &op.op_hash,
                 action_hash: op.action_hash(),
-                op_type: i64::from(op.get_type()),
-                basis_hash: &basis_hash,
+                op_type: i64::from(op.op_type),
+                basis_hash: &op.basis_hash,
                 storage_center_loc,
                 validation_status: holochain_zome_types::dht_v2::RecordValidity::Accepted,
                 locally_validated: true,
                 require_receipt: false,
-                when_received: *timestamp,
-                when_integrated: *timestamp,
+                when_received: timestamp,
+                when_integrated: timestamp,
                 serialized_size,
             })
             .await
             .map_err(SourceChainError::other)?;
 
-            tx.insert_chain_op_publish(op_hash, None, None, None)
+            tx.insert_chain_op_publish(&op.op_hash, None, None, None)
                 .await
                 .map_err(SourceChainError::other)?;
         }
@@ -1202,7 +1140,8 @@ pub async fn genesis(
     Ok(())
 }
 
-pub type CurrentCountersigningSessionOpt = Option<(Record, EntryHash, CounterSigningSessionData)>;
+pub type CurrentCountersigningSessionOpt =
+    Option<(v2::Record, EntryHash, CounterSigningSessionData)>;
 
 /// Dump the entire source chain from the DhtStore.
 ///
@@ -1234,16 +1173,13 @@ pub async fn dump_state(
 ///
 /// The entry content is needed to extract the tag; entries are looked up by
 /// the entry hash carried by the action.
-///
-/// `Action`, `EntryType`, `CapAccess`, and `Entry` are all in scope via the
-/// prelude.
 fn cap_grant_index_params(
-    shh: &SignedActionHashed,
+    shh: &v2::SignedActionHashed,
     entries: &[EntryHashed],
 ) -> Option<(i64, Option<String>)> {
-    let (entry_type, entry_hash) = match shh.action() {
-        Action::Create(d) => (&d.entry_type, &d.entry_hash),
-        Action::Update(d) => (&d.entry_type, &d.entry_hash),
+    let (entry_type, entry_hash) = match &shh.action().data {
+        v2::ActionData::Create(d) => (&d.entry_type, &d.entry_hash),
+        v2::ActionData::Update(d) => (&d.entry_type, &d.entry_hash),
         _ => return None,
     };
 
@@ -1287,41 +1223,40 @@ fn serialize_maybe_schedule_none(
     holochain_serialized_bytes::encode(&None::<holochain_zome_types::schedule::Schedule>)
 }
 
-/// Encode the wire-form `DhtOp` for a `ChainOpLite` and return its serialized
-/// length in bytes. The action is looked up by hash in `actions`; the entry
-/// (if any) is looked up by `Action::entry_hash` in `entries`. Returns `0`
-/// only if the op cannot be reconstructed because the action is missing —
-/// which would indicate a programming error in the caller.
+/// Encode the wire-form `DhtOp` for a [`v2::HashedChainOp`] and return its
+/// serialized length in bytes. The action is already carried on `op`; the
+/// entry (if any) is looked up by `Action::entry_hash` in `entries`. Always
+/// succeeds: `op`'s `op_type` was derived from its own action by
+/// `produce_ops_from_record`, so the two always agree.
 pub(crate) fn encoded_chain_op_size(
-    op: &holochain_types::dht_op::ChainOpLite,
-    actions: &[SignedActionHashed],
+    op: &v2::HashedChainOp,
     entries: &[holochain_types::EntryHashed],
 ) -> u32 {
-    use holochain_types::dht_op::{ChainOp, DhtOp};
+    use v2::{ChainOp, DhtOp, OpEntry};
 
-    let action_hash = op.action_hash();
-    let Some(sah) = actions.iter().find(|sah| sah.as_hash() == action_hash) else {
-        return 0;
-    };
-    let signed_action: SignedAction = (sah.action().clone(), sah.signature().clone()).into();
-    let maybe_entry: Option<Entry> = signed_action
-        .action()
+    let action = op.action.action();
+    let maybe_entry: Option<Entry> = action
         .entry_hash()
         .and_then(|eh| entries.iter().find(|e| e.as_hash() == eh))
         .map(|e| e.as_content().clone());
+    let signed_action = v2::SignedAction::new(action.clone(), op.action.signature().clone());
+    let op_entry = |entry: Option<Entry>| match entry {
+        Some(entry) => OpEntry::Present(entry),
+        // No privacy signal is available here (only whether the entry was
+        // found in `entries`); `ActionOnly` is the conservative choice — see
+        // `chain_op_from_joined_row`'s NotStored/NA → ActionOnly mapping.
+        None => OpEntry::ActionOnly,
+    };
 
-    match ChainOp::from_type(op.get_type(), signed_action, maybe_entry) {
-        Ok(chain_op) => holochain_serialized_bytes::encode(&DhtOp::from(chain_op))
-            .map(|b| b.len() as u32)
-            .unwrap_or(0),
-        Err(_) => 0,
-    }
+    let chain_op = ChainOp::from_type(op.op_type, signed_action, op_entry(maybe_entry));
+    holochain_serialized_bytes::encode(&DhtOp::ChainOp(Box::new(chain_op)))
+        .map(|b| b.len() as u32)
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::*;
     use crate::source_chain::SourceChainResult;
     use ::fixt::fixt;
     use ::fixt::prelude::*;
@@ -1345,15 +1280,15 @@ mod tests {
         let chain_2 = SourceChain::new(dht_store.clone(), keystore.clone(), alice.clone()).await?;
         let chain_3 = SourceChain::new(dht_store.clone(), keystore.clone(), alice.clone()).await?;
 
-        let action_builder = builder::CloseChain { new_target: None };
+        let close_chain = v2::ActionData::CloseChain(v2::CloseChainData { new_target: None });
         chain_1
-            .put(action_builder.clone(), None, ChainTopOrdering::Strict)
+            .put(close_chain.clone(), None, ChainTopOrdering::Strict)
             .await?;
         chain_2
-            .put(action_builder.clone(), None, ChainTopOrdering::Strict)
+            .put(close_chain.clone(), None, ChainTopOrdering::Strict)
             .await?;
         chain_3
-            .put(action_builder, None, ChainTopOrdering::Relaxed)
+            .put(close_chain, None, ChainTopOrdering::Relaxed)
             .await?;
 
         let storage_arcs = vec![DhtArc::Empty];
@@ -1408,38 +1343,38 @@ mod tests {
 
         let entry_1 = Entry::App(fixt!(AppEntryBytes));
         let eh1 = EntryHash::with_data_sync(&entry_1);
-        let create = builder::Create {
+        let create = v2::ActionData::Create(v2::CreateData {
             entry_type: EntryType::App(fixt!(AppEntryDef)),
             entry_hash: eh1.clone(),
-        };
+        });
         let h1 = chain_1
-            .put_weightless(create, Some(entry_1.clone()), ChainTopOrdering::Strict)
+            .put(create, Some(entry_1.clone()), ChainTopOrdering::Strict)
             .await
             .unwrap();
 
         let entry_err = Entry::App(fixt!(AppEntryBytes));
         let entry_hash_err = EntryHash::with_data_sync(&entry_err);
-        let create = builder::Create {
+        let create = v2::ActionData::Create(v2::CreateData {
             entry_type: EntryType::App(fixt!(AppEntryDef)),
             entry_hash: entry_hash_err.clone(),
-        };
+        });
         chain_2
-            .put_weightless(create, Some(entry_err.clone()), ChainTopOrdering::Strict)
+            .put(create, Some(entry_err.clone()), ChainTopOrdering::Strict)
             .await
             .unwrap();
 
         let entry_2 = Entry::App(fixt!(AppEntryBytes));
         let eh2 = EntryHash::with_data_sync(&entry_2);
-        let create = builder::Create {
+        let create = v2::ActionData::Create(v2::CreateData {
             entry_type: EntryType::App(AppEntryDef::new(
                 EntryDefIndex(0),
                 0.into(),
                 EntryVisibility::Private,
             )),
             entry_hash: eh2.clone(),
-        };
+        });
         let old_h2 = chain_3
-            .put_weightless(create, Some(entry_2.clone()), ChainTopOrdering::Relaxed)
+            .put(create, Some(entry_2.clone()), ChainTopOrdering::Relaxed)
             .await
             .unwrap();
 
@@ -1504,9 +1439,12 @@ mod tests {
 
         let action = chain.valid_create_agent_key_action().await.unwrap();
 
-        // It is the agent-key `Create`: an `AgentPubKey`-typed `Create` whose
-        // entry hash is the agent key.
-        assert_matches!(action, Action::Create(_));
+        // The returned action is the agent-key `Create`: an `AgentPubKey`-typed
+        // `Create` whose entry hash is the agent key.
+        assert_matches!(
+            action.data,
+            holochain_zome_types::action::ActionData::Create(_)
+        );
         assert_eq!(action.entry_type(), Some(&EntryType::AgentPubKey));
         let agent_key_entry_hash: EntryHash = agent_key.into();
         assert_eq!(action.entry_hash(), Some(&agent_key_entry_hash));
@@ -1543,15 +1481,15 @@ mod tests {
         // Author an `Update` whose original entry is the agent-key entry. This
         // populates the `UpdatedRecord` index (keyed on `original_entry_hash`)
         // for the agent key.
-        let action_builder = builder::Update {
+        let action_data = v2::ActionData::Update(v2::UpdateData {
             entry_type: EntryType::AgentPubKey,
             entry_hash: agent_key_entry_hash.clone(),
             original_action_address: create.to_hash(),
             original_entry_address: agent_key_entry_hash,
-        };
+        });
         chain
-            .put_weightless(
-                action_builder,
+            .put(
+                action_data,
                 Some(Entry::Agent(agent_key.clone())),
                 ChainTopOrdering::default(),
             )
@@ -1615,12 +1553,12 @@ mod tests {
         let (original_action_address, original_entry_address) = {
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
-            let action_builder = builder::Create {
+            let action_data = v2::ActionData::Create(v2::CreateData {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
-            };
+            });
             let action = chain
-                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
+                .put(action_data, Some(entry), ChainTopOrdering::default())
                 .await?;
 
             chain.flush(storage_arcs.clone()).await.unwrap();
@@ -1672,14 +1610,14 @@ mod tests {
                 SourceChain::new(dht_store.clone(), keystore.clone(), alice.clone()).await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
-            let action_builder = builder::Update {
+            let action_data = v2::ActionData::Update(v2::UpdateData {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
                 original_action_address,
                 original_entry_address,
-            };
+            });
             let action = chain
-                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
+                .put(action_data, Some(entry), ChainTopOrdering::default())
                 .await?;
             chain.flush(storage_arcs.clone()).await.unwrap();
 
@@ -1762,12 +1700,12 @@ mod tests {
         {
             let chain =
                 SourceChain::new(dht_store.clone(), keystore.clone(), alice.clone()).await?;
-            let action_builder = builder::Delete {
+            let action_data = v2::ActionData::Delete(v2::DeleteData {
                 deletes_address: updated_action_hash,
                 deletes_entry_address: updated_entry_hash,
-            };
+            });
             chain
-                .put_weightless(action_builder, None, ChainTopOrdering::default())
+                .put(action_data, None, ChainTopOrdering::default())
                 .await?;
             chain.flush(storage_arcs.clone()).await.unwrap();
         }
@@ -1813,12 +1751,12 @@ mod tests {
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(unrestricted_grant.clone()))
                     .into_inner();
-            let action_builder = builder::Create {
+            let action_data = v2::ActionData::Create(v2::CreateData {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
-            };
+            });
             let action = chain
-                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
+                .put(action_data, Some(entry), ChainTopOrdering::default())
                 .await?;
             chain.flush(storage_arcs.clone()).await.unwrap();
             (action, entry_hash)
@@ -1873,12 +1811,12 @@ mod tests {
         {
             let chain =
                 SourceChain::new(dht_store.clone(), keystore.clone(), alice.clone()).await?;
-            let action_builder = builder::Delete {
+            let action_data = v2::ActionData::Delete(v2::DeleteData {
                 deletes_address: original_action_address,
                 deletes_entry_address: original_entry_address,
-            };
+            });
             chain
-                .put_weightless(action_builder, None, ChainTopOrdering::default())
+                .put(action_data, None, ChainTopOrdering::default())
                 .await?;
             chain.flush(storage_arcs.clone()).await.unwrap();
         }
@@ -1925,24 +1863,24 @@ mod tests {
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(first_unrestricted_grant.clone()))
                     .into_inner();
-            let action_builder = builder::Create {
+            let action_data = v2::ActionData::Create(v2::CreateData {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
-            };
+            });
             let _ = chain
-                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
+                .put(action_data, Some(entry), ChainTopOrdering::default())
                 .await?;
 
             // commit second grant to alice's chain
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(second_unrestricted_grant.clone()))
                     .into_inner();
-            let action_builder = builder::Create {
+            let action_data = v2::ActionData::Create(v2::CreateData {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
-            };
+            });
             let _ = chain
-                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
+                .put(action_data, Some(entry), ChainTopOrdering::default())
                 .await?;
 
             chain.flush(storage_arcs).await.unwrap();
@@ -1980,21 +1918,21 @@ mod tests {
             .await
             .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
-        let create = builder::Create {
+        let create = v2::ActionData::Create(v2::CreateData {
             entry_type: EntryType::App(fixt!(AppEntryDef)),
             entry_hash: EntryHash::with_data_sync(&entry),
-        };
+        });
         let h1 = source_chain
-            .put_weightless(create, Some(entry), ChainTopOrdering::default())
+            .put(create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
-        let create = builder::Create {
+        let create = v2::ActionData::Create(v2::CreateData {
             entry_type: EntryType::App(fixt!(AppEntryDef)),
             entry_hash: EntryHash::with_data_sync(&entry),
-        };
+        });
         let h2 = source_chain
-            .put_weightless(create, Some(entry), ChainTopOrdering::default())
+            .put(create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
         source_chain.flush(vec![DhtArc::Empty]).await.unwrap();
@@ -2070,7 +2008,10 @@ mod tests {
             .await?
             .expect("head record present in store");
         assert_eq!(head_record.action().action_seq(), 2);
-        assert!(matches!(head_record.action(), Action::Create(_)));
+        assert!(matches!(
+            head_record.action().data,
+            holochain_zome_types::action::ActionData::Create(_)
+        ));
 
         Ok(())
     }
@@ -2090,16 +2031,16 @@ mod tests {
         // Add a private-entry action (seq 3) on top of the genesis 3-action chain.
         let private_entry = Entry::App(fixt!(AppEntryBytes));
         let private_entry_hash = EntryHash::with_data_sync(&private_entry);
-        let create = builder::Create {
+        let create = v2::ActionData::Create(v2::CreateData {
             entry_type: EntryType::App(AppEntryDef::new(
                 0.into(),
                 0.into(),
                 EntryVisibility::Private,
             )),
             entry_hash: private_entry_hash.clone(),
-        };
+        });
         chain
-            .put_weightless(
+            .put(
                 create,
                 Some(private_entry.clone()),
                 ChainTopOrdering::default(),
@@ -2151,11 +2092,14 @@ mod tests {
         let json = serde_json::to_string_pretty(&json)?;
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(parsed["records"][0]["action"]["type"], "Dna");
+        assert_eq!(parsed["records"][0]["action"]["data"]["type"], "Dna");
         assert_eq!(parsed["records"][0]["entry"], serde_json::Value::Null);
 
-        assert_eq!(parsed["records"][2]["action"]["type"], "Create");
-        assert_eq!(parsed["records"][2]["action"]["entry_type"], "AgentPubKey");
+        assert_eq!(parsed["records"][2]["action"]["data"]["type"], "Create");
+        assert_eq!(
+            parsed["records"][2]["action"]["data"]["entry_type"],
+            "AgentPubKey"
+        );
         assert_eq!(parsed["records"][2]["entry"]["entry_type"], "Agent");
         assert_ne!(
             parsed["records"][2]["entry"]["entry"],
@@ -2187,17 +2131,23 @@ mod tests {
             let entry = Entry::App(fixt!(AppEntryBytes));
             let entry_hashed = EntryHashed::from_content_sync(entry);
 
-            let action = Action::Create(Create {
-                author: alice.clone(),
-                timestamp: Timestamp::now(),
-                action_seq: chain_top.seq + 1,
-                prev_action: chain_top.action.as_hash().clone(),
-                entry_type: app_entry_type.clone(),
-                entry_hash: entry_hashed.hash.clone(),
-                weight: EntryRateWeight::default(),
-            });
-            let sig = alice.sign(&keystore, &action).await.unwrap();
-            let signed_action = SignedActionHashed::from_content_sync((action.clone(), sig).into());
+            let v2_action = v2::Action {
+                header: v2::ActionHeader {
+                    author: alice.clone(),
+                    timestamp: Timestamp::now(),
+                    action_seq: chain_top.seq + 1,
+                    prev_action: Some(chain_top.action.as_hash().clone()),
+                },
+                data: v2::ActionData::Create(v2::CreateData {
+                    entry_type: app_entry_type.clone(),
+                    entry_hash: entry_hashed.hash.clone(),
+                }),
+            };
+            let sig = alice.sign(&keystore, &v2_action).await.unwrap();
+            let signed_action = v2::SignedActionHashed::with_presigned(
+                HoloHashed::from_content_sync(v2_action.clone()),
+                sig,
+            );
 
             chain
                 .scratch()
@@ -2208,7 +2158,7 @@ mod tests {
                 .unwrap();
             chain.flush(vec![DhtArc::Empty]).await.unwrap();
 
-            action
+            v2_action
         };
 
         // Add an app entry to the scratch space
@@ -2218,19 +2168,25 @@ mod tests {
             let entry = Entry::App(fixt!(AppEntryBytes));
             let entry_hashed = EntryHashed::from_content_sync(entry);
 
-            let action = Action::Update(Update {
-                author: alice.clone(),
-                timestamp: Timestamp::now(),
-                action_seq: chain_top.seq + 2,
-                prev_action: create_action.to_hash(),
-                original_action_address: create_action.to_hash(),
-                original_entry_address: create_action.entry_hash().unwrap().clone(),
-                entry_type: app_entry_type.clone(),
-                entry_hash: entry_hashed.hash.clone(),
-                weight: EntryRateWeight::default(),
-            });
-            let sig = alice.sign(&keystore, &action).await.unwrap();
-            let signed_action = SignedActionHashed::from_content_sync((action, sig).into());
+            let v2_action = v2::Action {
+                header: v2::ActionHeader {
+                    author: alice.clone(),
+                    timestamp: Timestamp::now(),
+                    action_seq: chain_top.seq + 2,
+                    prev_action: Some(create_action.to_hash()),
+                },
+                data: v2::ActionData::Update(v2::UpdateData {
+                    original_action_address: create_action.to_hash(),
+                    original_entry_address: create_action.entry_hash().unwrap().clone(),
+                    entry_type: app_entry_type.clone(),
+                    entry_hash: entry_hashed.hash.clone(),
+                }),
+            };
+            let sig = alice.sign(&keystore, &v2_action).await.unwrap();
+            let signed_action = v2::SignedActionHashed::with_presigned(
+                HoloHashed::from_content_sync(v2_action),
+                sig,
+            );
 
             chain
                 .scratch()
@@ -2353,17 +2309,23 @@ mod tests {
         // Commit a Create with a PRIVATE entry to the DhtStore via flush.
         let chain_top = chain.chain_head_nonempty().unwrap();
         let private_entry_hashed = EntryHashed::from_content_sync(Entry::App(fixt!(AppEntryBytes)));
-        let private_create = Action::Create(Create {
-            author: alice.clone(),
-            timestamp: Timestamp::now(),
-            action_seq: chain_top.seq + 1,
-            prev_action: chain_top.action.as_hash().clone(),
-            entry_type: private_entry_type.clone(),
-            entry_hash: private_entry_hashed.hash.clone(),
-            weight: EntryRateWeight::default(),
-        });
-        let sig = alice.sign(&keystore, &private_create).await.unwrap();
-        let private_sah = SignedActionHashed::from_content_sync((private_create, sig).into());
+        let v2_private_create = v2::Action {
+            header: v2::ActionHeader {
+                author: alice.clone(),
+                timestamp: Timestamp::now(),
+                action_seq: chain_top.seq + 1,
+                prev_action: Some(chain_top.action.as_hash().clone()),
+            },
+            data: v2::ActionData::Create(v2::CreateData {
+                entry_type: private_entry_type.clone(),
+                entry_hash: private_entry_hashed.hash.clone(),
+            }),
+        };
+        let sig = alice.sign(&keystore, &v2_private_create).await.unwrap();
+        let private_sah = v2::SignedActionHashed::with_presigned(
+            HoloHashed::from_content_sync(v2_private_create),
+            sig,
+        );
         let private_action_hash = private_sah.as_hash().clone();
         chain
             .scratch()
@@ -2380,17 +2342,23 @@ mod tests {
         // Add an uncommitted public Create to the scratch.
         let chain_top = chain.chain_head_nonempty().unwrap();
         let public_entry_hashed = EntryHashed::from_content_sync(Entry::App(fixt!(AppEntryBytes)));
-        let public_create = Action::Create(Create {
-            author: alice.clone(),
-            timestamp: Timestamp::now(),
-            action_seq: chain_top.seq + 1,
-            prev_action: chain_top.action.as_hash().clone(),
-            entry_type: public_entry_type.clone(),
-            entry_hash: public_entry_hashed.hash.clone(),
-            weight: EntryRateWeight::default(),
-        });
-        let sig = alice.sign(&keystore, &public_create).await.unwrap();
-        let public_sah = SignedActionHashed::from_content_sync((public_create, sig).into());
+        let v2_public_create = v2::Action {
+            header: v2::ActionHeader {
+                author: alice.clone(),
+                timestamp: Timestamp::now(),
+                action_seq: chain_top.seq + 1,
+                prev_action: Some(chain_top.action.as_hash().clone()),
+            },
+            data: v2::ActionData::Create(v2::CreateData {
+                entry_type: public_entry_type.clone(),
+                entry_hash: public_entry_hashed.hash.clone(),
+            }),
+        };
+        let sig = alice.sign(&keystore, &v2_public_create).await.unwrap();
+        let public_sah = v2::SignedActionHashed::with_presigned(
+            HoloHashed::from_content_sync(v2_public_create),
+            sig,
+        );
         let scratch_action_hash = public_sah.as_hash().clone();
         chain
             .scratch()
@@ -2460,7 +2428,7 @@ mod tests {
         assert_ne!(asc, desc);
 
         let mut desc_sorted = desc;
-        desc_sorted.sort_by_key(|r| r.signed_action.action().action_seq());
+        desc_sorted.sort_by_key(|r| r.action().action_seq());
         assert_eq!(asc, desc_sorted);
     }
 
@@ -2475,7 +2443,7 @@ mod tests {
         // insert init marker into source chain
         let result = chain
             .put(
-                builder::InitZomesComplete {},
+                v2::ActionData::InitZomesComplete(v2::InitZomesCompleteData {}),
                 None,
                 ChainTopOrdering::Strict,
             )
@@ -2704,7 +2672,7 @@ mod tests {
 
         let entry = Entry::CounterSign(Box::new(session_data), fixt!(AppEntryBytes));
         chain
-            .put_countersigned(entry, ChainTopOrdering::Strict, EntryRateWeight::default())
+            .put_countersigned(entry, ChainTopOrdering::Strict)
             .await
             .unwrap();
 
@@ -2739,8 +2707,8 @@ mod tests {
         // Author one action and flush it so the DHT store has a head beyond genesis.
         let storage_arcs = vec![DhtArc::Empty];
         chain
-            .put_weightless(
-                builder::CloseChain { new_target: None },
+            .put(
+                v2::ActionData::CloseChain(v2::CloseChainData { new_target: None }),
                 None,
                 ChainTopOrdering::Strict,
             )
@@ -2780,12 +2748,12 @@ mod tests {
         // chain_1 flushes.
         let chain_2 = SourceChain::new(dht_store.clone(), keystore.clone(), alice.clone()).await?;
 
-        let action_builder = builder::CloseChain { new_target: None };
+        let close_chain = v2::ActionData::CloseChain(v2::CloseChainData { new_target: None });
         chain_1
-            .put(action_builder.clone(), None, ChainTopOrdering::Strict)
+            .put(close_chain.clone(), None, ChainTopOrdering::Strict)
             .await?;
         chain_2
-            .put(action_builder, None, ChainTopOrdering::Strict)
+            .put(close_chain, None, ChainTopOrdering::Strict)
             .await?;
 
         // chain_1 flushes: its action becomes the store head and is visible via
@@ -2846,12 +2814,12 @@ mod tests {
 
         // Each stages one strict action from the same head; the flush loser gets
         // a clean `HeadMoved` (strict ordering means no relaxed rebase/retry).
-        let action_builder = builder::CloseChain { new_target: None };
+        let close_chain = v2::ActionData::CloseChain(v2::CloseChainData { new_target: None });
         chain_a
-            .put(action_builder.clone(), None, ChainTopOrdering::Strict)
+            .put(close_chain.clone(), None, ChainTopOrdering::Strict)
             .await?;
         chain_b
-            .put(action_builder, None, ChainTopOrdering::Strict)
+            .put(close_chain, None, ChainTopOrdering::Strict)
             .await?;
 
         // Flush both in true parallel on the multi-threaded runtime via spawned

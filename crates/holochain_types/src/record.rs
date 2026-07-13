@@ -1,5 +1,6 @@
 //! Defines a Record, the basic unit of Holochain data.
 
+use crate::dht_v2::CloseChainData;
 use crate::prelude::*;
 use holochain_keystore::KeystoreError;
 use holochain_keystore::LairResult;
@@ -94,6 +95,22 @@ pub struct RecordStatus {
     pub status: ValidationStatus,
 }
 
+/// The public key that should sign (and later verify) this action.
+///
+/// This is the author for every variant except a `CloseChain` that names an
+/// agent migration target: that variant is signed with the *new* key so the
+/// forward reference it carries is provably endorsed by the destination
+/// agent.
+fn action_signer(action: &Action) -> &AgentPubKey {
+    match &action.data {
+        ActionData::CloseChain(CloseChainData {
+            new_target: Some(MigrationTarget::Agent(agent)),
+            ..
+        }) => agent,
+        _ => &action.header.author,
+    }
+}
+
 /// Extension trait to keep zome types minimal
 #[async_trait::async_trait]
 pub trait SignedActionHashedExt {
@@ -103,7 +120,7 @@ pub trait SignedActionHashedExt {
     #[allow(clippy::new_ret_no_self)]
     async fn sign(
         keystore: &MetaLairClient,
-        action: ActionHashed,
+        action: holo_hash::HoloHashed<Action>,
     ) -> LairResult<SignedActionHashed>;
     /// Validate the data
     async fn verify_signature(&self) -> Result<(), KeystoreError>;
@@ -121,25 +138,25 @@ impl SignedActionHashedExt for SignedActionHashed {
     }
 
     /// Construct by signing the Action (NOT including the hash)
-    async fn sign(keystore: &MetaLairClient, action_hashed: ActionHashed) -> LairResult<Self> {
-        let signature = action_hashed
-            .signer()
-            .sign(keystore, action_hashed.as_content())
+    async fn sign(
+        keystore: &MetaLairClient,
+        action_hashed: holo_hash::HoloHashed<Action>,
+    ) -> LairResult<Self> {
+        let signature = action_signer(&action_hashed.content)
+            .sign(keystore, &action_hashed.content)
             .await?;
         Ok(Self::with_presigned(action_hashed, signature))
     }
 
     /// Verify that the signature matches the signed action
     async fn verify_signature(&self) -> Result<(), KeystoreError> {
-        if !self
-            .action()
-            .signer()
-            .verify_signature(self.signature(), self.action())
+        if !action_signer(&self.hashed.content)
+            .verify_signature(self.signature(), &self.hashed.content)
             .await?
         {
             return Err(KeystoreError::InvalidSignature(
                 self.signature().clone(),
-                format!("action {:?}", self.action_address()),
+                format!("action {:?}", self.as_hash()),
             ));
         }
         Ok(())
@@ -150,31 +167,38 @@ impl SignedActionHashedExt for SignedActionHashed {
 mod tests {
     use super::SignedAction;
     use super::SignedActionHashed;
+    use super::SignedActionHashedExt;
+    use crate::dht_v2::{ActionHeader, DnaData};
     use crate::prelude::*;
-    use ::fixt::prelude::*;
-    use holo_hash::HasHash;
-    use holo_hash::HoloHashed;
+    use holo_hash::{AgentPubKey, DnaHash, HasHash, HoloHashed};
 
-    #[tokio::test(flavor = "multi_thread")]
+    fn sample_action() -> Action {
+        Action {
+            header: ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![1u8; 36]),
+                timestamp: holochain_timestamp::Timestamp::from_micros(42),
+                action_seq: 0,
+                prev_action: None,
+            },
+            data: ActionData::Dna(DnaData {
+                dna_hash: DnaHash::from_raw_36(vec![2u8; 36]),
+            }),
+        }
+    }
+
+    #[tokio::test]
     async fn test_signed_action_roundtrip() {
-        let signature = SignatureFixturator::new(Unpredictable).next().unwrap();
-        let action = ActionFixturator::new(Unpredictable).next().unwrap();
-        let signed_action = SignedAction::new(action, signature);
-        let hashed: HoloHashed<SignedAction> = HoloHashed::from_content_sync(signed_action);
-        let HoloHashed { content, hash } = hashed.clone();
-        let (action, signature) = content.into();
-        let shh = SignedActionHashed {
-            hashed: ActionHashed::with_pre_hashed(action, hash),
-            signature,
-        };
+        let signature = Signature([9u8; 64]);
+        let action = sample_action();
+        let signed_action = SignedAction::new(action.clone(), signature.clone());
 
-        assert_eq!(shh.action_address(), hashed.as_hash());
+        let shh = SignedActionHashed::from_content_sync(signed_action);
 
-        let round = HoloHashed {
-            content: SignedAction::new(shh.action().clone(), shh.signature().clone()),
-            hash: shh.action_address().clone(),
-        };
-
-        assert_eq!(hashed, round);
+        assert_eq!(
+            shh.as_hash(),
+            &HoloHashed::<Action>::from_content_sync(action.clone()).into_hash()
+        );
+        assert_eq!(shh.hashed.content, action);
+        assert_eq!(shh.signature, signature);
     }
 }

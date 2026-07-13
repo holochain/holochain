@@ -41,10 +41,6 @@ derive_more = { version = "2.0", features = [
 fixt = { version = "^0.7.0-dev.1", path = "../fixt", optional = true }
 rand = { version = "0.9", optional = true }
 
-# sqlite dependencies
-rusqlite = { version = "0.37", optional = true }
-num_enum = { version = "0.7", optional = true }
-
 # full-dna-def dependencies
 derive_builder = { version = "0.20", optional = true }
 uuid = { version = "1.17", features = ["v4", "rng-getrandom"], optional = true }
@@ -59,7 +55,6 @@ schemars = { version = "0.9", optional = true }
 
 [dev-dependencies]
 holochain_zome_types = { path = ".", features = ["test_utils"] }
-once_cell = { version = "1.4", optional = false }
 
 [lints]
 workspace = true
@@ -79,8 +74,6 @@ full-dna-def = [
 
 full = [
   "default",
-  "sqlite",
-  "dep:num_enum",
   "holochain_timestamp/now",
   "properties",
   "holochain_integrity_types/full",
@@ -117,19 +110,6 @@ test_utils = [
 ]
 
 instrument = []
-
-sqlite-encrypted = [
-  "dep:rusqlite",
-  "rusqlite/bundled-sqlcipher-vendored-openssl",
-  "holo_hash/sqlite-encrypted",
-  "holochain_timestamp/sqlite-encrypted",
-]
-sqlite = [
-  "dep:rusqlite",
-  "rusqlite/bundled",
-  "holo_hash/sqlite",
-  "holochain_timestamp/sqlite",
-]
 
 unstable-functions = []
 
