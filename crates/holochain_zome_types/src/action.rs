@@ -4,10 +4,6 @@ use holo_hash::ActionHash;
 use holochain_serialized_bytes::prelude::*;
 use thiserror::Error;
 
-// Legacy per-variant `Action` enum and its builders. Only `Action` itself is
-// shadowed by the v2 re-export below — every other legacy item (`Create`,
-// `Update`, `ActionType`, `EntryType`, etc.) stays reachable under these
-// names, since v2 reuses most of them.
 pub use holochain_integrity_types::action::builder::{ActionBuilder, ActionBuilderCommon};
 pub use holochain_integrity_types::action::*;
 

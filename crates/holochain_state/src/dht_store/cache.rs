@@ -143,8 +143,8 @@ mod tests {
         Dht::new(Arc::new(DnaHash::from_raw_36(vec![0u8; 36])))
     }
 
-    /// Build a v2 [`Action`] with the given header fields and per-variant data.
-    fn v2_action(
+    /// Build an [`Action`] with the given header fields and per-variant data.
+    fn mk_action(
         author: AgentPubKey,
         seq: u32,
         prev: ActionHash,
@@ -179,7 +179,7 @@ mod tests {
             holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
         ));
         let sig = Signature::from([seed; 64]);
-        let v2_action = v2_action(
+        let action = mk_action(
             author,
             1,
             ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
@@ -191,7 +191,7 @@ mod tests {
         );
         let entry_hashed = EntryHashed::with_pre_hashed(entry.clone(), entry_hash);
 
-        let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::StoreRecord)
             .expect("rendered op build");
 
         RenderedOps {
@@ -214,7 +214,7 @@ mod tests {
             holo_hash::hash_type::AnyLinkable::Entry,
         );
         let sig = Signature::from([seed; 64]);
-        let v2_action = v2_action(
+        let action = mk_action(
             author,
             2,
             ActionHash::from_raw_36(vec![seed.wrapping_add(70); 36]),
@@ -228,7 +228,7 @@ mod tests {
             }),
         );
 
-        let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterAddLink)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterAddLink)
             .expect("rendered op build");
         RenderedOps {
             entry: None,
@@ -247,7 +247,7 @@ mod tests {
         );
         let link_add = ActionHash::from_raw_36(vec![seed.wrapping_add(80); 36]);
         let sig = Signature::from([seed; 64]);
-        let v2_action = v2_action(
+        let action = mk_action(
             author,
             3,
             ActionHash::from_raw_36(vec![seed.wrapping_add(90); 36]),
@@ -257,7 +257,7 @@ mod tests {
                 link_add_address: link_add,
             }),
         );
-        let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterRemoveLink)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterRemoveLink)
             .expect("rendered op build");
         RenderedOps {
             entry: None,
@@ -277,7 +277,7 @@ mod tests {
             holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
         ));
         let sig = Signature::from([seed; 64]);
-        let v2_action = v2_action(
+        let action = mk_action(
             author,
             2,
             ActionHash::from_raw_36(vec![seed.wrapping_add(70); 36]),
@@ -290,7 +290,7 @@ mod tests {
             }),
         );
         let entry_hashed = EntryHashed::with_pre_hashed(entry.clone(), entry_hash);
-        let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterUpdatedRecord)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterUpdatedRecord)
             .expect("rendered op build");
         RenderedOps {
             entry: Some(entry_hashed),
@@ -306,7 +306,7 @@ mod tests {
         let deletes_address = ActionHash::from_raw_36(vec![seed.wrapping_add(20); 36]);
         let deletes_entry = EntryHash::from_raw_36(vec![seed.wrapping_add(30); 36]);
         let sig = Signature::from([seed; 64]);
-        let v2_action = v2_action(
+        let action = mk_action(
             author,
             3,
             ActionHash::from_raw_36(vec![seed.wrapping_add(70); 36]),
@@ -316,7 +316,7 @@ mod tests {
                 deletes_entry_address: deletes_entry,
             }),
         );
-        let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterDeletedBy)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterDeletedBy)
             .expect("rendered op build");
         RenderedOps {
             entry: None,
@@ -329,7 +329,7 @@ mod tests {
     fn build_rendered_activity(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let sig = Signature::from([seed; 64]);
-        let v2_action = v2_action(
+        let action = mk_action(
             author,
             1,
             ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
@@ -339,7 +339,7 @@ mod tests {
                 entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
             }),
         );
-        let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterAgentActivity)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterAgentActivity)
             .expect("rendered op build");
         RenderedOps {
             entry: None,

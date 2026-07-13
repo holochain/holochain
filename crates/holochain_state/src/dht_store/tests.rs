@@ -3,8 +3,8 @@ use holo_hash::{ActionHash, AnyLinkableHash, DnaHash, EntryHash};
 use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use holochain_types::prelude::Signature;
 use holochain_types::wire_ops::{RenderedOp, RenderedOps};
-// This test module seeds the op-cache/limbo pipeline directly with v2
-// `ChainOp`/`DhtOp`, building v2 actions (header + `ActionData`) directly.
+// This test module seeds the op-cache/limbo pipeline directly with
+// `ChainOp`/`DhtOp`, building actions (header + `ActionData`) directly.
 use holochain_zome_types::dht_v2::{
     Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
     SignedAction, UpdateData,
@@ -1279,7 +1279,7 @@ fn build_rendered_store_record_for_move(seed: u8) -> (RenderedOps, holo_hash::Ac
         holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
     ));
     let sig = Signature::from([seed; 64]);
-    // `RenderedOp::new` takes the wire's v2 action; build it directly.
+    // `RenderedOp::new` takes the wire's action; build it directly.
     let v2_action = Action {
         header: ActionHeader {
             author,
@@ -1646,7 +1646,7 @@ fn build_rendered_store_entry(
         holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
     ));
     let sig = Signature::from([seed; 64]);
-    // `RenderedOp::new` takes the wire's v2 action; build it directly.
+    // `RenderedOp::new` takes the wire's action; build it directly.
     let v2_action = Action {
         header: ActionHeader {
             author,
@@ -1758,7 +1758,7 @@ fn build_rendered_store_record_ops(
         holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
     ));
     let sig = Signature::from([seed; 64]);
-    // `RenderedOp::new` takes the wire's v2 action; build it directly.
+    // `RenderedOp::new` takes the wire's action; build it directly.
     let v2_action = Action {
         header: ActionHeader {
             author,
@@ -2003,7 +2003,7 @@ fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHa
         holo_hash::hash_type::AnyLinkable::Entry,
     );
     let sig = Signature::from([seed; 64]);
-    // `RenderedOp::new` takes the wire's v2 action; build it directly.
+    // `RenderedOp::new` takes the wire's action; build it directly.
     let v2_action = Action {
         header: ActionHeader {
             author,
@@ -2039,7 +2039,7 @@ fn build_rendered_delete_link_for(
 ) -> RenderedOps {
     let author = AgentPubKey::from_raw_36(vec![seed.wrapping_add(1); 36]);
     let sig = Signature::from([seed.wrapping_add(1); 64]);
-    // `RenderedOp::new` takes the wire's v2 action; build it directly.
+    // `RenderedOp::new` takes the wire's action; build it directly.
     let v2_action = Action {
         header: ActionHeader {
             author,
@@ -2260,7 +2260,7 @@ async fn integrate_link_op(
 }
 
 fn build_cached_create_link(base: &holo_hash::AnyLinkableHash, seed: u8) -> RenderedOps {
-    // `RenderedOp::new` takes the wire's v2 action; build it directly.
+    // `RenderedOp::new` takes the wire's action; build it directly.
     let v2_action = Action {
         header: ActionHeader {
             author: AgentPubKey::from_raw_36(vec![seed; 36]),
@@ -2414,7 +2414,7 @@ async fn integrate_upgrades_cached_op_to_locally_validated() {
         holo_hash::hash_type::AnyLinkable::Entry,
     );
 
-    // One v2 action + signature, used to build BOTH the cached RenderedOps and
+    // One action + signature, used to build BOTH the cached RenderedOps and
     // the incoming DhtOpHashed, so they share the same op hash.
     let v2_action = Action {
         header: ActionHeader {
@@ -2459,7 +2459,7 @@ async fn integrate_upgrades_cached_op_to_locally_validated() {
         "cached-only link must not be served by the authority read"
     );
 
-    // Receive + validate + integrate the SAME op (same v2 action + signature,
+    // Receive + validate + integrate the SAME op (same action + signature,
     // so it shares the cached op's hash).
     let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::CreateLink(
         SignedAction::new(v2_action, sig),
@@ -2754,7 +2754,7 @@ mod publish_query {
     use holochain_types::fixt::SignatureFixturator;
     use holochain_types::prelude::*;
     // Disambiguate op-pipeline names brought in by `holochain_types::prelude::*`;
-    // this module seeds v2 `ChainOp`s built from a `Create` fixture.
+    // this module seeds `ChainOp`s built from a `Create` fixture.
     use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, WarrantOp};
     use holochain_zome_types::dht_v2::{ActionData, ActionHeader, CreateData};
     use holochain_zome_types::fixt::{

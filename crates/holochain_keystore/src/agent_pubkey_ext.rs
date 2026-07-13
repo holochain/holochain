@@ -121,14 +121,14 @@ mod tests {
 
     /// Mirrors the two production call sites this crate's `sign`/
     /// `verify_signature` feed: `holochain_state`'s source chain signs over the
-    /// v2 action content, and
+    /// action content, and
     /// `holochain::core::sys_validate::verify_action_signature` verifies against
-    /// the same v2 action content. A signature produced this way must verify
-    /// against the v2 action.
+    /// the same action content. A signature produced this way must verify
+    /// against the action.
     // `test_keystore()` spawns lair onto a blocking task, which requires a
     // multi-threaded runtime.
     #[tokio::test(flavor = "multi_thread")]
-    async fn v2_signature_round_trips() {
+    async fn signature_round_trips() {
         let keystore = test_keystore();
         let author = holo_hash::AgentPubKey::new_random(&keystore).await.unwrap();
 
@@ -144,7 +144,7 @@ mod tests {
             }),
         };
 
-        // Sign over the v2 action, as the source chain does.
+        // Sign over the action, as the source chain does.
         let signature = action.signer().sign(&keystore, &action).await.unwrap();
 
         // Verify, exactly as `verify_action_signature` does, over the same bytes.
@@ -154,7 +154,7 @@ mod tests {
                 .verify_signature(&signature, &action)
                 .await
                 .unwrap(),
-            "a signature computed over the v2 action must verify against it"
+            "a signature computed over the action must verify against it"
         );
     }
 }

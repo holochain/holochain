@@ -20,8 +20,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::DynHcP2p;
 use holochain_state::data::{DbKey, DbSyncLevel};
 use holochain_state::{host_fn_workspace::SourceChainWorkspace, prelude::*};
-// The countersigning publish/receive path is v2-native; shadow the legacy
-// `ChainOp` re-export pulled in via `holochain_state::prelude::*`.
 use holochain_types::dht_v2::ChainOp;
 use holochain_util::timed;
 use lair_keystore_api::prelude::SharedLockedArray;
@@ -389,10 +387,8 @@ impl Spaces {
         self.get_or_create_space_ref(dna_hash, |space| space.peer_meta_store.clone())
     }
 
-    /// we are receiving a "publish" event from the network.
-    ///
-    /// Ops arrive in the v2 wire form and are passed straight through to the
-    /// (v2-native) incoming ops workflow.
+    /// Handle a "publish" event received from the network, passing the ops
+    /// straight through to the incoming ops workflow.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, ops)))]
     pub async fn handle_publish(
         &self,

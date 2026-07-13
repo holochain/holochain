@@ -1,11 +1,10 @@
-//! Redesigned DHT state-model types (transitional module — see
-//! `docs/design/state_model.md`).
+//! DHT state-model types (see `docs/design/state_model.md`).
 //!
-//! These types replace the per-action variant enum of the v1 model with a
-//! common [`ActionHeader`] + per-variant `*Data` struct, pulled together by
-//! a tagged [`ActionData`] enum. The resulting [`Action`] is content-only
-//! and always hashed via [`holo_hash::HoloHashed`] / [`SignedHashed`] at
-//! call sites, so the stored hash is invariant with the content.
+//! The action model is a common [`ActionHeader`] + per-variant `*Data` struct,
+//! pulled together by a tagged [`ActionData`] enum. The resulting [`Action`] is
+//! content-only and always hashed via [`holo_hash::HoloHashed`] /
+//! [`SignedHashed`] at call sites, so the stored hash is invariant with the
+//! content.
 //!
 //! [`SignedHashed`]: crate::record::SignedHashed
 
@@ -479,27 +478,30 @@ impl HashableContent for Action {
     }
 }
 
-impl crate::record::SignedHashed<Action> {
-    /// The v2 action content, mirroring the legacy
-    /// `SignedActionHashed::action` accessor.
+/// An [`Action`] paired with its [`ActionHash`].
+///
+/// The agent-activity traits
+/// [`ActionSequenceAndHash`](crate::action::ActionSequenceAndHash) and
+/// [`ActionHashedContainer`](crate::action::ActionHashedContainer) are
+/// implemented for it.
+pub type ActionHashed = HoloHashed<Action>;
+
+/// An [`Action`] that is both hashed and signed.
+pub type SignedActionHashed = crate::record::SignedHashed<Action>;
+
+impl SignedActionHashed {
+    /// The action content.
     pub fn action(&self) -> &Action {
         &self.hashed.content
     }
 
-    /// The action hash, mirroring the legacy
-    /// `SignedActionHashed::action_address` accessor.
+    /// The action hash.
     pub fn action_address(&self) -> &ActionHash {
         &self.hashed.hash
     }
 }
 
-/// The v2 `ActionHashed` shape: a content-addressed v2 [`Action`].
-///
-/// Mirrors the legacy `holochain_integrity_types::action::ActionHashed`
-/// (`HoloHashed<legacy::Action>`) so the shared agent-activity machinery
-/// (`ActionSequenceAndHash` / `ActionHashedContainer`) runs directly on v2
-/// actions.
-impl crate::action::ActionSequenceAndHash for HoloHashed<Action> {
+impl crate::action::ActionSequenceAndHash for ActionHashed {
     fn action_seq(&self) -> u32 {
         self.content.action_seq()
     }
@@ -509,7 +511,7 @@ impl crate::action::ActionSequenceAndHash for HoloHashed<Action> {
     }
 }
 
-impl crate::action::ActionHashedContainer for HoloHashed<Action> {
+impl crate::action::ActionHashedContainer for ActionHashed {
     fn action(&self) -> &Action {
         &self.content
     }

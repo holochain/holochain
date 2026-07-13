@@ -1,7 +1,5 @@
 use super::*;
 use holochain_p2p::{HolochainP2pError, HolochainP2pResult};
-// The countersigning publish handler is v2-native; shadow the legacy
-// `ChainOp` re-export pulled in via `super::*` (from `holochain_state::prelude::*`).
 use holochain_types::dht_v2::ChainOp;
 use kitsune2_api::BoxFut;
 

@@ -5,17 +5,14 @@ use holo_hash::fixt::DnaHashFixturator;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_state::dht_store::DhtStore;
-// The op pipeline is v2-native; `ChainOp` fixtures here are built from a
-// legacy per-variant `CreateLink` fixture (`fixt!(CreateLink)`) and projected
-// into a v2 `Action` by the `v2_create_link` helper, matching the v2 signature
-// basis (every signature in this file is over the v2 action bytes).
+use holochain_state::prelude::*;
 use holochain_types::dht_v2::ChainOp;
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
     Action, ActionData, ActionHeader, CreateLinkData,
 };
 use holochain_zome_types::dht_v2::SignedAction;
 
-/// Project a fixturated legacy `CreateLink` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `CreateLink` struct.
 fn v2_create_link(c: CreateLink) -> Action {
     Action {
         header: ActionHeader {

@@ -46,7 +46,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast::{Receiver, Sender};
 
-/// Project a fixturated legacy `Create` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `Create` struct.
 fn v2_create(c: Create) -> Action {
     Action {
         header: ActionHeader {
@@ -1887,7 +1887,6 @@ impl TestHarness {
             self.test_space.space.clone(),
             self.workspace.clone(),
             self.network.clone(),
-            self.keystore.clone(),
             CellId::new(self.dna_hash.clone(), self.author.clone()),
             self.signal_tx.clone(),
             self.countersigning_tx.clone(),
@@ -1950,35 +1949,30 @@ impl TestHarness {
         entry: Entry,
         entry_hash: EntryHash,
     ) -> SignedAction {
-        // `insert_action`/`insert_op_authored` write the still-legacy
-        // `DbKindAuthored` mirror (Phase 6). The countersigning action is built
-        // directly as a v2 `Action` via `from_countersigning_data` and signed
-        // over the v2 bytes, matching the v2 signature basis used everywhere
-        // else. The DhtStore writes below (the real op pipeline) build the v2
-        // op directly from the same `signed`.
+        // Build the countersigning action via `from_countersigning_data` and
+        // sign over its bytes, matching the signature basis used everywhere
+        // else. The DhtStore writes below build the op from the same `signed`.
         let my_action = holochain_zome_types::dht_v2::from_countersigning_data(
             entry_hash.clone(),
             session_data,
             self.author.clone(),
         )
         .unwrap();
-        let v2_action = my_action.clone();
-        let v2_hashed = holo_hash::HoloHashed::from_content_sync(v2_action.clone());
-        let sah = SignedActionHashed::sign(&self.keystore, v2_hashed)
+        let action = my_action.clone();
+        let hashed = holo_hash::HoloHashed::from_content_sync(action.clone());
+        let sah = SignedActionHashed::sign(&self.keystore, hashed)
             .await
             .unwrap();
         let signature = sah.signature().clone();
 
-        let signed = SignedAction::new(v2_action, signature.clone());
+        let signed = SignedAction::new(action, signature.clone());
 
-        // The v2 op-pipeline form of the `StoreEntry`/`CreateEntry` op, for the
-        // (v2-native) DhtStore writes below. It carries the real action
-        // signature: the store record is reconstructed from this op and the
-        // completion path verifies the record's signature, so a fixt signature
-        // would be rejected.
-        let v2_store_entry_op =
-            ChainOp::CreateEntry(signed.clone(), OpEntry::Present(entry.clone()));
-        let dht_op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(v2_store_entry_op)));
+        // Build the `StoreEntry`/`CreateEntry` op for the DhtStore writes below.
+        // It carries the real action signature: the store record is
+        // reconstructed from this op and the completion path verifies the
+        // record's signature, so a fixt signature would be rejected.
+        let store_entry_op = ChainOp::CreateEntry(signed.clone(), OpEntry::Present(entry.clone()));
+        let dht_op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(store_entry_op)));
 
         // Write the commit to the DhtStore so the store-backed session reads
         // (`current_countersigning_session`, chain head) see it.

@@ -4,12 +4,8 @@
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
-use holochain_types::prelude::*;
-// The countersigning publish wire (`ChainOp`) is v2-native; shadow the
-// legacy re-export pulled in via `prelude::*` above. `crate::*` glob imports
-// from descendant modules (`actor.rs`, `wire.rs`, `event.rs`, `spawn/actor.rs`)
-// see this same v2 binding.
 use holochain_types::dht_v2::ChainOp;
+use holochain_types::prelude::*;
 use kitsune2_api::{AgentInfoSigned, BoxFut};
 use kitsune2_api::{SpaceId, StoredOp};
 use mockall::automock;

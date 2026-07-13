@@ -8,9 +8,6 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use thiserror::Error;
 
-// The scratch stages the v2 `SignedActionHashed`/`Record`, matching what
-// `source_chain.rs` builds during authoring and what the `Store` trait
-// (`query.rs`) returns.
 use holochain_zome_types::record::Record;
 use holochain_zome_types::record::SignedActionHashed;
 

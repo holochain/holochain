@@ -49,7 +49,7 @@ pub fn update(
                     // build the entry hash
                     let entry_hash = EntryHash::with_data_sync(&entry);
 
-                    // build the v2 action data for the entry being updated
+                    // build the action data for the entry being updated
                     let action_data = ActionData::Update(UpdateData {
                         original_action_address,
                         original_entry_address,

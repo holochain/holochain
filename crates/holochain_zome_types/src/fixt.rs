@@ -627,12 +627,11 @@ use crate::dht_v2::{
     DeleteData, DeleteLinkData, DnaData, InitZomesCompleteData, OpenChainData, UpdateData,
 };
 
-// Build a v2 [`Action`] directly from v2 primitives — a common [`ActionHeader`]
-// plus a per-variant [`ActionData`] — with no dependency on the legacy
-// per-variant action enum. The variant is chosen by the fixturator index so a
-// sequence exercises all ten variants; the genesis `Dna` action is always the
+// Build an [`Action`] directly from a common [`ActionHeader`] plus a
+// per-variant [`ActionData`]. The variant is chosen by the fixturator index so
+// a sequence exercises all ten variants; the genesis `Dna` action is always the
 // first on a chain, so it carries `action_seq == 0` and no `prev_action`.
-macro_rules! v2_action_for_curve {
+macro_rules! action_for_curve {
     ($curve:expr, $index:expr) => {{
         let index = $index;
         let author = AgentPubKeyFixturator::new_indexed($curve, index)
@@ -753,21 +752,20 @@ fixturator!(
     Action;
     curve Empty {
         let index = get_fixt_index!();
-        v2_action_for_curve!(Empty, index)
+        action_for_curve!(Empty, index)
     };
     curve Unpredictable {
         let index = get_fixt_index!();
-        v2_action_for_curve!(Unpredictable, index)
+        action_for_curve!(Unpredictable, index)
     };
     curve Predictable {
         let index = get_fixt_index!();
-        v2_action_for_curve!(Predictable, index)
+        action_for_curve!(Predictable, index)
     };
     curve PublicCurve {
         let index = get_fixt_index!();
-        let mut action = v2_action_for_curve!(Unpredictable, index);
-        // Force entry-creating variants to a public entry type, matching the
-        // legacy `PublicCurve` behavior.
+        let mut action = action_for_curve!(Unpredictable, index);
+        // Force entry-creating variants to a public entry type.
         match &mut action.data {
             ActionData::Create(d) => {
                 d.entry_type = EntryTypeFixturator::new_indexed(PublicCurve, index)
@@ -785,8 +783,8 @@ fixturator!(
     };
 );
 
-// Build a v2 `SignedActionHashed` (`SignedHashed<v2 Action>`) directly from a v2
-// action and signature, hashing the action content.
+// Build a `SignedActionHashed` from an action and signature, hashing the
+// action content.
 fn signed_action_hashed_from_parts(action: Action, signature: Signature) -> SignedActionHashed {
     SignedActionHashed::with_presigned(holo_hash::HoloHashed::from_content_sync(action), signature)
 }

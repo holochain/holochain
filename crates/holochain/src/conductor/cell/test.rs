@@ -106,7 +106,6 @@ async fn test_cell_handle_publish() {
     )
     .await
     .unwrap();
-    // The publish wire carries the v2 op form.
     let v2_op = holochain_types::dht_v2::DhtOp::ChainOp(Box::new(
         holochain_types::dht_v2::ChainOp::CreateRecord(
             holochain_types::dht_v2::SignedAction::new(v2_action, shh.signature().clone()),

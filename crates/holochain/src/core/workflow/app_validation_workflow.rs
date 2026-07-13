@@ -116,10 +116,6 @@ use holochain_p2p::actor::{NetworkRequestOptions as NetworkGetOptions, NetworkRe
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
-// App validation dispatches the v2 `Op` to the wasm `validate` callback; the
-// bare `Op` name (and its variant structs) otherwise resolves to the legacy op
-// module via the glob imports above. The op pipeline itself is v2-native:
-// `ChainOp`/`DhtOp`/`OpEntry` similarly shadow the legacy re-exports.
 use holochain_types::dht_v2::{ChainOp, DhtOp, OpEntry};
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
     Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
@@ -508,7 +504,7 @@ pub async fn record_to_op(
     Ok((op, dht_op_hash, hidden_entry))
 }
 
-/// Build the v2 `Op` (the wasm `validate` callback's input) from a sys-validated
+/// Build the `Op` (the wasm `validate` callback's input) from a sys-validated
 /// `ChainOp`. Sys validation has already rejected any op whose action doesn't
 /// match its `ChainOp` variant, so the `OpActionMismatch` branches below are
 /// defence-in-depth, not an expected path.

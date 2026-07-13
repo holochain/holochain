@@ -60,7 +60,7 @@ pub fn create<'a>(
                         EntryDefLocation::CapClaim => EntryType::CapClaim,
                     };
 
-                    // build the v2 action data for the entry being committed
+                    // build the action data for the entry being committed
                     let action_data = ActionData::Create(CreateData {
                         entry_type,
                         entry_hash,

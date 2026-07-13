@@ -3,9 +3,6 @@ use ::fixt::fixt;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::HoloHashed;
 use holochain_zome_types::action::ChainTopOrdering;
-// The scratch, the (v2) `DhtStore` reads, and the op-pipeline helpers
-// exercised here are all v2-native, so `Action`/`ActionData`/`ActionHeader`/
-// `SignedActionHashed` resolve to their v2 shape by default in this module.
 use holochain_zome_types::dht_v2::{
     Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
     DnaData, SignedActionHashed,
@@ -908,8 +905,7 @@ async fn get_agent_activity_reflects_scratch_activity() {
 }
 
 /// A status-only request (`include_valid_activity` and `include_rejected_activity`
-/// both false) must still return the real chain status, not `Empty`. Ported from
-/// the pre-v2 cascade `get_agent_activity` integration tests.
+/// both false) must still return the real chain status, not `Empty`.
 #[tokio::test]
 async fn get_agent_activity_status_only_returns_real_status() {
     let store = empty_store().await;

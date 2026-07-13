@@ -1,4 +1,4 @@
-//! Redesigned DHT state-model op types (transitional — see `docs/design/state_model.md`).
+//! DHT state-model op types (see `docs/design/state_model.md`).
 
 pub use holochain_zome_types::dht_v2::*;
 
@@ -46,16 +46,14 @@ pub enum ChainOp {
 
 /// A warrant op. Thin wrapper so `DhtOp` can carry both chain and warrant ops
 /// as a single sum type. Derefs to the wrapped [`SignedWarrant`] (which
-/// itself derefs to `Warrant`/`WarrantProof`), matching the legacy
-/// `holochain_types::warrant::WarrantOp`'s field-access ergonomics.
+/// itself derefs to `Warrant`/`WarrantProof`) for field-access ergonomics.
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, derive_more::Deref,
 )]
 pub struct WarrantOp(pub SignedWarrant);
 
 impl WarrantOp {
-    /// The wrapped warrant, matching the legacy
-    /// `holochain_types::warrant::WarrantOp::warrant` accessor.
+    /// The wrapped warrant.
     pub fn warrant(&self) -> &holochain_zome_types::warrant::Warrant {
         self.0.data()
     }
@@ -98,9 +96,8 @@ impl From<SignedWarrant> for DhtOp {
 /// both a `CreateRecord` and a `CreateEntry` op — so one action yields distinct
 /// op hashes per op type.
 ///
-/// Unlike the legacy `ChainOpUniqueForm`, every variant borrows `&Action`
-/// directly, because the v2 `Action` is a single flat struct rather than a
-/// variant-per-type enum.
+/// Every variant borrows `&Action` directly, because `Action` is a single flat
+/// struct.
 #[allow(missing_docs)]
 #[derive(serde::Serialize, Debug)]
 pub enum ChainOpUniqueForm<'a> {
@@ -137,7 +134,7 @@ impl ChainOp {
     /// The content-derived [`DhtOpHash`] for this op.
     ///
     /// Excludes the signature and entry (see [`ChainOpUniqueForm`]) and carries
-    /// no `weight`, so it is reproducible from the v2 op alone.
+    /// no `weight`, so it is reproducible from the op alone.
     pub fn to_hash(&self) -> DhtOpHash {
         DhtOpHash::with_data_sync(&self.to_unique_form())
     }
@@ -237,10 +234,8 @@ impl DhtOp {
     pub fn to_hash(&self) -> DhtOpHash {
         match self {
             DhtOp::ChainOp(op) => op.to_hash(),
-            // Warrant hashing is unchanged by the v2 flip; reuse the legacy
-            // `WarrantOp` wrapper, which carries the `DhtOp` hash type over the
-            // warrant content. The wrapped `SignedWarrant` is identical, so the
-            // hash matches the legacy form.
+            // Hash the warrant content via the `WarrantOp` wrapper, which
+            // carries the `DhtOp` hash type over the wrapped `SignedWarrant`.
             DhtOp::WarrantOp(op) => {
                 DhtOpHash::with_data_sync(&crate::warrant::WarrantOp::from(op.0.clone()))
             }
@@ -313,7 +308,7 @@ impl ChainOpUniqueForm<'_> {
 
 /// The set of op types a record with this action produces.
 ///
-/// Mirrors the legacy `action_to_op_types`, matched over the v2 [`ActionData`].
+/// Matched over the action's [`ActionData`].
 pub fn action_to_op_types(action: &Action) -> Vec<ChainOpType> {
     use ChainOpType::*;
     match &action.data {
@@ -342,7 +337,7 @@ pub fn action_to_op_types(action: &Action) -> Vec<ChainOpType> {
 }
 
 /// The DHT basis where an op of `op_type` for `action` (hashed as
-/// `action_hash`) is stored, mirroring the legacy `ChainOpUniqueForm::basis`.
+/// `action_hash`) is stored.
 ///
 /// Returns `None` only for an `op_type` that does not match the action's data,
 /// which [`action_to_op_types`] never emits.
@@ -369,9 +364,8 @@ fn op_basis(
     })
 }
 
-/// Produce the [`HashedChainOp`]s a v2 [`Record`] generates, with all hashes,
-/// bases, and storage locations pre-computed — the v2 analog of the legacy
-/// `produce_ops_from_record`.
+/// Produce the [`HashedChainOp`]s a [`Record`] generates, with all hashes,
+/// bases, and storage locations pre-computed.
 ///
 /// The `StoreEntry` op is omitted whenever the entry is not present — whether
 /// because it is private (`Hidden`), inapplicable (`NA`), or held without its
@@ -548,7 +542,7 @@ mod op_hash_tests {
     #[test]
     fn op_hash_entry_point_matches_chain_op_to_hash() {
         let sa = signed(create_action(), 7);
-        // Cover every variant: a v2 `ChainOp` accepts any `SignedAction`
+        // Cover every variant: a `ChainOp` accepts any `SignedAction`
         // regardless of the action's content, so the same `sa` exercises the
         // full `to_unique_form` / `op_hash` mapping.
         let cases = [

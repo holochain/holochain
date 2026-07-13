@@ -565,17 +565,17 @@ impl DhtStore<DbRead<Dht>> {
         hash: &holo_hash::ActionHash,
         author: Option<&holo_hash::AgentPubKey>,
     ) -> StateQueryResult<Option<holochain_zome_types::record::Record>> {
-        let Some(v2_sah) = self.db().get_action(hash.clone()).await? else {
+        let Some(sah) = self.db().get_action(hash.clone()).await? else {
             return Ok(None);
         };
-        let action = &v2_sah.hashed.content;
+        let action = &sah.hashed.content;
         let entry = match action.data.entry_hash().cloned() {
-            Some(entry_hash) if v2_private_entry_visible_to(action, author) => {
+            Some(entry_hash) if private_entry_visible_to(action, author) => {
                 match self.db().get_entry(entry_hash.clone(), author).await? {
                     Some(entry) => Some(entry),
                     // A public entry referenced but unavailable means "no
                     // record"; an absent private entry is simply `Hidden`.
-                    None if v2_action_entry_is_private(action) => None,
+                    None if action_entry_is_private(action) => None,
                     None => return Ok(None),
                 }
             }
@@ -586,11 +586,11 @@ impl DhtStore<DbRead<Dht>> {
             None => None,
         };
         let record_entry = holochain_zome_types::record::RecordEntry::new(
-            v2_entry_type(action).map(|et| et.visibility()),
+            action_entry_type(action).map(|et| et.visibility()),
             entry,
         );
         Ok(Some(holochain_zome_types::record::Record::new(
-            v2_sah,
+            sah,
             record_entry,
         )))
     }
@@ -637,16 +637,16 @@ impl DhtStore<DbRead<Dht>> {
             }
             None => creates.into_iter().next(),
         };
-        let Some(v2_sah) = chosen else {
+        let Some(sah) = chosen else {
             return Ok(None);
         };
         let entry = self.db().get_entry(entry_hash.clone(), author).await?;
         let record_entry = holochain_zome_types::record::RecordEntry::new(
-            v2_entry_type(&v2_sah.hashed.content).map(|et| et.visibility()),
+            action_entry_type(&sah.hashed.content).map(|et| et.visibility()),
             entry,
         );
         Ok(Some(holochain_zome_types::record::Record::new(
-            v2_sah,
+            sah,
             record_entry,
         )))
     }
@@ -729,7 +729,6 @@ impl DhtStore<DbRead<Dht>> {
         if let Some(sah) = self.retrieve_action(hash).await? {
             return Ok(Some(sah));
         }
-        // The scratch already holds v2 actions.
         scratch_action(scratch, hash)
     }
 
@@ -768,7 +767,7 @@ impl DhtStore<DbRead<Dht>> {
         author: Option<&holo_hash::AgentPubKey>,
         scratch: &SyncScratch,
     ) -> StateQueryResult<Option<holochain_zome_types::record::Record>> {
-        // Resolve the action from store, then scratch (both v2).
+        // Resolve the action from store, then scratch.
         let action = match self.retrieve_action(hash).await? {
             Some(sah) => sah,
             None => match scratch_action(scratch, hash)? {
@@ -779,9 +778,9 @@ impl DhtStore<DbRead<Dht>> {
         let action_content = &action.hashed.content;
 
         // Resolve the entry (if the action references one). A private entry is
-        // only attached for its own author — see `v2_private_entry_visible_to`.
+        // only attached for its own author — see `private_entry_visible_to`.
         let entry = match action_content.data.entry_hash().cloned() {
-            Some(entry_hash) if v2_private_entry_visible_to(action_content, author) => {
+            Some(entry_hash) if private_entry_visible_to(action_content, author) => {
                 // Try the store first, then the scratch (scratch entries are
                 // this agent's own data; the visibility guard above already
                 // ensures we only reach here for the author of a private entry).
@@ -791,7 +790,7 @@ impl DhtStore<DbRead<Dht>> {
                         Some(e) => Some(e),
                         // Unavailable everywhere: a public entry means "no
                         // record"; an absent private entry is `Hidden`.
-                        None if v2_action_entry_is_private(action_content) => None,
+                        None if action_entry_is_private(action_content) => None,
                         None => return Ok(None),
                     },
                 }
@@ -801,7 +800,7 @@ impl DhtStore<DbRead<Dht>> {
             None => None,
         };
         let record_entry = holochain_zome_types::record::RecordEntry::new(
-            v2_entry_type(action_content).map(|et| et.visibility()),
+            action_entry_type(action_content).map(|et| et.visibility()),
             entry,
         );
 
@@ -882,7 +881,7 @@ impl DhtStore<DbRead<Dht>> {
             .filter(|sah| !scratch_deleted.contains(sah.as_hash()))
             .collect();
 
-        // Collect live scratch creates/updates for this entry (already v2).
+        // Collect live scratch creates/updates for this entry.
         let scratch_creates: Vec<holochain_zome_types::record::SignedActionHashed> =
             scratch_live_entry_creates(scratch, entry_hash)?;
 
@@ -921,7 +920,7 @@ impl DhtStore<DbRead<Dht>> {
             .await?;
 
         let record_entry = holochain_zome_types::record::RecordEntry::new(
-            v2_entry_type(&action.hashed.content).map(|et| et.visibility()),
+            action_entry_type(&action.hashed.content).map(|et| et.visibility()),
             entry,
         );
 
@@ -982,8 +981,7 @@ impl DhtStore<DbRead<Dht>> {
     /// exists. A scratch-only record (authored locally but not yet committed and
     /// published) has no such op; it is returned with `Valid` status, since the
     /// author's own uncommitted record is valid from their perspective. This
-    /// mirrors the legacy scratch-overlay behaviour this requester read replaces,
-    /// and lets host functions resolve a just-authored record mid-call — e.g. an
+    /// lets host functions resolve a just-authored record mid-call — e.g. an
     /// `update` reading the `create` it depends on within one zome call. An action
     /// reachable only via a non-record op (no `StoreRecord`, not in the scratch)
     /// still returns `None`.
@@ -1034,12 +1032,12 @@ impl DhtStore<DbRead<Dht>> {
             None => return Ok(None),
         };
 
-        // Store deletes + scratch deletes targeting this action hash (both v2).
+        // Store deletes + scratch deletes targeting this action hash.
         let mut deletes: Vec<holochain_zome_types::record::SignedActionHashed> =
             self.db().get_delete_actions_for_record(hash).await?;
         deletes.extend(scratch_deletes_for_record(scratch, hash)?);
 
-        // Store updates + scratch updates targeting this action hash (both v2).
+        // Store updates + scratch updates targeting this action hash.
         let mut updates: Vec<holochain_zome_types::record::SignedActionHashed> =
             self.db().get_update_actions_for_record(hash).await?;
         updates.extend(scratch_updates_for_record(scratch, hash)?);
@@ -1088,7 +1086,7 @@ impl DhtStore<DbRead<Dht>> {
         };
 
         // Accepted creates: store accepted creates + all scratch creates for
-        // this entry (both v2).
+        // this entry.
         let mut actions: Vec<holochain_zome_types::record::SignedActionHashed> = self
             .db()
             .get_create_actions_for_entry(entry_hash, author, RecordValidity::Accepted)
@@ -1101,12 +1099,12 @@ impl DhtStore<DbRead<Dht>> {
             .get_create_actions_for_entry(entry_hash, author, RecordValidity::Rejected)
             .await?;
 
-        // Deletes: store + scratch (both v2).
+        // Deletes: store + scratch.
         let mut deletes: Vec<holochain_zome_types::record::SignedActionHashed> =
             self.db().get_delete_actions_for_entry(entry_hash).await?;
         deletes.extend(scratch_deletes_for_entry(scratch, entry_hash)?);
 
-        // Updates: store + scratch (both v2).
+        // Updates: store + scratch.
         let mut updates: Vec<holochain_zome_types::record::SignedActionHashed> =
             self.db().get_update_actions_for_entry(entry_hash).await?;
         updates.extend(scratch_updates_for_entry(scratch, entry_hash)?);
@@ -1223,8 +1221,7 @@ impl DhtStore<DbRead<Dht>> {
                 create_link_hash: sah.as_hash().clone(),
             });
         }
-        // Match the legacy `GetLinksQuery` contract: links are returned in
-        // creation (timestamp) order.
+        // Return links in creation (timestamp) order.
         links.sort_by_key(|l| l.timestamp);
         Ok(links)
     }
@@ -1320,8 +1317,7 @@ impl DhtStore<DbRead<Dht>> {
             });
         }
 
-        // Match the legacy `GetLinksQuery` contract: links (store + scratch) are
-        // returned in creation (timestamp) order.
+        // Return links (store + scratch) in creation (timestamp) order.
         store_links.sort_by_key(|l| l.timestamp);
         Ok(store_links)
     }
@@ -1362,7 +1358,7 @@ impl DhtStore<DbRead<Dht>> {
         let scratch_dl_by_create = scratch_delete_links_by_create(scratch)?;
 
         // Augment each store create's delete list with scratch DeleteLinks
-        // targeting that create (both v2).
+        // targeting that create.
         for (create_sah, deletes) in &mut store_details {
             let create_hash = create_sah.as_hash();
             if let Some(scratch_deletes) = scratch_dl_by_create.get(create_hash) {
@@ -1388,7 +1384,7 @@ impl DhtStore<DbRead<Dht>> {
                 }
             }
             // Collect deletes: store deletes + scratch deletes targeting this
-            // create (both v2).
+            // create.
             let mut deletes: Vec<holochain_zome_types::record::SignedActionHashed> =
                 self.db().get_delete_link_actions(create_hash).await?;
             if let Some(scratch_deletes) = scratch_dl_by_create.get(create_hash) {
@@ -1404,9 +1400,9 @@ impl DhtStore<DbRead<Dht>> {
     /// actions classified into valid/rejected, with chain status, highest
     /// observed, and warrants. Store-only (no scratch).
     ///
-    /// Works natively on v2 records/actions: the `ChainItems::Full` case builds
-    /// v2 [`Record`](holochain_zome_types::record::Record)s and the hashes case
-    /// the v2 `HoloHashed<Action>` shape, both of which the shared
+    /// The `ChainItems::Full` case builds
+    /// [`Record`](holochain_zome_types::record::Record)s and the hashes case
+    /// the `HoloHashed<Action>` shape, both of which the shared
     /// `build_agent_activity_response` machinery accepts.
     pub async fn get_agent_activity(
         &self,
@@ -1434,7 +1430,7 @@ impl DhtStore<DbRead<Dht>> {
             let mut valid = Vec::new();
             let mut rejected = Vec::new();
             for item in items {
-                let record = v2_record_from_parts(item.action, item.entry);
+                let record = record_from_parts(item.action, item.entry);
                 match item.validation_status {
                     RecordValidity::Accepted => valid.push(record),
                     RecordValidity::Rejected => rejected.push(record),
@@ -1550,7 +1546,7 @@ impl DhtStore<DbRead<Dht>> {
                     }),
                     // The rejected list is Records, and keeps the store row's entry.
                     RecordValidity::Rejected => {
-                        rejected.push(v2_record_from_parts(item.action, item.entry))
+                        rejected.push(record_from_parts(item.action, item.entry))
                     }
                 }
             }
@@ -1561,7 +1557,7 @@ impl DhtStore<DbRead<Dht>> {
             // filled separately by the cascade); rejected records above keep theirs.
             let merged_valid: Vec<holochain_zome_types::record::Record> = merged_activity
                 .into_iter()
-                .map(|a| v2_record_from_parts(a.action, None))
+                .map(|a| record_from_parts(a.action, None))
                 .collect();
             Ok(build_agent_activity_response(
                 author.clone(),
@@ -1603,9 +1599,9 @@ impl DhtStore<DbRead<Dht>> {
 
     /// Store-only `must_get_agent_activity`: resolve `filter.chain_top`, scan the
     /// bounded `RegisterAgentActivity` range, exclude forked actions, apply the
-    /// timestamp/take filters, and decide completeness. Returns legacy types.
+    /// timestamp/take filters, and decide completeness.
     /// No scratch, no network, no cross-source merge (the requester layers those
-    /// on in phase 1c).
+    /// on).
     pub async fn must_get_agent_activity(
         &self,
         author: &holo_hash::AgentPubKey,
@@ -1968,7 +1964,7 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_link_creates(base)
             .await?
             .into_iter()
-            .map(|(v2, validity)| (v2, record_validity_to_status(validity)))
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
@@ -1988,7 +1984,7 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_delete_links(base)
             .await?
             .into_iter()
-            .map(|(v2, validity)| (v2, record_validity_to_status(validity)))
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
@@ -2007,7 +2003,7 @@ impl DhtStore<DbRead<Dht>> {
             .db()
             .get_authority_store_record(action_hash)
             .await?
-            .map(|(v2, validity)| (v2, record_validity_to_status(validity))))
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity))))
     }
 
     /// Authority-serving deletes targeting record `action_hash` (locally-validated
@@ -2026,7 +2022,7 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_deletes_for_record(action_hash)
             .await?
             .into_iter()
-            .map(|(v2, validity)| (v2, record_validity_to_status(validity)))
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
@@ -2046,7 +2042,7 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_updates_for_record(action_hash)
             .await?
             .into_iter()
-            .map(|(v2, validity)| (v2, record_validity_to_status(validity)))
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
@@ -2066,7 +2062,7 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_entry_creates(entry_hash)
             .await?
             .into_iter()
-            .map(|(v2, validity)| (v2, record_validity_to_status(validity)))
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
@@ -2086,7 +2082,7 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_deletes_for_entry(entry_hash)
             .await?
             .into_iter()
-            .map(|(v2, validity)| (v2, record_validity_to_status(validity)))
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
@@ -2106,11 +2102,11 @@ impl DhtStore<DbRead<Dht>> {
             .get_authority_updates_for_entry(entry_hash)
             .await?
             .into_iter()
-            .map(|(v2, validity)| (v2, record_validity_to_status(validity)))
+            .map(|(sah, validity)| (sah, record_validity_to_status(validity)))
             .collect())
     }
 
-    /// Warrants held against `warrantee`'s chain, as legacy signed warrants.
+    /// Warrants held against `warrantee`'s chain, as signed warrants.
     ///
     /// Used by the get authorities to pair a warrant with any `Rejected`
     /// record they serve, so the receiver can verify the rejection without
@@ -2176,11 +2172,11 @@ impl DhtStore<DbRead<Dht>> {
     ) -> StateQueryResult<holochain_state_types::SourceChainDump> {
         use holochain_state_types::{SourceChainDump, SourceChainDumpRecord};
 
-        // All actions for this author in seq order (v2 SignedActionHashed).
-        let v2_actions = self.db().get_actions_by_author(author.clone()).await?;
+        // All actions for this author in seq order.
+        let actions = self.db().get_actions_by_author(author.clone()).await?;
 
-        let mut records = Vec::with_capacity(v2_actions.len());
-        for sah in &v2_actions {
+        let mut records = Vec::with_capacity(actions.len());
+        for sah in &actions {
             let action_address = sah.as_hash().clone();
             let signature = sah.signature().clone();
             let action = sah.action().clone();
@@ -2245,7 +2241,7 @@ impl DhtStore<DbRead<Dht>> {
             .iter()
             .map(|sah| {
                 let action = &sah.hashed.content;
-                let private_entry = v2_action_entry_is_private(action);
+                let private_entry = action_entry_is_private(action);
 
                 if include_entries && (!private_entry || !public_only) {
                     if let Some(entry_hash) = action.data.entry_hash() {
@@ -2273,7 +2269,7 @@ impl DhtStore<DbRead<Dht>> {
             .map(|(sah, want)| {
                 let entry = want.and_then(|h| entries.get(&h).cloned());
                 let record_entry = holochain_zome_types::record::RecordEntry::new(
-                    v2_entry_type(&sah.hashed.content).map(|et| et.visibility()),
+                    action_entry_type(&sah.hashed.content).map(|et| et.visibility()),
                     entry,
                 );
                 holochain_zome_types::record::Record::new(sah, record_entry)
@@ -2304,8 +2300,8 @@ impl DhtStore<DbRead<Dht>> {
         // `action_type` but not `entry_type`, so filter on `Create` + the entry
         // hash with an `AgentPubKey` entry-type guard.
         let actions = self.db().get_actions_by_author(author.clone()).await?;
-        let create = actions.iter().find_map(|v2_sah| {
-            let action = v2_sah.hashed.content.clone();
+        let create = actions.iter().find_map(|sah| {
+            let action = sah.hashed.content.clone();
             let is_agent_key_create = match &action.data {
                 ActionData::Create(d) => {
                     d.entry_type == EntryType::AgentPubKey && d.entry_hash == agent_key_entry_hash
@@ -2375,10 +2371,10 @@ impl DhtStore<DbRead<Dht>> {
             let mut candidate_hashes: Vec<EntryHash> = Vec::new();
             for row in rows {
                 let action_hash = ActionHash::from_raw_36(row.action_hash);
-                let Some(v2_sah) = self.db().get_action(action_hash).await? else {
+                let Some(sah) = self.db().get_action(action_hash).await? else {
                     continue;
                 };
-                let Some(entry_hash) = v2_sah.hashed.content.data.entry_hash().cloned() else {
+                let Some(entry_hash) = sah.hashed.content.data.entry_hash().cloned() else {
                     continue;
                 };
                 // Skip grants whose entry was updated or deleted by the author.
@@ -2441,8 +2437,8 @@ impl DhtStore<DbRead<Dht>> {
     }
 }
 
-/// The v2 action's declared entry type, if it creates or updates an entry.
-fn v2_entry_type(action: &holochain_zome_types::dht_v2::Action) -> Option<&EntryType> {
+/// The action's declared entry type, if it creates or updates an entry.
+fn action_entry_type(action: &holochain_zome_types::dht_v2::Action) -> Option<&EntryType> {
     match &action.data {
         holochain_zome_types::dht_v2::ActionData::Create(d) => Some(&d.entry_type),
         holochain_zome_types::dht_v2::ActionData::Update(d) => Some(&d.entry_type),
@@ -2450,21 +2446,21 @@ fn v2_entry_type(action: &holochain_zome_types::dht_v2::Action) -> Option<&Entry
     }
 }
 
-/// Build a v2 [`Record`](holochain_zome_types::record::Record) from a signed
+/// Build a [`Record`](holochain_zome_types::record::Record) from a signed
 /// action and an optional entry, deriving the [`RecordEntry`] slot from the
-/// action's entry visibility (mirroring the legacy `Record::new`).
-fn v2_record_from_parts(
+/// action's entry visibility.
+fn record_from_parts(
     sah: holochain_zome_types::record::SignedActionHashed,
     entry: Option<holochain_types::prelude::Entry>,
 ) -> holochain_zome_types::record::Record {
-    let visibility = v2_entry_type(&sah.hashed.content).map(|et| et.visibility());
+    let visibility = action_entry_type(&sah.hashed.content).map(|et| et.visibility());
     let record_entry = holochain_zome_types::record::RecordEntry::new(visibility, entry);
     holochain_zome_types::record::Record::new(sah, record_entry)
 }
 
 /// Whether `action`'s entry (if any) is declared private.
-fn v2_action_entry_is_private(action: &holochain_zome_types::dht_v2::Action) -> bool {
-    v2_entry_type(action).map(|et| et.visibility()) == Some(&EntryVisibility::Private)
+fn action_entry_is_private(action: &holochain_zome_types::dht_v2::Action) -> bool {
+    action_entry_type(action).map(|et| et.visibility()) == Some(&EntryVisibility::Private)
 }
 
 /// Whether the requesting `author` may have `action`'s entry attached to the
@@ -2472,17 +2468,16 @@ fn v2_action_entry_is_private(action: &holochain_zome_types::dht_v2::Action) -> 
 /// only when the caller is the action's author. A private entry must never be
 /// served to a different author — not even when the caller holds a *same-hash*
 /// private entry of their own (the entry hash is shared by content, but the
-/// privacy is per author). This restores the legacy requester read's
-/// entry-visibility hiding that the by-hash `get_entry` lookup alone does not
-/// provide.
-fn v2_private_entry_visible_to(
+/// privacy is per author). This provides the entry-visibility hiding that the
+/// by-hash `get_entry` lookup alone does not.
+fn private_entry_visible_to(
     action: &holochain_zome_types::dht_v2::Action,
     author: Option<&holo_hash::AgentPubKey>,
 ) -> bool {
-    !v2_action_entry_is_private(action) || author == Some(&action.header.author)
+    !action_entry_is_private(action) || author == Some(&action.header.author)
 }
 
-/// Map the v2 record validity to the legacy validation status served on the wire.
+/// Map the record validity to the validation status served on the wire.
 fn record_validity_to_status(v: RecordValidity) -> ValidationStatus {
     match v {
         RecordValidity::Accepted => ValidationStatus::Valid,
@@ -2490,11 +2485,9 @@ fn record_validity_to_status(v: RecordValidity) -> ValidationStatus {
     }
 }
 
-// The scratch (`crate::scratch::Scratch`) stores v2 `Action`/
-// `SignedActionHashed` (see `scratch.rs`), matching the v2 results the
-// enclosing module returns — no conversion is needed at the boundary. This
-// module groups every helper that reads directly out of the scratch.
-mod scratch_legacy {
+// Groups every helper that reads directly out of the scratch
+// (`crate::scratch::Scratch`, see `scratch.rs`).
+mod scratch_reads {
     use super::{StateQueryResult, SyncScratch};
     use holochain_zome_types::dht_v2::ActionData;
     use holochain_zome_types::record::SignedActionHashed;
@@ -2508,9 +2501,6 @@ mod scratch_legacy {
         scratch: &SyncScratch,
         hash: &holo_hash::ActionHash,
     ) -> StateQueryResult<Option<SignedActionHashed>> {
-        // `Store::get_action` (`query.rs`) belongs to the legacy SQL query
-        // machinery and returns a legacy action, so this searches the (v2)
-        // scratch directly instead of delegating to it.
         scratch.apply_and_then(|s| {
             Ok::<_, crate::query::StateQueryError>(
                 s.actions()
@@ -2523,9 +2513,7 @@ mod scratch_legacy {
     /// Look up an [`Entry`] by `hash` in the scratch space.
     ///
     /// Entries in the scratch are authored by this agent and are therefore always
-    /// visible, regardless of the `author` parameter. (Analogue: the legacy
-    /// `Scratch::get_public_or_authored_entry` ignores `author` for the same
-    /// reason.)
+    /// visible, regardless of the `author` parameter.
     pub(super) fn scratch_entry(
         scratch: &SyncScratch,
         hash: &holo_hash::EntryHash,
@@ -2761,7 +2749,7 @@ mod scratch_legacy {
         })
     }
 }
-use scratch_legacy::{
+use scratch_reads::{
     scratch_action, scratch_create_links_for_base, scratch_creates_for_entry,
     scratch_delete_link_targets, scratch_delete_links_by_create, scratch_delete_targets,
     scratch_deletes_for_entry, scratch_deletes_for_record, scratch_entry,
@@ -2884,8 +2872,7 @@ fn merge_warrants(
 
 /// Reconstruct a [`DhtOpHashed`] (`ChainOp` variant) from a
 /// [`LimboChainOpJoinedRow`] without any additional database round-trips.
-/// The action and entry blobs are decoded in-process from the joined columns,
-/// straight into the v2 op shape — no legacy projection.
+/// The action and entry blobs are decoded in-process from the joined columns.
 fn chain_op_from_joined_row(
     row: &holochain_data::dht::LimboChainOpJoinedRow,
 ) -> StateQueryResult<DhtOpHashed> {
@@ -2899,7 +2886,7 @@ fn chain_op_from_joined_row(
         crate::query::StateQueryError::Other(format!("invalid op_type {n} in LimboChainOp row"))
     })?;
 
-    // Decode the v2 Action from the joined columns.
+    // Decode the Action from the joined columns.
     let action_data: ActionData = holochain_serialized_bytes::decode(&row.action_data)
         .map_err(|e| crate::query::StateQueryError::Other(format!("decode ActionData: {e}")))?;
     let action = Action {
@@ -2934,16 +2921,13 @@ fn chain_op_from_joined_row(
 
     // Build the `OpEntry` an entry-bearing op variant carries.
     //
-    // v2 `OpEntry` has only `Present`/`Hidden`/`ActionOnly` — no counterpart
-    // to legacy `RecordEntry::NotStored`/`NA`. An action with no entry-bearing
-    // data at all (`entry_type: None`, the legacy `NA` case) maps to
-    // `ActionOnly`. So does an entry-bearing *public* action whose entry blob
-    // isn't locally present (the legacy `NotStored` case): v2 doesn't
-    // distinguish "this action has no entry" from "the entry exists but
-    // isn't fetched yet", both just mean "no entry payload right now". A
-    // *private* action's absent entry maps to `Hidden`, preserving the one
-    // distinction v2 does need: the entry is deliberately withheld, not
-    // merely unfetched.
+    // `OpEntry` has only `Present`/`Hidden`/`ActionOnly`. An action with no
+    // entry-bearing data at all (`entry_type: None`) maps to `ActionOnly`, as
+    // does an entry-bearing *public* action whose entry blob isn't locally
+    // present: there is no distinction between "this action has no entry" and
+    // "the entry exists but isn't fetched yet", both just mean "no entry
+    // payload right now". A *private* action's absent entry maps to `Hidden`,
+    // recording that the entry is deliberately withheld, not merely unfetched.
     let op_entry_for = |entry_type: Option<&EntryType>| -> OpEntry {
         let Some(entry_type) = entry_type else {
             return OpEntry::ActionOnly;
@@ -3054,7 +3038,7 @@ fn warrant_from_limbo_row(
     Ok(DhtOpHashed::with_pre_hashed(op, op_hash))
 }
 
-/// Reconstruct a legacy [`SignedWarrant`] from an integrated `WarrantRow`.
+/// Reconstruct a [`SignedWarrant`] from an integrated `WarrantRow`.
 fn warrant_row_to_signed_warrant(
     row: holochain_data::models::dht::WarrantRow,
 ) -> StateQueryResult<SignedWarrant> {
@@ -3076,9 +3060,9 @@ fn warrant_row_to_signed_warrant(
 }
 
 /// Highest observed sequence number across the valid and rejected lists, each
-/// assumed sorted ascending by sequence. Mirrors the legacy authority: the hash
-/// list holds the last valid and/or last rejected action, which coincide only
-/// when both share the top sequence.
+/// assumed sorted ascending by sequence. The hash list holds the last valid
+/// and/or last rejected action, which coincide only when both share the top
+/// sequence.
 fn compute_highest_observed<T: ActionSequenceAndHash>(
     valid: &[T],
     rejected: &[T],
@@ -3303,9 +3287,9 @@ fn check_agent_activity_completeness(
 /// Assemble the [`AgentActivityResponse`] from the classified lists.
 ///
 /// Generic over the item shape via [`ActionHashedContainer`]: the
-/// `include_full_records` case passes v2
+/// `include_full_records` case passes
 /// [`Record`](holochain_zome_types::record::Record)s (whose `Vec` renders as
-/// [`ChainItems::Full`]) and the hashes case passes the v2 `HoloHashed<Action>`
+/// [`ChainItems::Full`]) and the hashes case passes the `HoloHashed<Action>`
 /// shape (rendering as [`ChainItems::Hashes`]).
 fn build_agent_activity_response<T>(
     agent: holo_hash::AgentPubKey,
@@ -3375,10 +3359,10 @@ mod tests {
     use holochain_types::prelude::MustGetAgentActivityResponse;
     use holochain_types::prelude::Signature;
     use holochain_types::prelude::Timestamp;
-    // This test module seeds the store via the v2 op pipeline
-    // (`ChainOp`/`DhtOpHashed`/`Scratch`), built from the flat v2 `Action`
+    // This test module seeds the store via the op pipeline
+    // (`ChainOp`/`DhtOpHashed`/`Scratch`), built from the flat `Action`
     // (`ActionHeader` + `ActionData`) shape. Reads through the `DhtStore`
-    // produce v2 `Record`/`Action` values, asserted via their own accessors.
+    // produce `Record`/`Action` values, asserted via their own accessors.
     use holochain_zome_types::chain::ChainFilter;
     use holochain_zome_types::dht_v2::{
         Action, ActionData, ActionHeader, CreateData, SignedAction,
@@ -4238,8 +4222,8 @@ mod tests {
             .unwrap();
 
         // The meaningful signal is fork detection: two valid actions at the
-        // same seq yield Forked. (highest_observed mirrors the legacy authority
-        // and reports the top sequence, not necessarily every tip's hash.)
+        // same seq yield Forked. (highest_observed reports the top sequence, not
+        // necessarily every tip's hash.)
         match resp.status {
             ChainStatus::Forked(fork) => assert_eq!(fork.fork_seq, 1),
             other => panic!("expected Forked, got {other:?}"),
@@ -4374,7 +4358,7 @@ mod tests {
 
     // ---- get_agent_activity_with_scratch tests ----
 
-    /// Build a scratch `SignedActionHashed` (v2) for a `Create` by `author`
+    /// Build a scratch `SignedActionHashed` for a `Create` by `author`
     /// at the given `action_seq`, linked from `prev`.
     fn make_scratch_create(
         author: &AgentPubKey,
@@ -5116,7 +5100,7 @@ mod tests {
 
     // ---- scratch overlay helpers ----
 
-    /// Build a `SignedActionHashed` (v2) for a `Create` that references
+    /// Build a `SignedActionHashed` for a `Create` that references
     /// `entry_hash`. Useful for scratch overlay tests.
     fn make_signed_action_for_entry(
         seed: u8,
@@ -5147,7 +5131,7 @@ mod tests {
         )
     }
 
-    /// Build a `SignedActionHashed` (v2) for a `Create` with no entry
+    /// Build a `SignedActionHashed` for a `Create` with no entry
     /// (simulates an action that is in the scratch but whose entry is missing).
     fn make_signed_action_no_entry(seed: u8) -> holochain_zome_types::record::SignedActionHashed {
         // Use a Dna action — it carries no entry hash.
@@ -6748,17 +6732,16 @@ mod tests {
     //
     // A chain whose valid head is a `CloseChain` action is reported as `Closed`,
     // but only when the chain is otherwise `Valid`; `Forked`/`Invalid` outrank
-    // it. These are ported from the pre-v2 cascade `get_agent_activity_query`
-    // unit tests and exercise `build_agent_activity_response` directly.
+    // it. These tests exercise `build_agent_activity_response` directly.
 
     // `build_agent_activity_response` is generic over any
-    // `T: ActionHashedContainer + Clone` with `Vec<T>: ChainItemsSource`; the v2
+    // `T: ActionHashedContainer + Clone` with `Vec<T>: ChainItemsSource`; the
     // `HoloHashed<Action>` shape satisfies both, so these helpers build a bare
-    // hashed v2 action. Only the resulting chain status is asserted, so the
+    // hashed action. Only the resulting chain status is asserted, so the
     // `ChainItems` rendering (hashes vs full) is irrelevant here.
     use holochain_zome_types::dht_v2::{CloseChainData, DnaData};
 
-    fn v2_action(
+    fn mk_action(
         author: &AgentPubKey,
         seq: u32,
         prev: Option<ActionHash>,
@@ -6776,7 +6759,7 @@ mod tests {
     }
 
     fn mk_dna(author: &AgentPubKey) -> HoloHashed<Action> {
-        v2_action(
+        mk_action(
             author,
             0,
             None,
@@ -6787,7 +6770,7 @@ mod tests {
     }
 
     fn mk_create(author: &AgentPubKey, seq: u32) -> HoloHashed<Action> {
-        v2_action(
+        mk_action(
             author,
             seq,
             Some(ActionHash::from_raw_36(vec![seq as u8; 36])),
@@ -6803,7 +6786,7 @@ mod tests {
     }
 
     fn mk_close(author: &AgentPubKey, seq: u32) -> HoloHashed<Action> {
-        v2_action(
+        mk_action(
             author,
             seq,
             Some(ActionHash::from_raw_36(vec![seq as u8; 36])),

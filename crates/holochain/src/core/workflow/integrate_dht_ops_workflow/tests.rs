@@ -14,7 +14,7 @@ use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
 use kitsune2_api::StoredOp;
 use std::sync::Arc;
 
-/// Project a fixturated legacy `Create` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `Create` struct.
 fn v2_create(c: Create) -> Action {
     Action {
         header: ActionHeader {

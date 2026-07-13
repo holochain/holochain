@@ -54,10 +54,10 @@
 //! All of these validation rules are declared in the `validate` callback. It
 //! is executed for a new action by each validation authority.
 //!
-//! There's a helper type called [`FlatOp`](crate::flat_op_v2::FlatOp) available for easy access
+//! There's a helper type called [`FlatOp`](crate::flat_op::FlatOp) available for easy access
 //! to all link and entry variants when validating an operation. In many cases, this type can be
 //! easier to work with than the bare [`Op`](crate::prelude::Op).
-//! [`FlatOp`](crate::flat_op_v2::FlatOp) contains the same information as
+//! [`FlatOp`](crate::flat_op::FlatOp) contains the same information as
 //! [`Op`](crate::prelude::Op) but with a flatter, more accessible data
 //! structure than [`Op`](crate::prelude::Op)'s deeply nested and
 //! concise structure.
@@ -341,10 +341,10 @@ pub mod link;
 pub mod chain;
 
 #[deny(missing_docs)]
-pub mod op_v2;
+pub mod op;
 
 #[deny(missing_docs)]
-pub mod flat_op_v2;
+pub mod flat_op;
 
 #[cfg(any(feature = "test_utils", test))]
 pub mod test_utils;

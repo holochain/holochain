@@ -3564,9 +3564,9 @@ pub fn app_manifest_from_dnas(
         .into()
 }
 
-/// Reconstruct v2 [`DhtOp`](holochain_types::dht_v2::DhtOp)s from wire rows for
-/// the integration dump. Rows that fail to reconstruct are dropped (the same
-/// lenient behaviour the wire path uses), so the result is a best-effort view.
+/// Build [`DhtOp`](holochain_types::dht_v2::DhtOp)s from wire rows for the
+/// integration dump. Rows that fail to build are dropped (the same lenient
+/// behaviour the wire path uses), so the result is a best-effort view.
 pub fn wire_rows_to_v2_ops(
     chain: Vec<holochain_state::dht_store::K2ChainOpForWireRow>,
     warrants: Vec<holochain_state::dht_store::K2WarrantForWireRow>,

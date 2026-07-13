@@ -10,8 +10,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DhtOpError {
-    // These diagnostics carry the v2 `Action`/`ActionType`. They are
-    // error-message payloads only (never used to decide an outcome).
+    // These diagnostics carry the `Action`/`ActionType` as error-message
+    // payloads only (never used to decide an outcome).
     #[error(
         "Tried to create a DhtOp from a Record that requires an Entry. Action type {:?}", .0
     )]

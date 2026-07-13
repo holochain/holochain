@@ -4,12 +4,7 @@ use super::sys_validation_workflow::counterfeit_check_action;
 use super::{error::WorkflowResult, sys_validation_workflow::counterfeit_check_warrant};
 use crate::{conductor::space::Space, core::queue_consumer::TriggerSender};
 use holo_hash::DhtOpHash;
-// The op pipeline is v2-native.
 use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
-// Only the `tests` submodule (via `use super::*`) draws fixturators and
-// signature primitives from this glob; the workflow itself is v2-native.
-#[cfg(test)]
-use holochain_state::prelude::*;
 use incoming_ops_batch::InOpBatchEntry;
 use std::{collections::HashSet, sync::Arc};
 

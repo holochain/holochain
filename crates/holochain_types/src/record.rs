@@ -100,7 +100,7 @@ pub struct RecordStatus {
 /// This is the author for every variant except a `CloseChain` that names an
 /// agent migration target: that variant is signed with the *new* key so the
 /// forward reference it carries is provably endorsed by the destination
-/// agent (mirrors the legacy `Action::signer` special case).
+/// agent.
 fn action_signer(action: &Action) -> &AgentPubKey {
     match &action.data {
         ActionData::CloseChain(CloseChainData {

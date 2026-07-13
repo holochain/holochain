@@ -44,15 +44,12 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::test_utils::valid_arbitrary_chain;
 use holochain_types::test_utils::ActionRefMut;
-// This module seeds the legacy per-variant `Create`/`CreateLink` action structs
-// (fixtures like `fixt!(Create)`) and projects each onto the v2 `Action`
-// (header + `ActionData`) that the checks under test consume.
 use holochain_zome_types::dht_v2::{Action, ActionData, ActionHeader, CreateData, CreateLinkData};
 use matches::assert_matches;
 use std::time::Duration;
 
-/// Project a legacy `Create` struct onto its v2 [`Action`] shape.
-fn create_to_v2(c: &Create) -> Action {
+/// Build an [`Action`] from a fixturated `Create` struct.
+fn create_to_action(c: &Create) -> Action {
     Action {
         header: ActionHeader {
             author: c.author.clone(),
@@ -108,7 +105,7 @@ fn check_entry_hash_test() {
         vec![1, 3, 5],
     ))));
     let hash = EntryHash::with_data_sync(&entry);
-    let action = create_to_v2(&ec);
+    let action = create_to_action(&ec);
 
     // First check it should have an entry
     assert_matches!(check_new_entry_action(&action), Ok(()));
@@ -122,7 +119,7 @@ fn check_entry_hash_test() {
     );
 
     ec.entry_hash = hash;
-    let action = create_to_v2(&ec);
+    let action = create_to_action(&ec);
 
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(check_entry_hash(eh, &entry), Ok(()));
@@ -172,13 +169,11 @@ async fn incoming_ops_filters_private_entry() {
         entry_hash: EntryHash::with_data_sync(&private_entry),
         weight: EntryRateWeight::default(),
     };
-    let v2_action = create_to_v2(&create);
-    let signature = author.sign(&keystore, &v2_action).await.unwrap();
+    let action = create_to_action(&create);
+    let signature = author.sign(&keystore, &action).await.unwrap();
 
-    // `send_store_entry`/`send_store_record` (below) take the v2 `Record`, so
-    // build one directly rather than a `LegacyRecord`.
     let shh = SignedActionHashed::with_presigned(
-        holo_hash::HoloHashed::from_content_sync(v2_action),
+        holo_hash::HoloHashed::from_content_sync(action),
         signature,
     );
     let record = Record::new(shh, RecordEntry::Present(private_entry));

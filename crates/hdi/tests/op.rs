@@ -1,10 +1,10 @@
-//! Coverage for the v2 [`OpHelper::flattened`] conversion (`hdi::op_v2`),
-//! the canonical `Op` -> `FlatOp` path used by the `validate` callback.
+//! Coverage for the [`OpHelper::flattened`] conversion (`hdi::op`),
+//! the `Op` -> `FlatOp` path used by the `validate` callback.
 //!
 //! `get_unit_entry_type`, `deny_other_zome`,
 //! `get_app_entry_type_for_record_authority`, and
 //! `get_app_entry_type_for_store_entry_authority` are private to
-//! `hdi::op_v2`, so their error branches are exercised the same way
+//! `hdi::op`, so their error branches are exercised the same way
 //! production code reaches them: through the public [`OpHelper::flattened`]
 //! method.
 //!
@@ -67,7 +67,7 @@ fn types() {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
 }
 
-// -- v2 action/op builders ---------------------------------------------------
+// -- action/op builders ------------------------------------------------------
 
 fn header() -> ActionHeader {
     ActionHeader {
@@ -245,7 +245,7 @@ fn register_delete_link(create_zome_index: u8, create_link_type: u8) -> Op {
 // Every case below exercises a failure branch of `get_unit_entry_type`,
 // `deny_other_zome`, `get_app_entry_type_for_record_authority`, or
 // `get_app_entry_type_for_store_entry_authority` (all private to
-// `hdi::op_v2`), plus the `Op`-variant/`ActionData`-shape mismatch guards:
+// `hdi::op`), plus the `Op`-variant/`ActionData`-shape mismatch guards:
 // every `Op` variant carries the same `Action` type, so `flattened` checks
 // at runtime that `action.data` is the variant each `Op` case requires.
 

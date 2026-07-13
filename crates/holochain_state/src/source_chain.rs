@@ -4,9 +4,9 @@ use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
 pub use error::*;
-// Authoring and op production are v2-native throughout: actions are built
-// directly (via `v2::build_action` and friends), staged in the (v2) scratch,
-// and turned into ops via `v2::produce_ops_from_record`.
+// Authoring and op production build actions directly (via `v2::build_action`
+// and friends), stage them in the scratch, and turn them into ops via
+// `v2::produce_ops_from_record`.
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
@@ -134,7 +134,7 @@ impl SourceChain<DbWrite<Dht>> {
         Ok(countersigning_agent_state)
     }
 
-    /// Hash, sign, and stage a fully-built v2 [`v2::Action`] (with its
+    /// Hash, sign, and stage a fully-built [`v2::Action`] (with its
     /// optional entry) at the end of the scratch.
     pub async fn put_with_action(
         &self,
@@ -154,7 +154,7 @@ impl SourceChain<DbWrite<Dht>> {
         Ok(hash)
     }
 
-    /// Put a new v2 countersigning [`Action`] at the end of the source chain
+    /// Put a new countersigning [`Action`] at the end of the source chain
     /// for `entry` (which must be an [`Entry::CounterSign`]).
     pub async fn put_countersigned(
         &self,
@@ -175,7 +175,7 @@ impl SourceChain<DbWrite<Dht>> {
         }
     }
 
-    /// Put a new v2 action at the end of the source chain, built from its
+    /// Put a new action at the end of the source chain, built from its
     /// per-variant [`v2::ActionData`] payload.
     ///
     /// The header (author, sequence number, and previous action) is filled in
@@ -265,8 +265,7 @@ impl SourceChain<DbWrite<Dht>> {
 
                 // The ops a freshly-authored batch of records produces.
                 // `produce_ops_from_record` is infallible over a well-formed
-                // v2 record — unlike the legacy op pipeline, there is no
-                // per-variant reconstruction that can fail.
+                // record.
                 let ops: Vec<v2::HashedChainOp> = records
                     .iter()
                     .flat_map(v2::produce_ops_from_record)
@@ -601,11 +600,8 @@ impl SourceChain<DbWrite<Dht>> {
     /// Valid means that there's no [`Update`] or [`Delete`] action for the key on the chain.
     /// Returns the create action if it is valid, and an [`SourceChainError::InvalidAgentKey`] otherwise.
     ///
-    /// Returns the v2 `Action` directly from [`DhtStore::valid_create_agent_key_action`]
-    /// (the source of truth) rather than converting to the legacy shape this
-    /// module otherwise uses for authoring — this is a read, not a step in
-    /// building a new action, and the returned action's hash (used by
-    /// [`Self::delete_valid_agent_pub_key`]) is identical either way.
+    /// Returns the `Action` from [`DhtStore::valid_create_agent_key_action`],
+    /// which is the source of truth.
     pub async fn valid_create_agent_key_action(
         &self,
     ) -> SourceChainResult<holochain_zome_types::prelude::Action> {
@@ -854,10 +850,8 @@ where
     /// This returns a Vec rather than an iterator because it is intended to be
     /// used by the `query` host function, which crosses the wasm boundary.
     ///
-    /// Returns v2 [`holochain_zome_types::prelude::Record`]s, matching
-    /// [`DhtStore::source_chain_records`]. The (v2) scratch is overlaid
-    /// afterwards; no conversion is needed since the scratch already holds
-    /// v2 actions.
+    /// Returns [`holochain_zome_types::prelude::Record`]s, matching
+    /// [`DhtStore::source_chain_records`], with the scratch overlaid afterwards.
     pub async fn query(
         &self,
         query: QueryFilter,
@@ -964,7 +958,7 @@ pub fn chain_lock_subject_for_entry(entry: Option<&Entry>) -> SourceChainResult<
     })
 }
 
-/// Rebase a batch of v2 actions onto a new chain head, re-signing each one.
+/// Rebase a batch of actions onto a new chain head, re-signing each one.
 async fn rebase_actions_on(
     keystore: &MetaLairClient,
     mut actions: Vec<v2::SignedActionHashed>,
@@ -997,7 +991,7 @@ pub async fn genesis(
     agent_pubkey: AgentPubKey,
     membrane_proof: Option<MembraneProof>,
 ) -> SourceChainResult<()> {
-    // The genesis DNA action is v2-native and, uniquely, has no `prev_action`.
+    // The genesis DNA action, uniquely, has no `prev_action`.
     let dna_header = v2::ActionHeader {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
@@ -1460,10 +1454,8 @@ mod tests {
 
         let action = chain.valid_create_agent_key_action().await.unwrap();
 
-        // `valid_create_agent_key_action` reads from the (v2) DhtStore, so the
-        // returned action is a v2 `Action`.
-        // It is the agent-key `Create`: an `AgentPubKey`-typed `Create` whose
-        // entry hash is the agent key.
+        // The returned action is the agent-key `Create`: an `AgentPubKey`-typed
+        // `Create` whose entry hash is the agent key.
         assert_matches!(
             action.data,
             holochain_zome_types::action::ActionData::Create(_)
@@ -2030,8 +2022,6 @@ mod tests {
             .retrieve_record(&head.action, Some(&author))
             .await?
             .expect("head record present in store");
-        // `retrieve_record` reads from the (v2) DhtStore, so the record's
-        // action is a v2 `Action`.
         assert_eq!(head_record.action().action_seq(), 2);
         assert!(matches!(
             head_record.action().data,

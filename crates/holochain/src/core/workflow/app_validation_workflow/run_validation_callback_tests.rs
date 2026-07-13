@@ -24,9 +24,6 @@ use holochain_types::{
     wire_ops::{RenderedOp, RenderedOps, WireOps},
 };
 use holochain_wasm_test_utils::TestWasm;
-// The wasm `validate(op: Op)` callback decodes the v2 `Op`; the fixturated
-// `Create`/`Delete`/`CreateLink` structs are projected into v2 `Action`s by
-// the `v2_*` helpers below.
 use holochain_zome_types::action::{Create, CreateLink, Delete};
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
     Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, Op,
@@ -46,7 +43,7 @@ use holochain_zome_types::{
 use matches::assert_matches;
 use std::{sync::Arc, time::Duration};
 
-/// Project a fixturated legacy `Create` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `Create` struct.
 fn v2_create(c: Create) -> Action {
     Action {
         header: ActionHeader {
@@ -62,7 +59,7 @@ fn v2_create(c: Create) -> Action {
     }
 }
 
-/// Project a fixturated legacy `Delete` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `Delete` struct.
 fn v2_delete(d: Delete) -> Action {
     Action {
         header: ActionHeader {
@@ -78,7 +75,7 @@ fn v2_delete(d: Delete) -> Action {
     }
 }
 
-/// Project a fixturated legacy `CreateLink` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `CreateLink` struct.
 fn v2_create_link(c: CreateLink) -> Action {
     Action {
         header: ActionHeader {
@@ -108,6 +105,10 @@ async fn validation_callback_must_get_action() {
                     ActionData::Delete(DeleteData {
                         deletes_address, ..
                     }) => deletes_address.clone(),
+                    // App validation only runs on ops that have passed sys
+                    // validation, which rejects a delete op whose action is not
+                    // a `Delete` (`malformed` in the sys validation workflow), so
+                    // a `RegisterDelete` op always carries `ActionData::Delete`.
                     _ => unreachable!(),
                 };
                 let result = api.must_get_action(MustGetActionInput(deletes_address.clone()));
@@ -198,6 +199,10 @@ async fn validation_callback_awaiting_deps_hashes() {
                     ActionData::Delete(DeleteData {
                         deletes_address, ..
                     }) => deletes_address.clone(),
+                    // App validation only runs on ops that have passed sys
+                    // validation, which rejects a delete op whose action is not
+                    // a `Delete` (`malformed` in the sys validation workflow), so
+                    // a `RegisterDelete` op always carries `ActionData::Delete`.
                     _ => unreachable!(),
                 };
                 let result = api.must_get_action(MustGetActionInput(deletes_address.clone()));
@@ -302,6 +307,10 @@ async fn validation_callback_awaiting_deps_agent_activity() {
                     ActionData::Delete(DeleteData {
                         deletes_address, ..
                     }) => deletes_address.clone(),
+                    // App validation only runs on ops that have passed sys
+                    // validation, which rejects a delete op whose action is not
+                    // a `Delete` (`malformed` in the sys validation workflow), so
+                    // a `RegisterDelete` op always carries `ActionData::Delete`.
                     _ => unreachable!(),
                 };
                 let author = delete.hashed.content.author().clone();

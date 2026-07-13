@@ -20,10 +20,6 @@ use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::IncompleteCommitReason;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
-// The scratch space authoring/inline-validation path is v2-native end to
-// end: each scratch record's signature is checked against its v2 action
-// content, and everything downstream (`sys_validate_record`, `record_to_op`,
-// `validate_op`, `op_to_record`) consumes that same v2 record.
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
     Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
     RegisterUpdate, StoreEntry, StoreRecord,
@@ -296,7 +292,7 @@ pub async fn inline_validation(
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
         // Loop forwards through all the new records
         for record in scratch_records {
-            // Verifies the signature over the record's v2 action content.
+            // Verifies the signature over the record's action content.
             counterfeit_check_authored_record(&record)
                 .await
                 .or_else(|outcome_or_err| outcome_or_err.into_workflow_error())?;
@@ -374,13 +370,8 @@ fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     }
 }
 
-/// Builds a [`Record`] directly from a v2 signed action, deriving the
-/// [`RecordEntry`] classification from the action's entry visibility.
-///
-/// Unlike the legacy `SignedActionHashed::raw_from_same_hash`, no
-/// type-narrowing conversion is needed here: every v2 `Op` variant already
-/// carries the full [`Action`], not a per-variant subtype, so the signed
-/// action can be used directly.
+/// Builds a [`Record`] from a signed action, deriving the [`RecordEntry`]
+/// classification from the action's entry visibility.
 fn record_from_signed_action(signed_action: SignedActionHashed, entry: Option<Entry>) -> Record {
     let visibility = signed_action.hashed.content.entry_visibility().copied();
     Record::new(signed_action, RecordEntry::new(visibility.as_ref(), entry))

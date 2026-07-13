@@ -2,7 +2,7 @@ use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::workflow::{WorkflowError, WorkflowResult};
 use holo_hash::{ActionHash, AgentPubKey, EntryHash};
-use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
+use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
 use holochain_timestamp::Timestamp;
@@ -13,7 +13,6 @@ use holochain_zome_types::prelude::SignedAction;
 pub(crate) async fn inner_countersigning_session_complete(
     space: Space,
     network: DynHolochainP2pDna,
-    keystore: MetaLairClient,
     author: AgentPubKey,
     signed_actions: Vec<SignedAction>,
     integration_trigger: TriggerSender,
@@ -52,7 +51,7 @@ pub(crate) async fn inner_countersigning_session_complete(
     // Do a quick check to see if this entry hash matches the current locked session, so we don't
     // check signatures unless there is an active session.
     let maybe_matched_session = match maybe_current_session {
-        Some((session_record, cs_entry_hash, session_data)) => {
+        Some((_session_record, cs_entry_hash, session_data)) => {
             let lock_subject = session_data.preflight_request.fingerprint()?;
             match &chain_lock {
                 // This is the case where we have already locked the chain for another session and are
@@ -61,7 +60,7 @@ pub(crate) async fn inner_countersigning_session_complete(
                 Some(chain_lock)
                     if cs_entry_hash == entry_hash && chain_lock.subject() == lock_subject =>
                 {
-                    Some((session_record, session_data))
+                    Some(session_data)
                 }
                 _ => None,
             }
@@ -69,7 +68,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         None => None,
     };
 
-    let (session_record, session_data) = match maybe_matched_session {
+    let session_data = match maybe_matched_session {
         Some(cs) => cs,
         None => {
             // If there is no active session then we can short circuit.
@@ -136,9 +135,6 @@ pub(crate) async fn inner_countersigning_session_complete(
 
     reveal_countersigning_session(
         space,
-        network.clone(),
-        keystore,
-        session_record,
         &author,
         this_cells_action_hash,
         integration_trigger,
@@ -172,12 +168,8 @@ pub(crate) async fn inner_countersigning_session_complete(
     Ok(Some(session_data.preflight_request.app_entry_hash))
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn reveal_countersigning_session(
     space: Space,
-    _network: DynHolochainP2pDna,
-    _keystore: MetaLairClient,
-    _session_record: Record,
     author: &AgentPubKey,
     this_cells_action_hash: ActionHash,
     integration_trigger: TriggerSender,
@@ -228,8 +220,6 @@ async fn apply_success_state_changes(
 /// the session becomes unresolved and can be forcefully completed and published anyway.
 pub(super) async fn force_publish_countersigning_session(
     space: Space,
-    network: DynHolochainP2pDna,
-    keystore: MetaLairClient,
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
     cell_id: CellId,
@@ -283,9 +273,6 @@ pub(super) async fn force_publish_countersigning_session(
 
     reveal_countersigning_session(
         space,
-        network,
-        keystore,
-        session_record,
         cell_id.agent_pubkey(),
         this_cells_action_hash,
         integration_trigger,

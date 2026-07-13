@@ -1,6 +1,6 @@
-//! Redesigned DHT state-model types (transitional — see `docs/design/state_model.md`).
+//! DHT state-model types (see `docs/design/state_model.md`).
 //!
-//! Re-exports the integrity-layer v2 types and adds the zome-layer aliases
+//! Re-exports the integrity-layer types and adds the zome-layer aliases
 //! [`SignedAction`] (data + signature) and [`SignedActionHashed`]
 //! (content-addressed + signed). Also exposes the `op_type` INTEGER mapping
 //! used by the DHT schema.
@@ -13,7 +13,7 @@ use crate::signature::Signed;
 use holo_hash::{AgentPubKey, EntryHash};
 use holochain_integrity_types::record::SignedHashed;
 
-/// Build a v2 [`Action`] from its common header and per-variant data.
+/// Build an [`Action`] from its common header and per-variant data.
 ///
 /// Every action variant — including the genesis [`ActionData::Dna`], whose
 /// header carries `prev_action: None` — shares the same [`ActionHeader`]
@@ -22,13 +22,10 @@ pub fn build_action(header: ActionHeader, data: ActionData) -> Action {
     Action { header, data }
 }
 
-/// Build the v2 [`Action`] a single agent contributes to a countersigning
+/// Build the [`Action`] a single agent contributes to a countersigning
 /// session.
 ///
-/// Mirrors the legacy `Action::from_countersigning_data`
-/// (`holochain_integrity_types::countersigning`), but builds the v2
-/// [`Action`] directly and carries no weight — the v2 model has no
-/// rate-limiting field.
+/// The action carries no weight; the model has no rate-limiting field.
 pub fn from_countersigning_data(
     entry_hash: EntryHash,
     session_data: &CounterSigningSessionData,
@@ -56,14 +53,12 @@ pub fn from_countersigning_data(
     Ok(build_action(header, data))
 }
 
-/// Map a countersigning session to the ordered set of v2 [`Action`]s each
+/// Map a countersigning session to the ordered set of [`Action`]s each
 /// participating agent contributes.
 ///
-/// Mirrors the legacy `CounterSigningSessionData::build_action_set`
-/// (`holochain_integrity_types::countersigning`), but produces v2
-/// [`Action`]s (no weight). A given session always maps to the same ordered
-/// set of actions or an error. The actions are not signed, since the intent
-/// is to build every participant's action without holding their private key.
+/// A given session always maps to the same ordered set of actions or an error.
+/// The actions are not signed, since the intent is to build every
+/// participant's action without holding their private key.
 pub fn build_action_set(
     session_data: &CounterSigningSessionData,
     entry_hash: EntryHash,
@@ -85,14 +80,13 @@ pub fn build_action_set(
     Ok(actions)
 }
 
-/// A v2 [`Action`] with its [`crate::signature::Signature`] (no hash).
+/// An [`Action`] with its [`crate::signature::Signature`] (no hash).
 pub type SignedAction = Signed<Action>;
 
-/// A v2 [`Action`] that is both hashed and signed.
+/// An [`Action`] that is both hashed and signed.
 pub type SignedActionHashed = SignedHashed<Action>;
 
-/// A `Warrant` with its signature. Re-uses the existing `Warrant` type
-/// from `holochain_zome_types::warrant` — unchanged by the v2 redesign.
+/// A `Warrant` with its signature, from `holochain_zome_types::warrant`.
 pub use crate::warrant::SignedWarrant;
 
 /// Maps [`ChainOpType`] onto the schema `op_type` INTEGER column (`1..=9`).

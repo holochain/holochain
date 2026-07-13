@@ -389,7 +389,7 @@ impl ChainQueryFilter {
                 self.action_type
                     .as_ref()
                     .map(|action_types| {
-                        action_types.contains(&legacy_action_type(&action.action().data))
+                        action_types.contains(&action_type_of(&action.action().data))
                     })
                     .unwrap_or(true)
                     && self
@@ -424,10 +424,9 @@ impl ChainQueryFilter {
     }
 }
 
-/// The [`ActionType`] discriminant of a v2 [`ActionData`] variant, in the
-/// legacy per-variant-enum [`ActionType`] (the type [`ChainQueryFilter`]
-/// filters against, shared unchanged by the v2 model).
-fn legacy_action_type(data: &ActionData) -> ActionType {
+/// The [`ActionType`] discriminant for an [`ActionData`] variant (the type
+/// [`ChainQueryFilter`] filters against).
+fn action_type_of(data: &ActionData) -> ActionType {
     match data {
         ActionData::Dna(_) => ActionType::Dna,
         ActionData::AgentValidationPkg(_) => ActionType::AgentValidationPkg,
@@ -509,8 +508,8 @@ mod tests {
     use holo_hash::fixt::EntryHashFixturator;
     use holo_hash::HasHash;
 
-    /// Create v2 hashed actions with various properties. The v2 `Action`s are
-    /// built directly (header + `ActionData`), seeded from the per-variant
+    /// Create hashed actions with various properties. The `Action`s are built
+    /// directly (header + `ActionData`), seeded from the per-variant
     /// fixturators, so the content-derived hashes match the production
     /// authoring path.
     fn fixtures() -> [HoloHashed<Action>; 7] {
@@ -666,8 +665,8 @@ mod tests {
     fn filter_by_action_type() {
         let actions = fixtures();
 
-        // `ChainQueryFilter` filters against the legacy per-variant
-        // `ActionType`; the fixtures are Create (0), Update (1) and CreateLink (2).
+        // `ChainQueryFilter` filters against `ActionType`; the fixtures are
+        // Create (0), Update (1) and CreateLink (2).
         let query_1 = ChainQueryFilter::new().action_type(ActionType::Create);
         let query_2 = ChainQueryFilter::new().action_type(ActionType::Update);
         let query_3 = ChainQueryFilter::new().action_type(ActionType::CreateLink);

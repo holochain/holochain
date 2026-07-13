@@ -15,10 +15,6 @@ use holochain_types::rate_limit::{EntryRateWeight, RateWeight};
 use holochain_zome_types::action::{
     AppEntryDef, Create, CreateLink, Delete, DeleteLink, EntryType, Update, ZomeIndex,
 };
-// `get_zomes_to_invoke` dispatches on the v2 `Op`; the bare `Op`/`Record`
-// names otherwise resolve ambiguously since no legacy `op`/`Action` glob is
-// imported here. The fixturated `Create`/`Update`/`Delete`/`CreateLink`/
-// `DeleteLink` structs are projected into v2 `Action`s by the `v2_*` helpers.
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
     Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData, Op,
     RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink, RegisterUpdate,
@@ -33,7 +29,7 @@ use holochain_zome_types::timestamp::Timestamp;
 use matches::assert_matches;
 use std::sync::Arc;
 
-/// Project a fixturated legacy `Create` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `Create` struct.
 fn v2_create(c: Create) -> Action {
     Action {
         header: ActionHeader {
@@ -49,7 +45,7 @@ fn v2_create(c: Create) -> Action {
     }
 }
 
-/// Project a fixturated legacy `Update` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `Update` struct.
 fn v2_update(u: Update) -> Action {
     Action {
         header: ActionHeader {
@@ -67,7 +63,7 @@ fn v2_update(u: Update) -> Action {
     }
 }
 
-/// Project a fixturated legacy `Delete` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `Delete` struct.
 fn v2_delete(d: Delete) -> Action {
     Action {
         header: ActionHeader {
@@ -83,7 +79,7 @@ fn v2_delete(d: Delete) -> Action {
     }
 }
 
-/// Project a fixturated legacy `CreateLink` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `CreateLink` struct.
 fn v2_create_link(c: CreateLink) -> Action {
     Action {
         header: ActionHeader {
@@ -102,7 +98,7 @@ fn v2_create_link(c: CreateLink) -> Action {
     }
 }
 
-/// Project a fixturated legacy `DeleteLink` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `DeleteLink` struct.
 fn v2_delete_link(d: DeleteLink) -> Action {
     Action {
         header: ActionHeader {

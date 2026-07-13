@@ -106,7 +106,7 @@ wasm_io_types! {
     // Retrieve an action from the DHT or short circuit.
     fn must_get_action (zt::entry::MustGetActionInput) -> zt::prelude::SignedActionHashed;
 
-    // The guest decodes v2 `RegisterAgentActivity`; keep in sync with the
+    // The guest decodes `RegisterAgentActivity`; keep in sync with the
     // matching entry in the ribosome's `HostFnApi` (`host_fn.rs`).
     fn must_get_agent_activity (zt::chain::MustGetAgentActivityInput) -> Vec<zt::dht_v2::op::RegisterAgentActivity>;
 

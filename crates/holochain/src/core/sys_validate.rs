@@ -9,11 +9,6 @@ pub use holo_hash::*;
 use holochain_keystore::AgentPubKeyExt;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-// `ChainOp`/`DhtOp`/`OpEntry` are the v2 op-pipeline types. `WarrantOp` here
-// stays the legacy, richer `holochain_types::warrant::WarrantOp` pulled in
-// via the glob below (`.warrant()`/`.get_type()`/`.sign()`) — a separate,
-// general-purpose warrant type from the thin `dht_v2::WarrantOp` variant
-// wrapper, which exists only to let a v2 `DhtOp` carry a warrant.
 use holochain_types::dht_v2::{ChainOp, DhtOp, OpEntry};
 use holochain_types::prelude::*;
 use holochain_zome_types::dht_v2::{
@@ -39,7 +34,7 @@ pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Verify the signature for this action.
 ///
-/// Signatures are computed and checked over the v2 `Action` bytes.
+/// Signatures are computed and checked over the `Action` bytes.
 pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysValidationResult<()> {
     if action.signer().verify_signature(sig, action).await? {
         Ok(())
@@ -51,11 +46,6 @@ pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysVal
 }
 
 /// Verify the signature for this warrant
-///
-/// Takes the v2 op-pipeline `WarrantOp` — its `Deref` chain to
-/// `SignedWarrant`/`Warrant`/`WarrantProof` plus its `warrant()` accessor
-/// give it the same field/method surface as the legacy warrant-processing
-/// type, so this body needs no other change.
 pub async fn verify_warrant_signature(
     warrant_op: &holochain_types::dht_v2::WarrantOp,
 ) -> SysValidationResult<()> {
@@ -290,26 +280,18 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 
 /// Check that the EntryVisibility is congruous with the presence or absence of entry data
 ///
-/// v2 `OpEntry` has three states — `Present`/`Hidden`/`ActionOnly` — versus
-/// legacy `RecordEntry`'s four (`Present`/`Hidden`/`NotStored`/`NA`), and
-/// `ChainOp` variants that never carry an entry (`AgentActivity`,
-/// `DeleteEntry`, `DeleteRecord`, `CreateLink`, `DeleteLink`) have no
-/// `OpEntry` slot at all rather than a synthesized `RecordEntry::NA` — so the
-/// match below is reshaped, not a line-for-line port:
-/// - `op.op_entry() == None` (no slot on this variant) is unconditionally
-///   `Ok`, covering both the legacy `RegisterAgentActivity` special case and
-///   the legacy `RecordEntry::NA` those other variants always returned.
-/// - For a `Public` entry-bearing op, legacy's `NotStored` and `NA` states
-///   both already led to the same outcome (error, except the
-///   `RegisterAgentActivity`/`AgentPubKey` carve-out) — so their `ActionOnly`
-///   merge point matches legacy behaviour exactly.
-/// - For a `Private` entry-bearing op, legacy's `NotStored` (Ok) and `NA`
-///   (Err — a malformed op falsely claiming N/A despite entry-bearing
-///   action data) diverge. `ActionOnly` here is treated as `Ok`, matching
-///   `NotStored`: it is by far the common legitimate case (a private entry
-///   this authority never receives), and the malformed-`NA` case it now
-///   also covers carries no information leak either way (the entry is
-///   absent from the op regardless).
+/// Ops whose variant carries no entry slot (`op.op_entry()` is `None`, e.g.
+/// `AgentActivity`, `DeleteEntry`, `DeleteRecord`, `CreateLink`, `DeleteLink`)
+/// always pass. For entry-bearing ops the entry slot must match the action's
+/// entry visibility:
+/// - A `Public` entry-bearing op must carry its entry (`Present`). The sole
+///   exception is an `AgentPubKey` action, whose entry data is the entry hash
+///   already carried in the action.
+/// - A `Private` entry-bearing op must withhold its entry (`Hidden` or
+///   `ActionOnly`); presenting the entry, or carrying a private entry under the
+///   public-entry `CreateEntry` op, is a leak. `ActionOnly` is accepted here as
+///   the common case of a private entry this authority never receives, and it
+///   carries no entry to leak either way.
 pub fn check_entry_visibility(op: &ChainOp) -> SysValidationResult<()> {
     use EntryVisibility::*;
     use OpEntry::*;
@@ -408,9 +390,7 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
 /// Check a Update's entry type is the same for
 /// original and new entry.
 ///
-/// `original_entry_action` is looked up from the validation dependencies,
-/// which store v2 actions, so this takes the v2 `Action` directly rather
-/// than the legacy `NewEntryActionRef` (which cannot represent a v2 action).
+/// `original_entry_action` is looked up from the validation dependencies.
 pub fn check_update_reference(
     update: &UpdateData,
     original_entry_action: &Action,
@@ -516,10 +496,10 @@ impl DhtOpSender for IncomingDhtOpSender {
     }
 }
 
-/// The v2 `OpEntry` an entry-bearing `ChainOp` variant carries, mapped from a
+/// The `OpEntry` an entry-bearing `ChainOp` variant carries, mapped from a
 /// `Record`'s `RecordEntry` slot. `RecordEntry::NA`/`NotStored` both collapse
-/// to `OpEntry::ActionOnly` — v2 has no third "absent" state (see
-/// `check_entry_visibility`'s doc comment for the full rationale).
+/// to `OpEntry::ActionOnly` (see `check_entry_visibility`'s doc comment for the
+/// full rationale).
 fn record_entry_to_op_entry(entry: RecordEntry) -> OpEntry {
     match entry {
         RecordEntry::Present(e) => OpEntry::Present(e),

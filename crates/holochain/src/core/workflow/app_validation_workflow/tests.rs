@@ -26,10 +26,6 @@ use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::{TestWasm, TestWasmPair, TestZomes};
-// `hdk::prelude::*` (v2 `Op`/`Action`/etc.) and `holochain_types::prelude::*`
-// (legacy `Op`/etc., under the same bare names) are both globbed above; pin
-// the names this file's inline-zome `validate` callbacks actually decode
-// (the v2 shapes the ribosome dispatches) with explicit imports.
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
     Action, ActionData, ActionHeader, CreateData, DeleteData, Op, RegisterAgentActivity,
     RegisterDelete, StoreEntry, StoreRecord,
@@ -42,7 +38,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Project a fixturated legacy `Create` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `Create` struct.
 fn v2_create(c: Create) -> Action {
     Action {
         header: ActionHeader {
@@ -58,7 +54,7 @@ fn v2_create(c: Create) -> Action {
     }
 }
 
-/// Project a fixturated legacy `Delete` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `Delete` struct.
 fn v2_delete(d: Delete) -> Action {
     Action {
         header: ActionHeader {

@@ -633,7 +633,7 @@ fn limbo_chain_op_not_ready_pred() -> String {
 }
 
 /// `(validation_limbo, integration_limbo, integrated)` counts across the
-/// limbo + integrated tables, matching the legacy integration-state report.
+/// limbo + integrated tables.
 ///
 /// - `integrated` = locally-validated `ChainOp` rows (GET-cached ops with
 ///   `locally_validated = 0` are excluded) plus all `WarrantOp` rows.

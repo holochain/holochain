@@ -8,8 +8,6 @@ use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
-// The witnessing map and the countersigning wire are v2-native; shadow the
-// legacy `ChainOp`/`DhtOp` re-exports pulled in via `holochain_state::prelude::*`.
 use holochain_types::dht_v2::{ChainOp, OpEntry};
 use holochain_zome_types::dht_v2::build_action_set;
 use std::collections::HashMap;

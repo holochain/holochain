@@ -1,3 +1,4 @@
+use super::validate_op_tests::ToV2Action;
 use super::*;
 use crate::retry_until_timeout;
 use crate::sweettest::*;
@@ -6,17 +7,13 @@ use crate::test_utils::{assert_limbo_empty, wait_for_integration};
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::dht_v2::SignedAction;
 use std::convert::TryFrom;
 use std::time::Duration;
 use {
     crate::core::workflow::sys_validation_workflow::types::Outcome, ::fixt::fixt,
     holochain_zome_types::fixt::EntryFixturator, std::convert::TryInto,
 };
-// The ops constructed by hand in this module seed the legacy per-variant action
-// structs (`fixt!(Create)`, `fixt!(Dna)`, ...) and project each to the v2
-// `Action` (header + `ActionData`) via the shared `ToV2Action` helper.
-use super::validate_op_tests::ToV2Action;
-use holochain_zome_types::dht_v2::SignedAction;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sys_validation_workflow_test() {
@@ -181,8 +178,8 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let expected_seq = 1u32;
 
     // Build ChainOps for genesis, original, and forked actions directly from
-    // the v2 signed actions (the hash carried on each `SignedActionHashed` is
-    // the same content-derived v2 identity the op hash is built from).
+    // the signed actions (the hash carried on each `SignedActionHashed` is the
+    // same content-derived identity the op hash is built from).
     let (dna_hashed, dna_sig) = signed_dna_action.into_inner();
     let prev_op = ChainOp::CreateRecord(
         SignedAction::new(dna_hashed.into_content(), dna_sig),
@@ -349,9 +346,9 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
     let action2_hash = signed_action2.as_hash().clone();
 
     // Create ChainOps for the previous action and both forked actions,
-    // directly from the v2 signed actions (the hash carried on each
-    // `SignedActionHashed` is the same content-derived v2 identity the op
-    // hash is built from).
+    // directly from the signed actions (the hash carried on each
+    // `SignedActionHashed` is the same content-derived identity the op hash is
+    // built from).
     let (dna_hashed, dna_sig) = signed_dna_action.into_inner();
     let prev_op = ChainOp::CreateRecord(
         SignedAction::new(dna_hashed.into_content(), dna_sig),
@@ -469,10 +466,9 @@ async fn run_test(
     conductors: SweetConductorBatch,
     dna_file: DnaFile,
 ) {
-    // Assert against the new `holochain_data` DHT store, which is the
-    // authoritative source for integration during the migration; the legacy
-    // `DhtOp` table is now a downstream mirror. Poll every 100 ms for up to
-    // 10 seconds, exiting early once the expected ops are integrated.
+    // Assert against the DHT store, the authoritative source for integration.
+    // Poll every 100 ms for up to 10 seconds, exiting early once the expected
+    // ops are integrated.
     let num_attempts = 100;
     let delay_per_attempt = Duration::from_millis(100);
 

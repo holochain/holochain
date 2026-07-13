@@ -1,4 +1,4 @@
-//! The `OpEntry` / `OpUpdate` / `OpDelete` for v2, see description in the [`crate::flat_op_v2`] parent module.
+//! The `OpEntry` / `OpUpdate` / `OpDelete` types; see the description in the [`crate::flat_op`] parent module.
 use super::*;
 use holochain_integrity_types::{CapClaimEntry, CapGrantEntry};
 

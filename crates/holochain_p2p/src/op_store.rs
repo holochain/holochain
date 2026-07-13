@@ -4,18 +4,16 @@
 //! All reads go through `DhtStore` methods; this module is responsible only
 //! for marshalling K2 types (`OpId`, `MetaOp`, `DhtArc`, `Timestamp`) into
 //! and out of the row shapes returned by the store. The gossip wire carries
-//! the **v2** `holochain_types::dht_v2::DhtOp` encoding: chain-op wire bytes
-//! are built directly from the stored v2 `Action` rows, with no legacy
-//! reconstruction. Op hashes and `prev_action` chains are content-derived v2
-//! (see the 1c-iii action/op hash cutover).
+//! the `holochain_types::dht_v2::DhtOp` encoding: chain-op wire bytes are
+//! built directly from the stored `Action` rows. Op hashes and `prev_action`
+//! chains are content-derived.
 //!
 //! On retrieve, op ids are built from the hash and basis bytes already stored
 //! in the database — cheaper than rehashing every op on every read, and the
-//! stored hash is the canonical v2 identity. On receive, the op id is the
-//! native v2 rehash (`DhtOp::to_hash` + `DhtOp::dht_basis`), which equals the
-//! sender's id because both sides hash the same v2 op. The incoming workflow
-//! (`DhtStore::record_incoming_ops`) consumes the v2 op directly, with no
-//! legacy reconstruction on this path.
+//! stored hash is the canonical identity. On receive, the op id is the rehash
+//! (`DhtOp::to_hash` + `DhtOp::dht_basis`), which equals the sender's id
+//! because both sides hash the same op. The incoming workflow
+//! (`DhtStore::record_incoming_ops`) consumes the op directly.
 
 use bytes::{Bytes, BytesMut};
 use futures::future::BoxFuture;
@@ -136,8 +134,8 @@ impl OpStore for HolochainOpStore {
             for op_bytes in op_list {
                 let op = decode::<_, DhtOp>(&op_bytes.op_data)
                     .map_err(|e| K2Error::other_src("Could not decode op", e))?;
-                // Native v2 rehash + basis; equals the sender's id since both
-                // sides hash the same v2 op.
+                // Rehash + basis; equals the sender's id since both sides hash
+                // the same op.
                 ids.push(op.to_hash().to_located_k2_op_id(&op.dht_basis()));
                 let require_validation_receipt =
                     crate::publish_metadata::get_require_validation_receipt_from_metadata(
@@ -217,12 +215,12 @@ impl OpStore for HolochainOpStore {
 
             for row in chain_rows {
                 // The op id comes from the stored hash + basis — both already
-                // the canonical v2 identity, so no rehash is needed on read.
+                // the canonical identity, so no rehash is needed on read.
                 let op_id = k2_op_id_from_raw(&row.op_hash, &row.basis_hash);
                 let op = match build_chain_dht_op_v2(row) {
                     Ok(op) => op,
                     Err(e) => {
-                        tracing::warn!("Failed to build v2 chain op for wire: {e}");
+                        tracing::warn!("Failed to build chain op for wire: {e}");
                         continue;
                     }
                 };
@@ -240,7 +238,7 @@ impl OpStore for HolochainOpStore {
                 let op = match build_warrant_dht_op_v2(row) {
                     Ok(op) => op,
                     Err(e) => {
-                        tracing::warn!("Failed to build v2 warrant op for wire: {e}");
+                        tracing::warn!("Failed to build warrant op for wire: {e}");
                         continue;
                     }
                 };
@@ -431,14 +429,12 @@ impl OpStore for HolochainOpStore {
     }
 }
 
-/// Reconstruct a v2 `DhtOp` from a wire row; shared with the
-/// integration-dump + consistency reads.
+/// Build a [`DhtOp::ChainOp`] directly from the joined wire row; shared with
+/// the integration-dump + consistency reads.
 ///
-/// Build a v2 [`DhtOp::ChainOp`] directly from the joined row.
-///
-/// The row already stores the v2 `ActionData` + header fields, so the op is
-/// assembled natively with no legacy detour. The op id is taken from the
-/// stored hash/basis, so this builder does not re-hash.
+/// The row already stores the `ActionData` + header fields, so the op is
+/// assembled directly. The op id is taken from the stored hash/basis, so this
+/// builder does not re-hash.
 pub fn build_chain_dht_op_v2(row: K2ChainOpForWireRow) -> Result<DhtOp, String> {
     use holo_hash::{ActionHash, AgentPubKey};
 
@@ -494,11 +490,8 @@ pub fn build_chain_dht_op_v2(row: K2ChainOpForWireRow) -> Result<DhtOp, String> 
     Ok(DhtOp::ChainOp(Box::new(chain_op)))
 }
 
-/// Reconstruct a v2 `DhtOp` from a wire row; shared with the
+/// Build a [`DhtOp::WarrantOp`] from a warrant wire row; shared with the
 /// integration-dump + consistency reads.
-///
-/// Build a v2 [`DhtOp::WarrantOp`] from the warrant row. Warrant content is
-/// unchanged by the v2 flip, so this is a straight assembly.
 pub fn build_warrant_dht_op_v2(row: K2WarrantForWireRow) -> Result<DhtOp, String> {
     use holo_hash::AgentPubKey;
 

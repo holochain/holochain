@@ -50,8 +50,8 @@ pub(crate) async fn verify_rendered_ops_batch(rendered_all: Vec<RenderedOps>) ->
 
 async fn verify_rendered_ops_signatures(rendered: &RenderedOps) -> bool {
     for op in &rendered.ops {
-        // Verify over the v2 signed action — the same v2 bytes the action was
-        // signed over.
+        // Verify over the signed action — the same bytes the action was signed
+        // over.
         let sa = &op.action;
         let action = &sa.hashed.content;
         match action
@@ -113,7 +113,7 @@ pub(crate) async fn verify_activity_signatures(
 ) -> (Vec<RegisterAgentActivity>, Vec<WarrantOp>) {
     let mut verified_activity = Vec::with_capacity(activity.len());
     for ra in activity {
-        // Verify over the v2 signed action — the same v2 bytes it was signed over.
+        // Verify over the signed action — the same bytes it was signed over.
         let action = &ra.action.hashed.content;
         let verified = action
             .signer()

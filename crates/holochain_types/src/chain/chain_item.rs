@@ -36,9 +36,8 @@ pub trait ChainItem: Clone + PartialEq + Eq + std::fmt::Debug + Send + Sync {
 /// Alias for getting the associated hash type of a ChainItem
 pub type ChainItemHash<I> = <I as ChainItem>::Hash;
 
-// `SignedActionHashed` here is the v2 `SignedHashed<Action>` (a flat
-// `ActionHeader` + `ActionData` envelope), so this impl reads the header
-// fields directly.
+// `SignedActionHashed` is a `SignedHashed<Action>` (a flat `ActionHeader` +
+// `ActionData` envelope), so this impl reads the header fields directly.
 impl ChainItem for SignedActionHashed {
     type Hash = ActionHash;
 

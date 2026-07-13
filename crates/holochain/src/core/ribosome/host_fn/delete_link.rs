@@ -49,9 +49,6 @@ pub fn delete_link<'a>(
 
             let base_address = match maybe_add_link {
                 Some(add_link_signed_action_hash) => {
-                    // The cascade returns a v2 signed action; read the
-                    // `CreateLink` data via `ActionData` rather than the
-                    // legacy `Action::CreateLink` variant match.
                     match &add_link_signed_action_hash.hashed.content.data {
                         ActionData::CreateLink(CreateLinkData { base_address, .. }) => {
                             Ok(base_address.clone())

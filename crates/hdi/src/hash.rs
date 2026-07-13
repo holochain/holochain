@@ -168,7 +168,7 @@ use crate::prelude::*;
 /// oldest live record.
 /// However there is no way to _generate_ an action hash directly from an action from inside wasm.
 /// [`Record`] values (entry+action pairs returned by [`must_get_action`] etc.) contain prehashed action structs
-/// called [`ActionHashed`](holo_hash::HoloHashed), which is composed of a [`ActionHash`] alongside the "raw" [`Action`] value. Generally the pre-hashing is
+/// called [`ActionHashed`], which is composed of a [`ActionHash`] alongside the "raw" [`Action`] value. Generally the pre-hashing is
 /// more efficient than hashing actions ad-hoc as hashing always needs to be done at the database
 /// layer, so we want to re-use that as much as possible.
 /// The action hash can be extracted from the Record as `record.action_hashed().as_hash()`.
@@ -211,9 +211,9 @@ where
 /// rolling an in-wasm solution. Any inconsistencies in serialization or hash handling will result
 /// in dangling references to things due to a "corrupt" hash.
 ///
-/// Note that usually relevant HDI functions return a [`ActionHashed`](holo_hash::HoloHashed) or [`SignedActionHashed`]
+/// Note that usually relevant HDI functions return a [`ActionHashed`] or [`SignedActionHashed`]
 /// which already has associated methods to access the [`ActionHash`] of the inner [`Action`]. In
 /// normal usage it is unlikely to be required to separately hash a [`Action`] like this.
 pub fn hash_action(input: Action) -> ExternResult<ActionHash> {
-    Ok(HoloHashed::<Action>::from_content_sync(input).into_hash())
+    Ok(ActionHashed::from_content_sync(input).into_hash())
 }

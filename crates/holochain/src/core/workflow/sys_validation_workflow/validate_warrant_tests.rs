@@ -7,6 +7,7 @@
 //!
 //! The signature verification for actions in warrants is still exercised by the valid warrant test.
 
+use super::validate_op_tests::ToV2Action;
 use super::validation_deps::SysValDeps;
 use super::validation_deps::ValidationDependencies;
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
@@ -17,10 +18,6 @@ use ::fixt::prelude::*;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
-// `sign_action` fixtures seed the legacy per-variant `Create` action struct;
-// the shared `ToV2Action` helper projects it onto the v2 `Action` that is
-// actually authored, hashed, and signed.
-use super::validate_op_tests::ToV2Action;
 use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
 use holochain_zome_types::dht_v2::Action;
 
@@ -224,7 +221,7 @@ async fn validate_chain_fork_warrant_rejected_seq_mismatch() {
     let (action1, action2, _) = test_case.create_forking_actions().await;
 
     // Create a warrant with a mismatched seq (actions have seq=5, warrant declares seq=99)
-    let chain_author = action1.hashed.content.author().clone();
+    let chain_author = action1.action().author().clone();
     let warrant_op = test_case
         .create_chain_fork_warrant_with_seq(&action1, &action2, chain_author, 99)
         .await;
@@ -571,9 +568,6 @@ impl ChainForkWarrantTestCase {
         action: &SignedActionHashed,
         reason: &str,
     ) -> DhtOpHashed {
-        // `make_invalid_chain_warrant_op` is v2-native, unlike the legacy
-        // `ChainOp` this module otherwise builds (see the other
-        // `ChainOp::RegisterAgentActivity` call sites in this file).
         let chain_op = holochain_types::dht_v2::ChainOp::AgentActivity(
             holochain_zome_types::dht_v2::SignedAction::new(
                 action.action().clone(),
@@ -599,7 +593,7 @@ impl ChainForkWarrantTestCase {
     ) -> holochain_types::warrant::WarrantOp {
         use holochain_zome_types::warrant::{ChainIntegrityWarrant, Warrant, WarrantProof};
 
-        let action_author = action.hashed.content.author().clone();
+        let action_author = action.action().author().clone();
         let warrant = Warrant::new(
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: action_author.clone(),
@@ -623,7 +617,7 @@ impl ChainForkWarrantTestCase {
         action1: &SignedActionHashed,
         action2: &SignedActionHashed,
     ) -> holochain_types::warrant::WarrantOp {
-        let chain_author = action1.hashed.content.author().clone();
+        let chain_author = action1.action().author().clone();
         self.create_chain_fork_warrant_with_chain_author(action1, action2, chain_author)
             .await
     }
@@ -635,7 +629,7 @@ impl ChainForkWarrantTestCase {
         action2: &SignedActionHashed,
         chain_author: AgentPubKey,
     ) -> holochain_types::warrant::WarrantOp {
-        let seq = action1.hashed.content.action_seq();
+        let seq = action1.action().action_seq();
         self.create_chain_fork_warrant_with_seq(action1, action2, chain_author, seq)
             .await
     }
@@ -688,10 +682,9 @@ impl ChainForkWarrantTestCase {
         warrant_op: holochain_types::warrant::WarrantOp,
     ) -> WorkflowResult<Outcome> {
         let dna_hash = DnaDefHashed::from_content_sync(self.dna_def.clone()).hash;
-        // `holochain_types::warrant::WarrantOp` is the legacy, richer
-        // warrant-processing type this module builds throughout; `validate_op`
-        // is v2-native, so project via the shared `SignedWarrant` (warrant
-        // hashing/signing is unchanged by the v2 flip — see `DhtOp::to_hash`).
+        // `validate_op` takes a `DhtOp`; project the
+        // `holochain_types::warrant::WarrantOp` this module builds through the
+        // shared `SignedWarrant` to get one.
         let signed_warrant: holochain_zome_types::warrant::SignedWarrant = (*warrant_op).clone();
         let op = holochain_types::dht_v2::DhtOp::from(signed_warrant);
 

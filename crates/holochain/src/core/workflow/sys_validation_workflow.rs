@@ -114,11 +114,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
-// The op pipeline is v2-native: `ChainOp`/`DhtOp`/`DhtOpHashed`/`OpEntry`
-// shadow the legacy re-exports pulled in via `holochain_state::prelude::*`.
-// The couple of sites that build a fresh warrant `DhtOp` from scratch
-// (`make_invalid_chain_warrant_op`, `make_fork_warrant_op_inner`) return the
-// legacy `DhtOpHashed` explicitly, fully-qualified.
 use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use holochain_zome_types::dht_v2::{
     build_action_set, ActionData, CreateLinkData, DeleteData, DeleteLinkData, UpdateData,
@@ -820,7 +815,7 @@ fn get_dependencies_from_ops(
                 DhtOp::ChainOp(op) => {
                     let action = op.signed_action().data();
                     let chain_op_dependencies = match &**op {
-                        // `CreateRecord`/`CreateEntry` share the same v2 action, so
+                        // `CreateRecord`/`CreateEntry` share the same action, so
                         // the countersigning-set and Update-reference checks apply
                         // identically to both.
                         ChainOp::CreateRecord(_, op_entry) | ChainOp::CreateEntry(_, op_entry) => {
@@ -957,11 +952,11 @@ fn make_action_set_for_session_data(
         .collect())
 }
 
-/// The op's action does not match the per-variant data its `ChainOp` variant
-/// requires (e.g. an `UpdateEntry` op wrapping a `Create` action). The v2 flat
-/// `Action` inside `SignedAction` carries no structural guarantee that the
-/// action shape fits the op type, so this check catches a same-shaped swap
-/// between two entry-bearing variants (Create vs. Update) or a mismatch on a
+/// The op's action does not match the data its `ChainOp` variant requires
+/// (e.g. an `UpdateEntry` op wrapping a `Create` action). The flat `Action`
+/// inside `SignedAction` carries no structural guarantee that the action shape
+/// fits the op type, so this check catches a same-shaped swap between two
+/// entry-bearing variants (Create vs. Update) or a mismatch on a
 /// non-entry-bearing op (AgentActivity/Delete*/*Link), which `check_entry_visibility`
 /// does not.
 fn malformed(op: &ChainOp, action: &Action) -> SysValidationError {
@@ -1080,21 +1075,21 @@ async fn validate_chain_op(
     }
 }
 
-/// Verify `sig` against the v2 action content already carried by
-/// `signed_action` — the same v2 bytes it was signed over. Used by the warrant
-/// checks below, which hold their dependency actions in v2 form and so verify
-/// directly rather than going through [`verify_action_signature`] (which takes
-/// the legacy per-variant shape).
-async fn verify_v2_action_signature(
+/// Verify `sig` against the action content already carried by `signed_action`
+/// — the same bytes it was signed over. Used by the warrant checks below, which
+/// hold their dependency actions as `SignedActionHashed` and so verify directly
+/// rather than going through [`verify_action_signature`] (which takes a bare
+/// `Action`).
+async fn verify_signed_action_signature(
     sig: &Signature,
     signed_action: &SignedActionHashed,
 ) -> SysValidationResult<()> {
-    let v2_action = &signed_action.hashed.content;
-    if v2_action.signer().verify_signature(sig, v2_action).await? {
+    let action = &signed_action.hashed.content;
+    if action.signer().verify_signature(sig, action).await? {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::CounterfeitAction(sig.clone(), Box::new(v2_action.clone())),
+            ValidationOutcome::CounterfeitAction(sig.clone(), Box::new(action.clone())),
         ))
     }
 }
@@ -1137,7 +1132,7 @@ async fn validate_warrant_op(
                     }
                     (signed_action.clone(), validation_status)
                 };
-                verify_v2_action_signature(action_sig, &action).await?;
+                verify_signed_action_signature(action_sig, &action).await?;
 
                 match validation_status {
                     ValidationStatus::Valid => {
@@ -1231,8 +1226,8 @@ async fn validate_warrant_op(
                     (signed_action1.clone(), signed_action2.clone())
                 };
 
-                verify_v2_action_signature(a1_sig, &action1).await?;
-                verify_v2_action_signature(a2_sig, &action2).await?;
+                verify_signed_action_signature(a1_sig, &action1).await?;
+                verify_signed_action_signature(a2_sig, &action2).await?;
 
                 Ok(())
             }
@@ -1241,9 +1236,9 @@ async fn validate_warrant_op(
 }
 
 /// Verify a freshly authored record's signature, checked directly against its
-/// v2 action content, before running [`sys_validate_record`] on it.
+/// action content, before running [`sys_validate_record`] on it.
 pub async fn counterfeit_check_authored_record(record: &Record) -> SysValidationOutcome<()> {
-    match verify_v2_action_signature(record.signature(), record.signed_action()).await {
+    match verify_signed_action_signature(record.signature(), record.signed_action()).await {
         Ok(()) => Ok(()),
         Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
             validation_outcome.into_outcome()
@@ -1260,10 +1255,8 @@ pub async fn counterfeit_check_authored_record(record: &Record) -> SysValidation
 /// it is intended to be used for validation of records which have been authored locally so we should always be able to check the previous action.
 ///
 /// The caller must already have verified the record's signature (e.g. via
-/// [`counterfeit_check_authored_record`]). This function reconstructs a legacy
-/// action internally for the structural checks that still need the legacy
-/// per-variant shape (countersigning weight); that reconstruction never touches
-/// the signature.
+/// [`counterfeit_check_authored_record`]); this function validates structure and
+/// dependencies only and does not check the signature.
 pub async fn sys_validate_record(
     record: &Record,
     cascade: Arc<impl Cascade + Send + Sync>,
@@ -1339,17 +1332,13 @@ async fn sys_validate_record_inner(
 
 /// Check if the chain op has valid signature and author.
 /// Ops that fail this check should be dropped.
-///
-/// Takes the v2 action directly — the op pipeline carries v2 actions
-/// end-to-end, so this hashes `action` and checks `signature` over it via the
-/// same verification the rest of sys validation uses for v2 actions.
 pub async fn counterfeit_check_action(
     signature: &Signature,
     action: &Action,
 ) -> SysValidationResult<()> {
     let hashed = holo_hash::HoloHashed::from_content_sync(action.clone());
     let signed_action = SignedActionHashed::with_presigned(hashed, signature.clone());
-    verify_v2_action_signature(signature, &signed_action).await
+    verify_signed_action_signature(signature, &signed_action).await
 }
 
 /// Check if the warrant op has valid signature and author.

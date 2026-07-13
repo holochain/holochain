@@ -86,9 +86,7 @@ pub(crate) fn get_original_entry_data(
             .transpose()?;
 
         match maybe_original_record {
-            // The cascade returns a v2 signed action; read its entry data
-            // via the v2 accessor rather than the legacy-only `ActionHashed`
-            // pattern (which only matches the legacy action shape).
+            // Read the entry hash and type from the action's entry data.
             Some(signed_action_hashed) => {
                 match signed_action_hashed.hashed.content.into_entry_data() {
                     Some((entry_hash, entry_type)) => Ok((entry_hash, entry_type)),

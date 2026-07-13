@@ -158,8 +158,8 @@ mod tests {
         Action, ActionData, ActionHeader, CreateData,
     };
 
-    /// Project a fixturated legacy `Create` struct into a v2 `Action`.
-    fn v2_create(c: Create) -> Action {
+    /// Build an `Action` from a fixturated `Create`.
+    fn action_from_create(c: Create) -> Action {
         Action {
             header: ActionHeader {
                 author: c.author,
@@ -190,7 +190,7 @@ mod tests {
         let mut create = fixt!(Create);
         // Set author to the cell's agent to keep data coherent.
         create.author = alice_cell.agent_pubkey().clone();
-        let create_action = v2_create(create.clone());
+        let create_action = action_from_create(create.clone());
         let create_entry = fixt!(Entry);
         let create_entry_hash = create_action.entry_hash().unwrap().clone();
 

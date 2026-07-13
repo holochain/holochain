@@ -37,8 +37,6 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
-// The countersigning publish handler is v2-native; shadow the legacy
-// `ChainOp` re-export pulled in via `holochain_state::prelude::*`.
 use holochain_types::dht_v2::ChainOp;
 use kitsune2_api::BoxFut;
 use std::hash::Hash;

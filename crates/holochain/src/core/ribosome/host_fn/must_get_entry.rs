@@ -125,8 +125,8 @@ pub mod test {
 
     test_entry_impl!(Something);
 
-    /// Project a fixturated legacy `Create` struct into a v2 `Action`.
-    fn v2_create(c: Create) -> Action {
+    /// Build an `Action` from a fixturated `Create`.
+    fn action_from_create(c: Create) -> Action {
         Action {
             header: ActionHeader {
                 author: c.author,
@@ -156,13 +156,13 @@ pub mod test {
         // initially Accepted. Crucially this is `locally_validated = false`, so
         // it can later be transitioned to Rejected — `reject_chain_ops` only
         // transitions network-cached ops, never an agent's own authored,
-        // locally-validated ops. The action's weight is defaulted so it survives
-        // the v2 round-trip identically (the v2 model drops weight).
+        // locally-validated ops. The action's weight is defaulted; it is not
+        // carried by the `Action` model.
         let entry = Entry::try_from(Something(vec![1, 2, 3])).unwrap();
         let mut create = fixt!(Create);
         create.weight = Default::default();
         let entry_hash = create.entry_hash.clone();
-        let action = v2_create(create);
+        let action = action_from_create(create);
         let action_hash = action.to_hash();
 
         let rendered = holochain_types::wire_ops::RenderedOp::new(

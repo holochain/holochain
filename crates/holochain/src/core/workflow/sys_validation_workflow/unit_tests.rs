@@ -1,4 +1,5 @@
 use super::sys_validation_workflow;
+use super::validate_op_tests::ToV2Action;
 use super::validation_deps::SysValDeps;
 use super::SysValidationWorkspace;
 use crate::conductor::space::TestSpace;
@@ -28,16 +29,12 @@ use holochain_types::record::WireRecordOps;
 use holochain_types::wire_ops::WireOps;
 use holochain_zome_types::action::AppEntryDef;
 use holochain_zome_types::action::EntryType;
+use holochain_zome_types::dht_v2::Action;
 use holochain_zome_types::dna_def::{DnaDef, DnaDefHashed};
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::judged::Judged;
 use holochain_zome_types::record::SignedActionHashed;
 use holochain_zome_types::timestamp::Timestamp;
-// The fixturators (`fixt!(Create)`, ...) seed the legacy per-variant action
-// structs; the shared `ToV2Action` helper projects each onto the flat v2
-// `ActionHeader` + `ActionData` envelope that is authored, hashed, and signed.
-use super::validate_op_tests::ToV2Action;
-use holochain_zome_types::dht_v2::Action;
 use std::collections::HashSet;
 use std::sync::Arc;
 use {
@@ -106,8 +103,8 @@ async fn validate_op_with_dependency_held_in_dht_store() {
 
     // Op to validate, to go in the dht database
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.hashed.content.author().clone();
-    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
+    create_action.author = previous_action.action().author().clone();
+    create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -153,8 +150,8 @@ async fn validate_op_with_dependency_not_held() {
 
     // Op to validate, to go in the dht database
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.hashed.content.author().clone();
-    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
+    create_action.author = previous_action.action().author().clone();
+    create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -171,7 +168,7 @@ async fn validate_op_with_dependency_not_held() {
     let mut ops: WireRecordOps = WireRecordOps::new();
     ops.action = Some(Judged::valid(
         holochain_zome_types::dht_v2::SignedAction::new(
-            previous_action.hashed.content.clone(),
+            previous_action.action().clone(),
             previous_action.signature.clone(),
         ),
     ));
@@ -218,8 +215,8 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
 
     // Op to validate, to go in the dht database
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.hashed.content.author().clone();
-    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
+    create_action.author = previous_action.action().author().clone();
+    create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -282,8 +279,8 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
 
     // Op to validate, to go in the dht database
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.hashed.content.author().clone();
-    create_action.action_seq = previous_action.hashed.content.action_seq() + 31;
+    create_action.author = previous_action.action().author().clone();
+    create_action.action_seq = previous_action.action().action_seq() + 31;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -418,7 +415,7 @@ async fn validate_valid_warrant_with_fetched_dependency() {
             let mut ops: WireRecordOps = WireRecordOps::new();
             ops.action = Some(Judged::valid(
                 holochain_zome_types::dht_v2::SignedAction::new(
-                    warranted_action.hashed.content.clone(),
+                    warranted_action.action().clone(),
                     warranted_action.signature.clone(),
                 ),
             ));
@@ -889,7 +886,7 @@ impl TestCase {
             holochain_zome_types::prelude::Warrant::new(
                 holochain_zome_types::prelude::WarrantProof::ChainIntegrity(
                     holochain_zome_types::prelude::ChainIntegrityWarrant::InvalidChainOp {
-                        action_author: warranted_action.hashed.content.author().clone(),
+                        action_author: warranted_action.action().author().clone(),
                         action: (
                             warranted_action.as_hash().clone(),
                             warranted_action.signature.clone(),
@@ -900,7 +897,7 @@ impl TestCase {
                 ),
                 issuing_agent.clone(),
                 Timestamp::now(),
-                warranted_action.hashed.content.author().clone(),
+                warranted_action.action().author().clone(),
             ),
         )
         .await

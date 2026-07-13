@@ -76,10 +76,9 @@ fn new_entry_record(entry: Entry, action_type: ActionType, index: usize) -> Reco
     }
 }
 
-/// Project a legacy [`NewEntryAction`] (a `Create` or `Update` struct) onto the
-/// v2 [`Action`] shape, building [`ActionData`] directly. Seeds fixtures only;
-/// production authoring builds v2 actions natively.
-fn new_entry_action_to_v2(new_entry_action: NewEntryAction) -> Action {
+/// Build an [`Action`] from a [`NewEntryAction`] (a `Create` or `Update`
+/// struct), constructing [`ActionData`] directly. Seeds fixtures only.
+fn action_from_new_entry_action(new_entry_action: NewEntryAction) -> Action {
     use holochain_zome_types::dht_v2::{ActionHeader, CreateData, UpdateData};
     match new_entry_action {
         NewEntryAction::Create(c) => Action {
@@ -121,7 +120,7 @@ fixturator!(
     vanilla fn record_with_no_entry(Signature, Action);
     curve NewEntryAction {
         let s = SignatureFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        record_with_no_entry(s, new_entry_action_to_v2(get_fixt_curve!()))
+        record_with_no_entry(s, action_from_new_entry_action(get_fixt_curve!()))
     };
     curve Entry {
         let et = match get_fixt_curve!() {

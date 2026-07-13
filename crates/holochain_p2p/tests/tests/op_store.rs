@@ -59,7 +59,7 @@ impl HcP2pHandler for StubHost {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let store = self.store.clone();
         Box::pin(async move {
-            // The op pipeline is v2-native; hash the wire op directly.
+            // Hash the wire op directly.
             let hashed: Vec<(holochain_types::dht_v2::DhtOpHashed, bool)> = ops
                 .into_iter()
                 .map(|(op, require_receipt)| {
@@ -154,11 +154,10 @@ impl HcP2pHandler for StubHost {
     }
 }
 
-/// Build a v2 `StoreRecord` op, as it travels on the gossip wire.
+/// Build a `StoreRecord` op, as it travels on the gossip wire.
 fn test_dht_op(authored_timestamp: Timestamp) -> holochain_types::dht_v2::DhtOp {
     use holochain_types::dht_v2::{
-        Action, ActionData, ActionHeader, ChainOp as V2ChainOp, CreateData, DhtOp as V2DhtOp,
-        OpEntry, SignedAction,
+        Action, ActionData, ActionHeader, CreateData, OpEntry, SignedAction,
     };
 
     let mut create = fixt!(Create);
@@ -176,13 +175,13 @@ fn test_dht_op(authored_timestamp: Timestamp) -> holochain_types::dht_v2::DhtOp 
         }),
     };
     let signed = SignedAction::new(action, fixt!(Signature));
-    V2DhtOp::ChainOp(Box::new(V2ChainOp::CreateRecord(
+    DhtOp::ChainOp(Box::new(ChainOp::CreateRecord(
         signed,
         OpEntry::Present(fixt!(Entry)),
     )))
 }
 
-/// The `serialized_size` the store records for an op: the v2 wire op's own
+/// The `serialized_size` the store records for an op: the wire op's own
 /// encoded length (used only for gossip budgeting).
 fn stored_size(op: &holochain_types::dht_v2::DhtOp) -> usize {
     holochain_serialized_bytes::encode(op).unwrap().len()

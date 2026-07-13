@@ -3,10 +3,6 @@
 use crate::{core::ribosome::guest_callback::validate::ValidateResult, sweettest::*};
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
-// `Op`/`StoreRecord`/.../`RegisterDeleteLink` and `ActionType` otherwise
-// resolve to the legacy per-variant shapes via `holochain_types::prelude::*`;
-// this inline zome's `validate` callback decodes the v2 `Op` the ribosome
-// actually dispatches, so these names are pinned to the v2 forms explicitly.
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
     ActionType, Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
     RegisterUpdate, StoreEntry, StoreRecord,
@@ -77,9 +73,9 @@ impl ActionLocation {
         let action = action.into();
         Self {
             agent: agents.get(action.author()).unwrap(),
-            // v2 `ActionType` has no `Display` impl (only `Debug`); its
-            // fieldless variants render identically either way (e.g. "Dna",
-            // "Create"), so `Debug` formatting is an exact stand-in here.
+            // `ActionType` has no `Display` impl (only `Debug`); its fieldless
+            // variants render identically either way (e.g. "Dna", "Create"), so
+            // `Debug` formatting is an exact stand-in here.
             action_type: format!("{:?}", action.action_type()),
             seq: action.action_seq(),
         }

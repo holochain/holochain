@@ -1,100 +1,95 @@
-//! The `OpRecord` for v2, see description in the [`crate::flat_op_v2`] parent module.
+//! The `OpActivity` type; see the description in the [`crate::flat_op`] parent module.
 use super::*;
 use holochain_integrity_types::MigrationTarget;
 
-/// Data specific to the [`Op::StoreRecord`](holochain_integrity_types::dht_v2::op::Op::StoreRecord)
+/// Data specific to the
+/// [`Op::RegisterAgentActivity`](holochain_integrity_types::dht_v2::op::Op::RegisterAgentActivity)
 /// operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OpRecord<ET: UnitEnum, LT> {
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for an app
-    /// defined entry type.
+pub enum OpActivity<UnitType, LT> {
+    /// This operation registers the Action for an
+    /// app defined entry type to the author's chain.
     CreateEntry {
-        /// The app defined entry type with the deserialized
-        /// [`Entry`](holochain_integrity_types::entry::Entry) data.
-        app_entry: ET,
+        /// The unit version of the app defined entry type. If this is [`None`] then the entry type
+        /// is defined in a different zome.
+        app_entry_type: Option<UnitType>,
         /// The Create action that creates the entry
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for an app
-    /// defined private entry type.
+    /// This operation registers the Action for an
+    /// app defined private entry type to the author's chain.
     CreatePrivateEntry {
-        /// The unit version of the app defined entry type. Note it is not possible to deserialize
-        /// the full entry type here because we don't have the
-        /// [`Entry`](holochain_integrity_types::entry::Entry) data.
-        app_entry_type: <ET as UnitEnum>::Unit,
+        /// The unit version of the app defined entry type. If this is [`None`] then the entry type
+        /// is defined in a different zome.
+        app_entry_type: Option<UnitType>,
         /// The Create action that creates the entry
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for an
-    /// [`AgentPubKey`] that has been created.
+    /// This operation registers the Action for an
+    /// [`AgentPubKey`] to the author's chain.
     CreateAgent {
         /// The agent that was created
         agent: AgentPubKey,
         /// The Create action that creates the entry
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for a
-    /// Capability Claim that has been created.
+    /// This operation registers the Action for a
+    /// Capability Claim to the author's chain.
     CreateCapClaim {
         /// The Create action that creates the
         /// [`CapClaim`](holochain_integrity_types::action::EntryType::CapClaim)
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for a
-    /// Capability Grant that has been created.
+    /// This operation registers the Action for a
+    /// Capability Grant to the author's chain.
     CreateCapGrant {
         /// The Create action that creates the
         /// [`CapGrant`](holochain_integrity_types::action::EntryType::CapGrant)
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for an
-    /// updated app defined entry type.
+    /// This operation registers the Action for an
+    /// updated app defined entry type to the author's chain.
     UpdateEntry {
-        /// The hash of the [`Action`](holochain_integrity_types::dht_v2::Action) that created the
-        /// original entry
+        /// The hash of the Action that created the original entry
         original_action_hash: ActionHash,
         /// The hash of the original entry
         original_entry_hash: EntryHash,
-        /// The app defined entry type with the deserialized
-        /// [`Entry`](holochain_integrity_types::entry::Entry) data from the new entry. Note the
-        /// new entry type is always the same as the original entry type however the data may have
-        /// changed.
-        app_entry: ET,
+        /// The unit version of the app defined entry type. If this is [`None`] then the entry type
+        /// is defined in a different zome.
+        app_entry_type: Option<UnitType>,
         /// The Update action that updates the entry
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for an
-    /// updated app defined private entry type.
+    /// This operation registers the Action for an
+    /// updated app defined private entry type to the author's chain.
     UpdatePrivateEntry {
-        /// The hash of the [`Action`](holochain_integrity_types::dht_v2::Action) that created the
-        /// original entry
+        /// The hash of the Action that created the original entry
         original_action_hash: ActionHash,
         /// The hash of the original entry
         original_entry_hash: EntryHash,
-        /// The unit version of the app defined entry type. Note the new entry type is always the
-        /// same as the original entry type however the data may have changed.
-        app_entry_type: <ET as UnitEnum>::Unit,
+        /// The unit version of the app defined entry type.
+        /// If this is [`None`] then the entry type is defined in a different zome.
+        app_entry_type: Option<UnitType>,
         /// The Update action that updates the entry
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for an
-    /// updated [`AgentPubKey`].
+    /// This operation registers the Action for an
+    /// updated [`AgentPubKey`] to the author's chain.
     UpdateAgent {
-        /// The original [`AgentPubKey`].
-        original_key: AgentPubKey,
         /// The new [`AgentPubKey`].
         new_key: AgentPubKey,
-        /// The hash of the [`Action`](holochain_integrity_types::dht_v2::Action) that created the
-        /// original key
+        /// The original [`AgentPubKey`].
+        original_key: AgentPubKey,
+        /// The hash of the Action that created the original entry
         original_action_hash: ActionHash,
-        /// The Update action that updates the entry
+        /// The Update action that updates the agent's key
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for an
-    /// updated Capability Claim.
+    /// This operation registers the Action for an
+    /// updated Capability Claim to the author's chain.
     UpdateCapClaim {
-        /// The hash of the [`Action`](holochain_integrity_types::dht_v2::Action) that created the
-        /// original [`CapClaim`](holochain_integrity_types::action::EntryType::CapClaim)
+        /// The hash of the Action that created the original
+        /// [`CapClaim`](holochain_integrity_types::action::EntryType::CapClaim)
         original_action_hash: ActionHash,
         /// The hash of the original
         /// [`CapClaim`](holochain_integrity_types::action::EntryType::CapClaim)
@@ -103,11 +98,11 @@ pub enum OpRecord<ET: UnitEnum, LT> {
         /// [`CapClaim`](holochain_integrity_types::action::EntryType::CapClaim)
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for an
-    /// updated Capability Grant.
+    /// This operation registers the Action for an
+    /// updated Capability Grant to the author's chain.
     UpdateCapGrant {
-        /// The hash of the [`Action`](holochain_integrity_types::dht_v2::Action) that created the
-        /// original [`CapGrant`](holochain_integrity_types::action::EntryType::CapGrant)
+        /// The hash of the Action that created the original
+        /// [`CapGrant`](holochain_integrity_types::action::EntryType::CapGrant)
         original_action_hash: ActionHash,
         /// The hash of the original
         /// [`CapGrant`](holochain_integrity_types::action::EntryType::CapGrant)
@@ -116,19 +111,18 @@ pub enum OpRecord<ET: UnitEnum, LT> {
         /// [`CapGrant`](holochain_integrity_types::action::EntryType::CapGrant)
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for a
-    /// deleted app defined entry type.
+    /// This operation registers the Action for a
+    /// deleted app defined entry type to the author's chain.
     DeleteEntry {
-        /// The hash of the [`Action`](holochain_integrity_types::dht_v2::Action) that created the
-        /// original entry
+        /// The hash of the Action that created the original entry
         original_action_hash: ActionHash,
         /// The hash of the original entry
         original_entry_hash: EntryHash,
-        /// The Delete action that deletes the original entry
+        /// The action that deletes the original entry
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for a new
-    /// link.
+    /// This operation registers the Action for a
+    /// new link to the author's chain.
     CreateLink {
         /// The base address of the link.
         base_address: AnyLinkableHash,
@@ -137,15 +131,16 @@ pub enum OpRecord<ET: UnitEnum, LT> {
         /// The link's tag.
         tag: LinkTag,
         /// The app defined link type of this link.
-        link_type: LT,
-        /// The CreateLink action that creates this link
+        /// If this is [`None`] then the link type is defined in a different zome.
+        link_type: Option<LT>,
+        /// The action that creates this link
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for a
-    /// deleted link and contains the original link's
-    /// [`Action`](holochain_integrity_types::dht_v2::Action) hash.
+    /// This operation registers the Action for a
+    /// deleted link to the author's chain and contains the original link's
+    /// Action hash.
     DeleteLink {
-        /// The deleted links CreateLink [`Action`](holochain_integrity_types::dht_v2::Action).
+        /// The deleted link's CreateLink Action.
         original_action_hash: ActionHash,
         /// The base address where this link is stored.
         /// This is the base address of the link that is being deleted.
@@ -153,52 +148,53 @@ pub enum OpRecord<ET: UnitEnum, LT> {
         /// The DeleteLink action that deletes the link
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for an
-    /// [`Action::Dna`](holochain_integrity_types::dht_v2::ActionData::Dna).
+    /// This operation registers the Action for an
+    /// [`Action::Dna`](holochain_integrity_types::dht_v2::ActionData::Dna) to the author's chain.
     Dna {
         /// The hash of the DNA
         dna_hash: DnaHash,
         /// The Dna action
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for an
-    /// [`Action::OpenChain`](holochain_integrity_types::dht_v2::ActionData::OpenChain) and contains
-    /// the previous chains's [`MigrationTarget`].
+    /// This operation registers the Action for an
+    /// [`Action::OpenChain`](holochain_integrity_types::dht_v2::ActionData::OpenChain) to the author's
+    /// chain and contains the previous chain's [`MigrationTarget`].
     OpenChain {
-        /// Specifier for the previous chain that we are migrating from
+        /// Target for the previous chain that we are migrating from
         previous_target: MigrationTarget,
-        /// The hash of the corresponding CloseChain action.
+        /// Hash of the corresponding CloseChain.
         close_hash: ActionHash,
         /// The OpenChain action
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for an
-    /// [`Action::CloseChain`](holochain_integrity_types::dht_v2::ActionData::CloseChain) and contains
-    /// the new chains's [`MigrationTarget`], if applicable.
+    /// This operation registers the Action for an
+    /// [`Action::CloseChain`](holochain_integrity_types::dht_v2::ActionData::CloseChain) to the
+    /// author's chain and contains the new chain's [`MigrationTarget`] if applicable.
     CloseChain {
-        /// Specifier for the new chain that we are migrating to
+        /// Target for the new chain that we are migrating to
         new_target: Option<MigrationTarget>,
         /// The CloseChain action
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for an
+    /// This operation registers the Action for an
     /// [`Action::AgentValidationPkg`](holochain_integrity_types::dht_v2::ActionData::AgentValidationPkg)
-    /// and contains the membrane proof if there is one.
+    /// to the author's chain and contains the membrane proof if there is one.
     AgentValidationPkg {
         /// The membrane proof proving that the agent is allowed to participate in this DNA
         membrane_proof: Option<MembraneProof>,
         /// The AgentValidationPkg action
         action: Action,
     },
-    /// This operation stores the [`Record`](holochain_integrity_types::dht_v2::Record) for an
-    /// [`Action::InitZomesComplete`](holochain_integrity_types::dht_v2::ActionData::InitZomesComplete).
+    /// This operation registers the Action for an
+    /// [`Action::InitZomesComplete`](holochain_integrity_types::dht_v2::ActionData::InitZomesComplete)
+    /// to the author's chain.
     InitZomesComplete {
         /// The InitZomesComplete action
         action: Action,
     },
 }
 
-impl<ET: UnitEnum, LT> OpRecord<ET, LT> {
+impl<UnitType, LT> OpActivity<UnitType, LT> {
     /// DRY constructor. `action.data` must be
     /// [`ActionData::OpenChain`](holochain_integrity_types::dht_v2::ActionData::OpenChain).
     pub(crate) fn open_chain(action: Action) -> Self {
@@ -206,7 +202,7 @@ impl<ET: UnitEnum, LT> OpRecord<ET, LT> {
             holochain_integrity_types::dht_v2::ActionData::OpenChain(d) => {
                 (d.prev_target.clone(), d.close_hash.clone())
             }
-            other => unreachable!("OpRecord::open_chain requires OpenChain data, got {other:?}"),
+            other => unreachable!("OpActivity::open_chain requires OpenChain data, got {other:?}"),
         };
         Self::OpenChain {
             previous_target,
@@ -220,7 +216,9 @@ impl<ET: UnitEnum, LT> OpRecord<ET, LT> {
     pub(crate) fn close_chain(action: Action) -> Self {
         let new_target = match &action.data {
             holochain_integrity_types::dht_v2::ActionData::CloseChain(d) => d.new_target.clone(),
-            other => unreachable!("OpRecord::close_chain requires CloseChain data, got {other:?}"),
+            other => {
+                unreachable!("OpActivity::close_chain requires CloseChain data, got {other:?}")
+            }
         };
         Self::CloseChain { new_target, action }
     }
@@ -254,9 +252,9 @@ mod tests {
             prev_target: target.clone(),
             close_hash: close.clone(),
         }));
-        let op = OpRecord::<(), ()>::open_chain(action);
+        let op = OpActivity::<(), ()>::open_chain(action);
         match op {
-            OpRecord::OpenChain {
+            OpActivity::OpenChain {
                 previous_target,
                 close_hash,
                 ..
@@ -270,13 +268,10 @@ mod tests {
 
     #[test]
     fn close_chain_constructor_extracts_target() {
-        let target = MigrationTarget::Dna(DnaHash::from_raw_36(vec![7u8; 36]));
-        let action = action_from_data(ActionData::CloseChain(CloseChainData {
-            new_target: Some(target.clone()),
-        }));
-        let op = OpRecord::<(), ()>::close_chain(action);
+        let action = action_from_data(ActionData::CloseChain(CloseChainData { new_target: None }));
+        let op = OpActivity::<(), ()>::close_chain(action);
         match op {
-            OpRecord::CloseChain { new_target, .. } => assert_eq!(new_target, Some(target)),
+            OpActivity::CloseChain { new_target, .. } => assert_eq!(new_target, None),
             _ => panic!("expected CloseChain"),
         }
     }

@@ -46,13 +46,13 @@ impl WireOps {
 
 /// The data rendered from a wire op to place in the database.
 ///
-/// Wraps a [`HashedChainOp`] (the v2 op with all hashes, basis, and storage
+/// Wraps a [`HashedChainOp`] (the op with all hashes, basis, and storage
 /// location pre-computed) alongside the served record-level validation status.
 /// Dereferences to the wrapped [`HashedChainOp`] so callers can read its op
 /// hash, signed action, op type, and basis directly.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RenderedOp {
-    /// The v2 op with its pre-computed hashes and basis.
+    /// The op with its pre-computed hashes and basis.
     pub op: HashedChainOp,
     /// The validation status served for this op.
     pub validation_status: Option<ValidationStatus>,
@@ -67,7 +67,7 @@ impl std::ops::Deref for RenderedOp {
 }
 
 impl RenderedOp {
-    /// Create a new rendered op from a wire's v2 action.
+    /// Create a new rendered op from a wire's action.
     ///
     /// Computes the op hash, DHT basis, and storage location from the action.
     /// The entry (if any) is carried separately on the parent [`RenderedOps`],

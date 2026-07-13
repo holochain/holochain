@@ -1,5 +1,4 @@
-//! The v2 [`Record`] type (transitional `dht_v2` location; promoted to the
-//! canonical `record` module in the legacy-deletion phase).
+//! The [`Record`] type.
 
 use super::Action;
 use crate::entry_def::EntryVisibility;
@@ -9,10 +8,10 @@ use crate::Entry;
 use holo_hash::{ActionHash, HoloHashed};
 use holochain_serialized_bytes::prelude::*;
 
-/// A chain record: a signed v2 action plus its entry, if the action has one.
+/// A chain record: a signed action plus its entry, if the action has one.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct Record {
-    /// The signed, hashed v2 action for this record.
+    /// The signed, hashed action for this record.
     pub signed_action: SignedHashed<Action>,
     /// The entry associated with the action, or why it is absent.
     pub entry: RecordEntry<Entry>,
@@ -27,7 +26,7 @@ impl Record {
         }
     }
 
-    /// The v2 action content.
+    /// The action content.
     pub fn action(&self) -> &Action {
         &self.signed_action.hashed.content
     }

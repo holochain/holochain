@@ -221,12 +221,11 @@ fn merge_activity_responses(
 }
 
 /// Sequence-number/hash pair used to sort and detect forks in a chain of
-/// activity items, whether those items are full v2 [`Record`]s or bare
+/// activity items, whether those items are full [`Record`]s or bare
 /// `(u32, ActionHash)` pairs.
 ///
-/// A local trait rather than `holochain_types::prelude::ActionSequenceAndHash`
-/// because that trait is implemented for the legacy `Record`, not the v2
-/// `Record` this crate reads from the `DhtStore`.
+/// A local trait so it can be implemented for both the `Record` this crate
+/// reads from the `DhtStore` and the bare `(u32, ActionHash)` pair.
 pub(crate) trait ChainSequenceAndHash {
     fn action_seq(&self) -> u32;
     fn address(&self) -> &ActionHash;

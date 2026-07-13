@@ -136,8 +136,8 @@ pub trait ActionRefMut {
     fn timestamp_mut(&mut self) -> &mut Timestamp;
 }
 
-// `Action` here is the v2 `ActionHeader` + `ActionData` struct, so every
-// header field is a direct projection; only entry data is per-variant.
+// `Action` is an `ActionHeader` + `ActionData` struct, so every header field is
+// a direct projection; only entry data is per-variant.
 impl ActionRefMut for Action {
     /// returns a mutable reference to the author
     fn author_mut(&mut self) -> &mut AgentPubKey {

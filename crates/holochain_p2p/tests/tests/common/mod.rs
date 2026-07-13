@@ -2,12 +2,8 @@ use ::fixt::fixt;
 use holo_hash::fixt::ActionHashFixturator;
 use holochain_p2p::event::*;
 use holochain_p2p::*;
-use holochain_types::prelude::*;
-// The countersigning publish handler is v2-native; shadow the legacy
-// `ChainOp` re-export pulled in via `holochain_types::prelude::*`.
-// `WireLinkOps.creates` carries the v2 `SignedAction`, built directly from a
-// `CreateLink` fixture's fields.
 use holochain_types::dht_v2::{ActionData, ActionHeader, ChainOp, CreateLinkData};
+use holochain_types::prelude::*;
 use kitsune2_api::*;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::{Arc, Mutex};

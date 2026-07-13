@@ -22,7 +22,7 @@ use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Project a fixturated legacy `Create` struct into a v2 `Action`.
+/// Build an [`Action`] from a fixturated `Create` struct.
 fn v2_create(c: Create) -> Action {
     Action {
         header: ActionHeader {
@@ -309,8 +309,8 @@ async fn private_entries_are_not_published() {
         OpEntry::Hidden,
     )));
 
-    // The v2 AgentActivity op structurally carries no entry, so the private
-    // entry cannot leak through the op that gets published.
+    // The AgentActivity op structurally carries no entry, so the private entry
+    // cannot leak through the op that gets published.
     match register_agent_activity_op.as_content() {
         DhtOp::ChainOp(op) => assert!(op.op_entry().is_none()),
         DhtOp::WarrantOp(_) => panic!("expected a chain op"),

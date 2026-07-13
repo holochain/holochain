@@ -1,7 +1,6 @@
-//! [`FlatOp`] flattens a v2 [`Op`](holochain_integrity_types::dht_v2::Op)
+//! [`FlatOp`] flattens an [`Op`](holochain_integrity_types::dht_v2::Op)
 //! into a flatter, more accessible shape than
-//! [`Op`](holochain_integrity_types::dht_v2::Op)'s deeply nested variants,
-//! expressed over the v2 `holochain_integrity_types::dht_v2::Action`.
+//! [`Op`](holochain_integrity_types::dht_v2::Op)'s deeply nested variants.
 
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
 use holochain_integrity_types::dht_v2::Action;
@@ -14,7 +13,7 @@ pub use flat_op_activity::*;
 pub use flat_op_entry::*;
 pub use flat_op_record::*;
 
-/// A flattened view of a v2 [`Op`](holochain_integrity_types::dht_v2::Op),
+/// A flattened view of an [`Op`](holochain_integrity_types::dht_v2::Op),
 /// grouped by authority (record, entry, agent activity, link) rather than by
 /// the underlying action variant.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -51,12 +50,12 @@ pub enum OpLink<LT> {
         tag: LinkTag,
         /// The app defined link type of this link.
         link_type: LT,
-        /// The v2 action that creates the link (`ActionData::CreateLink`).
+        /// The action that creates the link (`ActionData::CreateLink`).
         action: Action,
     },
     /// A link was deleted (`ActionData::DeleteLink`).
     DeleteLink {
-        /// The original create-link v2 action (`ActionData::CreateLink`).
+        /// The original create-link action (`ActionData::CreateLink`).
         original_action: Action,
         /// The base address where this link is stored.
         base_address: AnyLinkableHash,
@@ -66,7 +65,7 @@ pub enum OpLink<LT> {
         tag: LinkTag,
         /// The app defined link type of the deleted link.
         link_type: LT,
-        /// The v2 action that deletes the link (`ActionData::DeleteLink`).
+        /// The action that deletes the link (`ActionData::DeleteLink`).
         action: Action,
     },
 }

@@ -180,9 +180,7 @@ host_fn_api_impls! {
     // Retrieve an action from the DHT or short circuit.
     fn must_get_action (zt::entry::MustGetActionInput) -> SignedActionHashed;
 
-    // The guest decodes v2 `RegisterAgentActivity` (matching the
-    // already-migrated hdk side); see `must_get_agent_activity.rs` for the
-    // legacy -> v2 conversion boundary.
+    // Retrieve an agent activity chain segment from the DHT or short circuit.
     fn must_get_agent_activity (zt::chain::MustGetAgentActivityInput) -> Vec<zt::dht_v2::op::RegisterAgentActivity>;
 
     // Query the source chain for data.
