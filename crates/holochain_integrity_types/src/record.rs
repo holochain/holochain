@@ -25,7 +25,9 @@ pub enum RecordEntry<E: Borrow<Entry> = Entry> {
     NA,
     /// The Action has an entry but was stored without it.
     /// This can happen when you receive gossip of just an action
-    /// when the action type is a [`crate::EntryCreationAction`],
+    /// when the action type creates an entry (a
+    /// [`Create`](crate::dht_v2::ActionData::Create) or
+    /// [`Update`](crate::dht_v2::ActionData::Update)),
     /// in particular for certain DhtOps
     NotStored,
 }

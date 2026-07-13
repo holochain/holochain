@@ -11,108 +11,19 @@ use holo_hash::HashableContentExtSync;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
-use holochain_types::rate_limit::{EntryRateWeight, RateWeight};
-use holochain_zome_types::action::{
-    AppEntryDef, Create, CreateLink, Delete, DeleteLink, EntryType, Update, ZomeIndex,
-};
+use holochain_zome_types::action::{AppEntryDef, EntryType, ZomeIndex};
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData, Op,
-    RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink, RegisterUpdate,
-    StoreEntry, StoreRecord, UpdateData,
+    ActionData, Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
+    RegisterUpdate, StoreEntry, StoreRecord,
 };
 use holochain_zome_types::fixt::{
-    ActionFixturator, CreateFixturator, CreateLinkFixturator, DeleteLinkFixturator,
-    EntryFixturator, SignatureFixturator, UpdateFixturator,
+    ActionFixturator, CreateAction, CreateLinkAction, DeleteAction, DeleteLinkAction,
+    EntryFixturator, SignatureFixturator, UpdateAction,
 };
 use holochain_zome_types::record::{Record, RecordEntry, SignedActionHashed};
 use holochain_zome_types::timestamp::Timestamp;
 use matches::assert_matches;
 use std::sync::Arc;
-
-/// Build an [`Action`] from a fixturated `Create` struct.
-fn v2_create(c: Create) -> Action {
-    Action {
-        header: ActionHeader {
-            author: c.author,
-            timestamp: c.timestamp,
-            action_seq: c.action_seq,
-            prev_action: Some(c.prev_action),
-        },
-        data: ActionData::Create(CreateData {
-            entry_type: c.entry_type,
-            entry_hash: c.entry_hash,
-        }),
-    }
-}
-
-/// Build an [`Action`] from a fixturated `Update` struct.
-fn v2_update(u: Update) -> Action {
-    Action {
-        header: ActionHeader {
-            author: u.author,
-            timestamp: u.timestamp,
-            action_seq: u.action_seq,
-            prev_action: Some(u.prev_action),
-        },
-        data: ActionData::Update(UpdateData {
-            original_action_address: u.original_action_address,
-            original_entry_address: u.original_entry_address,
-            entry_type: u.entry_type,
-            entry_hash: u.entry_hash,
-        }),
-    }
-}
-
-/// Build an [`Action`] from a fixturated `Delete` struct.
-fn v2_delete(d: Delete) -> Action {
-    Action {
-        header: ActionHeader {
-            author: d.author,
-            timestamp: d.timestamp,
-            action_seq: d.action_seq,
-            prev_action: Some(d.prev_action),
-        },
-        data: ActionData::Delete(DeleteData {
-            deletes_address: d.deletes_address,
-            deletes_entry_address: d.deletes_entry_address,
-        }),
-    }
-}
-
-/// Build an [`Action`] from a fixturated `CreateLink` struct.
-fn v2_create_link(c: CreateLink) -> Action {
-    Action {
-        header: ActionHeader {
-            author: c.author,
-            timestamp: c.timestamp,
-            action_seq: c.action_seq,
-            prev_action: Some(c.prev_action),
-        },
-        data: ActionData::CreateLink(CreateLinkData {
-            base_address: c.base_address,
-            target_address: c.target_address,
-            zome_index: c.zome_index,
-            link_type: c.link_type,
-            tag: c.tag,
-        }),
-    }
-}
-
-/// Build an [`Action`] from a fixturated `DeleteLink` struct.
-fn v2_delete_link(d: DeleteLink) -> Action {
-    Action {
-        header: ActionHeader {
-            author: d.author,
-            timestamp: d.timestamp,
-            action_seq: d.action_seq,
-            prev_action: Some(d.prev_action),
-        },
-        data: ActionData::DeleteLink(DeleteLinkData {
-            base_address: d.base_address,
-            link_add_address: d.link_add_address,
-        }),
-    }
-}
 
 /// Seed a dependency op into the `DhtStore`.
 ///
@@ -170,20 +81,17 @@ async fn store_entry_create_app_entry() {
         .unwrap();
 
     let entry = fixt!(Entry);
-    let create = Create {
-        action_seq: 0,
-        author: fixt!(AgentPubKey),
-        entry_hash: entry.clone().to_hash(),
-        entry_type: EntryType::App(AppEntryDef {
-            zome_index,
-            entry_index: 0.into(),
-            visibility: Default::default(),
-        }),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: EntryRateWeight::default(),
-    };
-    let action = v2_create(create);
+    let mut action = fixt!(Action, CreateAction);
+    action.header.action_seq = 0;
+    action.header.author = fixt!(AgentPubKey);
+    *action.entry_hash_mut().unwrap() = entry.clone().to_hash();
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+        zome_index,
+        entry_index: 0.into(),
+        visibility: Default::default(),
+    });
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let op = Op::StoreEntry(StoreEntry {
         action: action.clone(),
@@ -216,16 +124,13 @@ async fn store_entry_create_non_app_entry() {
         .unwrap();
 
     let entry = fixt!(Entry);
-    let create = Create {
-        action_seq: 0,
-        author: fixt!(AgentPubKey),
-        entry_hash: entry.clone().to_hash(),
-        entry_type: EntryType::CapClaim,
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: EntryRateWeight::default(),
-    };
-    let action = v2_create(create);
+    let mut action = fixt!(Action, CreateAction);
+    action.header.action_seq = 0;
+    action.header.author = fixt!(AgentPubKey);
+    *action.entry_hash_mut().unwrap() = entry.clone().to_hash();
+    *action.entry_type_mut().unwrap() = EntryType::CapClaim;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let op = Op::StoreEntry(StoreEntry {
         action: action.clone(),
@@ -260,22 +165,21 @@ async fn store_entry_update_app_entry() {
         .unwrap();
 
     let entry = fixt!(Entry);
-    let update = Update {
-        action_seq: 1,
-        author: fixt!(AgentPubKey),
-        entry_hash: entry.to_hash(),
-        entry_type: EntryType::App(AppEntryDef {
-            zome_index,
-            entry_index: 0.into(),
-            visibility: Default::default(),
-        }),
-        original_action_address: fixt!(ActionHash),
-        original_entry_address: fixt!(EntryHash),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: EntryRateWeight::default(),
-    };
-    let action = v2_update(update);
+    let mut action = fixt!(Action, UpdateAction);
+    action.header.action_seq = 1;
+    action.header.author = fixt!(AgentPubKey);
+    *action.entry_hash_mut().unwrap() = entry.to_hash();
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+        zome_index,
+        entry_index: 0.into(),
+        visibility: Default::default(),
+    });
+    if let ActionData::Update(d) = &mut action.data {
+        d.original_action_address = fixt!(ActionHash);
+        d.original_entry_address = fixt!(EntryHash);
+    }
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let op = Op::StoreEntry(StoreEntry {
         action: action.clone(),
@@ -308,18 +212,17 @@ async fn store_entry_update_non_app_entry() {
         .unwrap();
 
     let entry = fixt!(Entry);
-    let update = Update {
-        action_seq: 1,
-        author: fixt!(AgentPubKey),
-        entry_hash: entry.to_hash(),
-        entry_type: EntryType::AgentPubKey,
-        original_action_address: fixt!(ActionHash),
-        original_entry_address: fixt!(EntryHash),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: EntryRateWeight::default(),
-    };
-    let action = v2_update(update);
+    let mut action = fixt!(Action, UpdateAction);
+    action.header.action_seq = 1;
+    action.header.author = fixt!(AgentPubKey);
+    *action.entry_hash_mut().unwrap() = entry.to_hash();
+    *action.entry_type_mut().unwrap() = EntryType::AgentPubKey;
+    if let ActionData::Update(d) = &mut action.data {
+        d.original_action_address = fixt!(ActionHash);
+        d.original_entry_address = fixt!(EntryHash);
+    }
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let op = Op::StoreEntry(StoreEntry {
         action: action.clone(),
@@ -354,20 +257,17 @@ async fn store_record_create_app_entry() {
         .unwrap();
 
     let entry = fixt!(Entry);
-    let create = Create {
-        action_seq: 0,
-        author: fixt!(AgentPubKey),
-        entry_hash: entry.clone().to_hash(),
-        entry_type: EntryType::App(AppEntryDef {
-            zome_index,
-            entry_index: 0.into(),
-            visibility: Default::default(),
-        }),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: EntryRateWeight::default(),
-    };
-    let action = v2_create(create);
+    let mut action = fixt!(Action, CreateAction);
+    action.header.action_seq = 0;
+    action.header.author = fixt!(AgentPubKey);
+    *action.entry_hash_mut().unwrap() = entry.clone().to_hash();
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+        zome_index,
+        entry_index: 0.into(),
+        visibility: Default::default(),
+    });
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let record = Record::new(
         action.clone(),
@@ -397,16 +297,13 @@ async fn store_record_create_non_app_entry() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
-    let create = Create {
-        action_seq: 0,
-        author: fixt!(AgentPubKey),
-        entry_hash: fixt!(AgentPubKey).into(),
-        entry_type: EntryType::AgentPubKey,
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: EntryRateWeight::default(),
-    };
-    let action = v2_create(create);
+    let mut action = fixt!(Action, CreateAction);
+    action.header.action_seq = 0;
+    action.header.author = fixt!(AgentPubKey);
+    *action.entry_hash_mut().unwrap() = fixt!(AgentPubKey).into();
+    *action.entry_type_mut().unwrap() = EntryType::AgentPubKey;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let record = Record::new(
         action.clone(),
@@ -440,21 +337,18 @@ async fn store_record_create_wrong_entry() {
         .unwrap();
 
     let entry = fixt!(Entry);
-    let create = Create {
-        action_seq: 0,
-        author: fixt!(AgentPubKey),
-        entry_hash: entry.clone().to_hash(),
-        entry_type: EntryType::App(AppEntryDef {
-            // zome with index 1 does not exist
-            zome_index: 1.into(),
-            entry_index: 0.into(),
-            visibility: Default::default(),
-        }),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: EntryRateWeight::default(),
-    };
-    let action = v2_create(create);
+    let mut action = fixt!(Action, CreateAction);
+    action.header.action_seq = 0;
+    action.header.author = fixt!(AgentPubKey);
+    *action.entry_hash_mut().unwrap() = entry.clone().to_hash();
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+        // zome with index 1 does not exist
+        zome_index: 1.into(),
+        entry_index: 0.into(),
+        visibility: Default::default(),
+    });
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let record = Record::new(
         action.clone(),
@@ -490,9 +384,10 @@ async fn store_record_create_link() {
         .await
         .unwrap();
 
-    let mut create_link = fixt!(CreateLink);
-    create_link.zome_index = zome_index;
-    let action = v2_create_link(create_link);
+    let mut action = fixt!(Action, CreateLinkAction);
+    if let ActionData::CreateLink(d) = &mut action.data {
+        d.zome_index = zome_index;
+    }
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let record = Record::new(
         action.clone(),
@@ -527,28 +422,27 @@ async fn store_record_update_app_entry() {
         .await
         .unwrap();
 
-    let mut create = fixt!(Create);
-    create.entry_type = EntryType::App(AppEntryDef {
+    let mut create = fixt!(Action, CreateAction);
+    *create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         zome_index,
         entry_index: 0.into(),
         visibility: Default::default(),
     });
-    let update = Update {
-        action_seq: 0,
-        author: fixt!(AgentPubKey),
-        entry_hash: fixt!(EntryHash),
-        entry_type: EntryType::App(AppEntryDef {
-            zome_index,
-            entry_index: 0.into(),
-            visibility: Default::default(),
-        }),
-        original_action_address: v2_create(create.clone()).to_hash(),
-        original_entry_address: create.entry_hash.clone(),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: EntryRateWeight::default(),
-    };
-    let action = v2_update(update);
+    let mut action = fixt!(Action, UpdateAction);
+    action.header.action_seq = 0;
+    action.header.author = fixt!(AgentPubKey);
+    *action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+        zome_index,
+        entry_index: 0.into(),
+        visibility: Default::default(),
+    });
+    if let ActionData::Update(d) = &mut action.data {
+        d.original_action_address = create.to_hash();
+        d.original_entry_address = create.entry_hash().unwrap().clone();
+    }
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let record = Record::new(
         action.clone(),
@@ -578,20 +472,19 @@ async fn store_record_update_non_app_entry() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
-    let mut create = fixt!(Create);
-    create.entry_type = EntryType::CapGrant;
-    let update = Update {
-        action_seq: 0,
-        author: fixt!(AgentPubKey),
-        entry_hash: fixt!(EntryHash),
-        entry_type: EntryType::AgentPubKey,
-        original_action_address: v2_create(create.clone()).to_hash(),
-        original_entry_address: create.entry_hash.clone(),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: EntryRateWeight::default(),
-    };
-    let action = v2_update(update);
+    let mut create = fixt!(Action, CreateAction);
+    *create.entry_type_mut().unwrap() = EntryType::CapGrant;
+    let mut action = fixt!(Action, UpdateAction);
+    action.header.action_seq = 0;
+    action.header.author = fixt!(AgentPubKey);
+    *action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    *action.entry_type_mut().unwrap() = EntryType::AgentPubKey;
+    if let ActionData::Update(d) = &mut action.data {
+        d.original_action_address = create.to_hash();
+        d.original_entry_address = create.entry_hash().unwrap().clone();
+    }
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let record = Record::new(
         action.clone(),
@@ -626,43 +519,42 @@ async fn store_record_update_of_update_app_entry() {
         .await
         .unwrap();
 
-    let mut create = fixt!(Create);
-    create.entry_type = EntryType::App(AppEntryDef {
+    let mut create = fixt!(Action, CreateAction);
+    *create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         zome_index,
         entry_index: 0.into(),
         visibility: Default::default(),
     });
-    let update = v2_update(Update {
-        action_seq: 0,
-        author: fixt!(AgentPubKey),
-        entry_hash: fixt!(EntryHash),
-        entry_type: EntryType::App(AppEntryDef {
-            zome_index,
-            entry_index: 0.into(),
-            visibility: Default::default(),
-        }),
-        original_action_address: v2_create(create.clone()).to_hash(),
-        original_entry_address: create.entry_hash.clone(),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: EntryRateWeight::default(),
+    let mut update = fixt!(Action, UpdateAction);
+    update.header.action_seq = 0;
+    update.header.author = fixt!(AgentPubKey);
+    *update.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    *update.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+        zome_index,
+        entry_index: 0.into(),
+        visibility: Default::default(),
     });
-    let update_of_update = Update {
-        action_seq: 0,
-        author: fixt!(AgentPubKey),
-        entry_hash: fixt!(EntryHash),
-        entry_type: EntryType::App(AppEntryDef {
-            zome_index: 0.into(),
-            entry_index: 0.into(),
-            visibility: Default::default(),
-        }),
-        original_action_address: update.to_hash(),
-        original_entry_address: update.entry_hash().unwrap().clone(),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: EntryRateWeight::default(),
-    };
-    let action = v2_update(update_of_update);
+    if let ActionData::Update(d) = &mut update.data {
+        d.original_action_address = create.to_hash();
+        d.original_entry_address = create.entry_hash().unwrap().clone();
+    }
+    update.header.prev_action = Some(fixt!(ActionHash));
+    update.header.timestamp = Timestamp::now();
+    let mut action = fixt!(Action, UpdateAction);
+    action.header.action_seq = 0;
+    action.header.author = fixt!(AgentPubKey);
+    *action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+        zome_index: 0.into(),
+        entry_index: 0.into(),
+        visibility: Default::default(),
+    });
+    if let ActionData::Update(d) = &mut action.data {
+        d.original_action_address = update.to_hash();
+        d.original_entry_address = update.entry_hash().unwrap().clone();
+    }
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let record = Record::new(
         action.clone(),
@@ -697,23 +589,21 @@ async fn store_record_delete_without_entry() {
         .await
         .unwrap();
 
-    let mut create = fixt!(Create);
-    create.entry_type = EntryType::App(AppEntryDef {
+    let mut original_action = fixt!(Action, CreateAction);
+    *original_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         zome_index,
         entry_index: 0.into(),
         visibility: Default::default(),
     });
-    let original_action = v2_create(create);
-    let delete = Delete {
-        action_seq: 0,
-        author: fixt!(AgentPubKey),
-        deletes_address: original_action.to_hash(),
-        deletes_entry_address: fixt!(EntryHash),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: RateWeight::default(),
-    };
-    let action = v2_delete(delete);
+    let mut action = fixt!(Action, DeleteAction);
+    action.header.action_seq = 0;
+    action.header.author = fixt!(AgentPubKey);
+    if let ActionData::Delete(d) = &mut action.data {
+        d.deletes_address = original_action.to_hash();
+        d.deletes_entry_address = fixt!(EntryHash);
+    }
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let record = Record::new(
         action.clone(),
@@ -750,19 +640,17 @@ async fn store_record_delete_non_app_entry() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
-    let mut create = fixt!(Create);
-    create.entry_type = EntryType::CapGrant;
-    let original_action = v2_create(create);
-    let delete = Delete {
-        action_seq: 0,
-        author: fixt!(AgentPubKey),
-        deletes_address: original_action.to_hash(),
-        deletes_entry_address: fixt!(EntryHash),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: RateWeight::default(),
-    };
-    let action = v2_delete(delete);
+    let mut original_action = fixt!(Action, CreateAction);
+    *original_action.entry_type_mut().unwrap() = EntryType::CapGrant;
+    let mut action = fixt!(Action, DeleteAction);
+    action.header.action_seq = 0;
+    action.header.author = fixt!(AgentPubKey);
+    if let ActionData::Delete(d) = &mut action.data {
+        d.deletes_address = original_action.to_hash();
+        d.deletes_entry_address = fixt!(EntryHash);
+    }
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let record = Record::new(
         action.clone(),
@@ -804,12 +692,14 @@ async fn store_record_delete_link() {
         .await
         .unwrap();
 
-    let mut create_link = fixt!(CreateLink);
-    create_link.zome_index = zome_index;
-    let original_action = v2_create_link(create_link.clone());
-    let mut delete_link = fixt!(DeleteLink);
-    delete_link.link_add_address = original_action.to_hash();
-    let action = v2_delete_link(delete_link);
+    let mut original_action = fixt!(Action, CreateLinkAction);
+    if let ActionData::CreateLink(d) = &mut original_action.data {
+        d.zome_index = zome_index;
+    }
+    let mut action = fixt!(Action, DeleteLinkAction);
+    if let ActionData::DeleteLink(d) = &mut action.data {
+        d.link_add_address = original_action.to_hash();
+    }
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let record = Record::new(
         action.clone(),
@@ -852,22 +742,21 @@ async fn register_update_app_entry() {
         .unwrap();
 
     let entry = fixt!(Entry);
-    let update = Update {
-        action_seq: 1,
-        author: fixt!(AgentPubKey),
-        entry_hash: entry.to_hash(),
-        entry_type: EntryType::App(AppEntryDef {
-            zome_index,
-            entry_index: 0.into(),
-            visibility: Default::default(),
-        }),
-        original_action_address: fixt!(ActionHash),
-        original_entry_address: fixt!(EntryHash),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: EntryRateWeight::default(),
-    };
-    let update = v2_update(update);
+    let mut update = fixt!(Action, UpdateAction);
+    update.header.action_seq = 1;
+    update.header.author = fixt!(AgentPubKey);
+    *update.entry_hash_mut().unwrap() = entry.to_hash();
+    *update.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+        zome_index,
+        entry_index: 0.into(),
+        visibility: Default::default(),
+    });
+    if let ActionData::Update(d) = &mut update.data {
+        d.original_action_address = fixt!(ActionHash);
+        d.original_entry_address = fixt!(EntryHash);
+    }
+    update.header.prev_action = Some(fixt!(ActionHash));
+    update.header.timestamp = Timestamp::now();
     let update = SignedActionHashed::new_unchecked(update, fixt!(Signature));
     let op = Op::RegisterUpdate(RegisterUpdate {
         update: update.clone(),
@@ -897,18 +786,17 @@ async fn register_update_non_app_entry() {
     let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
     let entry = fixt!(Entry);
-    let update = Update {
-        action_seq: 1,
-        author: fixt!(AgentPubKey),
-        entry_hash: entry.to_hash(),
-        entry_type: EntryType::CapClaim,
-        original_action_address: fixt!(ActionHash),
-        original_entry_address: fixt!(EntryHash),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: EntryRateWeight::default(),
-    };
-    let update = v2_update(update);
+    let mut update = fixt!(Action, UpdateAction);
+    update.header.action_seq = 1;
+    update.header.author = fixt!(AgentPubKey);
+    *update.entry_hash_mut().unwrap() = entry.to_hash();
+    *update.entry_type_mut().unwrap() = EntryType::CapClaim;
+    if let ActionData::Update(d) = &mut update.data {
+        d.original_action_address = fixt!(ActionHash);
+        d.original_entry_address = fixt!(EntryHash);
+    }
+    update.header.prev_action = Some(fixt!(ActionHash));
+    update.header.timestamp = Timestamp::now();
     let update = SignedActionHashed::new_unchecked(update, fixt!(Signature));
     let op = Op::RegisterUpdate(RegisterUpdate {
         update: update.clone(),
@@ -942,23 +830,21 @@ async fn register_delete_create_app_entry() {
         .await
         .unwrap();
 
-    let mut create = fixt!(Create);
-    create.entry_type = EntryType::App(AppEntryDef {
+    let mut original_action = fixt!(Action, CreateAction);
+    *original_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         zome_index,
         entry_index: 0.into(),
         visibility: Default::default(),
     });
-    let original_action = v2_create(create);
-    let delete = Delete {
-        action_seq: 1,
-        author: fixt!(AgentPubKey),
-        deletes_address: original_action.to_hash(),
-        deletes_entry_address: fixt!(EntryHash),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: RateWeight::default(),
-    };
-    let delete = v2_delete(delete);
+    let mut delete = fixt!(Action, DeleteAction);
+    delete.header.action_seq = 1;
+    delete.header.author = fixt!(AgentPubKey);
+    if let ActionData::Delete(d) = &mut delete.data {
+        d.deletes_address = original_action.to_hash();
+        d.deletes_entry_address = fixt!(EntryHash);
+    }
+    delete.header.prev_action = Some(fixt!(ActionHash));
+    delete.header.timestamp = Timestamp::now();
     let delete = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
     let op = Op::RegisterDelete(RegisterDelete {
         delete: delete.clone(),
@@ -996,19 +882,17 @@ async fn register_delete_create_non_app_entry() {
         .await
         .unwrap();
 
-    let mut create = fixt!(Create);
-    create.entry_type = EntryType::CapGrant;
-    let original_action = v2_create(create);
-    let delete = Delete {
-        action_seq: 1,
-        author: fixt!(AgentPubKey),
-        deletes_address: original_action.to_hash(),
-        deletes_entry_address: fixt!(EntryHash),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: RateWeight::default(),
-    };
-    let delete = v2_delete(delete);
+    let mut original_action = fixt!(Action, CreateAction);
+    *original_action.entry_type_mut().unwrap() = EntryType::CapGrant;
+    let mut delete = fixt!(Action, DeleteAction);
+    delete.header.action_seq = 1;
+    delete.header.author = fixt!(AgentPubKey);
+    if let ActionData::Delete(d) = &mut delete.data {
+        d.deletes_address = original_action.to_hash();
+        d.deletes_entry_address = fixt!(EntryHash);
+    }
+    delete.header.prev_action = Some(fixt!(ActionHash));
+    delete.header.timestamp = Timestamp::now();
     let delete = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
     let op = Op::RegisterDelete(RegisterDelete {
         delete: delete.clone(),
@@ -1048,23 +932,21 @@ async fn register_delete_update_app_entry() {
         .await
         .unwrap();
 
-    let mut update = fixt!(Update);
-    update.entry_type = EntryType::App(AppEntryDef {
+    let mut original_action = fixt!(Action, UpdateAction);
+    *original_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         zome_index,
         entry_index: 0.into(),
         visibility: Default::default(),
     });
-    let original_action = v2_update(update);
-    let delete = Delete {
-        action_seq: 1,
-        author: fixt!(AgentPubKey),
-        deletes_address: original_action.to_hash(),
-        deletes_entry_address: fixt!(EntryHash),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: RateWeight::default(),
-    };
-    let delete = v2_delete(delete);
+    let mut delete = fixt!(Action, DeleteAction);
+    delete.header.action_seq = 1;
+    delete.header.author = fixt!(AgentPubKey);
+    if let ActionData::Delete(d) = &mut delete.data {
+        d.deletes_address = original_action.to_hash();
+        d.deletes_entry_address = fixt!(EntryHash);
+    }
+    delete.header.prev_action = Some(fixt!(ActionHash));
+    delete.header.timestamp = Timestamp::now();
     let delete = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
     let op = Op::RegisterDelete(RegisterDelete {
         delete: delete.clone(),
@@ -1102,19 +984,17 @@ async fn register_delete_update_non_app_entry() {
         .await
         .unwrap();
 
-    let mut update = fixt!(Update);
-    update.entry_type = EntryType::CapClaim;
-    let original_action = v2_update(update);
-    let delete = Delete {
-        action_seq: 1,
-        author: fixt!(AgentPubKey),
-        deletes_address: original_action.to_hash(),
-        deletes_entry_address: fixt!(EntryHash),
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: RateWeight::default(),
-    };
-    let delete = v2_delete(delete);
+    let mut original_action = fixt!(Action, UpdateAction);
+    *original_action.entry_type_mut().unwrap() = EntryType::CapClaim;
+    let mut delete = fixt!(Action, DeleteAction);
+    delete.header.action_seq = 1;
+    delete.header.author = fixt!(AgentPubKey);
+    if let ActionData::Delete(d) = &mut delete.data {
+        d.deletes_address = original_action.to_hash();
+        d.deletes_entry_address = fixt!(EntryHash);
+    }
+    delete.header.prev_action = Some(fixt!(ActionHash));
+    delete.header.timestamp = Timestamp::now();
     let delete = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
     let op = Op::RegisterDelete(RegisterDelete {
         delete: delete.clone(),
@@ -1154,9 +1034,10 @@ async fn register_create_link() {
         .await
         .unwrap();
 
-    let mut create_link = fixt!(CreateLink);
-    create_link.zome_index = zome_index;
-    let create_link = v2_create_link(create_link);
+    let mut create_link = fixt!(Action, CreateLinkAction);
+    if let ActionData::CreateLink(d) = &mut create_link.data {
+        d.zome_index = zome_index;
+    }
     let create_link = SignedActionHashed::new_unchecked(create_link, fixt!(Signature));
     let op = Op::RegisterCreateLink(RegisterCreateLink {
         create_link: create_link.clone(),
@@ -1189,10 +1070,11 @@ async fn register_delete_link() {
         .await
         .unwrap();
 
-    let mut create_link = fixt!(CreateLink);
-    create_link.zome_index = zome_index;
-    let create_link = v2_create_link(create_link);
-    let delete_link = v2_delete_link(fixt!(DeleteLink));
+    let mut create_link = fixt!(Action, CreateLinkAction);
+    if let ActionData::CreateLink(d) = &mut create_link.data {
+        d.zome_index = zome_index;
+    }
+    let delete_link = fixt!(Action, DeleteLinkAction);
     let delete_link = SignedActionHashed::new_unchecked(delete_link, fixt!(Signature));
     let op = Op::RegisterDeleteLink(RegisterDeleteLink {
         create_link,

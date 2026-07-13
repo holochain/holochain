@@ -7,7 +7,6 @@
 //!
 //! The signature verification for actions in warrants is still exercised by the valid warrant test.
 
-use super::validate_op_tests::ToV2Action;
 use super::validation_deps::SysValDeps;
 use super::validation_deps::ValidationDependencies;
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
@@ -20,6 +19,7 @@ use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
 use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
 use holochain_zome_types::dht_v2::Action;
+use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
 
 /// Test that a valid ChainFork warrant is accepted when both actions:
 /// - Have the same author
@@ -164,31 +164,31 @@ async fn validate_chain_fork_warrant_rejected_action_seq_differs() {
     // Create two actions with same prev_action but different action_seq values
     let prev_action_hash = fixt!(ActionHash);
 
-    let mut create1 = fixt!(Create);
-    create1.author = test_case.chain_author.clone();
-    create1.prev_action = prev_action_hash.clone();
-    create1.action_seq = 5;
-    create1.timestamp = Timestamp::now();
-    create1.entry_type = EntryType::App(AppEntryDef {
+    let mut create1 = fixt!(Action, CreateAction);
+    create1.header.author = test_case.chain_author.clone();
+    create1.header.prev_action = Some(prev_action_hash.clone());
+    create1.header.action_seq = 5;
+    create1.header.timestamp = Timestamp::now();
+    *create1.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    create1.entry_hash = fixt!(EntryHash);
-    let action1 = test_case.sign_action(create1.to_v2()).await;
+    *create1.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    let action1 = test_case.sign_action(create1).await;
 
-    let mut create2 = fixt!(Create);
-    create2.author = test_case.chain_author.clone();
-    create2.prev_action = prev_action_hash;
-    create2.action_seq = 6; // Different seq
-    create2.timestamp = Timestamp::now();
-    create2.entry_type = EntryType::App(AppEntryDef {
+    let mut create2 = fixt!(Action, CreateAction);
+    create2.header.author = test_case.chain_author.clone();
+    create2.header.prev_action = Some(prev_action_hash);
+    create2.header.action_seq = 6; // Different seq
+    create2.header.timestamp = Timestamp::now();
+    *create2.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    create2.entry_hash = fixt!(EntryHash);
-    let action2 = test_case.sign_action(create2.to_v2()).await;
+    *create2.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    let action2 = test_case.sign_action(create2).await;
 
     let warrant_op = test_case
         .create_chain_fork_warrant(&action1, &action2)
@@ -419,32 +419,32 @@ impl ChainForkWarrantTestCase {
         let prev_action_hash = fixt!(ActionHash);
 
         // First action
-        let mut create1 = fixt!(Create);
-        create1.author = self.chain_author.clone();
-        create1.prev_action = prev_action_hash.clone();
-        create1.action_seq = 5;
-        create1.timestamp = Timestamp::now();
-        create1.entry_type = EntryType::App(AppEntryDef {
+        let mut create1 = fixt!(Action, CreateAction);
+        create1.header.author = self.chain_author.clone();
+        create1.header.prev_action = Some(prev_action_hash.clone());
+        create1.header.action_seq = 5;
+        create1.header.timestamp = Timestamp::now();
+        *create1.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
             entry_index: 0.into(),
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        create1.entry_hash = fixt!(EntryHash);
-        let action1 = self.sign_action(create1.to_v2()).await;
+        *create1.entry_hash_mut().unwrap() = fixt!(EntryHash);
+        let action1 = self.sign_action(create1).await;
 
         // Second action (different entry hash makes it a different action)
-        let mut create2 = fixt!(Create);
-        create2.author = self.chain_author.clone();
-        create2.prev_action = prev_action_hash.clone();
-        create2.action_seq = 5;
-        create2.timestamp = Timestamp::now();
-        create2.entry_type = EntryType::App(AppEntryDef {
+        let mut create2 = fixt!(Action, CreateAction);
+        create2.header.author = self.chain_author.clone();
+        create2.header.prev_action = Some(prev_action_hash.clone());
+        create2.header.action_seq = 5;
+        create2.header.timestamp = Timestamp::now();
+        *create2.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
             entry_index: 0.into(),
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        create2.entry_hash = fixt!(EntryHash); // Different entry hash
-        let action2 = self.sign_action(create2.to_v2()).await;
+        *create2.entry_hash_mut().unwrap() = fixt!(EntryHash); // Different entry hash
+        let action2 = self.sign_action(create2).await;
 
         (action1, action2, prev_action_hash)
     }
@@ -457,30 +457,30 @@ impl ChainForkWarrantTestCase {
         let other_author = self.keystore.new_sign_keypair_random().await.unwrap();
 
         // First action with chain_author
-        let mut create1 = fixt!(Create);
-        create1.author = self.chain_author.clone();
-        create1.prev_action = prev_action_hash.clone();
-        create1.action_seq = 5;
-        create1.timestamp = Timestamp::now();
-        create1.entry_type = EntryType::App(AppEntryDef {
+        let mut create1 = fixt!(Action, CreateAction);
+        create1.header.author = self.chain_author.clone();
+        create1.header.prev_action = Some(prev_action_hash.clone());
+        create1.header.action_seq = 5;
+        create1.header.timestamp = Timestamp::now();
+        *create1.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
             entry_index: 0.into(),
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        let action1 = self.sign_action(create1.to_v2()).await;
+        let action1 = self.sign_action(create1).await;
 
         // Second action with different author
-        let mut create2 = fixt!(Create);
-        create2.author = other_author;
-        create2.prev_action = prev_action_hash.clone();
-        create2.action_seq = 5;
-        create2.timestamp = Timestamp::now();
-        create2.entry_type = EntryType::App(AppEntryDef {
+        let mut create2 = fixt!(Action, CreateAction);
+        create2.header.author = other_author;
+        create2.header.prev_action = Some(prev_action_hash.clone());
+        create2.header.action_seq = 5;
+        create2.header.timestamp = Timestamp::now();
+        *create2.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
             entry_index: 0.into(),
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        let action2 = self.sign_action(create2.to_v2()).await;
+        let action2 = self.sign_action(create2).await;
 
         (action1, action2)
     }
@@ -488,30 +488,30 @@ impl ChainForkWarrantTestCase {
     /// Create two actions with different prev_actions (not a real fork)
     async fn create_non_forking_actions(&self) -> (SignedActionHashed, SignedActionHashed) {
         // First action
-        let mut create1 = fixt!(Create);
-        create1.author = self.chain_author.clone();
-        create1.prev_action = fixt!(ActionHash);
-        create1.action_seq = 5;
-        create1.timestamp = Timestamp::now();
-        create1.entry_type = EntryType::App(AppEntryDef {
+        let mut create1 = fixt!(Action, CreateAction);
+        create1.header.author = self.chain_author.clone();
+        create1.header.prev_action = Some(fixt!(ActionHash));
+        create1.header.action_seq = 5;
+        create1.header.timestamp = Timestamp::now();
+        *create1.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
             entry_index: 0.into(),
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        let action1 = self.sign_action(create1.to_v2()).await;
+        let action1 = self.sign_action(create1).await;
 
         // Second action with DIFFERENT prev_action
-        let mut create2 = fixt!(Create);
-        create2.author = self.chain_author.clone();
-        create2.prev_action = fixt!(ActionHash); // Different prev_action
-        create2.action_seq = 5;
-        create2.timestamp = Timestamp::now();
-        create2.entry_type = EntryType::App(AppEntryDef {
+        let mut create2 = fixt!(Action, CreateAction);
+        create2.header.author = self.chain_author.clone();
+        create2.header.prev_action = Some(fixt!(ActionHash)); // Different prev_action
+        create2.header.action_seq = 5;
+        create2.header.timestamp = Timestamp::now();
+        *create2.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
             entry_index: 0.into(),
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        let action2 = self.sign_action(create2.to_v2()).await;
+        let action2 = self.sign_action(create2).await;
 
         (action1, action2)
     }
@@ -525,17 +525,17 @@ impl ChainForkWarrantTestCase {
 
     /// Create a single signed Create action authored by `chain_author`.
     async fn create_signed_action(&self) -> SignedActionHashed {
-        let mut create = fixt!(Create);
-        create.author = self.chain_author.clone();
-        create.action_seq = 5;
-        create.timestamp = Timestamp::now();
-        create.entry_type = EntryType::App(AppEntryDef {
+        let mut create = fixt!(Action, CreateAction);
+        create.header.author = self.chain_author.clone();
+        create.header.action_seq = 5;
+        create.header.timestamp = Timestamp::now();
+        *create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
             entry_index: 0.into(),
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        create.entry_hash = fixt!(EntryHash);
-        self.sign_action(create.to_v2()).await
+        *create.entry_hash_mut().unwrap() = fixt!(EntryHash);
+        self.sign_action(create).await
     }
 
     /// Insert an action as a warranted dependency that has been validated with the

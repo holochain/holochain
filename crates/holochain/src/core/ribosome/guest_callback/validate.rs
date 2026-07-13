@@ -129,28 +129,10 @@ mod test {
     use ::fixt::prelude::*;
     use holochain_types::prelude::*;
     use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-        Action, ActionData, ActionHeader, CreateLinkData, Op, RegisterAgentActivity,
+        Op, RegisterAgentActivity,
     };
+    use holochain_zome_types::fixt::{ActionFixturator, CreateLinkAction};
     use rand::seq::SliceRandom;
-
-    /// Build an `Action` from a fixturated `CreateLink`.
-    fn action_from_create_link(c: CreateLink) -> Action {
-        Action {
-            header: ActionHeader {
-                author: c.author,
-                timestamp: c.timestamp,
-                action_seq: c.action_seq,
-                prev_action: Some(c.prev_action),
-            },
-            data: ActionData::CreateLink(CreateLinkData {
-                base_address: c.base_address,
-                target_address: c.target_address,
-                zome_index: c.zome_index,
-                link_type: c.link_type,
-                tag: c.tag,
-            }),
-        }
-    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn validate_callback_result_fold() {
@@ -211,7 +193,7 @@ mod test {
             ZomesToInvoke::All,
             &Op::RegisterAgentActivity(RegisterAgentActivity {
                 action: SignedActionHashed::new_unchecked(
-                    action_from_create_link(fixt!(CreateLink)),
+                    fixt!(Action, CreateLinkAction),
                     fixt!(Signature),
                 ),
                 cached_entry: None,
@@ -228,7 +210,7 @@ mod test {
             ZomesToInvoke::All,
             &Op::RegisterAgentActivity(RegisterAgentActivity {
                 action: SignedActionHashed::new_unchecked(
-                    action_from_create_link(fixt!(CreateLink)),
+                    fixt!(Action, CreateLinkAction),
                     fixt!(Signature),
                 ),
                 cached_entry: None,
@@ -246,7 +228,7 @@ mod test {
     async fn validate_invocation_host_input() {
         let op = Op::RegisterAgentActivity(RegisterAgentActivity {
             action: SignedActionHashed::new_unchecked(
-                action_from_create_link(fixt!(CreateLink)),
+                fixt!(Action, CreateLinkAction),
                 fixt!(Signature),
             ),
             cached_entry: None,
@@ -285,45 +267,10 @@ mod slow_tests {
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-        Action, ActionData, ActionHeader, CreateData, CreateLinkData, Op, RegisterAgentActivity,
-        StoreRecord,
+        Op, RegisterAgentActivity, StoreRecord,
     };
+    use holochain_zome_types::fixt::{ActionFixturator, CreateAction, CreateLinkAction};
     use std::sync::Arc;
-
-    /// Build an `Action` from a fixturated `Create`.
-    fn action_from_create(c: Create) -> Action {
-        Action {
-            header: ActionHeader {
-                author: c.author,
-                timestamp: c.timestamp,
-                action_seq: c.action_seq,
-                prev_action: Some(c.prev_action),
-            },
-            data: ActionData::Create(CreateData {
-                entry_type: c.entry_type,
-                entry_hash: c.entry_hash,
-            }),
-        }
-    }
-
-    /// Build an `Action` from a fixturated `CreateLink`.
-    fn action_from_create_link(c: CreateLink) -> Action {
-        Action {
-            header: ActionHeader {
-                author: c.author,
-                timestamp: c.timestamp,
-                action_seq: c.action_seq,
-                prev_action: Some(c.prev_action),
-            },
-            data: ActionData::CreateLink(CreateLinkData {
-                base_address: c.base_address,
-                target_address: c.target_address,
-                zome_index: c.zome_index,
-                link_type: c.link_type,
-                tag: c.tag,
-            }),
-        }
-    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {
@@ -331,7 +278,7 @@ mod slow_tests {
             ZomesToInvoke::One(IntegrityZome::from(TestWasm::Foo).erase_type()),
             &Op::RegisterAgentActivity(RegisterAgentActivity {
                 action: SignedActionHashed::new_unchecked(
-                    action_from_create_link(fixt!(CreateLink)),
+                    fixt!(Action, CreateLinkAction),
                     fixt!(Signature),
                 ),
                 cached_entry: None,
@@ -354,7 +301,7 @@ mod slow_tests {
             ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateValid).erase_type()),
             &Op::RegisterAgentActivity(RegisterAgentActivity {
                 action: SignedActionHashed::new_unchecked(
-                    action_from_create_link(fixt!(CreateLink)),
+                    fixt!(Action, CreateLinkAction),
                     fixt!(Signature),
                 ),
                 cached_entry: None,
@@ -420,7 +367,7 @@ mod slow_tests {
             ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalidParams).erase_type()),
             &Op::RegisterAgentActivity(RegisterAgentActivity {
                 action: SignedActionHashed::new_unchecked(
-                    action_from_create_link(fixt!(CreateLink)),
+                    fixt!(Action, CreateLinkAction),
                     fixt!(Signature),
                 ),
                 cached_entry: None,
@@ -469,20 +416,18 @@ mod slow_tests {
 
         let agent = fixt!(AgentPubKey);
         let entry = Entry::Agent(agent.clone());
-        let action = Create {
-            author: agent.clone(),
-            timestamp: Timestamp::now(),
-            action_seq: 8,
-            prev_action: fixt!(ActionHash),
-            entry_type: EntryType::AgentPubKey,
-            entry_hash: EntryHash::with_data_sync(&entry),
-            weight: EntryRateWeight::default(),
-        };
+        let mut action = fixt!(Action, CreateAction);
+        action.header.author = agent.clone();
+        action.header.timestamp = Timestamp::now();
+        action.header.action_seq = 8;
+        action.header.prev_action = Some(fixt!(ActionHash));
+        *action.entry_type_mut().unwrap() = EntryType::AgentPubKey;
+        *action.entry_hash_mut().unwrap() = EntryHash::with_data_sync(&entry);
 
         let op = Op::StoreRecord(StoreRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(
-                    HoloHashed::from_content_sync(action_from_create(action)),
+                    HoloHashed::from_content_sync(action),
                     Signature(vec![7; SIGNATURE_BYTES].try_into().unwrap()),
                 ),
                 RecordEntry::Present(entry),

@@ -502,7 +502,7 @@ impl LinkQuery {
 mod tests {
     use super::ChainQueryFilter;
     use crate::action::EntryType;
-    use crate::fixt::AppEntryDefFixturator;
+    use crate::fixt::{AppEntryDefFixturator, CreateAction, CreateLinkAction, UpdateAction};
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::EntryHashFixturator;
@@ -513,103 +513,53 @@ mod tests {
     /// fixturators, so the content-derived hashes match the production
     /// authoring path.
     fn fixtures() -> [HoloHashed<Action>; 7] {
-        use crate::dht_v2::{ActionData, ActionHeader, CreateData, CreateLinkData, UpdateData};
-
-        fn create_to_v2(c: Create) -> Action {
-            Action {
-                header: ActionHeader {
-                    author: c.author,
-                    timestamp: c.timestamp,
-                    action_seq: c.action_seq,
-                    prev_action: Some(c.prev_action),
-                },
-                data: ActionData::Create(CreateData {
-                    entry_type: c.entry_type,
-                    entry_hash: c.entry_hash,
-                }),
-            }
-        }
-        fn update_to_v2(u: Update) -> Action {
-            Action {
-                header: ActionHeader {
-                    author: u.author,
-                    timestamp: u.timestamp,
-                    action_seq: u.action_seq,
-                    prev_action: Some(u.prev_action),
-                },
-                data: ActionData::Update(UpdateData {
-                    original_action_address: u.original_action_address,
-                    original_entry_address: u.original_entry_address,
-                    entry_type: u.entry_type,
-                    entry_hash: u.entry_hash,
-                }),
-            }
-        }
-        fn create_link_to_v2(cl: CreateLink) -> Action {
-            Action {
-                header: ActionHeader {
-                    author: cl.author,
-                    timestamp: cl.timestamp,
-                    action_seq: cl.action_seq,
-                    prev_action: Some(cl.prev_action),
-                },
-                data: ActionData::CreateLink(CreateLinkData {
-                    base_address: cl.base_address,
-                    target_address: cl.target_address,
-                    zome_index: cl.zome_index,
-                    link_type: cl.link_type,
-                    tag: cl.tag,
-                }),
-            }
-        }
-
         let entry_type_1 = EntryType::App(fixt!(AppEntryDef));
         let entry_type_2 = EntryType::AgentPubKey;
 
         let entry_hash_0 = fixt!(EntryHash);
 
-        let mut h0 = fixt!(Create);
-        h0.entry_type = entry_type_1.clone();
-        h0.action_seq = 0;
-        h0.entry_hash = entry_hash_0.clone();
-        let hh0: HoloHashed<Action> = HoloHashed::from_content_sync(create_to_v2(h0));
+        let mut h0 = fixt!(Action, CreateAction);
+        *h0.entry_type_mut().unwrap() = entry_type_1.clone();
+        h0.header.action_seq = 0;
+        *h0.entry_hash_mut().unwrap() = entry_hash_0.clone();
+        let hh0: HoloHashed<Action> = HoloHashed::from_content_sync(h0);
 
-        let mut h1 = fixt!(Update);
-        h1.entry_type = entry_type_2.clone();
-        h1.action_seq = 1;
-        h1.prev_action = hh0.as_hash().clone();
-        let hh1: HoloHashed<Action> = HoloHashed::from_content_sync(update_to_v2(h1));
+        let mut h1 = fixt!(Action, UpdateAction);
+        *h1.entry_type_mut().unwrap() = entry_type_2.clone();
+        h1.header.action_seq = 1;
+        h1.header.prev_action = Some(hh0.as_hash().clone());
+        let hh1: HoloHashed<Action> = HoloHashed::from_content_sync(h1);
 
-        let mut h2 = fixt!(CreateLink);
-        h2.action_seq = 2;
-        h2.prev_action = hh1.as_hash().clone();
-        let hh2: HoloHashed<Action> = HoloHashed::from_content_sync(create_link_to_v2(h2));
+        let mut h2 = fixt!(Action, CreateLinkAction);
+        h2.header.action_seq = 2;
+        h2.header.prev_action = Some(hh1.as_hash().clone());
+        let hh2: HoloHashed<Action> = HoloHashed::from_content_sync(h2);
 
-        let mut h3 = fixt!(Create);
-        h3.entry_type = entry_type_2.clone();
-        h3.action_seq = 3;
-        h3.prev_action = hh2.as_hash().clone();
-        let hh3: HoloHashed<Action> = HoloHashed::from_content_sync(create_to_v2(h3));
+        let mut h3 = fixt!(Action, CreateAction);
+        *h3.entry_type_mut().unwrap() = entry_type_2.clone();
+        h3.header.action_seq = 3;
+        h3.header.prev_action = Some(hh2.as_hash().clone());
+        let hh3: HoloHashed<Action> = HoloHashed::from_content_sync(h3);
 
         // Cheeky forker!
-        let mut h3a = fixt!(Create);
-        h3a.entry_type = entry_type_1.clone();
-        h3a.action_seq = 3;
-        h3a.prev_action = hh2.as_hash().clone();
-        let hh3a: HoloHashed<Action> = HoloHashed::from_content_sync(create_to_v2(h3a));
+        let mut h3a = fixt!(Action, CreateAction);
+        *h3a.entry_type_mut().unwrap() = entry_type_1.clone();
+        h3a.header.action_seq = 3;
+        h3a.header.prev_action = Some(hh2.as_hash().clone());
+        let hh3a: HoloHashed<Action> = HoloHashed::from_content_sync(h3a);
 
-        let mut h4 = fixt!(Update);
-        h4.entry_type = entry_type_1.clone();
+        let mut h4 = fixt!(Action, UpdateAction);
+        *h4.entry_type_mut().unwrap() = entry_type_1.clone();
         // same entry content as h0
-        h4.entry_hash = entry_hash_0;
-        h4.action_seq = 4;
-        h4.prev_action = hh3.as_hash().clone();
-        let hh4: HoloHashed<Action> = HoloHashed::from_content_sync(update_to_v2(h4));
+        *h4.entry_hash_mut().unwrap() = entry_hash_0;
+        h4.header.action_seq = 4;
+        h4.header.prev_action = Some(hh3.as_hash().clone());
+        let hh4: HoloHashed<Action> = HoloHashed::from_content_sync(h4);
 
-        let mut h5 = fixt!(CreateLink);
-        h5.action_seq = 5;
-        h5.prev_action = hh4.as_hash().clone();
-        let hh5: HoloHashed<Action> = HoloHashed::from_content_sync(create_link_to_v2(h5));
+        let mut h5 = fixt!(Action, CreateLinkAction);
+        h5.header.action_seq = 5;
+        h5.header.prev_action = Some(hh4.as_hash().clone());
+        let hh5: HoloHashed<Action> = HoloHashed::from_content_sync(h5);
 
         [hh0, hh1, hh2, hh3, hh3a, hh4, hh5]
     }

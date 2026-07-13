@@ -430,6 +430,26 @@ impl Action {
         }
     }
 
+    /// A mutable reference to the type of the entry this action references,
+    /// for the `Create` and `Update` variants.
+    pub fn entry_type_mut(&mut self) -> Option<&mut EntryType> {
+        match &mut self.data {
+            ActionData::Create(d) => Some(&mut d.entry_type),
+            ActionData::Update(d) => Some(&mut d.entry_type),
+            _ => None,
+        }
+    }
+
+    /// A mutable reference to the hash of the entry this action references,
+    /// for the `Create` and `Update` variants.
+    pub fn entry_hash_mut(&mut self) -> Option<&mut EntryHash> {
+        match &mut self.data {
+            ActionData::Create(d) => Some(&mut d.entry_hash),
+            ActionData::Update(d) => Some(&mut d.entry_hash),
+            _ => None,
+        }
+    }
+
     /// The [`AppEntryDef`] of the entry this action references, if it is an
     /// application-defined entry.
     pub fn app_entry_def(&self) -> Option<&AppEntryDef> {

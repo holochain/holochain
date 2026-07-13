@@ -7,7 +7,6 @@ use crate::core::ValidationOutcome;
 use crate::prelude::*;
 use ::fixt::prelude::*;
 use futures::FutureExt;
-use hdk::prelude::Dna as HdkDna;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
@@ -15,13 +14,14 @@ use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
 // This module builds op-pipeline types (`ChainOp`/`DhtOp`) directly and feeds
-// them to `validate_op`. The fixturators (`fixt!(Create)` etc.) yield per-field
-// action structs, so the `ToV2Action` helper below maps each onto the flat
-// `ActionHeader` + `ActionData` envelope that is authored, hashed, and signed.
+// them to `validate_op`. The `fixt!(Action, <Variant>Action)` fixturators yield
+// v2 `Action` values (an `ActionHeader` + `ActionData` envelope) that are
+// authored, hashed, and signed.
 use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
-use holochain_zome_types::dht_v2::{
-    Action, ActionData, ActionHeader, AgentValidationPkgData, CloseChainData, CreateData,
-    CreateLinkData, DeleteData, DeleteLinkData, DnaData, InitZomesCompleteData, UpdateData,
+use holochain_zome_types::dht_v2::{Action, ActionData};
+use holochain_zome_types::fixt::{
+    ActionFixturator, AgentValidationPkgAction, CloseChainAction, CreateAction, CreateLinkAction,
+    DeleteAction, DeleteLinkAction, DnaAction, InitZomesCompleteAction, UpdateAction,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -32,12 +32,13 @@ async fn validate_valid_dna_op() {
 
     let mut test_case = TestCase::new().await;
 
-    let dna_action = HdkDna {
-        author: test_case.agent.clone(),
-        timestamp: Timestamp::now(),
-        hash: test_case.dna_def_hash().hash,
-    };
-    let op = ChainOp::AgentActivity(signed(dna_action.to_v2(), fixt!(Signature))).into();
+    let mut dna_action = fixt!(Action, DnaAction);
+    dna_action.header.author = test_case.agent.clone();
+    dna_action.header.timestamp = Timestamp::now();
+    if let ActionData::Dna(d) = &mut dna_action.data {
+        d.dna_hash = test_case.dna_def_hash().hash;
+    }
+    let op = ChainOp::AgentActivity(signed(dna_action, fixt!(Signature))).into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -61,13 +62,14 @@ async fn validate_dna_op_mismatched_dna_hash() {
         mismatched_dna_hash = fixt!(DnaHash);
     }
 
-    let dna_action = HdkDna {
-        author: test_case.agent.clone(),
-        timestamp: Timestamp::now(),
-        // Will not match the space hash from the test_case
-        hash: mismatched_dna_hash.clone(),
-    };
-    let op = ChainOp::AgentActivity(signed(dna_action.to_v2(), fixt!(Signature))).into();
+    let mut dna_action = fixt!(Action, DnaAction);
+    dna_action.header.author = test_case.agent.clone();
+    dna_action.header.timestamp = Timestamp::now();
+    // Will not match the space hash from the test_case
+    if let ActionData::Dna(d) = &mut dna_action.data {
+        d.dna_hash = mismatched_dna_hash.clone();
+    }
+    let op = ChainOp::AgentActivity(signed(dna_action, fixt!(Signature))).into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -90,22 +92,23 @@ async fn non_dna_op_as_first_action() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let dna_action = HdkDna {
-        author: test_case.agent.clone(),
-        timestamp: Timestamp::now(),
-        hash: test_case.dna_def_hash().hash,
-    };
-    let previous_action = test_case.sign_action(dna_action.to_v2()).await;
+    let mut dna_action = fixt!(Action, DnaAction);
+    dna_action.header.author = test_case.agent.clone();
+    dna_action.header.timestamp = Timestamp::now();
+    if let ActionData::Dna(d) = &mut dna_action.data {
+        d.dna_hash = test_case.dna_def_hash().hash;
+    }
+    let previous_action = test_case.sign_action(dna_action).await;
 
-    let mut create = fixt!(Create);
-    create.prev_action = previous_action.as_hash().clone();
-    create.action_seq = 0; // Not valid, a DNA should always be first
-    create.entry_type = EntryType::App(AppEntryDef {
+    let mut create = fixt!(Action, CreateAction);
+    create.header.prev_action = Some(previous_action.as_hash().clone());
+    create.header.action_seq = 0; // Not valid, a DNA should always be first
+    *create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::AgentActivity(signed(create.to_v2(), fixt!(Signature))).into();
+    let op = ChainOp::AgentActivity(signed(create.clone(), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -116,10 +119,8 @@ async fn non_dna_op_as_first_action() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::PrevActionError(
-                (PrevActionErrorKind::InvalidRoot, create.to_v2(),).into()
-            )
-            .to_string()
+            ValidationOutcome::PrevActionError((PrevActionErrorKind::InvalidRoot, create,).into())
+                .to_string()
         ),
         outcome
     );
@@ -132,22 +133,24 @@ async fn validate_valid_agent_validation_package_op() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let dna_action = HdkDna {
-        author: test_case.agent.clone(),
-        timestamp: Timestamp::now(),
-        hash: test_case.dna_def_hash().hash,
-    };
-    let previous_action = test_case.sign_action(dna_action.to_v2()).await;
+    let mut dna_action = fixt!(Action, DnaAction);
+    dna_action.header.author = test_case.agent.clone();
+    dna_action.header.timestamp = Timestamp::now();
+    if let ActionData::Dna(d) = &mut dna_action.data {
+        d.dna_hash = test_case.dna_def_hash().hash;
+    }
+    let previous_action = test_case.sign_action(dna_action).await;
 
     // Op to validate
-    let action = AgentValidationPkg {
-        author: test_case.agent.clone(),
-        timestamp: Timestamp::now(),
-        action_seq: 1,
-        prev_action: previous_action.as_hash().clone(),
-        membrane_proof: None,
-    };
-    let op = ChainOp::AgentActivity(signed(action.to_v2(), fixt!(Signature))).into();
+    let mut action = fixt!(Action, AgentValidationPkgAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 1;
+    action.header.prev_action = Some(previous_action.as_hash().clone());
+    if let ActionData::AgentValidationPkg(d) = &mut action.data {
+        d.membrane_proof = None;
+    }
+    let op = ChainOp::AgentActivity(signed(action, fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -169,28 +172,28 @@ async fn validate_valid_create_op() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut prev_create_action = fixt!(Create);
-    prev_create_action.author = test_case.agent.clone();
-    prev_create_action.action_seq = 10;
-    prev_create_action.entry_type = EntryType::App(AppEntryDef {
+    let mut prev_create_action = fixt!(Action, CreateAction);
+    prev_create_action.header.author = test_case.agent.clone();
+    prev_create_action.header.action_seq = 10;
+    *prev_create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(prev_create_action.to_v2()).await;
+    let previous_action = test_case.sign_action(prev_create_action).await;
 
     // Op to validate
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::App(AppEntryDef {
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::AgentActivity(signed(create_action.to_v2(), fixt!(Signature))).into();
+    let op = ChainOp::AgentActivity(signed(create_action, fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -212,28 +215,28 @@ async fn validate_create_op_with_prev_from_network() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut prev_create_action = fixt!(Create);
-    prev_create_action.author = test_case.agent.clone();
-    prev_create_action.action_seq = 10;
-    prev_create_action.entry_type = EntryType::App(AppEntryDef {
+    let mut prev_create_action = fixt!(Action, CreateAction);
+    prev_create_action.header.author = test_case.agent.clone();
+    prev_create_action.header.action_seq = 10;
+    *prev_create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(prev_create_action.to_v2()).await;
+    let previous_action = test_case.sign_action(prev_create_action).await;
 
     // Op to validate
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::App(AppEntryDef {
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::AgentActivity(signed(create_action.to_v2(), fixt!(Signature))).into();
+    let op = ChainOp::AgentActivity(signed(create_action, fixt!(Signature))).into();
 
     test_case
         .cascade_mut()
@@ -268,25 +271,23 @@ async fn validate_create_op_with_prev_action_not_found() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut validation_package_action = fixt!(AgentValidationPkg);
-    validation_package_action.author = test_case.agent.clone();
-    validation_package_action.action_seq = 10;
-    let signed_action = test_case
-        .sign_action(validation_package_action.to_v2())
-        .await;
+    let mut validation_package_action = fixt!(Action, AgentValidationPkgAction);
+    validation_package_action.header.author = test_case.agent.clone();
+    validation_package_action.header.action_seq = 10;
+    let signed_action = test_case.sign_action(validation_package_action).await;
 
     // Op to validate
-    let mut create_action = fixt!(Create);
-    create_action.author = signed_action.action().author().clone();
-    create_action.action_seq = signed_action.action().action_seq() + 1;
-    create_action.prev_action = signed_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::App(AppEntryDef {
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = signed_action.action().author().clone();
+    create_action.header.action_seq = signed_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(signed_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::AgentActivity(signed(create_action.to_v2(), fixt!(Signature))).into();
+    let op = ChainOp::AgentActivity(signed(create_action, fixt!(Signature))).into();
 
     test_case
         .cascade_mut()
@@ -309,12 +310,10 @@ async fn validate_create_op_author_mismatch_with_prev() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut validation_package_action = fixt!(AgentValidationPkg);
-    validation_package_action.author = test_case.agent.clone();
-    validation_package_action.action_seq = 10;
-    let previous_action = test_case
-        .sign_action(validation_package_action.to_v2())
-        .await;
+    let mut validation_package_action = fixt!(Action, AgentValidationPkgAction);
+    validation_package_action.header.author = test_case.agent.clone();
+    validation_package_action.header.action_seq = 10;
+    let previous_action = test_case.sign_action(validation_package_action).await;
 
     let mut mismatched_author = fixt!(AgentPubKey);
     loop {
@@ -325,17 +324,17 @@ async fn validate_create_op_author_mismatch_with_prev() {
     }
 
     // Op to validate
-    let mut create_action = fixt!(Create);
-    create_action.author = mismatched_author.clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::App(AppEntryDef {
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = mismatched_author.clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::AgentActivity(signed(create_action.to_v2(), fixt!(Signature))).into();
+    let op = ChainOp::AgentActivity(signed(create_action.clone(), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -352,7 +351,7 @@ async fn validate_create_op_author_mismatch_with_prev() {
                         test_case.agent.clone(),
                         mismatched_author.clone(),
                     ),
-                    create_action.to_v2(),
+                    create_action,
                 )
                     .into(),
             )
@@ -371,24 +370,24 @@ async fn validate_create_op_with_timestamp_same_as_prev() {
     let common_timestamp = Timestamp::now();
 
     // Previous action
-    let mut init_action = fixt!(InitZomesComplete);
-    init_action.author = test_case.agent.clone();
-    init_action.action_seq = 10;
-    init_action.timestamp = common_timestamp;
-    let previous_action = test_case.sign_action(init_action.to_v2()).await;
+    let mut init_action = fixt!(Action, InitZomesCompleteAction);
+    init_action.header.author = test_case.agent.clone();
+    init_action.header.action_seq = 10;
+    init_action.header.timestamp = common_timestamp;
+    let previous_action = test_case.sign_action(init_action).await;
 
     // Op to validate
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = common_timestamp;
-    create_action.entry_type = EntryType::App(AppEntryDef {
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = common_timestamp;
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::AgentActivity(signed(create_action.to_v2(), fixt!(Signature))).into();
+    let op = ChainOp::AgentActivity(signed(create_action, fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -407,26 +406,27 @@ async fn validate_create_op_with_timestamp_before_prev() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut validation_package_action = fixt!(AgentValidationPkg);
-    validation_package_action.author = test_case.agent.clone();
-    validation_package_action.action_seq = 10;
-    validation_package_action.timestamp = Timestamp::now();
+    let mut validation_package_action = fixt!(Action, AgentValidationPkgAction);
+    validation_package_action.header.author = test_case.agent.clone();
+    validation_package_action.header.action_seq = 10;
+    validation_package_action.header.timestamp = Timestamp::now();
     let previous_action = test_case
-        .sign_action(validation_package_action.to_v2())
+        .sign_action(validation_package_action.clone())
         .await;
 
     // Op to validate
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = (Timestamp::now() - std::time::Duration::from_secs(10)).unwrap();
-    create_action.entry_type = EntryType::App(AppEntryDef {
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp =
+        (Timestamp::now() - std::time::Duration::from_secs(10)).unwrap();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::AgentActivity(signed(create_action.to_v2(), fixt!(Signature))).into();
+    let op = ChainOp::AgentActivity(signed(create_action.clone(), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -440,10 +440,10 @@ async fn validate_create_op_with_timestamp_before_prev() {
             ValidationOutcome::PrevActionError(
                 (
                     PrevActionErrorKind::Timestamp(
-                        validation_package_action.timestamp,
-                        create_action.timestamp,
+                        validation_package_action.timestamp(),
+                        create_action.timestamp(),
                     ),
-                    create_action.to_v2(),
+                    create_action,
                 )
                     .into(),
             )
@@ -460,25 +460,23 @@ async fn validate_create_op_seq_number_decrements() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut validation_package_action = fixt!(AgentValidationPkg);
-    validation_package_action.author = test_case.agent.clone();
-    validation_package_action.action_seq = 10;
-    let previous_action = test_case
-        .sign_action(validation_package_action.to_v2())
-        .await;
+    let mut validation_package_action = fixt!(Action, AgentValidationPkgAction);
+    validation_package_action.header.author = test_case.agent.clone();
+    validation_package_action.header.action_seq = 10;
+    let previous_action = test_case.sign_action(validation_package_action).await;
 
     // Op to validate
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = 9; // Should be 11, has gone down instead of up
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::App(AppEntryDef {
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = 9; // Should be 11, has gone down instead of up
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::AgentActivity(signed(create_action.to_v2(), fixt!(Signature))).into();
+    let op = ChainOp::AgentActivity(signed(create_action.clone(), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -490,11 +488,7 @@ async fn validate_create_op_seq_number_decrements() {
     assert_eq!(
         Outcome::Rejected(
             ValidationOutcome::PrevActionError(
-                (
-                    PrevActionErrorKind::InvalidSeq(9, 10),
-                    create_action.to_v2(),
-                )
-                    .into(),
+                (PrevActionErrorKind::InvalidSeq(9, 10), create_action,).into(),
             )
             .to_string()
         ),
@@ -509,25 +503,23 @@ async fn validate_create_op_seq_number_reused() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut validation_package_action = fixt!(AgentValidationPkg);
-    validation_package_action.author = test_case.agent.clone();
-    validation_package_action.action_seq = 10;
-    let previous_action = test_case
-        .sign_action(validation_package_action.to_v2())
-        .await;
+    let mut validation_package_action = fixt!(Action, AgentValidationPkgAction);
+    validation_package_action.header.author = test_case.agent.clone();
+    validation_package_action.header.action_seq = 10;
+    let previous_action = test_case.sign_action(validation_package_action).await;
 
     // Op to validate
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = 10; // Should be 11, but has been re-used
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::App(AppEntryDef {
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = 10; // Should be 11, but has been re-used
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::AgentActivity(signed(create_action.to_v2(), fixt!(Signature))).into();
+    let op = ChainOp::AgentActivity(signed(create_action.clone(), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -539,11 +531,7 @@ async fn validate_create_op_seq_number_reused() {
     assert_eq!(
         Outcome::Rejected(
             ValidationOutcome::PrevActionError(
-                (
-                    PrevActionErrorKind::InvalidSeq(10, 10),
-                    create_action.to_v2(),
-                )
-                    .into(),
+                (PrevActionErrorKind::InvalidSeq(10, 10), create_action,).into(),
             )
             .to_string()
         ),
@@ -558,25 +546,25 @@ async fn validate_create_op_not_preceeded_by_avp() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut prev_create_action = fixt!(Create);
-    prev_create_action.author = test_case.agent.clone();
-    prev_create_action.action_seq = 10;
-    prev_create_action.timestamp = Timestamp::now();
-    prev_create_action.entry_type = EntryType::App(AppEntryDef {
+    let mut prev_create_action = fixt!(Action, CreateAction);
+    prev_create_action.header.author = test_case.agent.clone();
+    prev_create_action.header.action_seq = 10;
+    prev_create_action.header.timestamp = Timestamp::now();
+    *prev_create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(prev_create_action.to_v2()).await;
+    let previous_action = test_case.sign_action(prev_create_action).await;
 
     // Op to validate
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::AgentPubKey;
-    let op = ChainOp::AgentActivity(signed(create_action.to_v2(), fixt!(Signature))).into();
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::AgentPubKey;
+    let op = ChainOp::AgentActivity(signed(create_action.clone(), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action.clone()])
@@ -592,10 +580,10 @@ async fn validate_create_op_not_preceeded_by_avp() {
                     "Every Create or Update for an AgentPubKey must be preceded by an AgentValidationPkg".to_string(),
                     Box::new((
                         previous_action.action().clone(),
-                        create_action.to_v2(),
+                        create_action.clone(),
                     )),
                 ),
-                create_action.to_v2(),
+                create_action,
             )
                 .into(),
         )
@@ -611,22 +599,23 @@ async fn validate_avp_op_not_followed_by_create() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let action = AgentValidationPkg {
-        author: test_case.agent.clone(),
-        timestamp: Timestamp::now(),
-        action_seq: 1,
-        prev_action: fixt!(ActionHash),
-        membrane_proof: None,
-    };
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let mut action = fixt!(Action, AgentValidationPkgAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 1;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    if let ActionData::AgentValidationPkg(d) = &mut action.data {
+        d.membrane_proof = None;
+    }
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
-    let mut create_link_action = fixt!(CreateLink);
-    create_link_action.author = previous_action.action().author().clone();
-    create_link_action.action_seq = previous_action.action().action_seq() + 1;
-    create_link_action.prev_action = previous_action.as_hash().clone();
-    create_link_action.timestamp = Timestamp::now();
-    let op = ChainOp::AgentActivity(signed(create_link_action.to_v2(), fixt!(Signature))).into();
+    let mut create_link_action = fixt!(Action, CreateLinkAction);
+    create_link_action.header.author = previous_action.action().author().clone();
+    create_link_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_link_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_link_action.header.timestamp = Timestamp::now();
+    let op = ChainOp::AgentActivity(signed(create_link_action.clone(), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action.clone()])
@@ -642,10 +631,10 @@ async fn validate_avp_op_not_followed_by_create() {
                     "Every AgentValidationPkg must be followed by a Create or Update for an AgentPubKey".to_string(),
                     Box::new((
                         previous_action.action().clone(),
-                        create_link_action.to_v2(),
+                        create_link_action.clone(),
                     )),
                 ),
-                create_link_action.to_v2(),
+                create_link_action,
             )
                 .into(),
         )
@@ -661,27 +650,27 @@ async fn validate_valid_store_record_with_no_entry() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    action.entry_type = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 10;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::CapClaim;
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::CapClaim;
     let op = ChainOp::CreateRecord(
-        signed(create_action.to_v2(), fixt!(Signature)),
+        signed(create_action, fixt!(Signature)),
         to_op_entry(holochain_zome_types::record::RecordEntry::NotStored),
     )
     .into();
@@ -701,31 +690,31 @@ async fn validate_store_record_leaks_entry() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    action.entry_type = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 10;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::App(AppEntryDef {
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Private, // Private so should not have entry data
     });
     let op = ChainOp::CreateRecord(
-        signed(create_action.to_v2(), fixt!(Signature)),
+        signed(create_action, fixt!(Signature)),
         to_op_entry(holochain_zome_types::record::RecordEntry::Present(
             Entry::App(fixt!(AppEntryBytes)),
         )),
@@ -747,27 +736,28 @@ async fn validate_store_record_with_entry_having_wrong_entry_type() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let action = AgentValidationPkg {
-        author: test_case.agent.clone(),
-        timestamp: Timestamp::now(),
-        action_seq: 1,
-        prev_action: fixt!(ActionHash),
-        membrane_proof: None,
-    };
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let mut action = fixt!(Action, AgentValidationPkgAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 1;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    if let ActionData::AgentValidationPkg(d) = &mut action.data {
+        d.membrane_proof = None;
+    }
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::AgentPubKey; // Claiming to be a public key but is actually an app entry
-    create_action.entry_hash = entry_hash.as_hash().clone();
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::AgentPubKey; // Claiming to be a public key but is actually an app entry
+    *create_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
     let op = ChainOp::CreateRecord(
-        signed(create_action.to_v2(), fixt!(Signature)),
+        signed(create_action, fixt!(Signature)),
         to_op_entry(holochain_zome_types::record::RecordEntry::Present(
             app_entry,
         )),
@@ -789,32 +779,32 @@ async fn validate_store_record_with_entry_having_wrong_entry_hash() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    action.entry_type = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 10;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    create_action.entry_hash = entry_hash.as_hash().clone();
+    *create_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
 
     let mut mismatched_entry = Entry::App(fixt!(AppEntryBytes));
     loop {
@@ -825,7 +815,7 @@ async fn validate_store_record_with_entry_having_wrong_entry_hash() {
     }
 
     let op = ChainOp::CreateRecord(
-        signed(create_action.to_v2(), fixt!(Signature)),
+        signed(create_action, fixt!(Signature)),
         to_op_entry(holochain_zome_types::record::RecordEntry::Present(
             mismatched_entry,
         )),
@@ -856,17 +846,17 @@ async fn validate_store_record_with_large_entry() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    action.entry_type = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 10;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
     let app_entry = Entry::App(AppEntryBytes(
@@ -877,19 +867,19 @@ async fn validate_store_record_with_large_entry() {
         .unwrap(),
     ));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    create_action.entry_hash = entry_hash.as_hash().clone();
+    *create_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
     let op = ChainOp::CreateRecord(
-        signed(create_action.to_v2(), fixt!(Signature)),
+        signed(create_action, fixt!(Signature)),
         to_op_entry(holochain_zome_types::record::RecordEntry::Present(
             app_entry,
         )),
@@ -911,55 +901,59 @@ async fn validate_valid_store_record_update() {
     let mut test_case = TestCase::new().await;
 
     // Action to be updated
-    let mut to_update_action = fixt!(Create);
-    to_update_action.author = test_case.agent.clone();
-    to_update_action.timestamp = Timestamp::now();
-    to_update_action.action_seq = 5;
-    to_update_action.prev_action = fixt!(ActionHash);
-    to_update_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut to_update_action = fixt!(Action, CreateAction);
+    to_update_action.header.author = test_case.agent.clone();
+    to_update_action.header.timestamp = Timestamp::now();
+    to_update_action.header.action_seq = 5;
+    to_update_action.header.prev_action = Some(fixt!(ActionHash));
+    *to_update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    to_update_action.entry_hash = fixt!(EntryHash);
-    let to_update_signed_action = test_case.sign_action(to_update_action.to_v2()).await;
+    *to_update_action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    let to_update_signed_action = test_case.sign_action(to_update_action).await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    action.entry_type = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 10;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut update_action = fixt!(Update);
-    update_action.author = previous_action.action().author().clone();
-    update_action.action_seq = previous_action.action().action_seq() + 1;
-    update_action.prev_action = previous_action.as_hash().clone();
-    update_action.timestamp = Timestamp::now();
-    update_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut update_action = fixt!(Action, UpdateAction);
+    update_action.header.author = previous_action.action().author().clone();
+    update_action.header.action_seq = previous_action.action().action_seq() + 1;
+    update_action.header.prev_action = Some(previous_action.as_hash().clone());
+    update_action.header.timestamp = Timestamp::now();
+    *update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    update_action.entry_hash = entry_hash.as_hash().clone();
-    update_action.original_entry_address = to_update_signed_action
-        .hashed
-        .content
-        .entry_hash()
-        .unwrap()
-        .clone();
-    update_action.original_action_address = to_update_signed_action.as_hash().clone();
+    *update_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_entry_address = to_update_signed_action
+            .hashed
+            .content
+            .entry_hash()
+            .unwrap()
+            .clone();
+    }
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_action_address = to_update_signed_action.as_hash().clone();
+    }
     let op = ChainOp::CreateRecord(
-        signed(update_action.to_v2(), fixt!(Signature)),
+        signed(update_action, fixt!(Signature)),
         to_op_entry(holochain_zome_types::record::RecordEntry::Present(
             app_entry,
         )),
@@ -986,40 +980,42 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
     let mut test_case = TestCase::new().await;
 
     // Action to be updated
-    let mut to_update_action = fixt!(Dna);
-    to_update_action.author = test_case.agent.clone();
-    let to_update_signed_action = test_case.sign_action(to_update_action.to_v2()).await;
+    let mut to_update_action = fixt!(Action, DnaAction);
+    to_update_action.header.author = test_case.agent.clone();
+    let to_update_signed_action = test_case.sign_action(to_update_action).await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    action.entry_type = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 10;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut update_action = fixt!(Update);
-    update_action.author = previous_action.action().author().clone();
-    update_action.action_seq = previous_action.action().action_seq() + 1;
-    update_action.prev_action = previous_action.as_hash().clone();
-    update_action.timestamp = Timestamp::now();
-    update_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut update_action = fixt!(Action, UpdateAction);
+    update_action.header.author = previous_action.action().author().clone();
+    update_action.header.action_seq = previous_action.action().action_seq() + 1;
+    update_action.header.prev_action = Some(previous_action.as_hash().clone());
+    update_action.header.timestamp = Timestamp::now();
+    *update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    update_action.entry_hash = entry_hash.as_hash().clone();
-    update_action.original_action_address = to_update_signed_action.as_hash().clone();
+    *update_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_action_address = to_update_signed_action.as_hash().clone();
+    }
     let op = ChainOp::CreateRecord(
-        signed(update_action.to_v2(), fixt!(Signature)),
+        signed(update_action, fixt!(Signature)),
         to_op_entry(holochain_zome_types::record::RecordEntry::Present(
             app_entry,
         )),
@@ -1049,56 +1045,60 @@ async fn validate_store_record_update_changes_entry_type() {
     let mut test_case = TestCase::new().await;
 
     // Action to be updated
-    let mut to_update_action = fixt!(Create);
-    to_update_action.author = test_case.agent.clone();
-    to_update_action.timestamp = Timestamp::now();
-    to_update_action.action_seq = 5;
-    to_update_action.prev_action = fixt!(ActionHash);
-    to_update_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut to_update_action = fixt!(Action, CreateAction);
+    to_update_action.header.author = test_case.agent.clone();
+    to_update_action.header.timestamp = Timestamp::now();
+    to_update_action.header.action_seq = 5;
+    to_update_action.header.prev_action = Some(fixt!(ActionHash));
+    *to_update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    to_update_action.entry_hash = fixt!(EntryHash);
-    let to_update_signed_action = test_case.sign_action(to_update_action.to_v2()).await;
+    *to_update_action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    let to_update_signed_action = test_case.sign_action(to_update_action.clone()).await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    action.entry_type = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 10;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut update_action = fixt!(Update);
-    update_action.author = previous_action.action().author().clone();
-    update_action.action_seq = previous_action.action().action_seq() + 1;
-    update_action.prev_action = previous_action.as_hash().clone();
-    update_action.timestamp = Timestamp::now();
+    let mut update_action = fixt!(Action, UpdateAction);
+    update_action.header.author = previous_action.action().author().clone();
+    update_action.header.action_seq = previous_action.action().action_seq() + 1;
+    update_action.header.prev_action = Some(previous_action.as_hash().clone());
+    update_action.header.timestamp = Timestamp::now();
     // Different entry type defined here
-    update_action.entry_type = EntryType::App(AppEntryDef::new(
+    *update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         10.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    update_action.entry_hash = entry_hash.as_hash().clone();
-    update_action.original_entry_address = to_update_signed_action
-        .hashed
-        .content
-        .entry_hash()
-        .unwrap()
-        .clone();
-    update_action.original_action_address = to_update_signed_action.as_hash().clone();
+    *update_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_entry_address = to_update_signed_action
+            .hashed
+            .content
+            .entry_hash()
+            .unwrap()
+            .clone();
+    }
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_action_address = to_update_signed_action.as_hash().clone();
+    }
     let op = ChainOp::CreateRecord(
-        signed(update_action.to_v2(), fixt!(Signature)),
+        signed(update_action.clone(), fixt!(Signature)),
         to_op_entry(holochain_zome_types::record::RecordEntry::Present(
             app_entry,
         )),
@@ -1115,8 +1115,8 @@ async fn validate_store_record_update_changes_entry_type() {
     assert_eq!(
         Outcome::Rejected(
             ValidationOutcome::UpdateTypeMismatch(
-                to_update_action.entry_type,
-                update_action.entry_type
+                to_update_action.entry_type().unwrap().clone(),
+                update_action.entry_type().unwrap().clone()
             )
             .to_string()
         ),
@@ -1131,30 +1131,30 @@ async fn validate_store_entry_with_entry_having_wrong_entry_type() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    action.entry_type = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 10;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::AgentPubKey; // Claiming to be a public key but is actually an app entry
-    create_action.entry_hash = entry_hash.as_hash().clone();
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::AgentPubKey; // Claiming to be a public key but is actually an app entry
+    *create_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
     let op = ChainOp::CreateEntry(
-        signed(create_action.to_v2(), fixt!(Signature)),
+        signed(create_action, fixt!(Signature)),
         OpEntry::Present(app_entry),
     )
     .into();
@@ -1174,32 +1174,32 @@ async fn validate_store_entry_with_entry_having_wrong_entry_hash() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    action.entry_type = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 10;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    create_action.entry_hash = entry_hash.as_hash().clone();
+    *create_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
 
     let mut mismatched_entry = Entry::App(fixt!(AppEntryBytes));
     loop {
@@ -1210,7 +1210,7 @@ async fn validate_store_entry_with_entry_having_wrong_entry_hash() {
     }
 
     let op = ChainOp::CreateEntry(
-        signed(create_action.to_v2(), fixt!(Signature)),
+        signed(create_action, fixt!(Signature)),
         OpEntry::Present(mismatched_entry),
     )
     .into();
@@ -1239,17 +1239,17 @@ async fn validate_store_entry_with_large_entry() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    action.entry_type = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 10;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
     let app_entry = Entry::App(AppEntryBytes(
@@ -1260,19 +1260,19 @@ async fn validate_store_entry_with_large_entry() {
         .unwrap(),
     ));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
-    create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous_action.action().author().clone();
+    create_action.header.action_seq = previous_action.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous_action.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    create_action.entry_hash = entry_hash.as_hash().clone();
+    *create_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
     let op = ChainOp::CreateEntry(
-        signed(create_action.to_v2(), fixt!(Signature)),
+        signed(create_action, fixt!(Signature)),
         OpEntry::Present(app_entry),
     )
     .into();
@@ -1292,55 +1292,59 @@ async fn validate_valid_store_entry_update() {
     let mut test_case = TestCase::new().await;
 
     // Action to be updated
-    let mut to_update_action = fixt!(Create);
-    to_update_action.author = test_case.agent.clone();
-    to_update_action.timestamp = Timestamp::now();
-    to_update_action.action_seq = 5;
-    to_update_action.prev_action = fixt!(ActionHash);
-    to_update_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut to_update_action = fixt!(Action, CreateAction);
+    to_update_action.header.author = test_case.agent.clone();
+    to_update_action.header.timestamp = Timestamp::now();
+    to_update_action.header.action_seq = 5;
+    to_update_action.header.prev_action = Some(fixt!(ActionHash));
+    *to_update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    to_update_action.entry_hash = fixt!(EntryHash);
-    let to_update_signed_action = test_case.sign_action(to_update_action.to_v2()).await;
+    *to_update_action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    let to_update_signed_action = test_case.sign_action(to_update_action).await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    action.entry_type = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 10;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut update_action = fixt!(Update);
-    update_action.author = previous_action.action().author().clone();
-    update_action.action_seq = previous_action.action().action_seq() + 1;
-    update_action.prev_action = previous_action.as_hash().clone();
-    update_action.timestamp = Timestamp::now();
-    update_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut update_action = fixt!(Action, UpdateAction);
+    update_action.header.author = previous_action.action().author().clone();
+    update_action.header.action_seq = previous_action.action().action_seq() + 1;
+    update_action.header.prev_action = Some(previous_action.as_hash().clone());
+    update_action.header.timestamp = Timestamp::now();
+    *update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    update_action.entry_hash = entry_hash.as_hash().clone();
-    update_action.original_entry_address = to_update_signed_action
-        .hashed
-        .content
-        .entry_hash()
-        .unwrap()
-        .clone();
-    update_action.original_action_address = to_update_signed_action.as_hash().clone();
+    *update_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_entry_address = to_update_signed_action
+            .hashed
+            .content
+            .entry_hash()
+            .unwrap()
+            .clone();
+    }
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_action_address = to_update_signed_action.as_hash().clone();
+    }
     let op = ChainOp::CreateEntry(
-        signed(update_action.to_v2(), fixt!(Signature)),
+        signed(update_action, fixt!(Signature)),
         OpEntry::Present(app_entry),
     )
     .into();
@@ -1362,40 +1366,42 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
     let mut test_case = TestCase::new().await;
 
     // Action to be updated
-    let mut to_update_action = fixt!(Dna);
-    to_update_action.author = test_case.agent.clone();
-    let to_update_signed_action = test_case.sign_action(to_update_action.to_v2()).await;
+    let mut to_update_action = fixt!(Action, DnaAction);
+    to_update_action.header.author = test_case.agent.clone();
+    let to_update_signed_action = test_case.sign_action(to_update_action).await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    action.entry_type = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 10;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut update_action = fixt!(Update);
-    update_action.author = previous_action.action().author().clone();
-    update_action.action_seq = previous_action.action().action_seq() + 1;
-    update_action.prev_action = previous_action.as_hash().clone();
-    update_action.timestamp = Timestamp::now();
-    update_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut update_action = fixt!(Action, UpdateAction);
+    update_action.header.author = previous_action.action().author().clone();
+    update_action.header.action_seq = previous_action.action().action_seq() + 1;
+    update_action.header.prev_action = Some(previous_action.as_hash().clone());
+    update_action.header.timestamp = Timestamp::now();
+    *update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    update_action.entry_hash = entry_hash.as_hash().clone();
-    update_action.original_action_address = to_update_signed_action.as_hash().clone();
+    *update_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_action_address = to_update_signed_action.as_hash().clone();
+    }
     let op = ChainOp::CreateEntry(
-        signed(update_action.to_v2(), fixt!(Signature)),
+        signed(update_action, fixt!(Signature)),
         OpEntry::Present(app_entry),
     )
     .into();
@@ -1423,56 +1429,60 @@ async fn validate_store_entry_update_changes_entry_type() {
     let mut test_case = TestCase::new().await;
 
     // Action to be updated
-    let mut to_update_action = fixt!(Create);
-    to_update_action.author = test_case.agent.clone();
-    to_update_action.timestamp = Timestamp::now();
-    to_update_action.action_seq = 5;
-    to_update_action.prev_action = fixt!(ActionHash);
-    to_update_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut to_update_action = fixt!(Action, CreateAction);
+    to_update_action.header.author = test_case.agent.clone();
+    to_update_action.header.timestamp = Timestamp::now();
+    to_update_action.header.action_seq = 5;
+    to_update_action.header.prev_action = Some(fixt!(ActionHash));
+    *to_update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    to_update_action.entry_hash = fixt!(EntryHash);
-    let to_update_signed_action = test_case.sign_action(to_update_action.to_v2()).await;
+    *to_update_action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    let to_update_signed_action = test_case.sign_action(to_update_action).await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    action.entry_type = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 10;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut update_action = fixt!(Update);
-    update_action.author = previous_action.action().author().clone();
-    update_action.action_seq = previous_action.action().action_seq() + 1;
-    update_action.prev_action = previous_action.as_hash().clone();
-    update_action.timestamp = Timestamp::now();
+    let mut update_action = fixt!(Action, UpdateAction);
+    update_action.header.author = previous_action.action().author().clone();
+    update_action.header.action_seq = previous_action.action().action_seq() + 1;
+    update_action.header.prev_action = Some(previous_action.as_hash().clone());
+    update_action.header.timestamp = Timestamp::now();
     // Different entry type defined here
-    update_action.entry_type = EntryType::App(AppEntryDef::new(
+    *update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         10.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    update_action.entry_hash = entry_hash.as_hash().clone();
-    update_action.original_entry_address = to_update_signed_action
-        .hashed
-        .content
-        .entry_hash()
-        .unwrap()
-        .clone();
-    update_action.original_action_address = to_update_signed_action.as_hash().clone();
+    *update_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_entry_address = to_update_signed_action
+            .hashed
+            .content
+            .entry_hash()
+            .unwrap()
+            .clone();
+    }
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_action_address = to_update_signed_action.as_hash().clone();
+    }
     let op = ChainOp::CreateEntry(
-        signed(update_action.to_v2(), fixt!(Signature)),
+        signed(update_action.clone(), fixt!(Signature)),
         OpEntry::Present(app_entry),
     )
     .into();
@@ -1493,7 +1503,7 @@ async fn validate_store_entry_update_changes_entry_type() {
                     .entry_type()
                     .unwrap()
                     .clone(),
-                update_action.entry_type
+                update_action.entry_type().unwrap().clone()
             )
             .to_string()
         ),
@@ -1508,35 +1518,40 @@ async fn validate_valid_register_updated_content() {
     let mut test_case = TestCase::new().await;
 
     // Action to be updated
-    let mut to_update_action = fixt!(Create);
-    to_update_action.author = test_case.agent.clone();
-    to_update_action.timestamp = Timestamp::now();
-    to_update_action.action_seq = 5;
-    to_update_action.prev_action = fixt!(ActionHash);
-    to_update_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut to_update_action = fixt!(Action, CreateAction);
+    to_update_action.header.author = test_case.agent.clone();
+    to_update_action.header.timestamp = Timestamp::now();
+    to_update_action.header.action_seq = 5;
+    to_update_action.header.prev_action = Some(fixt!(ActionHash));
+    *to_update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    to_update_action.entry_hash = fixt!(EntryHash);
-    let to_update_signed_action = test_case.sign_action(to_update_action.to_v2()).await;
+    *to_update_action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    let to_update_signed_action = test_case.sign_action(to_update_action).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut update_action = fixt!(Update);
-    update_action.timestamp = Timestamp::now();
-    update_action.entry_type = to_update_signed_action.hashed.entry_type().unwrap().clone();
-    update_action.entry_hash = entry_hash.as_hash().clone();
-    update_action.original_entry_address = to_update_signed_action
-        .hashed
-        .content
-        .entry_hash()
-        .unwrap()
-        .clone();
-    update_action.original_action_address = to_update_signed_action.as_hash().clone();
+    let mut update_action = fixt!(Action, UpdateAction);
+    update_action.header.timestamp = Timestamp::now();
+    *update_action.entry_type_mut().unwrap() =
+        to_update_signed_action.hashed.entry_type().unwrap().clone();
+    *update_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_entry_address = to_update_signed_action
+            .hashed
+            .content
+            .entry_hash()
+            .unwrap()
+            .clone();
+    }
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_action_address = to_update_signed_action.as_hash().clone();
+    }
     let op = ChainOp::UpdateEntry(
-        signed(update_action.to_v2(), fixt!(Signature)),
+        signed(update_action, fixt!(Signature)),
         to_op_entry(RecordEntry::Present(app_entry)),
     )
     .into();
@@ -1558,14 +1573,14 @@ async fn validate_register_updated_content_missing_updates_ref() {
     let mut test_case = TestCase::new().await;
 
     // Needed to set up mocking but not actually referenced
-    let mut dummy_prev_action = fixt!(Create);
-    dummy_prev_action.author = test_case.agent.clone();
-    dummy_prev_action.entry_type = EntryType::App(AppEntryDef {
+    let mut dummy_prev_action = fixt!(Action, CreateAction);
+    dummy_prev_action.header.author = test_case.agent.clone();
+    *dummy_prev_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let dummy_prev_action = test_case.sign_action(dummy_prev_action.to_v2()).await;
+    let dummy_prev_action = test_case.sign_action(dummy_prev_action).await;
 
     let mut mismatched_action_hash = fixt!(ActionHash);
     loop {
@@ -1577,16 +1592,18 @@ async fn validate_register_updated_content_missing_updates_ref() {
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
-    let mut update_action: holochain_zome_types::prelude::Update = fixt!(Update);
-    update_action.timestamp = Timestamp::now();
-    update_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut update_action = fixt!(Action, UpdateAction);
+    update_action.header.timestamp = Timestamp::now();
+    *update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    update_action.original_action_address = mismatched_action_hash;
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_action_address = mismatched_action_hash;
+    }
     let op = ChainOp::UpdateEntry(
-        signed(update_action.to_v2(), fixt!(Signature)),
+        signed(update_action, fixt!(Signature)),
         to_op_entry(RecordEntry::Present(app_entry)),
     )
     .into();
@@ -1611,35 +1628,40 @@ async fn validate_valid_register_updated_record() {
     let mut test_case = TestCase::new().await;
 
     // Action to be updated
-    let mut to_update_action = fixt!(Create);
-    to_update_action.author = test_case.agent.clone();
-    to_update_action.timestamp = Timestamp::now();
-    to_update_action.action_seq = 5;
-    to_update_action.prev_action = fixt!(ActionHash);
-    to_update_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut to_update_action = fixt!(Action, CreateAction);
+    to_update_action.header.author = test_case.agent.clone();
+    to_update_action.header.timestamp = Timestamp::now();
+    to_update_action.header.action_seq = 5;
+    to_update_action.header.prev_action = Some(fixt!(ActionHash));
+    *to_update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    to_update_action.entry_hash = fixt!(EntryHash);
-    let to_update_signed_action = test_case.sign_action(to_update_action.to_v2()).await;
+    *to_update_action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    let to_update_signed_action = test_case.sign_action(to_update_action).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
-    let mut update_action = fixt!(Update);
-    update_action.timestamp = Timestamp::now();
-    update_action.entry_type = to_update_signed_action.hashed.entry_type().unwrap().clone();
-    update_action.entry_hash = entry_hash.as_hash().clone();
-    update_action.original_entry_address = to_update_signed_action
-        .hashed
-        .content
-        .entry_hash()
-        .unwrap()
-        .clone();
-    update_action.original_action_address = to_update_signed_action.as_hash().clone();
+    let mut update_action = fixt!(Action, UpdateAction);
+    update_action.header.timestamp = Timestamp::now();
+    *update_action.entry_type_mut().unwrap() =
+        to_update_signed_action.hashed.entry_type().unwrap().clone();
+    *update_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_entry_address = to_update_signed_action
+            .hashed
+            .content
+            .entry_hash()
+            .unwrap()
+            .clone();
+    }
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_action_address = to_update_signed_action.as_hash().clone();
+    }
     let op = ChainOp::UpdateRecord(
-        signed(update_action.to_v2(), fixt!(Signature)),
+        signed(update_action, fixt!(Signature)),
         to_op_entry(RecordEntry::Present(app_entry)),
     )
     .into();
@@ -1661,14 +1683,14 @@ async fn validate_register_updated_record_missing_updates_ref() {
     let mut test_case = TestCase::new().await;
 
     // Needed to set up mocking but not actually referenced
-    let mut dummy_prev_action = fixt!(Create);
-    dummy_prev_action.author = test_case.agent.clone();
-    dummy_prev_action.entry_type = EntryType::App(AppEntryDef {
+    let mut dummy_prev_action = fixt!(Action, CreateAction);
+    dummy_prev_action.header.author = test_case.agent.clone();
+    *dummy_prev_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let dummy_prev_action = test_case.sign_action(dummy_prev_action.to_v2()).await;
+    let dummy_prev_action = test_case.sign_action(dummy_prev_action).await;
 
     let mut mismatched_action_hash = fixt!(ActionHash);
     loop {
@@ -1680,16 +1702,18 @@ async fn validate_register_updated_record_missing_updates_ref() {
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
-    let mut update_action: holochain_zome_types::prelude::Update = fixt!(Update);
-    update_action.timestamp = Timestamp::now();
-    update_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut update_action = fixt!(Action, UpdateAction);
+    update_action.header.timestamp = Timestamp::now();
+    *update_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    update_action.original_action_address = mismatched_action_hash;
+    if let ActionData::Update(d) = &mut update_action.data {
+        d.original_action_address = mismatched_action_hash;
+    }
     let op = ChainOp::UpdateRecord(
-        signed(update_action.to_v2(), fixt!(Signature)),
+        signed(update_action, fixt!(Signature)),
         to_op_entry(RecordEntry::Present(app_entry)),
     )
     .into();
@@ -1714,24 +1738,26 @@ async fn validate_valid_register_deleted_by() {
     let mut test_case = TestCase::new().await;
 
     // Action to be updated
-    let mut to_delete_action = fixt!(Create);
-    to_delete_action.author = test_case.agent.clone();
-    to_delete_action.timestamp = Timestamp::now();
-    to_delete_action.action_seq = 5;
-    to_delete_action.prev_action = fixt!(ActionHash);
-    to_delete_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut to_delete_action = fixt!(Action, CreateAction);
+    to_delete_action.header.author = test_case.agent.clone();
+    to_delete_action.header.timestamp = Timestamp::now();
+    to_delete_action.header.action_seq = 5;
+    to_delete_action.header.prev_action = Some(fixt!(ActionHash));
+    *to_delete_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    to_delete_action.entry_hash = fixt!(EntryHash);
-    let to_delete_signed_action = test_case.sign_action(to_delete_action.to_v2()).await;
+    *to_delete_action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    let to_delete_signed_action = test_case.sign_action(to_delete_action).await;
 
     // Op to validate
-    let mut delete_action = fixt!(Delete);
-    delete_action.timestamp = Timestamp::now();
-    delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = ChainOp::DeleteRecord(signed(delete_action.to_v2(), fixt!(Signature))).into();
+    let mut delete_action = fixt!(Action, DeleteAction);
+    delete_action.header.timestamp = Timestamp::now();
+    if let ActionData::Delete(d) = &mut delete_action.data {
+        d.deletes_address = to_delete_signed_action.as_hash().clone();
+    }
+    let op = ChainOp::DeleteRecord(signed(delete_action, fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
@@ -1750,14 +1776,14 @@ async fn validate_register_deleted_by_with_missing_deletes_ref() {
     let mut test_case = TestCase::new().await;
 
     // Dummy action to set up the mock, won't be referenced
-    let mut dummy_action = fixt!(Create);
-    dummy_action.author = test_case.agent.clone();
-    dummy_action.entry_type = EntryType::App(AppEntryDef {
+    let mut dummy_action = fixt!(Action, CreateAction);
+    dummy_action.header.author = test_case.agent.clone();
+    *dummy_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let dummy_action = test_case.sign_action(dummy_action.to_v2()).await;
+    let dummy_action = test_case.sign_action(dummy_action).await;
 
     let mut mismatched_action_hash = fixt!(ActionHash);
     loop {
@@ -1768,10 +1794,12 @@ async fn validate_register_deleted_by_with_missing_deletes_ref() {
     }
 
     // Op to validate
-    let mut delete_action = fixt!(Delete);
-    delete_action.timestamp = Timestamp::now();
-    delete_action.deletes_address = mismatched_action_hash;
-    let op = ChainOp::DeleteRecord(signed(delete_action.to_v2(), fixt!(Signature))).into();
+    let mut delete_action = fixt!(Action, DeleteAction);
+    delete_action.header.timestamp = Timestamp::now();
+    if let ActionData::Delete(d) = &mut delete_action.data {
+        d.deletes_address = mismatched_action_hash;
+    }
+    let op = ChainOp::DeleteRecord(signed(delete_action, fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_action])
@@ -1793,15 +1821,17 @@ async fn validate_register_deleted_by_wrong_delete_target() {
     let mut test_case = TestCase::new().await;
 
     // Action to be updated
-    let mut to_delete_action = fixt!(Dna); // Cannot delete a DNA action
-    to_delete_action.author = test_case.agent.clone();
-    let to_delete_signed_action = test_case.sign_action(to_delete_action.to_v2()).await;
+    let mut to_delete_action = fixt!(Action, DnaAction); // Cannot delete a DNA action
+    to_delete_action.header.author = test_case.agent.clone();
+    let to_delete_signed_action = test_case.sign_action(to_delete_action).await;
 
     // Op to validate
-    let mut delete_action = fixt!(Delete);
-    delete_action.timestamp = Timestamp::now();
-    delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = ChainOp::DeleteRecord(signed(delete_action.to_v2(), fixt!(Signature))).into();
+    let mut delete_action = fixt!(Action, DeleteAction);
+    delete_action.header.timestamp = Timestamp::now();
+    if let ActionData::Delete(d) = &mut delete_action.data {
+        d.deletes_address = to_delete_signed_action.as_hash().clone();
+    }
+    let op = ChainOp::DeleteRecord(signed(delete_action, fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action.clone()])
@@ -1826,24 +1856,26 @@ async fn validate_valid_register_deleted_entry_action() {
     let mut test_case = TestCase::new().await;
 
     // Action to be updated
-    let mut to_delete_action = fixt!(Create);
-    to_delete_action.author = test_case.agent.clone();
-    to_delete_action.timestamp = Timestamp::now();
-    to_delete_action.action_seq = 5;
-    to_delete_action.prev_action = fixt!(ActionHash);
-    to_delete_action.entry_type = EntryType::App(AppEntryDef::new(
+    let mut to_delete_action = fixt!(Action, CreateAction);
+    to_delete_action.header.author = test_case.agent.clone();
+    to_delete_action.header.timestamp = Timestamp::now();
+    to_delete_action.header.action_seq = 5;
+    to_delete_action.header.prev_action = Some(fixt!(ActionHash));
+    *to_delete_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),
         0.into(),
         EntryVisibility::Public,
     ));
-    to_delete_action.entry_hash = fixt!(EntryHash);
-    let to_delete_signed_action = test_case.sign_action(to_delete_action.to_v2()).await;
+    *to_delete_action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    let to_delete_signed_action = test_case.sign_action(to_delete_action).await;
 
     // Op to validate
-    let mut delete_action = fixt!(Delete);
-    delete_action.timestamp = Timestamp::now();
-    delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = ChainOp::DeleteEntry(signed(delete_action.to_v2(), fixt!(Signature))).into();
+    let mut delete_action = fixt!(Action, DeleteAction);
+    delete_action.header.timestamp = Timestamp::now();
+    if let ActionData::Delete(d) = &mut delete_action.data {
+        d.deletes_address = to_delete_signed_action.as_hash().clone();
+    }
+    let op = ChainOp::DeleteEntry(signed(delete_action, fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
@@ -1862,14 +1894,14 @@ async fn validate_register_deleted_entry_action_with_missing_deletes_ref() {
     let mut test_case = TestCase::new().await;
 
     // Dummy action to set up the mock, won't be referenced
-    let mut dummy_action = fixt!(Create);
-    dummy_action.author = test_case.agent.clone();
-    dummy_action.entry_type = EntryType::App(AppEntryDef {
+    let mut dummy_action = fixt!(Action, CreateAction);
+    dummy_action.header.author = test_case.agent.clone();
+    *dummy_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let dummy_action = test_case.sign_action(dummy_action.to_v2()).await;
+    let dummy_action = test_case.sign_action(dummy_action).await;
 
     let mut mismatched_action_hash = fixt!(ActionHash);
     loop {
@@ -1880,10 +1912,12 @@ async fn validate_register_deleted_entry_action_with_missing_deletes_ref() {
     }
 
     // Op to validate
-    let mut delete_action = fixt!(Delete);
-    delete_action.timestamp = Timestamp::now();
-    delete_action.deletes_address = mismatched_action_hash;
-    let op = ChainOp::DeleteEntry(signed(delete_action.to_v2(), fixt!(Signature))).into();
+    let mut delete_action = fixt!(Action, DeleteAction);
+    delete_action.header.timestamp = Timestamp::now();
+    if let ActionData::Delete(d) = &mut delete_action.data {
+        d.deletes_address = mismatched_action_hash;
+    }
+    let op = ChainOp::DeleteEntry(signed(delete_action, fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_action])
@@ -1905,15 +1939,17 @@ async fn validate_register_deleted_entry_action_wrong_delete_target() {
     let mut test_case = TestCase::new().await;
 
     // Action to be updated
-    let mut to_delete_action = fixt!(Dna); // Cannot delete a DNA action
-    to_delete_action.author = test_case.agent.clone();
-    let to_delete_signed_action = test_case.sign_action(to_delete_action.to_v2()).await;
+    let mut to_delete_action = fixt!(Action, DnaAction); // Cannot delete a DNA action
+    to_delete_action.header.author = test_case.agent.clone();
+    let to_delete_signed_action = test_case.sign_action(to_delete_action).await;
 
     // Op to validate
-    let mut delete_action = fixt!(Delete);
-    delete_action.timestamp = Timestamp::now();
-    delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = ChainOp::DeleteEntry(signed(delete_action.to_v2(), fixt!(Signature))).into();
+    let mut delete_action = fixt!(Action, DeleteAction);
+    delete_action.header.timestamp = Timestamp::now();
+    if let ActionData::Delete(d) = &mut delete_action.data {
+        d.deletes_address = to_delete_signed_action.as_hash().clone();
+    }
+    let op = ChainOp::DeleteEntry(signed(delete_action, fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action.clone()])
@@ -1938,18 +1974,20 @@ async fn validate_delete_a_delete_is_rejected() {
     let mut test_case = TestCase::new().await;
 
     // Delete action to be deleted.
-    let mut delete = fixt!(Delete);
-    delete.author = test_case.agent.clone();
-    let delete_action_signed_hashed = test_case.sign_action(delete.to_v2()).await;
+    let mut delete = fixt!(Action, DeleteAction);
+    delete.header.author = test_case.agent.clone();
+    let delete_action_signed_hashed = test_case.sign_action(delete).await;
 
     // Op to validate
-    let mut delete_delete_action = fixt!(Delete);
-    delete_delete_action.author = test_case.agent.clone();
-    delete_delete_action.timestamp = Timestamp::now();
-    delete_delete_action.deletes_address = delete_action_signed_hashed.as_hash().clone();
+    let mut delete_delete_action = fixt!(Action, DeleteAction);
+    delete_delete_action.header.author = test_case.agent.clone();
+    delete_delete_action.header.timestamp = Timestamp::now();
+    if let ActionData::Delete(d) = &mut delete_delete_action.data {
+        d.deletes_address = delete_action_signed_hashed.as_hash().clone();
+    }
 
     // Validate a deleted entry action.
-    let op = ChainOp::DeleteEntry(signed(delete_delete_action.to_v2(), fixt!(Signature))).into();
+    let op = ChainOp::DeleteEntry(signed(delete_delete_action.clone(), fixt!(Signature))).into();
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![delete_action_signed_hashed.clone()])
         .with_op(op)
@@ -1965,7 +2003,7 @@ async fn validate_delete_a_delete_is_rejected() {
     );
 
     // Validate a deleted by.
-    let op = ChainOp::DeleteRecord(signed(delete_delete_action.to_v2(), fixt!(Signature))).into();
+    let op = ChainOp::DeleteRecord(signed(delete_delete_action, fixt!(Signature))).into();
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![])
         .with_op(op)
@@ -1988,10 +2026,12 @@ async fn validate_valid_add_link() {
     let mut test_case = TestCase::new().await;
 
     // Op to validate
-    let mut create_link_action = fixt!(CreateLink);
-    create_link_action.tag = "hello".as_bytes().to_vec().into();
-    create_link_action.timestamp = Timestamp::now();
-    let op = ChainOp::CreateLink(signed(create_link_action.to_v2(), fixt!(Signature))).into();
+    let mut create_link_action = fixt!(Action, CreateLinkAction);
+    if let ActionData::CreateLink(d) = &mut create_link_action.data {
+        d.tag = "hello".as_bytes().to_vec().into();
+    }
+    create_link_action.header.timestamp = Timestamp::now();
+    let op = ChainOp::CreateLink(signed(create_link_action, fixt!(Signature))).into();
 
     // Note that no mocking is configured so the base and target addressed for the link aren't not going to be checked.
     // This is intentional as the validation isn't meant to check them but not very obvious from this test, hence the comment!
@@ -2007,10 +2047,12 @@ async fn validate_add_link_tag_too_large() {
     let mut test_case = TestCase::new().await;
 
     // Op to validate
-    let mut create_link_action = fixt!(CreateLink);
-    create_link_action.tag = vec![0; 2_000].into();
-    create_link_action.timestamp = Timestamp::now();
-    let op = ChainOp::CreateLink(signed(create_link_action.to_v2(), fixt!(Signature))).into();
+    let mut create_link_action = fixt!(Action, CreateLinkAction);
+    if let ActionData::CreateLink(d) = &mut create_link_action.data {
+        d.tag = vec![0; 2_000].into();
+    }
+    create_link_action.header.timestamp = Timestamp::now();
+    let op = ChainOp::CreateLink(signed(create_link_action, fixt!(Signature))).into();
 
     // Note that no mocking is configured so the base and target addressed for the link aren't not going to be checked.
     // This is intentional as the validation isn't meant to check them but not very obvious from this test, hence the comment!
@@ -2029,16 +2071,18 @@ async fn validate_valid_remove_link() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut action = fixt!(CreateLink);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let mut action = fixt!(Action, CreateLinkAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
-    let mut delete_link_action = fixt!(DeleteLink);
-    delete_link_action.timestamp = Timestamp::now();
-    delete_link_action.link_add_address = previous_action.as_hash().clone();
-    let op = ChainOp::DeleteLink(signed(delete_link_action.to_v2(), fixt!(Signature))).into();
+    let mut delete_link_action = fixt!(Action, DeleteLinkAction);
+    delete_link_action.header.timestamp = Timestamp::now();
+    if let ActionData::DeleteLink(d) = &mut delete_link_action.data {
+        d.link_add_address = previous_action.as_hash().clone();
+    }
+    let op = ChainOp::DeleteLink(signed(delete_link_action, fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -2057,10 +2101,10 @@ async fn validate_remove_link_missing_link_add_ref() {
     let mut test_case = TestCase::new().await;
 
     // Dummy action to set up the mock, won't be referenced
-    let mut dummy_action = fixt!(CreateLink);
-    dummy_action.author = test_case.agent.clone();
-    dummy_action.timestamp = Timestamp::now();
-    let dummy_action = test_case.sign_action(dummy_action.to_v2()).await;
+    let mut dummy_action = fixt!(Action, CreateLinkAction);
+    dummy_action.header.author = test_case.agent.clone();
+    dummy_action.header.timestamp = Timestamp::now();
+    let dummy_action = test_case.sign_action(dummy_action).await;
 
     let mut mismatched_action_hash = fixt!(ActionHash);
     loop {
@@ -2071,10 +2115,12 @@ async fn validate_remove_link_missing_link_add_ref() {
     }
 
     // Op to validate
-    let mut delete_link_action = fixt!(DeleteLink);
-    delete_link_action.timestamp = Timestamp::now();
-    delete_link_action.link_add_address = mismatched_action_hash;
-    let op = ChainOp::DeleteLink(signed(delete_link_action.to_v2(), fixt!(Signature))).into();
+    let mut delete_link_action = fixt!(Action, DeleteLinkAction);
+    delete_link_action.header.timestamp = Timestamp::now();
+    if let ActionData::DeleteLink(d) = &mut delete_link_action.data {
+        d.link_add_address = mismatched_action_hash;
+    }
+    let op = ChainOp::DeleteLink(signed(delete_link_action, fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_action])
@@ -2096,16 +2142,18 @@ async fn validate_remove_link_with_wrong_target_type() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut action = fixt!(Update);
-    action.author = test_case.agent.clone();
-    action.timestamp = Timestamp::now();
-    let previous_action = test_case.sign_action(action.to_v2()).await;
+    let mut action = fixt!(Action, UpdateAction);
+    action.header.author = test_case.agent.clone();
+    action.header.timestamp = Timestamp::now();
+    let previous_action = test_case.sign_action(action).await;
 
     // Op to validate
-    let mut delete_link_action = fixt!(DeleteLink);
-    delete_link_action.timestamp = Timestamp::now();
-    delete_link_action.link_add_address = previous_action.as_hash().clone();
-    let op = ChainOp::DeleteLink(signed(delete_link_action.to_v2(), fixt!(Signature))).into();
+    let mut delete_link_action = fixt!(Action, DeleteLinkAction);
+    delete_link_action.header.timestamp = Timestamp::now();
+    if let ActionData::DeleteLink(d) = &mut delete_link_action.data {
+        d.link_add_address = previous_action.as_hash().clone();
+    }
+    let op = ChainOp::DeleteLink(signed(delete_link_action, fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action.clone()])
@@ -2129,33 +2177,36 @@ async fn action_after_close_chain() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut dna_action = CloseChain {
-        author: test_case.agent.clone(),
-        timestamp: Timestamp::now(),
-        action_seq: 23,
-        prev_action: fixt!(ActionHash),
-        new_target: Some(fixt!(MigrationTarget)),
-    };
+    let mut dna_action = fixt!(Action, CloseChainAction);
+    dna_action.header.author = test_case.agent.clone();
+    dna_action.header.timestamp = Timestamp::now();
+    dna_action.header.action_seq = 23;
+    dna_action.header.prev_action = Some(fixt!(ActionHash));
+    if let ActionData::CloseChain(d) = &mut dna_action.data {
+        d.new_target = Some(fixt!(MigrationTarget));
+    }
 
     // If this is an agent migration, the agent keypair needs to exist
     // so the Close can be signed.
-    if let Some(MigrationTarget::Agent(agent)) = dna_action.new_target.as_mut() {
-        *agent = test_case.keystore.new_sign_keypair_random().await.unwrap();
+    if let ActionData::CloseChain(d) = &mut dna_action.data {
+        if let Some(MigrationTarget::Agent(agent)) = d.new_target.as_mut() {
+            *agent = test_case.keystore.new_sign_keypair_random().await.unwrap();
+        }
     }
 
-    let previous_action = test_case.sign_action(dna_action.to_v2()).await;
+    let previous_action = test_case.sign_action(dna_action).await;
 
-    let mut create = fixt!(Create);
-    create.prev_action = previous_action.as_hash().clone();
-    create.action_seq = 24;
-    create.entry_type = EntryType::App(AppEntryDef {
+    let mut create = fixt!(Action, CreateAction);
+    create.header.prev_action = Some(previous_action.as_hash().clone());
+    create.header.action_seq = 24;
+    *create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
 
     // Use agent activity so that we'll validate the previous action
-    let op = ChainOp::AgentActivity(signed(create.to_v2(), fixt!(Signature))).into();
+    let op = ChainOp::AgentActivity(signed(create.clone(), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -2167,7 +2218,7 @@ async fn action_after_close_chain() {
     assert_eq!(
         Outcome::Rejected(
             ValidationOutcome::PrevActionError(
-                (PrevActionErrorKind::ActionAfterChainClose, create.to_v2()).into()
+                (PrevActionErrorKind::ActionAfterChainClose, create).into()
             )
             .to_string()
         ),
@@ -2186,11 +2237,11 @@ async fn crash_case() {
     let agent = keystore.new_sign_keypair_random().await.unwrap();
 
     // This is the previous
-    let mut create_action = fixt!(AgentValidationPkg);
-    create_action.author = agent.clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.action_seq = 10;
-    let action = create_action.to_v2();
+    let mut create_action = fixt!(Action, AgentValidationPkgAction);
+    create_action.header.author = agent.clone();
+    create_action.header.timestamp = Timestamp::now();
+    create_action.header.action_seq = 10;
+    let action = create_action;
     let action_hashed = HoloHashed::from_content_sync(action);
     let signed_action = SignedActionHashed::sign(&keystore, action_hashed)
         .await
@@ -2351,167 +2402,6 @@ fn signed(action: Action, signature: Signature) -> SignedAction {
     SignedAction::new(action, signature)
 }
 
-/// Build a flat [`Action`] from a fixturated per-field action struct.
-///
-/// The fixturators yield structs like `fixt!(Create)`; each impl maps one onto
-/// the [`ActionHeader`] + [`ActionData`] envelope the tests author, hash, and
-/// sign.
-pub(super) trait ToV2Action {
-    fn to_v2(&self) -> Action;
-}
-
-impl ToV2Action for Dna {
-    fn to_v2(&self) -> Action {
-        Action {
-            header: ActionHeader {
-                author: self.author.clone(),
-                timestamp: self.timestamp,
-                action_seq: 0,
-                prev_action: None,
-            },
-            data: ActionData::Dna(DnaData {
-                dna_hash: self.hash.clone(),
-            }),
-        }
-    }
-}
-
-impl ToV2Action for AgentValidationPkg {
-    fn to_v2(&self) -> Action {
-        Action {
-            header: ActionHeader {
-                author: self.author.clone(),
-                timestamp: self.timestamp,
-                action_seq: self.action_seq,
-                prev_action: Some(self.prev_action.clone()),
-            },
-            data: ActionData::AgentValidationPkg(AgentValidationPkgData {
-                membrane_proof: self.membrane_proof.clone(),
-            }),
-        }
-    }
-}
-
-impl ToV2Action for InitZomesComplete {
-    fn to_v2(&self) -> Action {
-        Action {
-            header: ActionHeader {
-                author: self.author.clone(),
-                timestamp: self.timestamp,
-                action_seq: self.action_seq,
-                prev_action: Some(self.prev_action.clone()),
-            },
-            data: ActionData::InitZomesComplete(InitZomesCompleteData {}),
-        }
-    }
-}
-
-impl ToV2Action for Create {
-    fn to_v2(&self) -> Action {
-        Action {
-            header: ActionHeader {
-                author: self.author.clone(),
-                timestamp: self.timestamp,
-                action_seq: self.action_seq,
-                prev_action: Some(self.prev_action.clone()),
-            },
-            data: ActionData::Create(CreateData {
-                entry_type: self.entry_type.clone(),
-                entry_hash: self.entry_hash.clone(),
-            }),
-        }
-    }
-}
-
-impl ToV2Action for Update {
-    fn to_v2(&self) -> Action {
-        Action {
-            header: ActionHeader {
-                author: self.author.clone(),
-                timestamp: self.timestamp,
-                action_seq: self.action_seq,
-                prev_action: Some(self.prev_action.clone()),
-            },
-            data: ActionData::Update(UpdateData {
-                original_action_address: self.original_action_address.clone(),
-                original_entry_address: self.original_entry_address.clone(),
-                entry_type: self.entry_type.clone(),
-                entry_hash: self.entry_hash.clone(),
-            }),
-        }
-    }
-}
-
-impl ToV2Action for Delete {
-    fn to_v2(&self) -> Action {
-        Action {
-            header: ActionHeader {
-                author: self.author.clone(),
-                timestamp: self.timestamp,
-                action_seq: self.action_seq,
-                prev_action: Some(self.prev_action.clone()),
-            },
-            data: ActionData::Delete(DeleteData {
-                deletes_address: self.deletes_address.clone(),
-                deletes_entry_address: self.deletes_entry_address.clone(),
-            }),
-        }
-    }
-}
-
-impl ToV2Action for CreateLink {
-    fn to_v2(&self) -> Action {
-        Action {
-            header: ActionHeader {
-                author: self.author.clone(),
-                timestamp: self.timestamp,
-                action_seq: self.action_seq,
-                prev_action: Some(self.prev_action.clone()),
-            },
-            data: ActionData::CreateLink(CreateLinkData {
-                base_address: self.base_address.clone(),
-                target_address: self.target_address.clone(),
-                zome_index: self.zome_index,
-                link_type: self.link_type,
-                tag: self.tag.clone(),
-            }),
-        }
-    }
-}
-
-impl ToV2Action for DeleteLink {
-    fn to_v2(&self) -> Action {
-        Action {
-            header: ActionHeader {
-                author: self.author.clone(),
-                timestamp: self.timestamp,
-                action_seq: self.action_seq,
-                prev_action: Some(self.prev_action.clone()),
-            },
-            data: ActionData::DeleteLink(DeleteLinkData {
-                base_address: self.base_address.clone(),
-                link_add_address: self.link_add_address.clone(),
-            }),
-        }
-    }
-}
-
-impl ToV2Action for CloseChain {
-    fn to_v2(&self) -> Action {
-        Action {
-            header: ActionHeader {
-                author: self.author.clone(),
-                timestamp: self.timestamp,
-                action_seq: self.action_seq,
-                prev_action: Some(self.prev_action.clone()),
-            },
-            data: ActionData::CloseChain(CloseChainData {
-                new_target: self.new_target.clone(),
-            }),
-        }
-    }
-}
-
 /// Map a [`RecordEntry`] to the [`OpEntry`] carried by entry-bearing ops.
 fn to_op_entry(entry: RecordEntry) -> OpEntry {
     match entry {
@@ -2522,17 +2412,17 @@ fn to_op_entry(entry: RecordEntry) -> OpEntry {
 }
 
 fn test_op(previous: &SignedActionHashed) -> DhtOp {
-    let mut create_action = fixt!(Create);
-    create_action.author = previous.action().author().clone();
-    create_action.action_seq = previous.action().action_seq() + 1;
-    create_action.prev_action = previous.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::App(AppEntryDef {
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = previous.action().author().clone();
+    create_action.header.action_seq = previous.action().action_seq() + 1;
+    create_action.header.prev_action = Some(previous.as_hash().clone());
+    create_action.header.timestamp = Timestamp::now();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let action = create_action.to_v2();
+    let action = create_action;
 
     ChainOp::AgentActivity(signed(action, fixt!(Signature))).into()
 }

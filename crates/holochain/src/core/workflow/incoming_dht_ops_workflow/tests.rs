@@ -7,29 +7,8 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_types::dht_v2::ChainOp;
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    Action, ActionData, ActionHeader, CreateLinkData,
-};
 use holochain_zome_types::dht_v2::SignedAction;
-
-/// Build an [`Action`] from a fixturated `CreateLink` struct.
-fn v2_create_link(c: CreateLink) -> Action {
-    Action {
-        header: ActionHeader {
-            author: c.author,
-            timestamp: c.timestamp,
-            action_seq: c.action_seq,
-            prev_action: Some(c.prev_action),
-        },
-        data: ActionData::CreateLink(CreateLinkData {
-            base_address: c.base_address,
-            target_address: c.target_address,
-            zome_index: c.zome_index,
-            link_type: c.link_type,
-            tag: c.tag,
-        }),
-    }
-}
+use holochain_zome_types::fixt::{ActionFixturator, CreateLinkAction};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_to_limbo() {
@@ -45,9 +24,9 @@ async fn incoming_ops_to_limbo() {
     let mut op_list = Vec::new();
 
     for _ in 0..10 {
-        let mut action = fixt!(CreateLink);
-        action.author = author.clone();
-        let v2_action = v2_create_link(action);
+        let mut action = fixt!(Action, CreateLinkAction);
+        action.header.author = author.clone();
+        let v2_action = action;
         let signature = author.sign(&keystore, &v2_action).await.unwrap();
 
         let op = ChainOp::AgentActivity(SignedAction::new(v2_action, signature));
@@ -87,9 +66,9 @@ async fn can_retry_failed_op() {
 
     let author = keystore.new_sign_keypair_random().await.unwrap();
 
-    let mut action = fixt!(CreateLink);
-    action.author = author.clone();
-    let v2_action = v2_create_link(action);
+    let mut action = fixt!(Action, CreateLinkAction);
+    action.header.author = author.clone();
+    let v2_action = action;
     // Create a dummy signature that will fail validation
     let signature = Signature([0; SIGNATURE_BYTES]);
 
@@ -149,9 +128,9 @@ async fn require_validation_receipt_follows_publish_flag() {
     // Two distinct signed ops
     let mut ops = Vec::new();
     for _ in 0..2 {
-        let mut action = fixt!(CreateLink);
-        action.author = author.clone();
-        let v2_action = v2_create_link(action);
+        let mut action = fixt!(Action, CreateLinkAction);
+        action.header.author = author.clone();
+        let v2_action = action;
         let signature = author.sign(&keystore, &v2_action).await.unwrap();
         let op: DhtOp = ChainOp::AgentActivity(SignedAction::new(v2_action, signature)).into();
         let hash = DhtOpHash::with_data_sync(&op);

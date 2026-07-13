@@ -1,4 +1,3 @@
-use super::validate_op_tests::ToV2Action;
 use super::*;
 use crate::retry_until_timeout;
 use crate::sweettest::*;
@@ -8,6 +7,7 @@ use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::dht_v2::SignedAction;
+use holochain_zome_types::fixt::{ActionFixturator, CreateAction, DnaAction};
 use std::convert::TryFrom;
 use std::time::Duration;
 use {
@@ -43,10 +43,10 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
 
     // - Create an invalid op
     let bob_pubkey = fixt!(AgentPubKey);
-    let mut mismatched_action = fixt!(Create);
-    mismatched_action.author = bob_pubkey.clone();
+    let mut mismatched_action = fixt!(Action, CreateAction);
+    mismatched_action.header.author = bob_pubkey.clone();
     let op: DhtOp = ChainOp::CreateEntry(
-        SignedAction::new(mismatched_action.to_v2(), fixt!(Signature)),
+        SignedAction::new(mismatched_action, fixt!(Signature)),
         OpEntry::Present(fixt!(Entry)),
     )
     .into();
@@ -120,9 +120,8 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let bob_cell_id = bob.cells()[0].cell_id().clone();
 
     // Create Alice's genesis action (Dna action at seq 0)
-    let mut dna_action = fixt!(Dna);
-    dna_action.author = alice_pubkey.clone();
-    let dna_action = dna_action.to_v2();
+    let mut dna_action = fixt!(Action, DnaAction);
+    dna_action.header.author = alice_pubkey.clone();
     let signed_dna_action = SignedActionHashed::sign(
         &keystore,
         holo_hash::HoloHashed::from_content_sync(dna_action),
@@ -133,32 +132,32 @@ async fn sys_validation_produces_forked_chain_warrant() {
 
     // Create the original action at seq 1
     let original_entry = Entry::App(AppEntryBytes(UnsafeBytes::from(vec![1; 10]).into()));
-    let mut original_create = fixt!(Create);
-    original_create.author = alice_pubkey.clone();
-    original_create.prev_action = prev_action_hash.clone();
-    original_create.action_seq = 1;
-    original_create.entry_type = EntryType::App(AppEntryDef {
+    let mut original_create = fixt!(Action, CreateAction);
+    original_create.header.author = alice_pubkey.clone();
+    original_create.header.prev_action = Some(prev_action_hash.clone());
+    original_create.header.action_seq = 1;
+    *original_create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    original_create.entry_hash = original_entry.to_hash();
+    *original_create.entry_hash_mut().unwrap() = original_entry.to_hash();
 
     // Create a forked action at seq 1 with a different entry
     let forked_entry = Entry::App(AppEntryBytes(UnsafeBytes::from(vec![2; 10]).into()));
-    let mut forked_create = fixt!(Create);
-    forked_create.author = alice_pubkey.clone();
-    forked_create.prev_action = prev_action_hash.clone();
-    forked_create.action_seq = 1;
-    forked_create.entry_type = EntryType::App(AppEntryDef {
+    let mut forked_create = fixt!(Action, CreateAction);
+    forked_create.header.author = alice_pubkey.clone();
+    forked_create.header.prev_action = Some(prev_action_hash.clone());
+    forked_create.header.action_seq = 1;
+    *forked_create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    forked_create.entry_hash = forked_entry.to_hash();
+    *forked_create.entry_hash_mut().unwrap() = forked_entry.to_hash();
 
-    let original_action = original_create.to_v2();
-    let forked_action = forked_create.to_v2();
+    let original_action = original_create;
+    let forked_action = forked_create;
 
     let signed_original = SignedActionHashed::sign(
         &keystore,
@@ -293,9 +292,8 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
     let bob_cell_id = bob.cells()[0].cell_id().clone();
 
     // Create Alice's genesis action (Dna action at seq 0)
-    let mut dna_action = fixt!(Dna);
-    dna_action.author = alice_pubkey.clone();
-    let dna_action = dna_action.to_v2();
+    let mut dna_action = fixt!(Action, DnaAction);
+    dna_action.header.author = alice_pubkey.clone();
     let signed_dna_action = SignedActionHashed::sign(
         &keystore,
         holo_hash::HoloHashed::from_content_sync(dna_action),
@@ -308,30 +306,30 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
     let entry1 = Entry::App(AppEntryBytes(UnsafeBytes::from(vec![1; 10]).into()));
     let entry2 = Entry::App(AppEntryBytes(UnsafeBytes::from(vec![2; 10]).into()));
 
-    let mut create1 = fixt!(Create);
-    create1.author = alice_pubkey.clone();
-    create1.prev_action = prev_action_hash.clone();
-    create1.action_seq = 1;
-    create1.entry_type = EntryType::App(AppEntryDef {
+    let mut create1 = fixt!(Action, CreateAction);
+    create1.header.author = alice_pubkey.clone();
+    create1.header.prev_action = Some(prev_action_hash.clone());
+    create1.header.action_seq = 1;
+    *create1.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    create1.entry_hash = entry1.to_hash();
+    *create1.entry_hash_mut().unwrap() = entry1.to_hash();
 
-    let mut create2 = fixt!(Create);
-    create2.author = alice_pubkey.clone();
-    create2.prev_action = prev_action_hash.clone();
-    create2.action_seq = 1;
-    create2.entry_type = EntryType::App(AppEntryDef {
+    let mut create2 = fixt!(Action, CreateAction);
+    create2.header.author = alice_pubkey.clone();
+    create2.header.prev_action = Some(prev_action_hash.clone());
+    create2.header.action_seq = 1;
+    *create2.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    create2.entry_hash = entry2.to_hash();
+    *create2.entry_hash_mut().unwrap() = entry2.to_hash();
 
-    let action1 = create1.to_v2();
-    let action2 = create2.to_v2();
+    let action1 = create1;
+    let action2 = create2;
 
     let signed_action1 =
         SignedActionHashed::sign(&keystore, holo_hash::HoloHashed::from_content_sync(action1))

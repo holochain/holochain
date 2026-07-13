@@ -35,7 +35,6 @@ use crate::sweettest::SweetConductor;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 use holo_hash::fixt::ActionHashFixturator;
-use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::MockCascade;
@@ -44,25 +43,9 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::test_utils::valid_arbitrary_chain;
 use holochain_types::test_utils::ActionRefMut;
-use holochain_zome_types::dht_v2::{Action, ActionData, ActionHeader, CreateData, CreateLinkData};
+use holochain_zome_types::fixt::{ActionFixturator, CreateAction, CreateLinkAction};
 use matches::assert_matches;
 use std::time::Duration;
-
-/// Build an [`Action`] from a fixturated `Create` struct.
-fn create_to_action(c: &Create) -> Action {
-    Action {
-        header: ActionHeader {
-            author: c.author.clone(),
-            timestamp: c.timestamp,
-            action_seq: c.action_seq,
-            prev_action: Some(c.prev_action.clone()),
-        },
-        data: ActionData::Create(CreateData {
-            entry_type: c.entry_type.clone(),
-            entry_hash: c.entry_hash.clone(),
-        }),
-    }
-}
 
 /// Entry type in the action matches the entry variant
 #[test]
@@ -92,20 +75,14 @@ fn check_entry_type_test() {
 /// Hash integrity check. The hash of an entry always matches what's in the action.
 #[test]
 fn check_entry_hash_test() {
-    let mut ec = Create {
-        author: fixt!(AgentPubKey),
-        timestamp: Timestamp::now(),
-        action_seq: 6,
-        prev_action: fixt!(ActionHash),
-        entry_type: EntryType::AgentPubKey,
-        entry_hash: fixt!(EntryHash),
-        weight: EntryRateWeight::default(),
-    };
+    let mut ec = fixt!(Action, CreateAction);
+    *ec.entry_type_mut().unwrap() = EntryType::AgentPubKey;
+    *ec.entry_hash_mut().unwrap() = fixt!(EntryHash);
     let entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
         vec![1, 3, 5],
     ))));
     let hash = EntryHash::with_data_sync(&entry);
-    let action = create_to_action(&ec);
+    let action = ec.clone();
 
     // First check it should have an entry
     assert_matches!(check_new_entry_action(&action), Ok(()));
@@ -118,26 +95,12 @@ fn check_entry_hash_test() {
         ))
     );
 
-    ec.entry_hash = hash;
-    let action = create_to_action(&ec);
+    *ec.entry_hash_mut().unwrap() = hash;
+    let action = ec.clone();
 
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(check_entry_hash(eh, &entry), Ok(()));
-    let create_link = Action {
-        header: ActionHeader {
-            author: fixt!(AgentPubKey),
-            timestamp: Timestamp::now(),
-            action_seq: 8,
-            prev_action: Some(fixt!(ActionHash)),
-        },
-        data: ActionData::CreateLink(CreateLinkData {
-            base_address: fixt!(EntryHash).into(),
-            target_address: fixt!(EntryHash).into(),
-            zome_index: 0.into(),
-            link_type: LinkType::new(3),
-            tag: ().into(),
-        }),
-    };
+    let create_link = fixt!(Action, CreateLinkAction);
     assert_matches!(
         check_new_entry_action(&create_link),
         Err(SysValidationError::ValidationOutcome(
@@ -160,16 +123,13 @@ async fn incoming_ops_filters_private_entry() {
     ))));
     let author = keystore.new_sign_keypair_random().await.unwrap();
     let app_entry_def = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Private);
-    let create = Create {
-        author: author.clone(),
-        timestamp: Timestamp::now(),
-        action_seq: 5,
-        prev_action: fixt!(ActionHash),
-        entry_type: EntryType::App(app_entry_def),
-        entry_hash: EntryHash::with_data_sync(&private_entry),
-        weight: EntryRateWeight::default(),
-    };
-    let action = create_to_action(&create);
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = author.clone();
+    action.header.timestamp = Timestamp::now();
+    action.header.action_seq = 5;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    *action.entry_type_mut().unwrap() = EntryType::App(app_entry_def);
+    *action.entry_hash_mut().unwrap() = EntryHash::with_data_sync(&private_entry);
     let signature = author.sign(&keystore, &action).await.unwrap();
 
     let shh = SignedActionHashed::with_presigned(
@@ -203,22 +163,12 @@ fn create_entry_op_rejects_private_entry() {
     use holochain_types::dht_v2::OpEntry;
     use holochain_types::dht_v2::SignedAction;
 
-    let private_create = Action {
-        header: ActionHeader {
-            author: fixt!(AgentPubKey),
-            timestamp: Timestamp::now(),
-            action_seq: 5,
-            prev_action: Some(fixt!(ActionHash)),
-        },
-        data: ActionData::Create(CreateData {
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Private,
-            )),
-            entry_hash: fixt!(EntryHash),
-        }),
-    };
+    let mut private_create = fixt!(Action, CreateAction);
+    *private_create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
+        0.into(),
+        0.into(),
+        EntryVisibility::Private,
+    ));
     let sa = SignedAction::new(
         private_create,
         holochain_zome_types::signature::Signature::from([0u8; 64]),

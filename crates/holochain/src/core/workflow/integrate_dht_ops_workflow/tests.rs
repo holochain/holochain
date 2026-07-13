@@ -8,27 +8,9 @@ use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::SysOutcome;
 use holochain_state::test_utils::test_dht_store;
 use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    Action, ActionData, ActionHeader, CreateData,
-};
+use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
 use kitsune2_api::StoredOp;
 use std::sync::Arc;
-
-/// Build an [`Action`] from a fixturated `Create` struct.
-fn v2_create(c: Create) -> Action {
-    Action {
-        header: ActionHeader {
-            author: c.author,
-            timestamp: c.timestamp,
-            action_seq: c.action_seq,
-            prev_action: Some(c.prev_action),
-        },
-        data: ActionData::Create(CreateData {
-            entry_type: c.entry_type,
-            entry_hash: c.entry_hash,
-        }),
-    }
-}
 
 // TESTS BEGIN HERE
 
@@ -175,11 +157,10 @@ async fn insert_validated_op_to_store(dht_store: &DhtStore, op: &DhtOpHashed) {
 
 fn make_store_entry_op(author: AgentPubKey) -> (DhtOp, DhtOpHashed) {
     let entry = EntryFixturator::new(AppEntry).next().unwrap();
-    let mut action = fixt!(Create);
-    action.author = author;
-    action.entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-    let v2_action = v2_create(action);
-    let signed = SignedAction::new(v2_action, fixt!(Signature));
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = author;
+    *action.entry_hash_mut().unwrap() = EntryHashed::from_content_sync(entry.clone()).into_hash();
+    let signed = SignedAction::new(action, fixt!(Signature));
     let op: DhtOp = ChainOp::CreateEntry(signed, OpEntry::Present(entry)).into();
     let hashed = DhtOpHashed::from_content_sync(op.clone());
     (op, hashed)
@@ -191,11 +172,10 @@ fn make_store_entry_op_pair() -> (DhtOp, DhtOpHashed) {
 
 fn make_store_record_op_pair() -> (DhtOp, DhtOpHashed) {
     let entry = EntryFixturator::new(AppEntry).next().unwrap();
-    let mut action = fixt!(Create);
-    action.author = fixt!(AgentPubKey);
-    action.entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-    let v2_action = v2_create(action);
-    let signed = SignedAction::new(v2_action, fixt!(Signature));
+    let mut action = fixt!(Action, CreateAction);
+    action.header.author = fixt!(AgentPubKey);
+    *action.entry_hash_mut().unwrap() = EntryHashed::from_content_sync(entry.clone()).into_hash();
+    let signed = SignedAction::new(action, fixt!(Signature));
     let op: DhtOp = ChainOp::CreateRecord(signed, OpEntry::Present(entry)).into();
     let hashed = DhtOpHashed::from_content_sync(op.clone());
     (op, hashed)

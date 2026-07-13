@@ -1,6 +1,5 @@
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
-use crate::prelude::CreateFixturator;
 use crate::prelude::SignatureFixturator;
 use ::fixt::fixt;
 use holo_hash::fixt::AgentPubKeyFixturator;
@@ -11,27 +10,8 @@ use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_state::test_utils::test_dht_store;
-use holochain_zome_types::action::Create;
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    Action, ActionData, ActionHeader, CreateData,
-};
+use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
 use std::sync::Arc;
-
-/// Build an [`Action`] from a fixturated `Create` struct.
-fn v2_create(c: Create) -> Action {
-    Action {
-        header: ActionHeader {
-            author: c.author,
-            timestamp: c.timestamp,
-            action_seq: c.action_seq,
-            prev_action: Some(c.prev_action),
-        },
-        data: ActionData::Create(CreateData {
-            entry_type: c.entry_type,
-            entry_hash: c.entry_hash,
-        }),
-    }
-}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn no_running_cells() {
@@ -398,10 +378,10 @@ async fn create_op_with_status(
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
 
     // The actual op does not matter, just some of the status fields
-    let mut create_action = fixt!(Create);
+    let mut create_action = fixt!(Action, CreateAction);
     let author = author.unwrap_or_else(|| fixt!(AgentPubKey));
-    create_action.author = author.clone();
-    let v2_action = v2_create(create_action);
+    create_action.header.author = author.clone();
+    let v2_action = create_action;
     let signed = holochain_types::dht_v2::SignedAction::new(v2_action, fixt!(Signature));
     let op = holochain_types::dht_v2::DhtOpHashed::from_content_sync(
         holochain_types::dht_v2::DhtOp::from(holochain_types::dht_v2::ChainOp::AgentActivity(

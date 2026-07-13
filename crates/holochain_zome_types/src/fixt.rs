@@ -632,7 +632,7 @@ use crate::dht_v2::{
 // a sequence exercises all ten variants; the genesis `Dna` action is always the
 // first on a chain, so it carries `action_seq == 0` and no `prev_action`.
 macro_rules! action_for_curve {
-    ($curve:expr, $index:expr) => {{
+    ($curve:expr, $index:expr, $variant:expr) => {{
         let index = $index;
         let author = AgentPubKeyFixturator::new_indexed($curve, index)
             .next()
@@ -644,7 +644,7 @@ macro_rules! action_for_curve {
         let prev_action = ActionHashFixturator::new_indexed($curve, index)
             .next()
             .unwrap();
-        let variant = index % 10;
+        let variant = $variant;
         let header = ActionHeader {
             author,
             timestamp,
@@ -748,23 +748,82 @@ macro_rules! action_for_curve {
     }};
 }
 
+/// Marker curves that make `fixt!(Action, <Variant>Action)` build one specific
+/// action variant instead of cycling through all ten.
+macro_rules! action_variant_curve {
+    ($name:ident) => {
+        #[derive(Clone)]
+        pub struct $name;
+    };
+}
+action_variant_curve!(DnaAction);
+action_variant_curve!(AgentValidationPkgAction);
+action_variant_curve!(InitZomesCompleteAction);
+action_variant_curve!(CreateLinkAction);
+action_variant_curve!(DeleteLinkAction);
+action_variant_curve!(OpenChainAction);
+action_variant_curve!(CloseChainAction);
+action_variant_curve!(CreateAction);
+action_variant_curve!(UpdateAction);
+action_variant_curve!(DeleteAction);
+
 fixturator!(
     Action;
     curve Empty {
         let index = get_fixt_index!();
-        action_for_curve!(Empty, index)
+        action_for_curve!(Empty, index, index % 10)
     };
     curve Unpredictable {
         let index = get_fixt_index!();
-        action_for_curve!(Unpredictable, index)
+        action_for_curve!(Unpredictable, index, index % 10)
     };
     curve Predictable {
         let index = get_fixt_index!();
-        action_for_curve!(Predictable, index)
+        action_for_curve!(Predictable, index, index % 10)
+    };
+    curve DnaAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 0)
+    };
+    curve AgentValidationPkgAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 1)
+    };
+    curve InitZomesCompleteAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 2)
+    };
+    curve CreateLinkAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 3)
+    };
+    curve DeleteLinkAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 4)
+    };
+    curve OpenChainAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 5)
+    };
+    curve CloseChainAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 6)
+    };
+    curve CreateAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 7)
+    };
+    curve UpdateAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 8)
+    };
+    curve DeleteAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 9)
     };
     curve PublicCurve {
         let index = get_fixt_index!();
-        let mut action = action_for_curve!(Unpredictable, index);
+        let mut action = action_for_curve!(Unpredictable, index, index % 10);
         // Force entry-creating variants to a public entry type.
         match &mut action.data {
             ActionData::Create(d) => {

@@ -6,7 +6,6 @@ use crate::core::workflow::countersigning_workflow::{
 };
 use crate::core::workflow::countersigning_workflow::{countersigning_success, WorkComplete};
 use crate::core::workflow::WorkflowResult;
-use crate::prelude::CreateFixturator;
 use crate::prelude::EntryFixturator;
 use crate::prelude::SignatureFixturator;
 use crate::prelude::SignedAction;
@@ -31,12 +30,9 @@ use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use holochain_types::prelude::SystemSignal;
 use holochain_types::prelude::{ChainItems, SignedActionHashedExt};
 use holochain_types::signal::Signal;
-use holochain_zome_types::action::Create;
 use holochain_zome_types::cell::CellId;
 use holochain_zome_types::countersigning::PreflightResponse;
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    Action, ActionData, ActionHeader, CreateData,
-};
+use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
 use holochain_zome_types::prelude::CreateBase;
 use holochain_zome_types::query::{ChainHead, ChainStatus};
 use matches::assert_matches;
@@ -45,22 +41,6 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast::{Receiver, Sender};
-
-/// Build an [`Action`] from a fixturated `Create` struct.
-fn v2_create(c: Create) -> Action {
-    Action {
-        header: ActionHeader {
-            author: c.author,
-            timestamp: c.timestamp,
-            action_seq: c.action_seq,
-            prev_action: Some(c.prev_action),
-        },
-        data: ActionData::Create(CreateData {
-            entry_type: c.entry_type,
-            entry_hash: c.entry_hash,
-        }),
-    }
-}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn accept_countersigning_request_creates_state() {
@@ -2282,7 +2262,7 @@ impl RemoteAgent {
     }
 
     fn other_activity_response(&self) -> AgentActivityResponse {
-        let action = v2_create(fixt!(Create));
+        let action = fixt!(Action, CreateAction);
 
         AgentActivityResponse {
             agent: self.agent.clone(),

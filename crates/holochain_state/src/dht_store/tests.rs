@@ -2754,11 +2754,10 @@ mod publish_query {
     use holochain_types::fixt::SignatureFixturator;
     use holochain_types::prelude::*;
     // Disambiguate op-pipeline names brought in by `holochain_types::prelude::*`;
-    // this module seeds `ChainOp`s built from a `Create` fixture.
+    // this module seeds `ChainOp`s built from a v2 `Create` action fixture.
     use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, WarrantOp};
-    use holochain_zome_types::dht_v2::{ActionData, ActionHeader, CreateData};
     use holochain_zome_types::fixt::{
-        AppEntryBytesFixturator, AppEntryDefFixturator, CreateFixturator,
+        ActionFixturator, AppEntryBytesFixturator, AppEntryDefFixturator, CreateAction,
     };
     use std::time::Duration;
 
@@ -2778,10 +2777,10 @@ mod publish_query {
     /// state derived from `facts`, and return its hash.
     async fn seed_chain_op(dht_store: &DhtStore, agent: &AgentPubKey, facts: Facts) -> DhtOpHash {
         let entry = Entry::App(fixt!(AppEntryBytes));
-        let mut action = fixt!(Create);
-        action.author = agent.clone();
-        action.entry_hash = EntryHash::with_data_sync(&entry);
-        action.entry_type = AppEntryDefFixturator::new(if facts.private {
+        let mut action = fixt!(Action, CreateAction);
+        action.header.author = agent.clone();
+        *action.entry_hash_mut().unwrap() = EntryHash::with_data_sync(&entry);
+        *action.entry_type_mut().unwrap() = AppEntryDefFixturator::new(if facts.private {
             EntryVisibility::Private
         } else {
             EntryVisibility::Public
@@ -2790,19 +2789,7 @@ mod publish_query {
         .next()
         .unwrap();
 
-        let v2_action = Action {
-            header: ActionHeader {
-                author: action.author,
-                timestamp: action.timestamp,
-                action_seq: action.action_seq,
-                prev_action: Some(action.prev_action),
-            },
-            data: ActionData::Create(CreateData {
-                entry_type: action.entry_type,
-                entry_hash: action.entry_hash,
-            }),
-        };
-        let signed_action = SignedAction::new(v2_action, fixt!(Signature));
+        let signed_action = SignedAction::new(action, fixt!(Signature));
 
         let op = if facts.store_entry {
             DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::CreateEntry(

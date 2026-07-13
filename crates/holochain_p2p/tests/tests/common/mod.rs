@@ -2,7 +2,8 @@ use ::fixt::fixt;
 use holo_hash::fixt::ActionHashFixturator;
 use holochain_p2p::event::*;
 use holochain_p2p::*;
-use holochain_types::dht_v2::{ActionData, ActionHeader, ChainOp, CreateLinkData};
+use holochain_types::dht_v2::ChainOp;
+use holochain_types::fixt::CreateLinkAction;
 use holochain_types::prelude::*;
 use kitsune2_api::*;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
@@ -107,22 +108,7 @@ impl HcP2pHandler for Handler {
     ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>> {
         Box::pin(async move {
             self.calls.lock().unwrap().push("get_links".into());
-            let create_link = fixt!(CreateLink);
-            let action = Action {
-                header: ActionHeader {
-                    author: create_link.author.clone(),
-                    timestamp: create_link.timestamp,
-                    action_seq: create_link.action_seq,
-                    prev_action: Some(create_link.prev_action.clone()),
-                },
-                data: ActionData::CreateLink(CreateLinkData {
-                    base_address: create_link.base_address.clone(),
-                    target_address: create_link.target_address.clone(),
-                    zome_index: create_link.zome_index,
-                    link_type: create_link.link_type,
-                    tag: create_link.tag.clone(),
-                }),
-            };
+            let action = fixt!(Action, CreateLinkAction);
             Ok(WireLinkOps {
                 creates: vec![Judged::new(
                     SignedAction::new(action, fixt!(Signature)),

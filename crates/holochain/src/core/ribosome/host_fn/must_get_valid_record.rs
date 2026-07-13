@@ -154,25 +154,7 @@ mod tests {
     use ::fixt::prelude::*;
     use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-        Action, ActionData, ActionHeader, CreateData,
-    };
-
-    /// Build an `Action` from a fixturated `Create`.
-    fn action_from_create(c: Create) -> Action {
-        Action {
-            header: ActionHeader {
-                author: c.author,
-                timestamp: c.timestamp,
-                action_seq: c.action_seq,
-                prev_action: Some(c.prev_action),
-            },
-            data: ActionData::Create(CreateData {
-                entry_type: c.entry_type,
-                entry_hash: c.entry_hash,
-            }),
-        }
-    }
+    use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
 
     // This test ensures the ValidationStatus::Rejected arm is hit and returns a
     // HostShortCircuit carrying ValidateCallbackResult::Invalid with the expected message.
@@ -187,10 +169,9 @@ mod tests {
         } = RibosomeTestFixture::new(TestWasm::Validate).await;
 
         // Build a StoreRecord op for a Create action.
-        let mut create = fixt!(Create);
+        let mut create_action = fixt!(Action, CreateAction);
         // Set author to the cell's agent to keep data coherent.
-        create.author = alice_cell.agent_pubkey().clone();
-        let create_action = action_from_create(create.clone());
+        create_action.header.author = alice_cell.agent_pubkey().clone();
         let create_entry = fixt!(Entry);
         let create_entry_hash = create_action.entry_hash().unwrap().clone();
 

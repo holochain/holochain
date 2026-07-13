@@ -4,7 +4,6 @@
 use crate::prelude::ChainItem;
 use ::fixt::prelude::*;
 use holo_hash::*;
-use holochain_zome_types::dht_v2::{ActionHeader, CreateData, DnaData};
 use holochain_zome_types::prelude::*;
 use std::ops::Range;
 
@@ -257,32 +256,18 @@ pub fn chain_item_to_action(i: &impl ChainItem) -> SignedActionHashed {
     let mut action = fixt!(SignedActionHashed);
     match (action_seq, prev_action) {
         (_, None) => {
-            let dna = fixt!(Dna);
-            action.hashed.content = Action {
-                header: ActionHeader {
-                    author: dna.author,
-                    timestamp: Timestamp(0),
-                    action_seq: 0,
-                    prev_action: None,
-                },
-                data: ActionData::Dna(DnaData { dna_hash: dna.hash }),
-            };
+            // `DnaAction` already carries `action_seq == 0` and `prev_action == None`.
+            let mut dna = fixt!(Action, DnaAction);
+            dna.header.timestamp = Timestamp(0);
+            action.hashed.content = dna;
             action.hashed.hash = hash;
         }
         (action_seq, Some(prev_action)) => {
-            let create = fixt!(Create);
-            action.hashed.content = Action {
-                header: ActionHeader {
-                    author: create.author,
-                    timestamp: i.get_timestamp(),
-                    action_seq,
-                    prev_action: Some(prev_action),
-                },
-                data: ActionData::Create(CreateData {
-                    entry_type: create.entry_type,
-                    entry_hash: create.entry_hash,
-                }),
-            };
+            let mut create = fixt!(Action, CreateAction);
+            create.header.timestamp = i.get_timestamp();
+            create.header.action_seq = action_seq;
+            create.header.prev_action = Some(prev_action);
+            action.hashed.content = create;
             action.hashed.hash = hash;
         }
     }

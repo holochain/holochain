@@ -17,7 +17,9 @@ use holochain_types::dht_v2::{ChainOp, DhtOp};
 use holochain_types::link::{CountLinksResponse, WireLinkKey, WireLinkOps, WireLinkQuery};
 use holochain_types::prelude::ValidationReceiptBundle;
 use holochain_types::wire_ops::WireOps;
-use holochain_zome_types::fixt::{CreateFixturator, EntryFixturator, SignatureFixturator};
+use holochain_zome_types::fixt::{
+    ActionFixturator, CreateAction, EntryFixturator, SignatureFixturator,
+};
 use holochain_zome_types::prelude::ChainQueryFilter;
 use kitsune2_api::*;
 use std::sync::Arc;
@@ -156,24 +158,10 @@ impl HcP2pHandler for StubHost {
 
 /// Build a `StoreRecord` op, as it travels on the gossip wire.
 fn test_dht_op(authored_timestamp: Timestamp) -> holochain_types::dht_v2::DhtOp {
-    use holochain_types::dht_v2::{
-        Action, ActionData, ActionHeader, CreateData, OpEntry, SignedAction,
-    };
+    use holochain_types::dht_v2::{OpEntry, SignedAction};
 
-    let mut create = fixt!(Create);
-    create.timestamp = authored_timestamp;
-    let action = Action {
-        header: ActionHeader {
-            author: create.author.clone(),
-            timestamp: create.timestamp,
-            action_seq: create.action_seq,
-            prev_action: Some(create.prev_action.clone()),
-        },
-        data: ActionData::Create(CreateData {
-            entry_type: create.entry_type.clone(),
-            entry_hash: create.entry_hash.clone(),
-        }),
-    };
+    let mut action = fixt!(Action, CreateAction);
+    action.header.timestamp = authored_timestamp;
     let signed = SignedAction::new(action, fixt!(Signature));
     DhtOp::ChainOp(Box::new(ChainOp::CreateRecord(
         signed,

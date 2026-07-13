@@ -113,10 +113,7 @@ pub mod test {
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-        Action, ActionData, ActionHeader, CreateData,
-    };
-    use holochain_zome_types::fixt::{CreateFixturator, SignatureFixturator};
+    use holochain_zome_types::fixt::{ActionFixturator, CreateAction, SignatureFixturator};
     use unwrap_to::unwrap_to;
 
     /// Mimics inside the must_get wasm.
@@ -124,22 +121,6 @@ pub mod test {
     struct Something(#[serde(with = "serde_bytes")] Vec<u8>);
 
     test_entry_impl!(Something);
-
-    /// Build an `Action` from a fixturated `Create`.
-    fn action_from_create(c: Create) -> Action {
-        Action {
-            header: ActionHeader {
-                author: c.author,
-                timestamp: c.timestamp,
-                action_seq: c.action_seq,
-                prev_action: Some(c.prev_action),
-            },
-            data: ActionData::Create(CreateData {
-                entry_type: c.entry_type,
-                entry_hash: c.entry_hash,
-            }),
-        }
-    }
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg_attr(target_os = "windows", ignore = "fails on windows")]
@@ -159,10 +140,8 @@ pub mod test {
         // locally-validated ops. The action's weight is defaulted; it is not
         // carried by the `Action` model.
         let entry = Entry::try_from(Something(vec![1, 2, 3])).unwrap();
-        let mut create = fixt!(Create);
-        create.weight = Default::default();
-        let entry_hash = create.entry_hash.clone();
-        let action = action_from_create(create);
+        let action = fixt!(Action, CreateAction);
+        let entry_hash = action.entry_hash().unwrap().clone();
         let action_hash = action.to_hash();
 
         let rendered = holochain_types::wire_ops::RenderedOp::new(

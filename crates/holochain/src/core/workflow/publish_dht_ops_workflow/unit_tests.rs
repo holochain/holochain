@@ -16,27 +16,9 @@ use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_state::test_utils::test_dht_store;
 use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    Action, ActionData, ActionHeader, CreateData,
-};
+use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
 use std::sync::Arc;
 use std::time::Duration;
-
-/// Build an [`Action`] from a fixturated `Create` struct.
-fn v2_create(c: Create) -> Action {
-    Action {
-        header: ActionHeader {
-            author: c.author,
-            timestamp: c.timestamp,
-            action_seq: c.action_seq,
-            prev_action: Some(c.prev_action),
-        },
-        data: ActionData::Create(CreateData {
-            entry_type: c.entry_type,
-            entry_hash: c.entry_hash,
-        }),
-    }
-}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn no_ops_to_publish() {
@@ -282,20 +264,17 @@ async fn private_entries_are_not_published() {
     let agent = fixt!(AgentPubKey);
 
     // Create a private entry.
-    let create_action = Create {
-        action_seq: 5,
-        prev_action: fixt!(ActionHash),
-        timestamp: Timestamp::now(),
-        weight: Default::default(),
-        author: agent.clone(),
-        entry_hash: fixt!(EntryHash),
-        entry_type: EntryType::App(AppEntryDef {
-            entry_index: 0.into(),
-            zome_index: 0.into(),
-            visibility: EntryVisibility::Private,
-        }),
-    };
-    let v2_action = v2_create(create_action);
+    let mut v2_action = fixt!(Action, CreateAction);
+    v2_action.header.action_seq = 5;
+    v2_action.header.prev_action = Some(fixt!(ActionHash));
+    v2_action.header.timestamp = Timestamp::now();
+    v2_action.header.author = agent.clone();
+    *v2_action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    *v2_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Private,
+    });
 
     let register_agent_activity_op = DhtOpHashed::from_content_sync(DhtOp::from(
         ChainOp::AgentActivity(SignedAction::new(v2_action.clone(), fixt!(Signature))),
@@ -377,9 +356,9 @@ async fn verify_published_recently(dht_store: &DhtStore, op_hash: DhtOpHash) {
 /// Seed an integrated, self-authored `RegisterAgentActivity` op (with an empty
 /// publish row) and return its hash.
 async fn create_op(dht_store: &DhtStore, author: AgentPubKey) -> StateMutationResult<DhtOpHash> {
-    let mut create_action = fixt!(Create);
-    create_action.author = author;
-    let signed = SignedAction::new(v2_create(create_action), fixt!(Signature));
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.author = author;
+    let signed = SignedAction::new(create_action, fixt!(Signature));
     let op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(signed)));
 
     let op_hash = op.as_hash().clone();
