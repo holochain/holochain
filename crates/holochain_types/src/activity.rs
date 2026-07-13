@@ -3,6 +3,7 @@
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::dht_v2::ActionHashed;
 use holochain_zome_types::prelude::*;
 
 /// An agents chain records returned from a agent_activity_query
@@ -60,7 +61,7 @@ impl AgentActivityResponse {
             ChainItems::Full(records) => ChainItems::Hashes(
                 records
                     .into_iter()
-                    .map(|r| (r.action().action_seq(), r.address().clone()))
+                    .map(|r| (r.action().action_seq(), r.action_address().clone()))
                     .collect(),
             ),
             ChainItems::Hashes(h) => ChainItems::Hashes(h),

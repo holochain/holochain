@@ -113,7 +113,7 @@ pub mod test {
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::fixt::{CreateFixturator, SignatureFixturator};
+    use holochain_zome_types::fixt::{ActionFixturator, CreateAction, SignatureFixturator};
     use unwrap_to::unwrap_to;
 
     /// Mimics inside the must_get wasm.
@@ -137,28 +137,24 @@ pub mod test {
         // initially Accepted. Crucially this is `locally_validated = false`, so
         // it can later be transitioned to Rejected — `reject_chain_ops` only
         // transitions network-cached ops, never an agent's own authored,
-        // locally-validated ops. The action's weight is defaulted so it survives
-        // the v2 round-trip identically (the v2 model drops weight).
+        // locally-validated ops.
         let entry = Entry::try_from(Something(vec![1, 2, 3])).unwrap();
-        let mut create = fixt!(Create);
-        create.weight = Default::default();
-        let entry_hash = create.entry_hash.clone();
-        let action = Action::Create(create);
+        let action = fixt!(Action, CreateAction);
+        let entry_hash = action.entry_hash().unwrap().clone();
         let action_hash = action.to_hash();
 
-        let rendered = holochain_types::dht_op::RenderedOp::new(
+        let rendered = holochain_types::wire_ops::RenderedOp::new(
             action.clone(),
             fixt!(Signature),
             None,
             holochain_zome_types::op::ChainOpType::StoreRecord,
         )
         .unwrap();
-        let (_, record_op_hash) = holochain_types::dht_op::ChainOpUniqueForm::op_hash(
+        let record_op_hash = holochain_types::dht_v2::ChainOpUniqueForm::op_hash(
             holochain_zome_types::op::ChainOpType::StoreRecord,
-            action.clone(),
-        )
-        .unwrap();
-        let rendered_ops = holochain_types::dht_op::RenderedOps {
+            &action,
+        );
+        let rendered_ops = holochain_types::wire_ops::RenderedOps {
             entry: Some(EntryHashed::with_pre_hashed(entry.clone(), entry_hash)),
             ops: vec![rendered],
             warrant: None,
@@ -194,7 +190,7 @@ pub mod test {
         let must_get_action: SignedActionHashed = conductor
             .call(&bob, "must_get_action", action_hash.clone())
             .await;
-        assert_eq!(must_get_action.action(), &action,);
+        assert_eq!(&must_get_action.hashed.content, &action,);
 
         // Must get VALID record ONLY returns the record if it is valid.
         let must_get_valid_record: Result<Record, _> = conductor

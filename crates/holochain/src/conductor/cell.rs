@@ -37,6 +37,7 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
+use holochain_types::dht_v2::ChainOp;
 use kitsune2_api::BoxFut;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -603,7 +604,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                 // If the action has an app entry type get the entry def
                 // from the conductor.
                 let required_receipt_count =
-                    match action.as_ref().and_then(|h| h.action().entry_type()) {
+                    match action.as_ref().and_then(|h| h.hashed.content.entry_type()) {
                         Some(EntryType::App(AppEntryDef {
                             zome_index,
                             entry_index,

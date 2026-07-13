@@ -97,7 +97,7 @@ pub enum ValidationOutcome {
     #[error("A warrant op was found to be invalid. Reason: {1}, Warrant: {0:?}")]
     InvalidWarrant(Box<Warrant>, String),
     #[error("The action {1:?} is not found in the countersigning session data {0:?}")]
-    ActionNotInCounterSigningSession(Box<CounterSigningSessionData>, Box<NewEntryAction>),
+    ActionNotInCounterSigningSession(Box<CounterSigningSessionData>, Box<Action>),
     #[error(transparent)]
     CounterSigningError(#[from] CounterSigningError),
     #[error("The dependency {0:?} was not found on the DHT")]

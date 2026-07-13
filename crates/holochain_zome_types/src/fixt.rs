@@ -4,7 +4,6 @@ use crate::prelude::*;
 use ::fixt::prelude::*;
 use ::fixt::*;
 use holo_hash::fixt::*;
-use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 use rand::Rng;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -67,65 +66,12 @@ impl Iterator for AppEntryDefFixturator<EntryVisibility> {
 pub type MaybeMembraneProof = Option<Arc<SerializedBytes>>;
 
 fixturator!(
-    ActionBuilderCommon;
-    constructor fn new(AgentPubKey, Timestamp, u32, ActionHash);
-);
-
-fixturator!(
-    DeleteLink;
-    constructor fn from_builder(ActionBuilderCommon, ActionHash, AnyLinkableHash);
-);
-
-fixturator!(
-    CreateLink;
-    constructor fn from_builder(ActionBuilderCommon, AnyLinkableHash, AnyLinkableHash, ZomeIndex, LinkType, LinkTag);
-);
-
-fixturator!(
     LinkType; constructor fn new(u8);
 );
 
 fixturator!(
     LinkTag; from Bytes;
 );
-
-pub struct KnownCreateLink {
-    pub author: AgentPubKey,
-    pub base_address: AnyLinkableHash,
-    pub target_address: AnyLinkableHash,
-    pub tag: LinkTag,
-    pub zome_index: ZomeIndex,
-    pub link_type: LinkType,
-}
-
-pub struct KnownDeleteLink {
-    pub link_add_address: holo_hash::ActionHash,
-    pub base_address: AnyLinkableHash,
-}
-
-impl Iterator for CreateLinkFixturator<KnownCreateLink> {
-    type Item = CreateLink;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(CreateLink);
-        f.author = self.0.curve.author.clone();
-        f.base_address = self.0.curve.base_address.clone();
-        f.target_address = self.0.curve.target_address.clone();
-        f.tag = self.0.curve.tag.clone();
-        f.zome_index = self.0.curve.zome_index;
-        f.link_type = self.0.curve.link_type;
-        Some(f)
-    }
-}
-
-impl Iterator for DeleteLinkFixturator<KnownDeleteLink> {
-    type Item = DeleteLink;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(DeleteLink);
-        f.link_add_address = self.0.curve.link_add_address.clone();
-        f.base_address = self.0.curve.base_address.clone();
-        Some(f)
-    }
-}
 
 /// a curve to spit out Entry::App values
 #[derive(Clone)]
@@ -398,9 +344,11 @@ fixturator!(
 );
 
 pub fn record_with_no_entry(signature: Signature, action: Action) -> Record {
-    let shh =
-        SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature);
-    Record::new(shh, None)
+    let shh = SignedActionHashed::with_presigned(
+        holo_hash::HoloHashed::from_content_sync(action),
+        signature,
+    );
+    Record::new(shh, RecordEntry::NA)
 }
 
 fixturator!(
@@ -487,11 +435,6 @@ fixturator!(
     };
 );
 
-fixturator!(
-    Dna;
-    constructor fn from_builder(DnaHash, ActionBuilderCommon);
-);
-
 fixturator! {
     MaybeMembraneProof;
     enum [ Some None ];
@@ -529,130 +472,240 @@ fixturator! {
 }
 
 fixturator!(
-    AgentValidationPkg;
-    constructor fn from_builder(ActionBuilderCommon, MaybeMembraneProof);
-);
-
-fixturator!(
-    InitZomesComplete;
-    constructor fn from_builder(ActionBuilderCommon);
-);
-
-fixturator!(
     MigrationTarget;
     variants [ Dna(DnaHash) Agent(AgentPubKey) ];
 );
 
-fixturator!(
-    OpenChain;
-    constructor fn from_builder(ActionBuilderCommon, MigrationTarget, ActionHash);
-);
+use crate::dht_v2::{
+    ActionData, ActionHeader, AgentValidationPkgData, CloseChainData, CreateData, CreateLinkData,
+    DeleteData, DeleteLinkData, DnaData, InitZomesCompleteData, OpenChainData, UpdateData,
+};
 
-fixturator!(
-    CloseChain;
-    constructor fn from_builder(ActionBuilderCommon, MigrationTarget);
-);
-
-fixturator!(
-    Create;
-    constructor fn from_builder(ActionBuilderCommon, EntryType, EntryHash);
-
-    curve PublicCurve {
-        let mut ec = fixt!(Create);
-        ec.entry_type = fixt!(EntryType, PublicCurve);
-        ec
-    };
-    curve EntryType {
-        let mut ec = CreateFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        ec.entry_type = get_fixt_curve!();
-        ec
-    };
-    curve Entry {
-        let et = match get_fixt_curve!() {
-            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryDefFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
-            Entry::Agent(_) => EntryType::AgentPubKey,
-            Entry::CapClaim(_) => EntryType::CapClaim,
-            Entry::CapGrant(_) => EntryType::CapGrant,
+// Build an [`Action`] directly from a common [`ActionHeader`] plus a
+// per-variant [`ActionData`]. The variant is chosen by the fixturator index so
+// a sequence exercises all ten variants; the genesis `Dna` action is always the
+// first on a chain, so it carries `action_seq == 0` and no `prev_action`.
+macro_rules! action_for_curve {
+    ($curve:expr, $index:expr, $variant:expr) => {{
+        let index = $index;
+        let author = AgentPubKeyFixturator::new_indexed($curve, index)
+            .next()
+            .unwrap();
+        let timestamp = TimestampFixturator::new_indexed($curve, index)
+            .next()
+            .unwrap();
+        let action_seq = U32Fixturator::new_indexed($curve, index).next().unwrap();
+        let prev_action = ActionHashFixturator::new_indexed($curve, index)
+            .next()
+            .unwrap();
+        let variant = $variant;
+        let header = ActionHeader {
+            author,
+            timestamp,
+            action_seq: if variant == 0 { 0 } else { action_seq },
+            prev_action: if variant == 0 {
+                None
+            } else {
+                Some(prev_action)
+            },
         };
-        CreateFixturator::new_indexed(et, get_fixt_index!()).next().unwrap()
-    };
-);
-
-type EntryTypeEntryHash = (EntryType, EntryHash);
-
-fixturator!(
-    Update;
-    constructor fn from_builder(ActionBuilderCommon, EntryHash, ActionHash, EntryType, EntryHash);
-
-    curve PublicCurve {
-        let mut eu = fixt!(Update);
-        eu.entry_type = fixt!(EntryType, PublicCurve);
-        eu
-    };
-
-    curve EntryType {
-        let mut eu = UpdateFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        eu.entry_type = get_fixt_curve!();
-        eu
-    };
-
-    curve EntryTypeEntryHash {
-        let mut u = UpdateFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        u.entry_type = get_fixt_curve!().0;
-        u.entry_hash = get_fixt_curve!().1;
-        u
-    };
-
-    curve Entry {
-        let et = match get_fixt_curve!() {
-            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryDefFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
-            Entry::Agent(_) => EntryType::AgentPubKey,
-            Entry::CapClaim(_) => EntryType::CapClaim,
-            Entry::CapGrant(_) => EntryType::CapGrant,
+        let data = match variant {
+            0 => ActionData::Dna(DnaData {
+                dna_hash: DnaHashFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+            }),
+            1 => ActionData::AgentValidationPkg(AgentValidationPkgData {
+                membrane_proof: if index % 2 == 0 {
+                    None
+                } else {
+                    Some(std::sync::Arc::new(
+                        SerializedBytesFixturator::new_indexed($curve, index)
+                            .next()
+                            .unwrap(),
+                    ))
+                },
+            }),
+            2 => ActionData::InitZomesComplete(InitZomesCompleteData {}),
+            3 => ActionData::CreateLink(CreateLinkData {
+                base_address: AnyLinkableHashFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+                target_address: AnyLinkableHashFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+                zome_index: ZomeIndexFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+                link_type: LinkTypeFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+                tag: LinkTagFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+            }),
+            4 => ActionData::DeleteLink(DeleteLinkData {
+                base_address: AnyLinkableHashFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+                link_add_address: ActionHashFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+            }),
+            5 => ActionData::OpenChain(OpenChainData {
+                prev_target: MigrationTargetFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+                close_hash: ActionHashFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+            }),
+            6 => ActionData::CloseChain(CloseChainData {
+                new_target: Some(
+                    MigrationTargetFixturator::new_indexed($curve, index)
+                        .next()
+                        .unwrap(),
+                ),
+            }),
+            7 => ActionData::Create(CreateData {
+                entry_type: EntryTypeFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+                entry_hash: EntryHashFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+            }),
+            8 => ActionData::Update(UpdateData {
+                original_action_address: ActionHashFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+                original_entry_address: EntryHashFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+                entry_type: EntryTypeFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+                entry_hash: EntryHashFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+            }),
+            _ => ActionData::Delete(DeleteData {
+                deletes_address: ActionHashFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+                deletes_entry_address: EntryHashFixturator::new_indexed($curve, index)
+                    .next()
+                    .unwrap(),
+            }),
         };
-        let eh = EntryHash::with_data_sync(&get_fixt_curve!());
-        UpdateFixturator::new_indexed((et, eh), get_fixt_index!()).next().unwrap()
-    };
-);
+        Action { header, data }
+    }};
+}
 
-fixturator!(
-    Delete;
-    constructor fn from_builder(ActionBuilderCommon, ActionHash, EntryHash);
-);
+/// Marker curves that make `fixt!(Action, <Variant>Action)` build one specific
+/// action variant instead of cycling through all ten.
+macro_rules! action_variant_curve {
+    ($name:ident) => {
+        #[derive(Clone)]
+        pub struct $name;
+    };
+}
+action_variant_curve!(DnaAction);
+action_variant_curve!(AgentValidationPkgAction);
+action_variant_curve!(InitZomesCompleteAction);
+action_variant_curve!(CreateLinkAction);
+action_variant_curve!(DeleteLinkAction);
+action_variant_curve!(OpenChainAction);
+action_variant_curve!(CloseChainAction);
+action_variant_curve!(CreateAction);
+action_variant_curve!(UpdateAction);
+action_variant_curve!(DeleteAction);
 
 fixturator!(
     Action;
-    variants [
-        Dna(Dna)
-        AgentValidationPkg(AgentValidationPkg)
-        InitZomesComplete(InitZomesComplete)
-        CreateLink(CreateLink)
-        DeleteLink(DeleteLink)
-        OpenChain(OpenChain)
-        CloseChain(CloseChain)
-        Create(Create)
-        Update(Update)
-        Delete(Delete)
-    ];
-
+    curve Empty {
+        let index = get_fixt_index!();
+        action_for_curve!(Empty, index, index % 10)
+    };
+    curve Unpredictable {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, index % 10)
+    };
+    curve Predictable {
+        let index = get_fixt_index!();
+        action_for_curve!(Predictable, index, index % 10)
+    };
+    curve DnaAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 0)
+    };
+    curve AgentValidationPkgAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 1)
+    };
+    curve InitZomesCompleteAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 2)
+    };
+    curve CreateLinkAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 3)
+    };
+    curve DeleteLinkAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 4)
+    };
+    curve OpenChainAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 5)
+    };
+    curve CloseChainAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 6)
+    };
+    curve CreateAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 7)
+    };
+    curve UpdateAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 8)
+    };
+    curve DeleteAction {
+        let index = get_fixt_index!();
+        action_for_curve!(Unpredictable, index, 9)
+    };
     curve PublicCurve {
-        match fixt!(Action) {
-            Action::Create(_) => Action::Create(fixt!(Create, PublicCurve)),
-            Action::Update(_) => Action::Update(fixt!(Update, PublicCurve)),
-            other_type => other_type,
+        let index = get_fixt_index!();
+        let mut action = action_for_curve!(Unpredictable, index, index % 10);
+        // Force entry-creating variants to a public entry type.
+        match &mut action.data {
+            ActionData::Create(d) => {
+                d.entry_type = EntryTypeFixturator::new_indexed(PublicCurve, index)
+                    .next()
+                    .unwrap();
+            }
+            ActionData::Update(d) => {
+                d.entry_type = EntryTypeFixturator::new_indexed(PublicCurve, index)
+                    .next()
+                    .unwrap();
+            }
+            _ => {}
         }
+        action
     };
 );
 
-fixturator!(
-    ActionHashed;
-    constructor fn from_content_sync_exact(Action);
-);
+// Build a `SignedActionHashed` from an action and signature, hashing the
+// action content.
+fn signed_action_hashed_from_parts(action: Action, signature: Signature) -> SignedActionHashed {
+    SignedActionHashed::with_presigned(holo_hash::HoloHashed::from_content_sync(action), signature)
+}
 
 fixturator!(
     with_vec 0 5;
     SignedActionHashed;
-    constructor fn with_presigned(ActionHashed, Signature);
+    vanilla fn signed_action_hashed_from_parts(Action, Signature);
 );
 
 fixturator!(

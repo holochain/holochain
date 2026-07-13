@@ -111,3 +111,50 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         MustBoxFuture::new(async move { Ok(pub_key.verify_detached(sig.into(), data).await) })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_keystore::test_keystore;
+    use holo_hash::DnaHash;
+    use holochain_zome_types::dht_v2::{Action, ActionData, ActionHeader, DnaData};
+
+    /// Mirrors the two production call sites this crate's `sign`/
+    /// `verify_signature` feed: `holochain_state`'s source chain signs over the
+    /// action content, and
+    /// `holochain::core::sys_validate::verify_action_signature` verifies against
+    /// the same action content. A signature produced this way must verify
+    /// against the action.
+    // `test_keystore()` spawns lair onto a blocking task, which requires a
+    // multi-threaded runtime.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn signature_round_trips() {
+        let keystore = test_keystore();
+        let author = holo_hash::AgentPubKey::new_random(&keystore).await.unwrap();
+
+        let action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: holochain_zome_types::timestamp::Timestamp::now(),
+                action_seq: 0,
+                prev_action: None,
+            },
+            data: ActionData::Dna(DnaData {
+                dna_hash: DnaHash::from_raw_36(vec![7u8; 36]),
+            }),
+        };
+
+        // Sign over the action, as the source chain does.
+        let signature = action.signer().sign(&keystore, &action).await.unwrap();
+
+        // Verify, exactly as `verify_action_signature` does, over the same bytes.
+        assert!(
+            action
+                .signer()
+                .verify_signature(&signature, &action)
+                .await
+                .unwrap(),
+            "a signature computed over the action must verify against it"
+        );
+    }
+}

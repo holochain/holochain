@@ -64,13 +64,10 @@ async fn countersigning_workflow_fn(
         .map_err(WorkflowError::other)?;
     let cell_network = cell.holochain_p2p_dna();
 
-    let keystore = conductor.keystore().clone();
-
     countersigning_workflow(
         space.clone(),
         workspace,
         Arc::new(cell_network.clone()),
-        keystore,
         cell_id.clone(),
         signal_tx,
         self_trigger.clone(),

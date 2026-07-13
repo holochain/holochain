@@ -46,7 +46,6 @@ pub mod prelude;
 #[cfg(feature = "properties")]
 pub mod properties;
 pub mod query;
-pub mod rate_limit;
 pub mod record;
 pub mod request;
 /// Schedule functions to run outside a direct zome call.
@@ -72,7 +71,7 @@ pub mod fixt;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 
-pub use action::Action;
+pub use dht_v2::Action;
 pub use entry::Entry;
 
 /// Re-exported dependencies

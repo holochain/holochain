@@ -9,9 +9,9 @@ use holo_hash::HasHash;
 use holochain_data::dht::{InsertChainOp, InsertLimboWarrant};
 use holochain_data::kind::Dht;
 use holochain_data::DbWrite;
-use holochain_types::dht_op::RenderedOps;
 use holochain_types::prelude::Timestamp;
 use holochain_types::warrant::WarrantOp;
+use holochain_types::wire_ops::RenderedOps;
 use holochain_zome_types::dht_v2::RecordValidity;
 
 use super::action_indexes::insert_action_indexes;
@@ -45,35 +45,19 @@ impl DhtStore<DbWrite<Dht>> {
         }
 
         for op in &ops.ops {
-            tx.insert_action(&op.signed_action_v2, None)
+            tx.insert_action(&op.action, None)
                 .await
                 .map_err(StateMutationError::from)?;
 
-            insert_action_indexes(
-                &mut tx,
-                op.signed_action_v2.as_hash(),
-                &op.signed_action_v2.hashed.content.data,
-            )
-            .await?;
-
-            let basis_hash = op.op_light.dht_basis();
-            let storage_center_loc = basis_hash.get_loc();
-
-            let op_type = match op.op_light.get_type() {
-                holochain_types::dht_op::DhtOpType::Chain(t) => i64::from(t),
-                holochain_types::dht_op::DhtOpType::Warrant(_) => {
-                    return Err(StateMutationError::Other(
-                        "RenderedOp had a Warrant op_light; expected Chain".into(),
-                    ));
-                }
-            };
+            insert_action_indexes(&mut tx, op.action.as_hash(), &op.action.hashed.content.data)
+                .await?;
 
             tx.insert_chain_op(InsertChainOp {
                 op_hash: &op.op_hash,
-                action_hash: op.signed_action_v2.as_hash(),
-                op_type,
-                basis_hash: &basis_hash,
-                storage_center_loc,
+                action_hash: op.action.as_hash(),
+                op_type: i64::from(op.op_type),
+                basis_hash: &op.basis_hash,
+                storage_center_loc: op.storage_center_loc,
                 validation_status: RecordValidity::Accepted,
                 locally_validated: false,
                 require_receipt: false,
@@ -140,14 +124,16 @@ mod tests {
     use super::*;
     use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
     use holochain_serialized_bytes::UnsafeBytes;
-    use holochain_types::dht_op::{RenderedOp, RenderedOps};
     use holochain_types::prelude::{AppEntryBytes, Entry, EntryHashed, Signature};
     use holochain_types::warrant::WarrantOp;
-    use holochain_zome_types::action::{
-        Action, Create, CreateLink, Delete, DeleteLink, EntryType, Update,
+    use holochain_types::wire_ops::{RenderedOp, RenderedOps};
+    use holochain_zome_types::dht_v2::{
+        Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
+        UpdateData,
     };
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::op::ChainOpType;
+    use holochain_zome_types::prelude::EntryType;
     use holochain_zome_types::prelude::{
         AppEntryDef, ChainIntegrityWarrant, SignedWarrant, Warrant, WarrantProof,
     };
@@ -155,6 +141,33 @@ mod tests {
 
     fn dht_id() -> Dht {
         Dht::new(Arc::new(DnaHash::from_raw_36(vec![0u8; 36])))
+    }
+
+    /// Build an [`Action`] with the given header fields and per-variant data.
+    fn mk_action(
+        author: AgentPubKey,
+        seq: u32,
+        prev: ActionHash,
+        ts: i64,
+        data: ActionData,
+    ) -> Action {
+        Action {
+            header: ActionHeader {
+                author,
+                timestamp: Timestamp::from_micros(ts),
+                action_seq: seq,
+                prev_action: Some(prev),
+            },
+            data,
+        }
+    }
+
+    fn app_public_entry_type() -> EntryType {
+        EntryType::App(AppEntryDef::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Public,
+        ))
     }
 
     /// Build a single-op `RenderedOps` for a `StoreRecord(Create)` chain op
@@ -166,19 +179,16 @@ mod tests {
             holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
         ));
         let sig = Signature::from([seed; 64]);
-        let action = Action::Create(Create {
+        let action = mk_action(
             author,
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: 1,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash: entry_hash.clone(),
-            weight: Default::default(),
-        });
+            1,
+            ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
+            seed as i64 * 1000,
+            ActionData::Create(CreateData {
+                entry_type: app_public_entry_type(),
+                entry_hash: entry_hash.clone(),
+            }),
+        );
         let entry_hashed = EntryHashed::with_pre_hashed(entry.clone(), entry_hash);
 
         let rendered = RenderedOp::new(action, sig, None, ChainOpType::StoreRecord)
@@ -204,18 +214,19 @@ mod tests {
             holo_hash::hash_type::AnyLinkable::Entry,
         );
         let sig = Signature::from([seed; 64]);
-        let action = Action::CreateLink(CreateLink {
+        let action = mk_action(
             author,
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: 2,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(70); 36]),
-            base_address: base,
-            target_address: target,
-            zome_index: 0.into(),
-            link_type: 0.into(),
-            tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
-            weight: Default::default(),
-        });
+            2,
+            ActionHash::from_raw_36(vec![seed.wrapping_add(70); 36]),
+            seed as i64 * 1000,
+            ActionData::CreateLink(CreateLinkData {
+                base_address: base,
+                target_address: target,
+                zome_index: 0.into(),
+                link_type: 0.into(),
+                tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
+            }),
+        );
 
         let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterAddLink)
             .expect("rendered op build");
@@ -236,14 +247,16 @@ mod tests {
         );
         let link_add = ActionHash::from_raw_36(vec![seed.wrapping_add(80); 36]);
         let sig = Signature::from([seed; 64]);
-        let action = Action::DeleteLink(DeleteLink {
+        let action = mk_action(
             author,
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: 3,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(90); 36]),
-            base_address: base,
-            link_add_address: link_add,
-        });
+            3,
+            ActionHash::from_raw_36(vec![seed.wrapping_add(90); 36]),
+            seed as i64 * 1000,
+            ActionData::DeleteLink(DeleteLinkData {
+                base_address: base,
+                link_add_address: link_add,
+            }),
+        );
         let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterRemoveLink)
             .expect("rendered op build");
         RenderedOps {
@@ -264,21 +277,18 @@ mod tests {
             holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
         ));
         let sig = Signature::from([seed; 64]);
-        let action = Action::Update(Update {
+        let action = mk_action(
             author,
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: 2,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(70); 36]),
-            original_action_address: original_action,
-            original_entry_address: original_entry,
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash: entry_hash.clone(),
-            weight: Default::default(),
-        });
+            2,
+            ActionHash::from_raw_36(vec![seed.wrapping_add(70); 36]),
+            seed as i64 * 1000,
+            ActionData::Update(UpdateData {
+                original_action_address: original_action,
+                original_entry_address: original_entry,
+                entry_type: app_public_entry_type(),
+                entry_hash: entry_hash.clone(),
+            }),
+        );
         let entry_hashed = EntryHashed::with_pre_hashed(entry.clone(), entry_hash);
         let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterUpdatedRecord)
             .expect("rendered op build");
@@ -296,15 +306,16 @@ mod tests {
         let deletes_address = ActionHash::from_raw_36(vec![seed.wrapping_add(20); 36]);
         let deletes_entry = EntryHash::from_raw_36(vec![seed.wrapping_add(30); 36]);
         let sig = Signature::from([seed; 64]);
-        let action = Action::Delete(Delete {
+        let action = mk_action(
             author,
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: 3,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(70); 36]),
-            deletes_address,
-            deletes_entry_address: deletes_entry,
-            weight: Default::default(),
-        });
+            3,
+            ActionHash::from_raw_36(vec![seed.wrapping_add(70); 36]),
+            seed as i64 * 1000,
+            ActionData::Delete(DeleteData {
+                deletes_address,
+                deletes_entry_address: deletes_entry,
+            }),
+        );
         let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterDeletedBy)
             .expect("rendered op build");
         RenderedOps {
@@ -318,19 +329,16 @@ mod tests {
     fn build_rendered_activity(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let sig = Signature::from([seed; 64]);
-        let action = Action::Create(Create {
+        let action = mk_action(
             author,
-            timestamp: Timestamp::from_micros(seed as i64 * 1000),
-            action_seq: 1,
-            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-            entry_type: EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            )),
-            entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
-            weight: Default::default(),
-        });
+            1,
+            ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
+            seed as i64 * 1000,
+            ActionData::Create(CreateData {
+                entry_type: app_public_entry_type(),
+                entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
+            }),
+        );
         let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterAgentActivity)
             .expect("rendered op build");
         RenderedOps {
@@ -422,8 +430,8 @@ mod tests {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let rendered = build_rendered_create_link(3);
         let action_hash = rendered.ops[0].action.as_hash().clone();
-        let base = match rendered.ops[0].action.action() {
-            Action::CreateLink(a) => a.base_address.clone(),
+        let base = match &rendered.ops[0].action.action().data {
+            ActionData::CreateLink(a) => a.base_address.clone(),
             _ => panic!("expected CreateLink"),
         };
 
@@ -438,8 +446,8 @@ mod tests {
     async fn cache_chain_ops_populates_deleted_link_index() {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let rendered = build_rendered_delete_link(4);
-        let create_link_hash = match rendered.ops[0].action.action() {
-            Action::DeleteLink(a) => a.link_add_address.clone(),
+        let create_link_hash = match &rendered.ops[0].action.action().data {
+            ActionData::DeleteLink(a) => a.link_add_address.clone(),
             _ => panic!("expected DeleteLink"),
         };
 
@@ -458,8 +466,8 @@ mod tests {
     async fn cache_chain_ops_populates_updated_record_index() {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let rendered = build_rendered_update(5);
-        let original_action = match rendered.ops[0].action.action() {
-            Action::Update(a) => a.original_action_address.clone(),
+        let original_action = match &rendered.ops[0].action.action().data {
+            ActionData::Update(a) => a.original_action_address.clone(),
             _ => panic!("expected Update"),
         };
 
@@ -478,8 +486,8 @@ mod tests {
     async fn cache_chain_ops_populates_deleted_record_index() {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let rendered = build_rendered_delete(6);
-        let deletes_address = match rendered.ops[0].action.action() {
-            Action::Delete(a) => a.deletes_address.clone(),
+        let deletes_address = match &rendered.ops[0].action.action().data {
+            ActionData::Delete(a) => a.deletes_address.clone(),
             _ => panic!("expected Delete"),
         };
 

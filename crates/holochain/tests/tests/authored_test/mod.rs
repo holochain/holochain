@@ -18,7 +18,7 @@ async fn store_has_op_at_basis_authored_by(
     let read = store.as_read();
     for op_hash in read.get_ops_at_basis(basis).await.unwrap() {
         if let Some(sah) = read.action_for_op(&op_hash).await.unwrap() {
-            if sah.action().author() == author {
+            if sah.hashed.content.author() == author {
                 return true;
             }
         }

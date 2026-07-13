@@ -136,6 +136,7 @@ mod tests {
     use holochain_trace;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
+    use holochain_zome_types::action::ActionData;
     use holochain_zome_types::Action;
     use matches::assert_matches;
 
@@ -217,9 +218,18 @@ mod tests {
             assert_matches!(
                 actions.as_slice(),
                 [
-                    Action::Dna(_),
-                    Action::AgentValidationPkg(_),
-                    Action::Create(_)
+                    Action {
+                        data: ActionData::Dna(_),
+                        ..
+                    },
+                    Action {
+                        data: ActionData::AgentValidationPkg(_),
+                        ..
+                    },
+                    Action {
+                        data: ActionData::Create(_),
+                        ..
+                    }
                 ]
             );
         }

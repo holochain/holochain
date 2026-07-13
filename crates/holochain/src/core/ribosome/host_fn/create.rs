@@ -1,9 +1,10 @@
-use crate::core::ribosome::{weigh_placeholder, Ribosome};
+use crate::core::ribosome::Ribosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
+use holochain_zome_types::dht_v2::{ActionData, CreateData};
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -26,8 +27,6 @@ pub fn create<'a>(
                 chain_top_ordering,
             } = input;
 
-            let weight = weigh_placeholder();
-
             // Countersigned entries have different action handling.
             match entry {
                 Entry::CounterSign(_, _) => tokio_helper::block_forever_on(async move {
@@ -37,7 +36,7 @@ pub fn create<'a>(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(entry, chain_top_ordering, weight)
+                        .put_countersigned(entry, chain_top_ordering)
                         .await
                         .map_err(|source_chain_error| -> RuntimeError {
                             wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
@@ -61,11 +60,11 @@ pub fn create<'a>(
                         EntryDefLocation::CapClaim => EntryType::CapClaim,
                     };
 
-                    // build an action for the entry being committed
-                    let action_builder = builder::Create {
+                    // build the action data for the entry being committed
+                    let action_data = ActionData::Create(CreateData {
                         entry_type,
                         entry_hash,
-                    };
+                    });
 
                     // return the hash of the committed entry
                     // note that validation is handled by the workflow
@@ -79,7 +78,7 @@ pub fn create<'a>(
                             .source_chain()
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given")
-                            .put_weightless(action_builder, Some(entry), chain_top_ordering)
+                            .put(action_data, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| -> RuntimeError {
                                 wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
@@ -178,7 +177,7 @@ pub mod wasm_test {
 
         let round_twice: Vec<Option<Record>> = conductor.call(&alice, "get_entry_twice", ()).await;
 
-        let bytes: Vec<u8> = match round.clone().and_then(|el| el.into()) {
+        let bytes: Vec<u8> = match round.clone().and_then(|el| el.entry().as_option().cloned()) {
             Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {
                 entry_bytes.bytes().to_vec()
             }

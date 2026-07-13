@@ -10,7 +10,7 @@ pub enum StateQueryError {
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
     #[error(transparent)]
-    DhtOpError(#[from] holochain_types::dht_op::DhtOpError),
+    DhtOpError(#[from] holochain_types::error::DhtOpError),
     #[error("Unexpected op {0:?} for query")]
     UnexpectedOp(ChainOpType),
     #[error("Unexpected action {0:?} for query")]

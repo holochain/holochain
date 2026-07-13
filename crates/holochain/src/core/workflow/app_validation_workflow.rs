@@ -12,7 +12,7 @@
 // All actions are written to the database straight away in the incoming dht ops workflow and do not require validation to be available for validating other ops. See https://github.com/holochain/holochain/issues/3724
 
 //! Ops are validated in sequence based on their op type and the timestamp they
-//! were authored (see [`OpOrder`] and [`OpNumericalOrder`]). Validating one op
+//! were authored (op order). Validating one op
 //! after the other with this ordering was chosen so that ops that depend on earlier
 //! ops will be validated after the earlier ops, and therefore have a higher chance
 //! of being validated successfully. An example is an incoming delete
@@ -29,7 +29,7 @@
 //! is executed. Entry and link CRUD actions, which the ops are derived from, have been
 //! written with a particular integrity zome's entry and link types. Thus for
 //! op validation, the validation function of the same integrity zome must be
-//! used. Ops that do not relate to a specific entry or link like [`ChainOp::RegisterAgentActivity`]
+//! used. Ops that do not relate to a specific entry or link like [`ChainOp::AgentActivity`]
 //! or non-app entries like [`EntryType::CapGrant`] are validated with all
 //! validation functions of the DNA's integrity zomes.
 //!
@@ -108,6 +108,7 @@ use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
 pub use error::*;
 use holo_hash::DhtOpHash;
+use holo_hash::HoloHashed;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
@@ -115,6 +116,15 @@ use holochain_p2p::actor::{NetworkRequestOptions as NetworkGetOptions, NetworkRe
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
+use holochain_types::dht_v2::{ChainOp, DhtOp, OpEntry};
+use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
+    Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
+    RegisterUpdate, StoreEntry, StoreRecord,
+};
+use holochain_zome_types::dht_v2::{
+    ActionData, CreateData, CreateLinkData, DeleteData, DeleteLinkData, SignedActionHashed,
+    UpdateData,
+};
 use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::sync::atomic::AtomicUsize;
@@ -212,7 +222,7 @@ async fn app_validation_workflow_inner(
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity_ops = vec![];
     // Locally-validated warrant ops, self-published into the DhtStore.
-    let mut warrant_ops_vec: Vec<DhtOpHashed> = vec![];
+    let mut warrant_ops_vec: Vec<holochain_types::dht_v2::DhtOpHashed> = vec![];
     let mut app_validation_outcomes: Vec<(DhtOpHash, AppOutcome)> = vec![];
     // Track action hashes already warranted in this batch to avoid creating duplicate
     // warrants for the same action. Multiple op types (StoreRecord, StoreEntry,
@@ -237,9 +247,8 @@ async fn app_validation_workflow_inner(
             _ => unreachable!("warrant ops are never sent to app validation"),
         };
 
-        let op_type = chain_op.get_type();
-        let action = chain_op.action();
-        let dht_op_lite = chain_op.to_lite();
+        let op_type = chain_op.op_type();
+        let action = chain_op.signed_action().data();
 
         // If this is agent activity, track it for the cache.
         let agent_activity_op = matches!(op_type, ChainOpType::RegisterAgentActivity)
@@ -276,13 +285,13 @@ async fn app_validation_workflow_inner(
                     }
                 }
                 if let Outcome::Rejected(_) = &outcome {
-                    warn!(?outcome, ?dht_op_lite, "DhtOp has failed app validation");
+                    warn!(?outcome, ?chain_op, "DhtOp has failed app validation");
                 } else if let Outcome::AwaitingDeps(_) = &outcome {
-                    debug!(?outcome, ?dht_op_lite, "DhtOp cannot be app validated yet");
+                    debug!(?outcome, ?chain_op, "DhtOp cannot be app validated yet");
                 }
 
                 if let Outcome::Rejected(reason) = &outcome {
-                    let action_hash = chain_op.action().to_hash();
+                    let action_hash = chain_op.signed_action().data().to_hash();
 
                     let issue_warrant = if warranted_in_batch.contains(&action_hash) {
                         tracing::trace!(
@@ -294,7 +303,10 @@ async fn app_validation_workflow_inner(
                         match workspace
                             .dht_store
                             .as_read()
-                            .is_action_warranted_as_invalid(&action_hash, chain_op.author())
+                            .is_action_warranted_as_invalid(
+                                &action_hash,
+                                chain_op.signed_action().data().author(),
+                            )
                             .await
                         {
                             Ok(true) => {
@@ -347,7 +359,7 @@ async fn app_validation_workflow_inner(
                     Outcome::Rejected(_) => {
                         rejected_ops.fetch_add(1, Ordering::SeqCst);
                         tracing::info!(
-                            "Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}"
+                            "Received invalid op. The op author will be blocked. Op: {chain_op:?}"
                         );
                         app_validation_outcomes.push((dht_op_hash, AppOutcome::Rejected));
                     }
@@ -424,84 +436,167 @@ pub async fn record_to_op(
 
     let (sah, entry) = record.into_inner();
     let mut entry = entry.into_option();
-    let action = sah.into();
     // Register agent activity doesn't store the entry so we need to
     // save it so we can reconstruct the record later.
     if matches!(op_type, ChainOpType::RegisterAgentActivity) {
         hidden_entry = entry.take().or(hidden_entry);
     }
-    let chain_op = ChainOp::from_type(op_type, action, entry)?;
-    let chain_op_hash = chain_op.clone().to_hash();
-    Ok((
-        chain_op_to_op(chain_op, cascade).await?,
-        chain_op_hash,
-        hidden_entry,
-    ))
-}
 
-async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
-    let op = match chain_op {
-        ChainOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
-            record: Record::new(
-                SignedActionHashed::with_presigned(
-                    ActionHashed::from_content_sync(action),
-                    signature,
-                ),
-                entry.into_option(),
-            ),
-        }),
-        ChainOp::StoreEntry(signature, action, entry) => Op::StoreEntry(StoreEntry {
-            action: SignedHashed::new_unchecked(action.into(), signature),
-            entry,
-        }),
-        ChainOp::RegisterAgentActivity(signature, action) => {
-            Op::RegisterAgentActivity(RegisterAgentActivity {
-                action: SignedActionHashed::with_presigned(
-                    ActionHashed::from_content_sync(action),
-                    signature,
-                ),
-                cached_entry: None,
+    let dht_op_hash =
+        holochain_types::dht_v2::ChainOpUniqueForm::op_hash(op_type, &sah.hashed.content);
+
+    let op = match op_type {
+        ChainOpType::StoreRecord => {
+            let visibility = sah.hashed.content.entry_visibility().copied();
+            Op::StoreRecord(StoreRecord {
+                record: Record::new(sah, RecordEntry::new(visibility.as_ref(), entry)),
             })
         }
-        ChainOp::RegisterUpdatedContent(signature, update, entry)
-        | ChainOp::RegisterUpdatedRecord(signature, update, entry) => {
-            let new_entry = match update.entry_type.visibility() {
-                EntryVisibility::Public => match entry.into_option() {
+        ChainOpType::StoreEntry => {
+            let entry = entry.ok_or_else(|| {
+                AppValidationError::DhtOpError(DhtOpError::ActionWithoutEntry(Box::new(
+                    sah.hashed.content.clone(),
+                )))
+            })?;
+            Op::StoreEntry(StoreEntry { action: sah, entry })
+        }
+        ChainOpType::RegisterAgentActivity => Op::RegisterAgentActivity(RegisterAgentActivity {
+            action: sah,
+            cached_entry: entry,
+        }),
+        ChainOpType::RegisterUpdatedContent | ChainOpType::RegisterUpdatedRecord => {
+            Op::RegisterUpdate(RegisterUpdate {
+                update: sah,
+                new_entry: entry,
+            })
+        }
+        ChainOpType::RegisterDeletedBy | ChainOpType::RegisterDeletedEntryAction => {
+            Op::RegisterDelete(RegisterDelete { delete: sah })
+        }
+        ChainOpType::RegisterAddLink => {
+            Op::RegisterCreateLink(RegisterCreateLink { create_link: sah })
+        }
+        ChainOpType::RegisterRemoveLink => {
+            let link_add_address = match &sah.hashed.content.data {
+                ActionData::DeleteLink(DeleteLinkData {
+                    link_add_address, ..
+                }) => link_add_address.clone(),
+                _ => {
+                    return Err(AppValidationError::DhtOpError(DhtOpError::OpActionMismatch(
+                        op_type,
+                        sah.hashed.content.data.action_type(),
+                    ))
+                    .into());
+                }
+            };
+            let create_link = cascade
+                .retrieve_action(link_add_address.clone(), Default::default())
+                .await?
+                .map(|(sh, _)| sh.hashed.content)
+                .ok_or_else(|| Outcome::awaiting(&link_add_address))?;
+            Op::RegisterDeleteLink(RegisterDeleteLink {
+                delete_link: sah,
+                create_link,
+            })
+        }
+    };
+
+    Ok((op, dht_op_hash, hidden_entry))
+}
+
+/// Build the `Op` (the wasm `validate` callback's input) from a sys-validated
+/// `ChainOp`. Sys validation has already rejected any op whose action doesn't
+/// match its `ChainOp` variant, so the `OpActionMismatch` branches below are
+/// defence-in-depth, not an expected path.
+async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
+    let signed_action = chain_op.signed_action().clone();
+    let hashed = HoloHashed::from_content_sync(signed_action.data().clone());
+    let sah = SignedHashed::with_presigned(hashed, signed_action.signature().clone());
+    let action = signed_action.data();
+
+    let op = match chain_op {
+        ChainOp::CreateRecord(_, op_entry) => {
+            let visibility = action.entry_visibility().copied();
+            let entry = match op_entry {
+                OpEntry::Present(entry) => Some(entry),
+                OpEntry::Hidden | OpEntry::ActionOnly => None,
+            };
+            Op::StoreRecord(StoreRecord {
+                record: Record::new(sah, RecordEntry::new(visibility.as_ref(), entry)),
+            })
+        }
+        ChainOp::CreateEntry(_, op_entry) => {
+            let entry =
+                match op_entry {
+                    OpEntry::Present(entry) => entry,
+                    OpEntry::Hidden | OpEntry::ActionOnly => {
+                        return Err(AppValidationError::DhtOpError(
+                            DhtOpError::ActionWithoutEntry(Box::new(sah.hashed.content.clone())),
+                        )
+                        .into());
+                    }
+                };
+            Op::StoreEntry(StoreEntry { action: sah, entry })
+        }
+        ChainOp::AgentActivity(_) => Op::RegisterAgentActivity(RegisterAgentActivity {
+            action: sah,
+            cached_entry: None,
+        }),
+        ChainOp::UpdateEntry(_, op_entry) | ChainOp::UpdateRecord(_, op_entry) => {
+            let ActionData::Update(update) = &action.data else {
+                return Err(AppValidationError::DhtOpError(DhtOpError::OpActionMismatch(
+                    ChainOpType::RegisterUpdatedContent,
+                    action.data.action_type(),
+                ))
+                .into());
+            };
+            let entry_visibility = *update.entry_type.visibility();
+            let entry_hash = update.entry_hash.clone();
+            let entry = match op_entry {
+                OpEntry::Present(entry) => Some(entry),
+                OpEntry::Hidden | OpEntry::ActionOnly => None,
+            };
+            let new_entry = match entry_visibility {
+                EntryVisibility::Public => match entry {
                     Some(entry) => Some(entry),
                     None => Some(
                         cascade
-                            .retrieve_entry(update.entry_hash.clone(), Default::default())
+                            .retrieve_entry(entry_hash.clone(), Default::default())
                             .await?
                             .map(|(e, _)| e.into_content())
-                            .ok_or_else(|| Outcome::awaiting(&update.entry_hash))?,
+                            .ok_or_else(|| Outcome::awaiting(&entry_hash))?,
                     ),
                 },
                 _ => None,
             };
             Op::RegisterUpdate(RegisterUpdate {
-                update: SignedHashed::new_unchecked(update, signature),
+                update: sah,
                 new_entry,
             })
         }
-        ChainOp::RegisterDeletedBy(signature, delete)
-        | ChainOp::RegisterDeletedEntryAction(signature, delete) => {
-            Op::RegisterDelete(RegisterDelete {
-                delete: SignedHashed::new_unchecked(delete, signature),
-            })
+        ChainOp::DeleteRecord(_) | ChainOp::DeleteEntry(_) => {
+            Op::RegisterDelete(RegisterDelete { delete: sah })
         }
-        ChainOp::RegisterAddLink(signature, create_link) => {
-            Op::RegisterCreateLink(RegisterCreateLink {
-                create_link: SignedHashed::new_unchecked(create_link, signature),
-            })
-        }
-        ChainOp::RegisterRemoveLink(signature, delete_link) => {
+        ChainOp::CreateLink(_) => Op::RegisterCreateLink(RegisterCreateLink { create_link: sah }),
+        ChainOp::DeleteLink(_) => {
+            let ActionData::DeleteLink(DeleteLinkData {
+                link_add_address, ..
+            }) = &action.data
+            else {
+                return Err(AppValidationError::DhtOpError(DhtOpError::OpActionMismatch(
+                    ChainOpType::RegisterRemoveLink,
+                    action.data.action_type(),
+                ))
+                .into());
+            };
+            let link_add_address = link_add_address.clone();
             let create_link = cascade
-                .retrieve_action(delete_link.link_add_address.clone(), Default::default())
+                .retrieve_action(link_add_address.clone(), Default::default())
                 .await?
-                .and_then(|(sh, _)| CreateLink::try_from(sh.hashed.content).ok())
-                .ok_or_else(|| Outcome::awaiting(&delete_link.link_add_address))?;
+                .map(|(sh, _)| sh.hashed.content)
+                .ok_or_else(|| Outcome::awaiting(&link_add_address))?;
             Op::RegisterDeleteLink(RegisterDeleteLink {
-                delete_link: SignedHashed::new_unchecked(delete_link, signature),
+                delete_link: sah,
                 create_link,
             })
         }
@@ -643,82 +738,94 @@ async fn get_zomes_to_invoke(
             // Instead the delete could be followed up the chain to find the original
             // create, but since deleting a delete does not have much practical use,
             // it is neglected here.
-            let action = match record.action() {
-                Action::Delete(Delete {
+            let action = match &record.action().data {
+                ActionData::Delete(DeleteData {
                     deletes_address, ..
                 })
-                | Action::DeleteLink(DeleteLink {
+                | ActionData::DeleteLink(DeleteLinkData {
                     link_add_address: deletes_address,
                     ..
                 }) => {
                     let deleted_action =
                         retrieve_deleted_action(workspace, network, deletes_address).await?;
-                    deleted_action.action().clone()
+                    deleted_action.hashed.content.clone()
                 }
                 _ => record.action().clone(),
             };
 
-            match action {
-                Action::CreateLink(CreateLink { zome_index, .. })
-                | Action::Create(Create {
+            match &action.data {
+                ActionData::CreateLink(CreateLinkData { zome_index, .. }) => {
+                    get_integrity_zome_from_ribosome(zome_index, ribosome)
+                }
+                ActionData::Create(CreateData {
                     entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
                     ..
                 })
-                | Action::Update(Update {
+                | ActionData::Update(UpdateData {
                     entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
                     ..
-                }) => get_integrity_zome_from_ribosome(&zome_index, ribosome),
+                }) => get_integrity_zome_from_ribosome(zome_index, ribosome),
                 _ => Ok(ZomesToInvoke::AllIntegrity),
             }
         }
-        Op::StoreEntry(StoreEntry { action, .. }) => match &action.hashed.content {
-            EntryCreationAction::Create(Create {
+        Op::StoreEntry(StoreEntry { action, .. }) => match &action.hashed.content.data {
+            ActionData::Create(CreateData {
                 entry_type: EntryType::App(app_entry_def),
                 ..
             })
-            | EntryCreationAction::Update(Update {
+            | ActionData::Update(UpdateData {
                 entry_type: EntryType::App(app_entry_def),
                 ..
             }) => get_integrity_zome_from_ribosome(&app_entry_def.zome_index, ribosome),
             _ => Ok(ZomesToInvoke::AllIntegrity),
         },
-        Op::RegisterUpdate(RegisterUpdate { update, .. }) => match &update.hashed.entry_type {
-            EntryType::App(app_entry_def) => {
-                get_integrity_zome_from_ribosome(&app_entry_def.zome_index, ribosome)
-            }
+        Op::RegisterUpdate(RegisterUpdate { update, .. }) => match &update.hashed.content.data {
+            ActionData::Update(UpdateData {
+                entry_type: EntryType::App(app_entry_def),
+                ..
+            }) => get_integrity_zome_from_ribosome(&app_entry_def.zome_index, ribosome),
             _ => Ok(ZomesToInvoke::AllIntegrity),
         },
         Op::RegisterDelete(RegisterDelete { delete }) => {
-            let deletes_address = &delete.hashed.deletes_address;
+            let deletes_address = match &delete.hashed.content.data {
+                ActionData::Delete(DeleteData {
+                    deletes_address, ..
+                }) => deletes_address,
+                // Not expected: `RegisterDelete`'s action data is always `Delete`.
+                _ => return Ok(ZomesToInvoke::AllIntegrity),
+            };
             let deleted_action =
                 retrieve_deleted_action(workspace, network, deletes_address).await?;
-            match deleted_action.hashed.content {
-                Action::Create(Create {
+            match &deleted_action.hashed.content.data {
+                ActionData::Create(CreateData {
                     entry_type: EntryType::App(app_entry_def),
                     ..
                 })
-                | Action::Update(Update {
+                | ActionData::Update(UpdateData {
                     entry_type: EntryType::App(app_entry_def),
                     ..
                 }) => get_integrity_zome_from_ribosome(&app_entry_def.zome_index, ribosome),
                 _ => Ok(ZomesToInvoke::AllIntegrity),
             }
         }
-        Op::RegisterCreateLink(RegisterCreateLink {
-            create_link:
-                SignedHashed {
-                    hashed:
-                        HoloHashed {
-                            content: action, ..
-                        },
-                    ..
-                },
-            ..
-        })
-        | Op::RegisterDeleteLink(RegisterDeleteLink {
-            create_link: action,
-            ..
-        }) => get_integrity_zome_from_ribosome(&action.zome_index, ribosome),
+        Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
+            match &create_link.hashed.content.data {
+                ActionData::CreateLink(CreateLinkData { zome_index, .. }) => {
+                    get_integrity_zome_from_ribosome(zome_index, ribosome)
+                }
+                // Not expected: `RegisterCreateLink`'s action data is always `CreateLink`.
+                _ => Ok(ZomesToInvoke::AllIntegrity),
+            }
+        }
+        Op::RegisterDeleteLink(RegisterDeleteLink { create_link, .. }) => {
+            match &create_link.data {
+                ActionData::CreateLink(CreateLinkData { zome_index, .. }) => {
+                    get_integrity_zome_from_ribosome(zome_index, ribosome)
+                }
+                // Not expected: `RegisterDeleteLink::create_link` is always `CreateLink`.
+                _ => Ok(ZomesToInvoke::AllIntegrity),
+            }
+        }
     }
 }
 

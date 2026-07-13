@@ -4,7 +4,7 @@ use crate::sweettest::SweetCell;
 use crate::test_utils::consistency::request_published_ops;
 use holo_hash::*;
 use holochain_state::dht_store::DhtStoreRead;
-use holochain_types::prelude::*;
+use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Write;
@@ -337,17 +337,20 @@ fn diff_report(unintegrated: Vec<String>, unpublished: Vec<String>) -> String {
 
 fn display_op(op: &DhtOp) -> String {
     match op {
-        DhtOp::ChainOp(op) => format!(
-            "{} {:>3} {} {} {} ({})",
-            op.action().author(),
-            op.action().action_seq(),
-            op.to_hash(),
-            op.action().to_hash(),
-            op.get_type(),
-            op.action().action_type(),
-        ),
+        DhtOp::ChainOp(op) => {
+            let action = op.signed_action().data();
+            format!(
+                "{} {:>3} {} {} {:?} ({:?})",
+                action.author(),
+                action.action_seq(),
+                op.to_hash(),
+                action.to_hash(),
+                op.op_type(),
+                action.action_type(),
+            )
+        }
         DhtOp::WarrantOp(op) => {
-            format!("{} WARRANT ({})", op.author, op.get_type(),)
+            format!("{} WARRANT (ChainIntegrityWarrant)", op.author)
         }
     }
 }
@@ -359,8 +362,11 @@ fn display_op(op: &DhtOp) -> String {
 /// (GET-cached copies excluded, rejected ops included). **Warrants are
 /// deliberately excluded** — the legacy check inner-joined `Action` (warrants
 /// have none) and so compared chain ops only; warrants need not reach every
-/// node. Ops are reconstructed into legacy `DhtOp`s so their hashes match the
-/// published set.
+/// node. **Private `StoreEntry` ops are also excluded** — a private entry never
+/// leaves its author, so `request_published_ops` (via `ops_to_publish_for_wire`)
+/// already omits them from the published set; the integrated set must match, or
+/// the author node could never reach consistency. Ops are reconstructed into v2
+/// `DhtOp`s so their hashes match the published set.
 async fn get_integrated_ops(dht_store: &DhtStoreRead) -> Vec<DhtOp> {
     let chain = dht_store
         .integrated_chain_ops_for_dump(None)
@@ -369,5 +375,21 @@ async fn get_integrated_ops(dht_store: &DhtStoreRead) -> Vec<DhtOp> {
         .into_iter()
         .map(|row| row.wire)
         .collect();
-    crate::conductor::wire_rows_to_legacy_ops(chain, Vec::new())
+    crate::conductor::wire_rows_to_v2_ops(chain, Vec::new())
+        .into_iter()
+        .filter(|op| !is_author_local_private_store_entry(op))
+        .collect()
+}
+
+/// A `StoreEntry` op whose entry is `Hidden` references a private entry, which
+/// is withheld from all peers. Such an op only ever exists on its author
+/// (reconstructed from the dump without its entry blob), so it must not enter a
+/// cross-node consistency comparison. Mirrors the SQL-level filter applied by
+/// `ops_to_publish_for_wire`.
+fn is_author_local_private_store_entry(op: &DhtOp) -> bool {
+    use holochain_types::dht_v2::{ChainOp, OpEntry};
+    matches!(
+        op,
+        DhtOp::ChainOp(chain_op) if matches!(**chain_op, ChainOp::CreateEntry(_, OpEntry::Hidden))
+    )
 }

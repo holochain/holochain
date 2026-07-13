@@ -256,17 +256,18 @@ pub fn chain_item_to_action(i: &impl ChainItem) -> SignedActionHashed {
     let mut action = fixt!(SignedActionHashed);
     match (action_seq, prev_action) {
         (_, None) => {
-            let mut dna = fixt!(Dna);
-            dna.timestamp = Timestamp(0);
-            action.hashed.content = Action::Dna(dna);
+            // `DnaAction` already carries `action_seq == 0` and `prev_action == None`.
+            let mut dna = fixt!(Action, DnaAction);
+            dna.header.timestamp = Timestamp(0);
+            action.hashed.content = dna;
             action.hashed.hash = hash;
         }
         (action_seq, Some(prev_action)) => {
-            let mut create = fixt!(Create);
-            create.action_seq = action_seq;
-            create.prev_action = prev_action;
-            create.timestamp = i.get_timestamp();
-            action.hashed.content = Action::Create(create);
+            let mut create = fixt!(Action, CreateAction);
+            create.header.timestamp = i.get_timestamp();
+            create.header.action_seq = action_seq;
+            create.header.prev_action = Some(prev_action);
+            action.hashed.content = create;
             action.hashed.hash = hash;
         }
     }
@@ -274,16 +275,12 @@ pub fn chain_item_to_action(i: &impl ChainItem) -> SignedActionHashed {
 }
 
 /// Produce a sequence of AgentActivity ops from a Vec of ChainItems
-pub fn chain_to_ops(chain: Vec<impl ChainItem>) -> Vec<RegisterAgentActivity> {
+pub fn chain_to_ops(chain: Vec<impl ChainItem>) -> Vec<crate::dht_v2::RegisterAgentActivity> {
     chain
         .into_iter()
-        .map(|i| {
-            let mut op = RegisterAgentActivity {
-                action: fixt!(SignedActionHashed),
-                cached_entry: None,
-            };
-            op.action = chain_item_to_action(&i);
-            op
+        .map(|i| crate::dht_v2::RegisterAgentActivity {
+            action: chain_item_to_action(&i),
+            cached_entry: None,
         })
         .collect()
 }

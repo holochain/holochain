@@ -4,6 +4,7 @@ use crate::core::ribosome::RibosomeError;
 use holochain_wasmer_host::prelude::*;
 
 use holochain_types::prelude::*;
+use holochain_zome_types::dht_v2::{ActionData, CreateLinkData};
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -28,8 +29,13 @@ pub fn create_link<'a>(
             } = input;
 
             // Construct the link add
-            let action_builder =
-                builder::CreateLink::new(base_address, target_address, zome_index, link_type, tag);
+            let action_data = ActionData::CreateLink(CreateLinkData {
+                base_address,
+                target_address,
+                zome_index,
+                link_type,
+                tag,
+            });
 
             let action_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
                 // push the action into the source chain
@@ -39,7 +45,7 @@ pub fn create_link<'a>(
                     .source_chain()
                     .as_ref()
                     .expect("Must have source chain if write_workspace access is given")
-                    .put_weightless(action_builder, None, chain_top_ordering)
+                    .put(action_data, None, chain_top_ordering)
                     .await?;
                 Ok::<ActionHash, RibosomeError>(action_hash)
             }))

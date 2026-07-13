@@ -13,31 +13,23 @@ pub enum EntryTypes {
     Thing(Thing),
 }
 
-fn validate_create_thing(action: EntryCreationAction) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_thing(action: Action) -> ExternResult<ValidateCallbackResult> {
     let author = action.author().clone();
-    if let EntryCreationAction::Create(action) = action {
-        let action_hash = hash_action(action.into_action().clone())?;
-        let filter = ChainFilter::new(action_hash);
-        let result = must_get_agent_activity(author.clone(), filter)?;
-        debug!("Agent Activity Count: {}", result.len());
-    }
+    let action_hash = hash_action(action)?;
+    let filter = ChainFilter::new(action_hash);
+    let result = must_get_agent_activity(author.clone(), filter)?;
+    debug!("Agent Activity Count: {}", result.len());
     Ok(ValidateCallbackResult::Valid)
 }
 
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, ()>()? {
-        FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => match app_entry {
-                EntryTypes::Thing(_) => validate_create_thing(EntryCreationAction::Create(action)),
-            },
-            _ => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, action }) => match app_entry {
+            EntryTypes::Thing(_) => validate_create_thing(action),
         },
-        FlatOp::StoreRecord(store_record) => match store_record {
-            OpRecord::CreateEntry { app_entry, action } => match app_entry {
-                EntryTypes::Thing(_) => validate_create_thing(EntryCreationAction::Create(action)),
-            },
-            _ => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreRecord(OpRecord::CreateEntry { app_entry, action }) => match app_entry {
+            EntryTypes::Thing(_) => validate_create_thing(action),
         },
         _ => Ok(ValidateCallbackResult::Valid),
     }

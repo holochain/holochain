@@ -4,6 +4,7 @@ use crate::core::ribosome::RibosomeError;
 use holochain_wasmer_host::prelude::*;
 
 use holochain_types::prelude::*;
+use holochain_zome_types::dht_v2::{ActionData, OpenChainData};
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -18,7 +19,10 @@ pub fn open_chain(
             ..
         } => {
             // Construct the open chain action
-            let action_builder = builder::OpenChain::new(input.prev_target, input.close_hash);
+            let action_data = ActionData::OpenChain(OpenChainData {
+                prev_target: input.prev_target,
+                close_hash: input.close_hash,
+            });
 
             let action_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
                 // push the action into the source chain
@@ -28,7 +32,7 @@ pub fn open_chain(
                     .source_chain()
                     .as_ref()
                     .expect("Must have source chain if write_workspace access is given")
-                    .put_weightless(action_builder, None, ChainTopOrdering::Strict)
+                    .put(action_data, None, ChainTopOrdering::Strict)
                     .await?;
                 Ok::<ActionHash, RibosomeError>(action_hash)
             }))

@@ -20,15 +20,11 @@ struct InitPropertiesPayload {
 
 #[hdk_extern]
 fn init() -> ExternResult<InitCallbackResult> {
-    let properties: Properties = dna_info()?
-        .modifiers
-        .properties
-        .try_into()
-        .map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest(
-                "Could not deserialize DNA properties".to_string()
-            ))
-        })?;
+    let properties: Properties = dna_info()?.modifiers.properties.try_into().map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize DNA properties".to_string()
+        ))
+    })?;
 
     let Some(init_props) = get_init_properties()? else {
         return Ok(InitCallbackResult::Fail(
@@ -87,18 +83,15 @@ fn get_all_my_types() -> ExternResult<Vec<MyType>> {
     Ok(my_types)
 }
 
-/// Return the `close_hash` recorded in the [`OpenChain`] action, if one exists.
+/// Return the `close_hash` recorded in the [`OpenChain`](ActionData::OpenChain) action, if one exists.
 ///
-/// Used by integration tests to verify that the real [`CloseChain`] hash from the old chain was
+/// Used by integration tests to verify that the real [`CloseChain`](ActionData::CloseChain) hash from the old chain was
 /// carried through `init_properties`.
 #[hdk_extern]
 fn get_open_chain_close_hash(_: ()) -> ExternResult<Option<ActionHash>> {
     let records = query(ChainQueryFilter::new().action_type(ActionType::OpenChain))?;
-    Ok(records.into_iter().find_map(|r| {
-        if let Action::OpenChain(oc) = r.action() {
-            Some(oc.close_hash.clone())
-        } else {
-            None
-        }
+    Ok(records.into_iter().find_map(|r| match &r.action().data {
+        ActionData::OpenChain(oc) => Some(oc.close_hash.clone()),
+        _ => None,
     }))
 }

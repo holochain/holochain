@@ -1,11 +1,10 @@
-//! Redesigned DHT state-model types (transitional module — see
-//! `docs/design/state_model.md`).
+//! DHT state-model types (see `docs/design/state_model.md`).
 //!
-//! These types replace the per-action variant enum of the v1 model with a
-//! common [`ActionHeader`] + per-variant `*Data` struct, pulled together by
-//! a tagged [`ActionData`] enum. The resulting [`Action`] is content-only
-//! and always hashed via [`holo_hash::HoloHashed`] / [`SignedHashed`] at
-//! call sites, so the stored hash is invariant with the content.
+//! The action model is a common [`ActionHeader`] + per-variant `*Data` struct,
+//! pulled together by a tagged [`ActionData`] enum. The resulting [`Action`] is
+//! content-only and always hashed via [`holo_hash::HoloHashed`] /
+//! [`SignedHashed`] at call sites, so the stored hash is invariant with the
+//! content.
 //!
 //! [`SignedHashed`]: crate::record::SignedHashed
 
@@ -19,13 +18,14 @@ pub use op::{
 pub use record::Record;
 
 use crate::action::ZomeIndex;
+use crate::entry_def::EntryVisibility;
 use crate::{
     link::{LinkTag, LinkType},
-    EntryType, MembraneProof,
+    AppEntryDef, EntryType, MembraneProof,
 };
 use holo_hash::{
     ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash, HashableContent,
-    HashableContentBytes,
+    HashableContentBytes, HoloHashed,
 };
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
@@ -71,7 +71,7 @@ impl TryFrom<i64> for RecordValidity {
 }
 
 /// Action-type discriminant.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 #[repr(i64)]
 pub enum ActionType {
     /// Genesis DNA action. Always `action_seq == 0` and `prev_action == None`.
@@ -123,6 +123,24 @@ impl TryFrom<i64> for ActionType {
             10 => Ok(OpenChain),
             other => Err(other),
         }
+    }
+}
+
+impl core::fmt::Display for ActionType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let name = match self {
+            ActionType::Dna => "Dna",
+            ActionType::AgentValidationPkg => "AgentValidationPkg",
+            ActionType::InitZomesComplete => "InitZomesComplete",
+            ActionType::Create => "Create",
+            ActionType::Update => "Update",
+            ActionType::Delete => "Delete",
+            ActionType::CreateLink => "CreateLink",
+            ActionType::DeleteLink => "DeleteLink",
+            ActionType::CloseChain => "CloseChain",
+            ActionType::OpenChain => "OpenChain",
+        };
+        f.write_str(name)
     }
 }
 
@@ -339,6 +357,132 @@ pub struct Action {
     pub data: ActionData,
 }
 
+impl Action {
+    /// The public key of the agent who "authored" this action.
+    ///
+    /// This is not necessarily the agent who signed the action; see
+    /// [`Action::signer`].
+    pub fn author(&self) -> &AgentPubKey {
+        &self.header.author
+    }
+
+    /// The public key of the agent who signed this action.
+    ///
+    /// This is not necessarily the agent who "authored" the action: a
+    /// `CloseChain` action during an agent-key migration is signed with the
+    /// new key rather than the author key, because the new key must be
+    /// known in order for the migration to be effective.
+    pub fn signer(&self) -> &AgentPubKey {
+        match &self.data {
+            ActionData::CloseChain(CloseChainData {
+                new_target: Some(crate::action::MigrationTarget::Agent(agent)),
+            }) => agent,
+            _ => self.author(),
+        }
+    }
+
+    /// The microsecond timestamp at which this action was authored.
+    pub fn timestamp(&self) -> Timestamp {
+        self.header.timestamp
+    }
+
+    /// This action's position on the authoring agent's source chain.
+    pub fn action_seq(&self) -> u32 {
+        self.header.action_seq
+    }
+
+    /// The hash of the preceding action on the source chain.
+    ///
+    /// `None` only for the genesis `Dna` action.
+    pub fn prev_action(&self) -> Option<&ActionHash> {
+        self.header.prev_action.as_ref()
+    }
+
+    /// A mutable reference to the preceding action hash.
+    ///
+    /// `None` only for the genesis `Dna` action.
+    pub fn prev_action_mut(&mut self) -> Option<&mut ActionHash> {
+        self.header.prev_action.as_mut()
+    }
+
+    /// `true` if this action's sequence number falls within the genesis
+    /// portion of the chain.
+    pub fn is_genesis(&self) -> bool {
+        self.action_seq() < crate::action::POST_GENESIS_SEQ_THRESHOLD
+    }
+
+    /// The [`ActionType`] discriminant of this action.
+    pub fn action_type(&self) -> ActionType {
+        self.data.action_type()
+    }
+
+    /// The hash of the entry this action references, if any.
+    pub fn entry_hash(&self) -> Option<&EntryHash> {
+        self.data.entry_hash()
+    }
+
+    /// The type of the entry this action references, if any.
+    pub fn entry_type(&self) -> Option<&EntryType> {
+        match &self.data {
+            ActionData::Create(d) => Some(&d.entry_type),
+            ActionData::Update(d) => Some(&d.entry_type),
+            _ => None,
+        }
+    }
+
+    /// A mutable reference to the type of the entry this action references,
+    /// for the `Create` and `Update` variants.
+    pub fn entry_type_mut(&mut self) -> Option<&mut EntryType> {
+        match &mut self.data {
+            ActionData::Create(d) => Some(&mut d.entry_type),
+            ActionData::Update(d) => Some(&mut d.entry_type),
+            _ => None,
+        }
+    }
+
+    /// A mutable reference to the hash of the entry this action references,
+    /// for the `Create` and `Update` variants.
+    pub fn entry_hash_mut(&mut self) -> Option<&mut EntryHash> {
+        match &mut self.data {
+            ActionData::Create(d) => Some(&mut d.entry_hash),
+            ActionData::Update(d) => Some(&mut d.entry_hash),
+            _ => None,
+        }
+    }
+
+    /// The [`AppEntryDef`] of the entry this action references, if it is an
+    /// application-defined entry.
+    pub fn app_entry_def(&self) -> Option<&AppEntryDef> {
+        match self.entry_type()? {
+            EntryType::App(app_entry_def) => Some(app_entry_def),
+            _ => None,
+        }
+    }
+
+    /// The hash and type of the entry this action references, if any.
+    pub fn entry_data(&self) -> Option<(&EntryHash, &EntryType)> {
+        match &self.data {
+            ActionData::Create(d) => Some((&d.entry_hash, &d.entry_type)),
+            ActionData::Update(d) => Some((&d.entry_hash, &d.entry_type)),
+            _ => None,
+        }
+    }
+
+    /// Pulls the entry hash and type out of this action by value, if any.
+    pub fn into_entry_data(self) -> Option<(EntryHash, EntryType)> {
+        match self.data {
+            ActionData::Create(d) => Some((d.entry_hash, d.entry_type)),
+            ActionData::Update(d) => Some((d.entry_hash, d.entry_type)),
+            _ => None,
+        }
+    }
+
+    /// The visibility of the entry this action references, if any.
+    pub fn entry_visibility(&self) -> Option<&EntryVisibility> {
+        self.entry_type().map(|entry_type| entry_type.visibility())
+    }
+}
+
 impl HashableContent for Action {
     type HashType = holo_hash::hash_type::Action;
 
@@ -354,77 +498,47 @@ impl HashableContent for Action {
     }
 }
 
-/// Project a legacy [`crate::action::Action`] onto the v2 [`Action`]
-/// (a flat [`ActionHeader`] + [`ActionData`] envelope), dropping the legacy
-/// `weight` field that the v2 model deliberately discards.
+/// An [`Action`] paired with its [`ActionHash`].
 ///
-/// This is **total** over every legacy variant. It is the action-only core
-/// shared by three callers, which therefore all agree on the v2 form (and so
-/// on the content-derived v2 hash):
-/// - `holochain_zome_types::dht_v2::from_legacy_signed_action` (a higher layer,
-///   so not linkable from here), which wraps this with the carried-over hash +
-///   signature during the dual-write transition;
-/// - the `HashableContent` impls for the legacy `Action` (and its per-variant
-///   refs) in [`crate::action`], which hash this projection so every
-///   `ActionHash` is content-derived v2;
-/// - host and wasm code alike, since both compile this same projection.
-pub fn from_legacy_action(action: &crate::action::Action) -> Action {
-    use crate::action::Action as LegacyAction;
+/// The agent-activity traits
+/// [`ActionSequenceAndHash`](crate::action::ActionSequenceAndHash) and
+/// [`ActionHashedContainer`](crate::action::ActionHashedContainer) are
+/// implemented for it.
+pub type ActionHashed = HoloHashed<Action>;
 
-    let header = ActionHeader {
-        author: action.author().clone(),
-        timestamp: action.timestamp(),
-        action_seq: action.action_seq(),
-        prev_action: action.prev_action().cloned(),
-    };
+/// An [`Action`] that is both hashed and signed.
+pub type SignedActionHashed = crate::record::SignedHashed<Action>;
 
-    let data = match action {
-        LegacyAction::Dna(d) => ActionData::Dna(DnaData {
-            dna_hash: d.hash.clone(),
-        }),
-        LegacyAction::AgentValidationPkg(d) => {
-            ActionData::AgentValidationPkg(AgentValidationPkgData {
-                membrane_proof: d.membrane_proof.clone(),
-            })
-        }
-        LegacyAction::InitZomesComplete(_) => {
-            ActionData::InitZomesComplete(InitZomesCompleteData {})
-        }
-        LegacyAction::Create(d) => ActionData::Create(CreateData {
-            entry_type: d.entry_type.clone(),
-            entry_hash: d.entry_hash.clone(),
-        }),
-        LegacyAction::Update(d) => ActionData::Update(UpdateData {
-            original_action_address: d.original_action_address.clone(),
-            original_entry_address: d.original_entry_address.clone(),
-            entry_type: d.entry_type.clone(),
-            entry_hash: d.entry_hash.clone(),
-        }),
-        LegacyAction::Delete(d) => ActionData::Delete(DeleteData {
-            deletes_address: d.deletes_address.clone(),
-            deletes_entry_address: d.deletes_entry_address.clone(),
-        }),
-        LegacyAction::CreateLink(d) => ActionData::CreateLink(CreateLinkData {
-            base_address: d.base_address.clone(),
-            target_address: d.target_address.clone(),
-            zome_index: d.zome_index,
-            link_type: d.link_type,
-            tag: d.tag.clone(),
-        }),
-        LegacyAction::DeleteLink(d) => ActionData::DeleteLink(DeleteLinkData {
-            base_address: d.base_address.clone(),
-            link_add_address: d.link_add_address.clone(),
-        }),
-        LegacyAction::CloseChain(d) => ActionData::CloseChain(CloseChainData {
-            new_target: d.new_target.clone(),
-        }),
-        LegacyAction::OpenChain(d) => ActionData::OpenChain(OpenChainData {
-            prev_target: d.prev_target.clone(),
-            close_hash: d.close_hash.clone(),
-        }),
-    };
+impl SignedActionHashed {
+    /// The action content.
+    pub fn action(&self) -> &Action {
+        &self.hashed.content
+    }
 
-    Action { header, data }
+    /// The action hash.
+    pub fn action_address(&self) -> &ActionHash {
+        &self.hashed.hash
+    }
+}
+
+impl crate::action::ActionSequenceAndHash for ActionHashed {
+    fn action_seq(&self) -> u32 {
+        self.content.action_seq()
+    }
+
+    fn address(&self) -> &ActionHash {
+        &self.hash
+    }
+}
+
+impl crate::action::ActionHashedContainer for ActionHashed {
+    fn action(&self) -> &Action {
+        &self.content
+    }
+
+    fn action_hash(&self) -> &ActionHash {
+        &self.hash
+    }
 }
 
 #[cfg(test)]
@@ -487,185 +601,6 @@ mod tests {
     }
 
     #[test]
-    fn from_legacy_action_is_total_and_maps_header_and_fields() {
-        use crate::action::{
-            Action as LegacyAction, AgentValidationPkg, CloseChain, Create, CreateLink, Delete,
-            DeleteLink, Dna, InitZomesComplete, MigrationTarget, OpenChain, Update,
-        };
-        use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
-        use holochain_timestamp::Timestamp;
-
-        let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
-        let ts = Timestamp::from_micros(1_234);
-        let seq = 7u32;
-        let prev = ActionHash::from_raw_36(vec![2u8; 36]);
-
-        // One representative of every legacy variant, paired with the
-        // `ActionType` the projection must produce.
-        let cases: Vec<(LegacyAction, ActionType)> = vec![
-            (
-                LegacyAction::Dna(Dna {
-                    author: author.clone(),
-                    timestamp: ts,
-                    hash: DnaHash::from_raw_36(vec![3u8; 36]),
-                }),
-                ActionType::Dna,
-            ),
-            (
-                LegacyAction::AgentValidationPkg(AgentValidationPkg {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    membrane_proof: None,
-                }),
-                ActionType::AgentValidationPkg,
-            ),
-            (
-                LegacyAction::InitZomesComplete(InitZomesComplete {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                }),
-                ActionType::InitZomesComplete,
-            ),
-            (
-                LegacyAction::Create(Create {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    entry_type: EntryType::AgentPubKey,
-                    entry_hash: EntryHash::from_raw_36(vec![4u8; 36]),
-                    weight: Default::default(),
-                }),
-                ActionType::Create,
-            ),
-            (
-                LegacyAction::Update(Update {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    original_action_address: ActionHash::from_raw_36(vec![5u8; 36]),
-                    original_entry_address: EntryHash::from_raw_36(vec![6u8; 36]),
-                    entry_type: EntryType::AgentPubKey,
-                    entry_hash: EntryHash::from_raw_36(vec![7u8; 36]),
-                    weight: Default::default(),
-                }),
-                ActionType::Update,
-            ),
-            (
-                LegacyAction::Delete(Delete {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    deletes_address: ActionHash::from_raw_36(vec![8u8; 36]),
-                    deletes_entry_address: EntryHash::from_raw_36(vec![9u8; 36]),
-                    weight: Default::default(),
-                }),
-                ActionType::Delete,
-            ),
-            (
-                LegacyAction::CreateLink(CreateLink {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    base_address: AnyLinkableHash::from_raw_36_and_type(
-                        vec![10u8; 36],
-                        holo_hash::hash_type::AnyLinkable::Entry,
-                    ),
-                    target_address: AnyLinkableHash::from_raw_36_and_type(
-                        vec![11u8; 36],
-                        holo_hash::hash_type::AnyLinkable::Entry,
-                    ),
-                    zome_index: ZomeIndex(1),
-                    link_type: 2.into(),
-                    tag: crate::link::LinkTag(vec![0xAA, 0xBB]),
-                    weight: Default::default(),
-                }),
-                ActionType::CreateLink,
-            ),
-            (
-                LegacyAction::DeleteLink(DeleteLink {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    base_address: AnyLinkableHash::from_raw_36_and_type(
-                        vec![12u8; 36],
-                        holo_hash::hash_type::AnyLinkable::Entry,
-                    ),
-                    link_add_address: ActionHash::from_raw_36(vec![13u8; 36]),
-                }),
-                ActionType::DeleteLink,
-            ),
-            (
-                LegacyAction::CloseChain(CloseChain {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    new_target: Some(MigrationTarget::Dna(DnaHash::from_raw_36(vec![14u8; 36]))),
-                }),
-                ActionType::CloseChain,
-            ),
-            (
-                LegacyAction::OpenChain(OpenChain {
-                    author: author.clone(),
-                    timestamp: ts,
-                    action_seq: seq,
-                    prev_action: prev.clone(),
-                    prev_target: MigrationTarget::Dna(DnaHash::from_raw_36(vec![15u8; 36])),
-                    close_hash: ActionHash::from_raw_36(vec![16u8; 36]),
-                }),
-                ActionType::OpenChain,
-            ),
-        ];
-
-        for (legacy, expected_type) in cases {
-            let v2 = from_legacy_action(&legacy);
-
-            // Discriminant is total + correct.
-            assert_eq!(v2.data.action_type(), expected_type);
-
-            // Header maps via the legacy accessors (Dna has seq 0 / no prev).
-            assert_eq!(&v2.header.author, legacy.author());
-            assert_eq!(v2.header.timestamp, legacy.timestamp());
-            assert_eq!(v2.header.action_seq, legacy.action_seq());
-            assert_eq!(v2.header.prev_action.as_ref(), legacy.prev_action());
-
-            // Spot-check a few payloads carried across without the weight.
-            match (&v2.data, &legacy) {
-                (ActionData::Create(d), LegacyAction::Create(l)) => {
-                    assert_eq!(d.entry_type, l.entry_type);
-                    assert_eq!(d.entry_hash, l.entry_hash);
-                }
-                (ActionData::Update(d), LegacyAction::Update(l)) => {
-                    assert_eq!(d.original_action_address, l.original_action_address);
-                    assert_eq!(d.original_entry_address, l.original_entry_address);
-                    assert_eq!(d.entry_hash, l.entry_hash);
-                }
-                (ActionData::CreateLink(d), LegacyAction::CreateLink(l)) => {
-                    assert_eq!(d.base_address, l.base_address);
-                    assert_eq!(d.target_address, l.target_address);
-                    assert_eq!(d.zome_index, l.zome_index);
-                    assert_eq!(d.link_type, l.link_type);
-                    assert_eq!(d.tag, l.tag);
-                }
-                (ActionData::OpenChain(d), LegacyAction::OpenChain(l)) => {
-                    assert_eq!(d.prev_target, l.prev_target);
-                    assert_eq!(d.close_hash, l.close_hash);
-                }
-                _ => {}
-            }
-        }
-    }
-
-    #[test]
     fn action_data_serde_roundtrip() {
         let cases: Vec<ActionData> = vec![
             ActionData::Dna(DnaData {
@@ -682,5 +617,175 @@ mod tests {
             let decoded: ActionData = holochain_serialized_bytes::decode(&bytes).unwrap();
             assert_eq!(decoded.action_type(), data.action_type());
         }
+    }
+
+    fn sample_action(data: ActionData) -> Action {
+        Action {
+            header: ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![1u8; 36]),
+                timestamp: Timestamp::from_micros(42),
+                action_seq: 5,
+                prev_action: Some(ActionHash::from_raw_36(vec![2u8; 36])),
+            },
+            data,
+        }
+    }
+
+    fn sample_create_data() -> ActionData {
+        ActionData::Create(CreateData {
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
+        })
+    }
+
+    #[test]
+    fn action_accessors_read_header_fields() {
+        let a = sample_action(sample_create_data());
+        assert_eq!(a.author(), &AgentPubKey::from_raw_36(vec![1u8; 36]));
+        assert_eq!(a.timestamp(), Timestamp::from_micros(42));
+        assert_eq!(a.action_seq(), 5);
+        assert_eq!(
+            a.prev_action(),
+            Some(&ActionHash::from_raw_36(vec![2u8; 36]))
+        );
+        assert_eq!(a.action_type(), ActionType::Create);
+    }
+
+    #[test]
+    fn action_prev_action_mut_writes_through_the_header() {
+        let mut a = sample_action(sample_create_data());
+        let new_prev = ActionHash::from_raw_36(vec![9u8; 36]);
+        *a.prev_action_mut().expect("has a prev action") = new_prev.clone();
+        assert_eq!(a.prev_action(), Some(&new_prev));
+    }
+
+    #[test]
+    fn action_entry_type_and_data_some_for_create_and_update() {
+        let create = sample_action(sample_create_data());
+        assert_eq!(create.entry_type(), Some(&EntryType::AgentPubKey));
+        assert_eq!(
+            create.entry_data(),
+            Some((
+                &EntryHash::from_raw_36(vec![3u8; 36]),
+                &EntryType::AgentPubKey
+            ))
+        );
+        assert_eq!(
+            create.entry_hash(),
+            Some(&EntryHash::from_raw_36(vec![3u8; 36]))
+        );
+
+        let update = sample_action(ActionData::Update(UpdateData {
+            original_action_address: ActionHash::from_raw_36(vec![6u8; 36]),
+            original_entry_address: EntryHash::from_raw_36(vec![7u8; 36]),
+            entry_type: EntryType::CapClaim,
+            entry_hash: EntryHash::from_raw_36(vec![8u8; 36]),
+        }));
+        assert_eq!(update.entry_type(), Some(&EntryType::CapClaim));
+        assert_eq!(
+            update.entry_data(),
+            Some((&EntryHash::from_raw_36(vec![8u8; 36]), &EntryType::CapClaim))
+        );
+    }
+
+    #[test]
+    fn action_entry_type_and_data_none_for_non_entry_actions() {
+        let dna = sample_action(ActionData::Dna(DnaData {
+            dna_hash: DnaHash::from_raw_36(vec![5u8; 36]),
+        }));
+        assert_eq!(dna.entry_type(), None);
+        assert_eq!(dna.entry_data(), None);
+        assert_eq!(dna.entry_hash(), None);
+        assert_eq!(dna.entry_visibility(), None);
+
+        let delete = sample_action(ActionData::Delete(DeleteData {
+            deletes_address: ActionHash::from_raw_36(vec![9u8; 36]),
+            deletes_entry_address: EntryHash::from_raw_36(vec![10u8; 36]),
+        }));
+        assert!(delete.entry_data().is_none());
+    }
+
+    #[test]
+    fn action_app_entry_def_some_for_app_entry_type() {
+        let app_entry_def = AppEntryDef::new(
+            crate::action::EntryDefIndex(1),
+            crate::action::ZomeIndex(2),
+            EntryVisibility::Public,
+        );
+        let create = sample_action(ActionData::Create(CreateData {
+            entry_type: EntryType::App(app_entry_def.clone()),
+            entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
+        }));
+        assert_eq!(create.app_entry_def(), Some(&app_entry_def));
+    }
+
+    #[test]
+    fn action_app_entry_def_none_for_non_app_entry_type() {
+        let create = sample_action(sample_create_data());
+        assert_eq!(create.app_entry_def(), None);
+
+        let dna = sample_action(ActionData::Dna(DnaData {
+            dna_hash: DnaHash::from_raw_36(vec![5u8; 36]),
+        }));
+        assert_eq!(dna.app_entry_def(), None);
+    }
+
+    #[test]
+    fn action_into_entry_data_moves_the_fields_out() {
+        let create = sample_action(sample_create_data());
+        let (hash, ty) = create.into_entry_data().expect("create has entry data");
+        assert_eq!(hash, EntryHash::from_raw_36(vec![3u8; 36]));
+        assert_eq!(ty, EntryType::AgentPubKey);
+
+        let dna = sample_action(ActionData::Dna(DnaData {
+            dna_hash: DnaHash::from_raw_36(vec![5u8; 36]),
+        }));
+        assert!(dna.into_entry_data().is_none());
+    }
+
+    #[test]
+    fn action_entry_visibility_reads_through_entry_type() {
+        let create = sample_action(sample_create_data());
+        assert_eq!(create.entry_visibility(), Some(&EntryVisibility::Public));
+
+        let cap_claim = sample_action(ActionData::Create(CreateData {
+            entry_type: EntryType::CapClaim,
+            entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
+        }));
+        assert_eq!(
+            cap_claim.entry_visibility(),
+            Some(&EntryVisibility::Private)
+        );
+    }
+
+    #[test]
+    fn action_is_genesis_below_threshold() {
+        let mut a = sample_action(sample_create_data());
+        a.header.action_seq = 0;
+        assert!(a.is_genesis());
+        a.header.action_seq = crate::action::POST_GENESIS_SEQ_THRESHOLD;
+        assert!(!a.is_genesis());
+    }
+
+    #[test]
+    fn action_signer_defaults_to_author() {
+        let a = sample_action(sample_create_data());
+        assert_eq!(a.signer(), a.author());
+    }
+
+    #[test]
+    fn action_signer_uses_the_migration_agent_for_close_chain() {
+        let new_agent = AgentPubKey::from_raw_36(vec![7u8; 36]);
+        let a = sample_action(ActionData::CloseChain(CloseChainData {
+            new_target: Some(crate::action::MigrationTarget::Agent(new_agent.clone())),
+        }));
+        assert_eq!(a.signer(), &new_agent);
+        assert_ne!(a.signer(), a.author());
+    }
+
+    #[test]
+    fn action_signer_uses_author_for_close_chain_without_agent_target() {
+        let a = sample_action(ActionData::CloseChain(CloseChainData { new_target: None }));
+        assert_eq!(a.signer(), a.author());
     }
 }

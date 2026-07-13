@@ -3,11 +3,19 @@ use crate::core::workflow::countersigning_workflow::{
     CountersigningSessionState, CountersigningWorkspace, ResolutionRequiredReason,
     SessionResolutionSummary,
 };
-use holochain_state::prelude::{CurrentCountersigningSessionOpt, SourceChainResult};
+use holochain_state::prelude::SourceChainResult;
 use holochain_types::prelude::{Signal, SystemSignal};
 use holochain_zome_types::cell::CellId;
 use std::sync::Arc;
 use tokio::sync::broadcast::Sender;
+
+/// The committed countersigning session at an agent's chain head: the record
+/// it was committed in, the entry's hash, and the decoded session data.
+type CurrentCountersigningSessionEntry = (
+    holochain_zome_types::record::Record,
+    holo_hash::EntryHash,
+    holochain_zome_types::countersigning::CounterSigningSessionData,
+);
 
 /// Resolves the various states that the system can find itself in when operating a countersigning session.
 ///
@@ -80,7 +88,7 @@ pub async fn refresh_workspace_state(
             // This might happen if we were in the coordination phase of countersigning and the
             // conductor restarted.
             let query_session_and_maybe_unlock_result: SourceChainResult<(
-                CurrentCountersigningSessionOpt,
+                Option<CurrentCountersigningSessionEntry>,
                 bool,
             )> = async {
                 let maybe_current_session = space
@@ -113,36 +121,33 @@ pub async fn refresh_workspace_state(
                     }
 
                     match maybe_current_session {
-                        Some((_, _, session_data)) => {
-                            if !session_registered_for_agent {
-                                // The chain is locked but the session isn't registered in the workspace.
-                                // It needs to be added in with the `Unknown` state because we don't
-                                // know the state of the session.
-                                workspace
-                                    .inner
-                                    .share_mut(|inner, _| {
-                                        inner.session = Some(CountersigningSessionState::Unknown {
-                                            preflight_request: session_data
-                                                .preflight_request()
-                                                .clone(),
-                                            resolution: SessionResolutionSummary {
-                                                required_reason: ResolutionRequiredReason::Unknown,
-                                                ..Default::default()
-                                            },
-                                            force_abandon: false,
-                                            force_publish: false,
-                                        });
+                        // The chain is locked but the session isn't registered in the workspace.
+                        // It needs to be added in with the `Unknown` state because we don't
+                        // know the state of the session.
+                        Some((_, _, session_data)) if !session_registered_for_agent => {
+                            workspace
+                                .inner
+                                .share_mut(|inner, _| {
+                                    inner.session = Some(CountersigningSessionState::Unknown {
+                                        preflight_request: session_data.preflight_request().clone(),
+                                        resolution: SessionResolutionSummary {
+                                            required_reason: ResolutionRequiredReason::Unknown,
+                                            ..Default::default()
+                                        },
+                                        force_abandon: false,
+                                        force_publish: false,
+                                    });
 
-                                        Ok(())
-                                    })
-                                    .unwrap();
-                            }
+                                    Ok(())
+                                })
+                                .unwrap();
                         }
-                        None => {
-                            // No session entry was found. This can happen if the chain is locked for
-                            // the session accept but no commit has been done yet. Either the author
-                            // will commit or the session will time out. Nothing to be done here!
-                        }
+                        // Either the session is already registered in the workspace, or no
+                        // session entry was found. The latter can happen if the chain is
+                        // locked for the session accept but no commit has been done yet:
+                        // either the author will commit or the session will time out.
+                        // Nothing to be done here in either case!
+                        _ => {}
                     }
                 }
                 Err(e) => {

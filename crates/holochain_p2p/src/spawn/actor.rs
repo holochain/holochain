@@ -201,7 +201,7 @@ impl event::HcP2pHandler for WrapEvtSender {
     fn handle_publish_countersign(
         &self,
         dna_hash: DnaHash,
-        op: holochain_types::dht_op::ChainOp,
+        op: ChainOp,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         timing_trace!(
             true,
@@ -3129,7 +3129,7 @@ mod tests {
         fn handle_publish_countersign(
             &self,
             _dna_hash: DnaHash,
-            _op: holochain_types::dht_op::ChainOp,
+            _op: ChainOp,
         ) -> BoxFut<'_, HolochainP2pResult<()>> {
             // Increment counter
             let mut count = self.handle_publish_countersign_count.lock().unwrap();
@@ -3712,14 +3712,21 @@ mod tests {
 
         // PublishCountersignEvt is not limited
         let msg = WireMessage::PublishCountersignEvt {
-            op: holochain_types::dht_op::ChainOp::RegisterAgentActivity(
-                Signature([0; 64]),
-                Action::InitZomesComplete(InitZomesComplete {
-                    author: AgentPubKey::from_raw_32(vec![1; 32]),
-                    timestamp: holochain_types::prelude::Timestamp::now(),
-                    action_seq: 0,
-                    prev_action: ActionHash::from_raw_32(vec![2; 32]),
-                }),
+            op: holochain_types::dht_v2::ChainOp::AgentActivity(
+                holochain_types::dht_v2::SignedAction::new(
+                    holochain_types::dht_v2::Action {
+                        header: holochain_types::dht_v2::ActionHeader {
+                            author: AgentPubKey::from_raw_32(vec![1; 32]),
+                            timestamp: holochain_types::prelude::Timestamp::now(),
+                            action_seq: 0,
+                            prev_action: Some(ActionHash::from_raw_32(vec![2; 32])),
+                        },
+                        data: holochain_types::dht_v2::ActionData::InitZomesComplete(
+                            holochain_types::dht_v2::InitZomesCompleteData {},
+                        ),
+                    },
+                    Signature([0; 64]),
+                ),
             ),
         };
         let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();

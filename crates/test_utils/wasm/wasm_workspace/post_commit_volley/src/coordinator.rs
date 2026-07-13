@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use crate::integrity::*;
 use hdk::prelude::*;
+use std::collections::HashSet;
 
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
@@ -24,9 +24,9 @@ fn ping(agent: AgentPubKey) -> ExternResult<ActionHash> {
 
 #[hdk_extern(infallible)]
 fn post_commit(shhs: Vec<SignedActionHashed>) {
-    if let Ok(ping) =
-        Ping::try_from(must_get_entry(shhs[0].action().entry_hash().unwrap().clone()).unwrap())
-    {
+    if let Ok(ping) = Ping::try_from(
+        must_get_entry(shhs[0].hashed.content.entry_hash().unwrap().clone()).unwrap(),
+    ) {
         if hdk::prelude::query(
             ChainQueryFilter::default().entry_type(EntryTypesUnit::Ping.try_into().unwrap()),
         )

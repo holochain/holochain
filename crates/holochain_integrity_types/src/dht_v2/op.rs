@@ -1,5 +1,4 @@
-//! The v2 DHT [`Op`] model, redesigned around `ActionData` (transitional
-//! `dht_v2` location; promoted to the canonical `op` module later).
+//! The DHT [`Op`] model, built around `ActionData`.
 
 use super::{Action, ActionData, ActionType, Record};
 use crate::action::conversions::WrongActionError;
@@ -9,9 +8,9 @@ use holo_hash::{ActionHash, AgentPubKey, EntryHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
 
-/// A DHT operation produced by a v2 action and validated by an authority.
+/// A DHT operation produced by an action and validated by an authority.
 ///
-/// Variants carry the v2 [`SignedHashed<Action>`] directly; consumers inspect
+/// Variants carry the [`SignedHashed<Action>`] directly; consumers inspect
 /// `action.hashed.content.data` ([`ActionData`]) to discriminate, rather than
 /// matching distinct typed per-variant action structs.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]

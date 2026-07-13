@@ -226,7 +226,7 @@ impl ValidationDependencies {
             .filter_map(|state| match (&state.dependency_type, &state.dependency) {
                 (ValidationDependencyType::Warranted(_), Some(v)) => match &v.value {
                     ValidationDependencyValue::Warranted(WarrantedDep::Pending(r, t)) => {
-                        Some((r.action_address().clone(), *t))
+                        Some((r.as_hash().clone(), *t))
                     }
                     _ => None,
                 },
@@ -364,25 +364,43 @@ impl ValidationDependencyState {
     /// Get the action from the dependency state if it is present.
     pub(super) fn as_action(&self) -> Option<&Action> {
         self.dependency.as_ref().map(|d| match &d.value {
-            ValidationDependencyValue::Action(a) => a.action(),
+            ValidationDependencyValue::Action(a) => &a.hashed.content,
             ValidationDependencyValue::Warranted(WarrantedDep::Pending(action, _)) => {
-                action.action()
+                &action.hashed.content
             }
             ValidationDependencyValue::Warranted(WarrantedDep::Validated(action, _)) => {
-                action.action()
+                &action.hashed.content
             }
         })
     }
 
-    /// Get the record from the dependency state if it is for a warranted record op that has been
-    /// validated.
-    pub(super) fn as_action_and_validation_status(&self) -> Option<(&Action, ValidationStatus)> {
+    /// Get the full signed action from the dependency state if it is present.
+    ///
+    /// Unlike [`Self::as_action`], this keeps the hash and signature attached,
+    /// which warrant validation needs to (re-)verify a claimed signature
+    /// against the locally-held action.
+    pub(super) fn as_signed_action(&self) -> Option<&SignedActionHashed> {
+        self.dependency.as_ref().map(|d| match &d.value {
+            ValidationDependencyValue::Action(a) => a,
+            ValidationDependencyValue::Warranted(WarrantedDep::Pending(action, _)) => action,
+            ValidationDependencyValue::Warranted(WarrantedDep::Validated(action, _)) => action,
+        })
+    }
+
+    /// Get the full signed action and validation status from the dependency
+    /// state if it is for a warranted record op that has been validated.
+    ///
+    /// Keeps the hash and signature attached, which warrant validation needs
+    /// to (re-)verify a claimed signature against the locally-held action.
+    pub(super) fn as_signed_action_and_validation_status(
+        &self,
+    ) -> Option<(&SignedActionHashed, ValidationStatus)> {
         match &self.dependency {
             Some(d) => match &d.value {
                 ValidationDependencyValue::Warranted(WarrantedDep::Validated(
                     a,
                     validation_status,
-                )) => Some((a.action(), *validation_status)),
+                )) => Some((a, *validation_status)),
                 _ => None,
             },
             None => None,

@@ -1,5 +1,6 @@
 use super::*;
 use holochain_p2p::{HolochainP2pError, HolochainP2pResult};
+use holochain_types::dht_v2::ChainOp;
 use kitsune2_api::BoxFut;
 
 impl Conductor {

@@ -38,8 +38,8 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 action,
             } => {
                 let _agent_activity = must_get_agent_activity(
-                    action.author.to_owned(),
-                    ChainFilter::new(hash_action(action.to_owned().into())?),
+                    action.author().to_owned(),
+                    ChainFilter::new(hash_action(action.to_owned())?),
                 )?;
                 return Ok(ValidateCallbackResult::Valid);
             }
@@ -48,8 +48,13 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 action,
             } => {
                 let _agent_activity = must_get_agent_activity(
-                    action.author.to_owned(),
-                    ChainFilter::new(action.prev_action.to_owned()),
+                    action.author().to_owned(),
+                    ChainFilter::new(
+                        action
+                            .prev_action()
+                            .cloned()
+                            .expect("a Create action always has a prev_action"),
+                    ),
                 )?;
                 return Ok(ValidateCallbackResult::Valid);
             }
@@ -74,10 +79,10 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     match chain.last() {
                         Some(op) => {
-                            if op.action.action().action_seq() == 0 {
+                            if op.action.hashed.content.action_seq() == 0 {
                                 return Ok(ValidateCallbackResult::Valid);
                             } else {
-                                filter = ChainFilter::take(op.action.action_address().clone(), 2);
+                                filter = ChainFilter::take(op.action.as_hash().clone(), 2);
                             }
                         }
                         None => {

@@ -9,7 +9,11 @@ pub use holo_hash::*;
 use holochain_keystore::AgentPubKeyExt;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
+use holochain_types::dht_v2::{ChainOp, DhtOp, OpEntry};
 use holochain_types::prelude::*;
+use holochain_zome_types::dht_v2::{
+    build_action_set, ActionData, CreateData, DnaData, SignedAction, UpdateData,
+};
 use std::sync::Arc;
 
 mod error;
@@ -28,19 +32,23 @@ pub const MAX_ENTRY_SIZE: usize = ENTRY_SIZE_LIMIT;
 /// fast lookup so they should be small.
 pub const MAX_TAG_SIZE: usize = 1000;
 
-/// Verify the signature for this action
+/// Verify the signature for this action.
+///
+/// Signatures are computed and checked over the `Action` bytes.
 pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysValidationResult<()> {
     if action.signer().verify_signature(sig, action).await? {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::CounterfeitAction((*sig).clone(), Box::new((*action).clone())),
+            ValidationOutcome::CounterfeitAction((*sig).clone(), Box::new(action.clone())),
         ))
     }
 }
 
 /// Verify the signature for this warrant
-pub async fn verify_warrant_signature(warrant_op: &WarrantOp) -> SysValidationResult<()> {
+pub async fn verify_warrant_signature(
+    warrant_op: &holochain_types::dht_v2::WarrantOp,
+) -> SysValidationResult<()> {
     if warrant_op
         .author
         .verify_signature(warrant_op.signature(), warrant_op.warrant().clone())
@@ -58,30 +66,17 @@ pub async fn verify_warrant_signature(warrant_op: &WarrantOp) -> SysValidationRe
 pub fn check_countersigning_session_data_contains_action(
     entry_hash: EntryHash,
     session_data: &CounterSigningSessionData,
-    action: NewEntryActionRef<'_>,
+    action: &Action,
 ) -> SysValidationResult<()> {
-    let weight = match action {
-        NewEntryActionRef::Create(h) => h.weight.clone(),
-        NewEntryActionRef::Update(h) => h.weight.clone(),
-    };
-    let action_is_in_session = session_data
-        .build_action_set(entry_hash, weight)
+    let action_is_in_session = build_action_set(session_data, entry_hash)
         .map_err(SysValidationError::from)?
         .iter()
-        .any(|session_action| match (&action, session_action) {
-            (NewEntryActionRef::Create(create), Action::Create(session_create)) => {
-                create == &session_create
-            }
-            (NewEntryActionRef::Update(update), Action::Update(session_update)) => {
-                update == &session_update
-            }
-            _ => false,
-        });
+        .any(|session_action| session_action == action);
     if !action_is_in_session {
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::ActionNotInCounterSigningSession(
                 Box::new(session_data.to_owned()),
-                Box::new(action.to_new_entry_action()),
+                Box::new(action.clone()),
             ),
         ))
     } else {
@@ -130,7 +125,7 @@ pub async fn check_countersigning_preflight_response_signature(
 pub async fn check_countersigning_session_data(
     entry_hash: EntryHash,
     session_data: &CounterSigningSessionData,
-    action: NewEntryActionRef<'_>,
+    action: &Action,
 ) -> SysValidationResult<()> {
     session_data.check_integrity()?;
     check_countersigning_session_data_contains_action(entry_hash, session_data, action)?;
@@ -160,7 +155,7 @@ pub async fn check_countersigning_session_data(
 /// - Dna can never have a prev_action, and must have seq == 0.
 /// - All other actions must have prev_action, and seq > 0.
 pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
-    let is_dna = matches!(action, Action::Dna(_));
+    let is_dna = matches!(action.data, ActionData::Dna(_));
     let has_prev = action.prev_action().is_some();
     let is_first = action.action_seq() == 0;
     #[allow(clippy::collapsible_else_if)]
@@ -184,10 +179,12 @@ pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
 
 /// Check that Dna actions are only added to empty source chains
 pub fn check_valid_if_dna(action: &Action, dna_hash: &DnaHash) -> SysValidationResult<()> {
-    match action {
-        Action::Dna(a) => {
-            if a.hash != *dna_hash {
-                Err(ValidationOutcome::WrongDna(a.hash.clone(), dna_hash.clone()).into())
+    match &action.data {
+        ActionData::Dna(DnaData {
+            dna_hash: action_dna_hash,
+        }) => {
+            if action_dna_hash != dna_hash {
+                Err(ValidationOutcome::WrongDna(action_dna_hash.clone(), dna_hash.clone()).into())
             } else {
                 Ok(())
             }
@@ -201,35 +198,30 @@ pub fn check_agent_validation_pkg_predecessor(
     action: &Action,
     prev_action: &Action,
 ) -> SysValidationResult<()> {
-    let maybe_error = match (prev_action, action) {
-        (
-            Action::AgentValidationPkg(AgentValidationPkg { .. }),
-            Action::Create(Create {
+    let is_agent_pubkey_entry_action = |a: &Action| {
+        matches!(
+            &a.data,
+            ActionData::Create(CreateData {
+                entry_type: EntryType::AgentPubKey,
+                ..
+            }) | ActionData::Update(UpdateData {
                 entry_type: EntryType::AgentPubKey,
                 ..
             })
-            | Action::Update(Update {
-                entry_type: EntryType::AgentPubKey,
-                ..
-            }),
-        ) => None,
-        (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => Some(
+        )
+    };
+    let prev_is_avp = matches!(prev_action.data, ActionData::AgentValidationPkg(_));
+    let action_is_agent_pubkey_entry = is_agent_pubkey_entry_action(action);
+
+    let maybe_error = match (prev_is_avp, action_is_agent_pubkey_entry) {
+        (true, true) => None,
+        (true, false) => Some(
             "Every AgentValidationPkg must be followed by a Create or Update for an AgentPubKey",
         ),
-        (
-            _,
-            Action::Create(Create {
-                entry_type: EntryType::AgentPubKey,
-                ..
-            })
-            | Action::Update(Update {
-                entry_type: EntryType::AgentPubKey,
-                ..
-            }),
-        ) => Some(
+        (false, true) => Some(
             "Every Create or Update for an AgentPubKey must be preceded by an AgentValidationPkg",
         ),
-        _ => None,
+        (false, false) => None,
     };
 
     if let Some(error) = maybe_error {
@@ -287,41 +279,65 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 }
 
 /// Check that the EntryVisibility is congruous with the presence or absence of entry data
+///
+/// Ops whose variant carries no entry slot (`op.op_entry()` is `None`, e.g.
+/// `AgentActivity`, `DeleteEntry`, `DeleteRecord`, `CreateLink`, `DeleteLink`)
+/// always pass. For entry-bearing ops the entry slot must match the action's
+/// entry visibility:
+/// - A `Public` entry-bearing op must carry its entry (`Present`). The sole
+///   exception is an `AgentPubKey` action, whose entry data is the entry hash
+///   already carried in the action.
+/// - A `Private` entry-bearing op must withhold its entry (`Hidden` or
+///   `ActionOnly`); presenting the entry, or carrying a private entry under the
+///   public-entry `CreateEntry` op, is a leak. `ActionOnly` is accepted here as
+///   the common case of a private entry this authority never receives, and it
+///   carries no entry to leak either way.
 pub fn check_entry_visibility(op: &ChainOp) -> SysValidationResult<()> {
     use EntryVisibility::*;
-    use RecordEntry::*;
+    use OpEntry::*;
 
+    let action = op.signed_action().data();
     let err = |reason: &str| {
         Err(ValidationOutcome::MalformedDhtOp(
-            Box::new(op.action()),
-            op.get_type(),
+            Box::new(action.clone()),
+            op.op_type(),
             reason.to_string(),
         )
         .into())
     };
 
-    match (op.action().entry_type().map(|t| t.visibility()), op.entry()) {
-        (Some(Public), Present(_)) => Ok(()),
-        (Some(Private), Hidden) => Ok(()),
-        (Some(Private), NotStored) => Ok(()),
+    match (action.entry_visibility(), op.op_entry()) {
+        (_, None) => Ok(()),
 
-        (Some(Public), Hidden) => err("RecordEntry::Hidden is only for Private entry type"),
-        (Some(_), NA) => err("There is action entry data but the entry itself is N/A"),
-        (Some(Private), Present(_)) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
-        (Some(Public), NotStored) => {
-            if op.get_type() == ChainOpType::RegisterAgentActivity
-                || op.action().entry_type() == Some(&EntryType::AgentPubKey)
-            {
-                // RegisterAgentActivity is a special case, where the entry data can be omitted.
-                // Agent entries are also a special case. The "entry data" is already present in
+        (Some(Public), Some(Present(_))) => Ok(()),
+
+        // A `CreateEntry` op is the public entry-authority op and is only ever
+        // produced for a public entry, so a private entry under this variant is
+        // a leak attempt whether or not the entry body itself is withheld.
+        (Some(Private), _) if matches!(op, ChainOp::CreateEntry(..)) => {
+            Err(ValidationOutcome::PrivateEntryLeaked.into())
+        }
+
+        (Some(Private), Some(Hidden)) => Ok(()),
+        (Some(Private), Some(ActionOnly)) => Ok(()),
+
+        (Some(Public), Some(Hidden)) => err("OpEntry::Hidden is only for Private entry type"),
+        (Some(Private), Some(Present(_))) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
+        (Some(Public), Some(ActionOnly)) => {
+            if action.entry_type() == Some(&EntryType::AgentPubKey) {
+                // Agent entries are a special case. The "entry data" is already present in
                 // the action as the entry hash, so no external entry data is needed.
                 Ok(())
             } else {
                 err("Op has public entry type but is missing its data")
             }
         }
-        (None, NA) => Ok(()),
-        (None, _) => err("Entry must be N/A for action with no entry type"),
+        // An action with no entry type carries `ActionOnly` — the op records
+        // the action alone, with no entry to store.
+        (None, Some(ActionOnly)) => Ok(()),
+        (None, Some(Present(_) | Hidden)) => {
+            err("Entry must be absent for action with no entry type")
+        }
     }
 }
 
@@ -337,8 +353,8 @@ pub fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<
 /// Check the action should have an entry.
 /// Is either a Create or Update
 pub fn check_new_entry_action(action: &Action) -> SysValidationResult<()> {
-    match action {
-        Action::Create(_) | Action::Update(_) => Ok(()),
+    match action.data {
+        ActionData::Create(_) | ActionData::Update(_) => Ok(()),
         _ => Err(ValidationOutcome::NotNewEntry(Box::new(action.clone())).into()),
     }
 }
@@ -373,21 +389,27 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
 
 /// Check a Update's entry type is the same for
 /// original and new entry.
+///
+/// `original_entry_action` is looked up from the validation dependencies.
 pub fn check_update_reference(
-    update: &Update,
-    original_entry_action: &NewEntryActionRef<'_>,
+    update: &UpdateData,
+    original_entry_action: &Action,
 ) -> SysValidationResult<()> {
-    if update.entry_type != *original_entry_action.entry_type() {
+    let (entry_hash, entry_type) = original_entry_action
+        .entry_data()
+        .ok_or_else(|| ValidationOutcome::NotNewEntry(Box::new(original_entry_action.clone())))?;
+
+    if update.entry_type != *entry_type {
         return Err(ValidationOutcome::UpdateTypeMismatch(
-            original_entry_action.entry_type().clone(),
+            entry_type.clone(),
             update.entry_type.clone(),
         )
         .into());
     }
 
-    if update.original_entry_address != *original_entry_action.entry_hash() {
+    if update.original_entry_address != *entry_hash {
         return Err(ValidationOutcome::UpdateHashMismatch(
-            original_entry_action.entry_hash().clone(),
+            entry_hash.clone(),
             update.original_entry_address.clone(),
         )
         .into());
@@ -474,6 +496,18 @@ impl DhtOpSender for IncomingDhtOpSender {
     }
 }
 
+/// The `OpEntry` an entry-bearing `ChainOp` variant carries, mapped from a
+/// `Record`'s `RecordEntry` slot. `RecordEntry::NA`/`NotStored` both collapse
+/// to `OpEntry::ActionOnly` (see `check_entry_visibility`'s doc comment for the
+/// full rationale).
+fn record_entry_to_op_entry(entry: RecordEntry) -> OpEntry {
+    match entry {
+        RecordEntry::Present(e) => OpEntry::Present(e),
+        RecordEntry::Hidden => OpEntry::Hidden,
+        RecordEntry::NA | RecordEntry::NotStored => OpEntry::ActionOnly,
+    }
+}
+
 /// Make a StoreRecord ChainOp from a Record.
 /// Note that this can fail if the op is missing an
 /// Entry when it was supposed to have one.
@@ -484,11 +518,14 @@ impl DhtOpSender for IncomingDhtOpSender {
 fn make_store_record(record: Record) -> ChainOp {
     // Extract the data
     let (shh, record_entry) = record.privatized().0.into_inner();
-    let (action, signature) = shh.into_inner();
-    let action = action.into_content();
+    let (hashed, signature) = shh.into_inner();
+    let action = hashed.into_content();
 
     // Create the op
-    ChainOp::StoreRecord(signature, action, record_entry)
+    ChainOp::CreateRecord(
+        SignedAction::new(action, signature),
+        record_entry_to_op_entry(record_entry),
+    )
 }
 
 /// Make a StoreEntry ChainOp from a Record.
@@ -501,16 +538,21 @@ fn make_store_record(record: Record) -> ChainOp {
 fn make_store_entry(record: Record) -> Option<ChainOp> {
     // Extract the data
     let (shh, record_entry) = record.into_inner();
-    let (action, signature) = shh.into_inner();
+    let (hashed, signature) = shh.into_inner();
+    let action = hashed.into_content();
 
     // Check the entry and exit early if it's not there
-    let entry_box = record_entry.into_option()?;
+    let entry = record_entry.into_option()?;
     // If the action is the wrong type exit early
-    let action = action.into_content().try_into().ok()?;
+    if !matches!(action.data, ActionData::Create(_) | ActionData::Update(_)) {
+        return None;
+    }
 
     // Create the op
-    let op = ChainOp::StoreEntry(signature, action, entry_box);
-    Some(op)
+    Some(ChainOp::CreateEntry(
+        SignedAction::new(action, signature),
+        OpEntry::Present(entry),
+    ))
 }
 
 /// Make a RegisterAddLink ChainOp from a Record.
@@ -522,14 +564,16 @@ fn make_store_entry(record: Record) -> Option<ChainOp> {
 fn make_register_add_link(record: Record) -> Option<ChainOp> {
     // Extract the data
     let (shh, _) = record.into_inner();
-    let (action, signature) = shh.into_inner();
+    let (hashed, signature) = shh.into_inner();
+    let action = hashed.into_content();
 
     // If the action is the wrong type exit early
-    let action = action.into_content().try_into().ok()?;
+    if !matches!(action.data, ActionData::CreateLink(_)) {
+        return None;
+    }
 
     // Create the op
-    let op = ChainOp::RegisterAddLink(signature, action);
-    Some(op)
+    Some(ChainOp::CreateLink(SignedAction::new(action, signature)))
 }
 
 /// Make a RegisterAgentActivity ChainOp from a Record.
@@ -541,14 +585,13 @@ fn make_register_add_link(record: Record) -> Option<ChainOp> {
 fn make_register_agent_activity(record: Record) -> ChainOp {
     // Extract the data
     let (shh, _) = record.into_inner();
-    let (action, signature) = shh.into_inner();
+    let (hashed, signature) = shh.into_inner();
 
     // TODO something seems to have changed here, should this not be able to fail?
-    // If the action is the wrong type exit early
-    let action = action.into_content();
+    let action = hashed.into_content();
 
     // Create the op
-    ChainOp::RegisterAgentActivity(signature, action)
+    ChainOp::AgentActivity(SignedAction::new(action, signature))
 }
 
 #[cfg(test)]

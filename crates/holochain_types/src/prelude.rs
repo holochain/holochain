@@ -1,16 +1,15 @@
 //! reexport some common things
 
 pub use crate::access::*;
-pub use crate::action::*;
 pub use crate::activity::*;
 pub use crate::app::*;
 pub use crate::chain::*;
 pub use crate::combinators::*;
 pub use crate::countersigning::*;
-pub use crate::dht_op::*;
 pub use crate::dna::wasm::*;
 pub use crate::dna::*;
 pub use crate::entry::*;
+pub use crate::error::*;
 #[cfg(feature = "fixturators")]
 pub use crate::fixt::TimestampFixturator;
 #[cfg(feature = "fixturators")]
@@ -21,6 +20,7 @@ pub use crate::record::*;
 pub use crate::signal::*;
 pub use crate::validation_receipt::*;
 pub use crate::warrant::*;
+pub use crate::wire_ops::*;
 pub use holochain_keystore::AgentPubKeyExt;
 pub use holochain_nonce::Nonce256Bits;
 pub use holochain_serialized_bytes::prelude::*;

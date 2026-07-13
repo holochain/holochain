@@ -22,13 +22,17 @@ use holochain_p2p::actor::MockHcP2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::dht_store::{DhtStore, SysOutcome};
 use holochain_state::test_utils::test_db_dir;
-use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::{TestWasm, TestWasmPair, TestZomes};
-use holochain_zome_types::fixt::{CreateFixturator, DeleteFixturator, SignatureFixturator};
+use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
+    ActionData, DeleteData, Op, RegisterAgentActivity, RegisterDelete, StoreEntry, StoreRecord,
+};
+use holochain_zome_types::fixt::{
+    ActionFixturator, CreateAction, DeleteAction, SignatureFixturator,
+};
 use holochain_zome_types::timestamp::Timestamp;
-use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
@@ -42,18 +46,18 @@ async fn main_workflow() {
     let zomes =
         SweetInlineZomes::new(vec![], 0).integrity_function("validate", move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
-                let result = api.must_get_action(MustGetActionInput::new(
-                    delete.hashed.deletes_address.clone(),
-                ));
+                let deletes_address = match &delete.hashed.content.data {
+                    ActionData::Delete(DeleteData {
+                        deletes_address, ..
+                    }) => deletes_address.clone(),
+                    _ => unreachable!(),
+                };
+                let result = api.must_get_action(MustGetActionInput::new(deletes_address.clone()));
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![delete
-                            .hashed
-                            .deletes_address
-                            .clone()
-                            .into()]),
+                        UnresolvedDependencies::Hashes(vec![deletes_address.into()]),
                     ))
                 }
             } else {
@@ -87,23 +91,26 @@ async fn main_workflow() {
     assert_eq!(ops_to_validate, 0);
 
     // create op that following delete op depends on
-    let mut create = fixt!(Create);
-    create.entry_type = EntryType::App(AppEntryDef {
+    let mut create_action = fixt!(Action, CreateAction);
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: Default::default(),
     });
-    let create_action = Action::Create(create);
-    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
-    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(
+        SignedAction::new(create_action.clone(), fixt!(Signature)),
+    )));
 
     // create op that depends on previous create
-    let mut delete = fixt!(Delete);
-    delete.author = create_action.author().clone();
-    delete.deletes_address = create_action.clone().to_hash();
-    let dht_delete_op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
-    let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
-    let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
+    let mut delete = fixt!(Action, DeleteAction);
+    delete.header.author = create_action.author().clone();
+    if let ActionData::Delete(d) = &mut delete.data {
+        d.deletes_address = create_action.to_hash();
+    }
+    let dht_delete_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::DeleteEntry(
+        SignedAction::new(delete, fixt!(Signature)),
+    )));
+    let dht_delete_op_hash = dht_delete_op_hashed.as_hash().clone();
 
     // Record the op into the DhtStore as sys-validated and ready for app
     // validation; the workflow reads ops to validate from the new store.
@@ -229,48 +236,52 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     let agent = fixt!(AgentPubKey);
 
     // create op that following delete op depends on
-    let create = Create {
-        action_seq: 3,
-        prev_action: fixt!(ActionHash),
-        author: agent.clone(),
-        entry_type: EntryType::App(AppEntryDef {
-            entry_index: 0.into(),
-            zome_index: 0.into(),
-            visibility: EntryVisibility::Public,
-        }),
-        entry_hash: fixt!(EntryHash),
-        timestamp: Timestamp::now(),
-        weight: Default::default(),
-    };
-    let create_action = Action::Create(create);
-    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
-    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+    let mut create_action = fixt!(Action, CreateAction);
+    create_action.header.action_seq = 3;
+    create_action.header.prev_action = Some(fixt!(ActionHash));
+    create_action.header.author = agent.clone();
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
+    *create_action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    create_action.header.timestamp = Timestamp::now();
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(
+        SignedAction::new(create_action.clone(), fixt!(Signature)),
+    )));
     let create_action_hash = create_action.to_hash();
 
     // create op that depends on previous create
-    let delete = Delete {
-        action_seq: 4,
-        prev_action: create_action_hash.clone(),
-        author: agent.clone(),
-        deletes_address: create_action_hash.clone(),
-        deletes_entry_address: create_action.entry_hash().unwrap().clone(),
-        timestamp: Timestamp::now(),
-        weight: Default::default(),
-    };
-    let delete_action = Action::Delete(delete);
-    let dht_delete_op = ChainOp::RegisterAgentActivity(fixt!(Signature), delete_action.clone());
-    let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
-    let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
+    let mut delete_action = fixt!(Action, DeleteAction);
+    delete_action.header.action_seq = 4;
+    delete_action.header.prev_action = Some(create_action_hash.clone());
+    delete_action.header.author = agent.clone();
+    if let ActionData::Delete(d) = &mut delete_action.data {
+        d.deletes_address = create_action_hash.clone();
+        d.deletes_entry_address = create_action.entry_hash().unwrap().clone();
+    }
+    delete_action.header.timestamp = Timestamp::now();
+    let dht_delete_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(
+        SignedAction::new(delete_action.clone(), fixt!(Signature)),
+    )));
+    let dht_delete_op_hash = dht_delete_op_hashed.as_hash().clone();
 
     let entry_def = EntryDef::default_from_id("entry_def_id");
     let zomes = SweetInlineZomes::new(vec![entry_def.clone()], 0).integrity_function(
         "validate",
         move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+                let deletes_address = match &delete.hashed.content.data {
+                    ActionData::Delete(DeleteData {
+                        deletes_address, ..
+                    }) => deletes_address.clone(),
+                    _ => unreachable!(),
+                };
                 // chain filter goes from delete action until create action
                 let chain_filter = ChainFilter::until_hash(
                     delete.hashed.content.clone().to_hash(),
-                    delete.hashed.deletes_address.clone(),
+                    deletes_address,
                 );
                 let result = api.must_get_agent_activity(MustGetAgentActivityInput {
                     author: agent.clone(),
@@ -397,18 +408,18 @@ async fn validate_ops_in_sequence_must_get_action() {
         "validate",
         move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
-                let result = api.must_get_action(MustGetActionInput::new(
-                    delete.hashed.deletes_address.clone(),
-                ));
+                let deletes_address = match &delete.hashed.content.data {
+                    ActionData::Delete(DeleteData {
+                        deletes_address, ..
+                    }) => deletes_address.clone(),
+                    _ => unreachable!(),
+                };
+                let result = api.must_get_action(MustGetActionInput::new(deletes_address.clone()));
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![delete
-                            .hashed
-                            .deletes_address
-                            .clone()
-                            .into()]),
+                        UnresolvedDependencies::Hashes(vec![deletes_address.into()]),
                     ))
                 }
             } else {
@@ -443,24 +454,27 @@ async fn validate_ops_in_sequence_must_get_action() {
     assert_eq!(ops_to_validate, 0);
 
     // create op that following delete op depends on
-    let mut create = fixt!(Create);
-    create.entry_type = EntryType::App(AppEntryDef {
+    let mut create_op = fixt!(Action, CreateAction);
+    *create_op.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let create_op = Action::Create(create);
-    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
-    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(
+        SignedAction::new(create_op.clone(), fixt!(Signature)),
+    )));
 
     // create op that depends on previous create
-    let mut delete = fixt!(Delete);
-    delete.author = create_op.author().clone();
-    delete.deletes_address = create_op.clone().to_hash();
-    delete.deletes_entry_address = create_op.entry_hash().unwrap().clone();
-    let dht_delete_op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
-    let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
-    let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
+    let mut delete = fixt!(Action, DeleteAction);
+    delete.header.author = create_op.author().clone();
+    if let ActionData::Delete(d) = &mut delete.data {
+        d.deletes_address = create_op.to_hash();
+        d.deletes_entry_address = create_op.entry_hash().unwrap().clone();
+    }
+    let dht_delete_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::DeleteEntry(
+        SignedAction::new(delete, fixt!(Signature)),
+    )));
+    let dht_delete_op_hash = dht_delete_op_hashed.as_hash().clone();
 
     // Record both ops into the DhtStore as sys-validated.
     let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();
@@ -612,29 +626,31 @@ async fn handle_error_in_op_validation() {
     ));
 
     // create register agent activity op that will return an error during validation
-    let mut create = fixt!(Create);
-    create.entry_type = EntryType::App(AppEntryDef {
+    let mut create_action = fixt!(Action, CreateAction);
+    *create_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: Default::default(),
     });
-    let create_action = Action::Create(create);
-    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
-    let dht_create_op_hash = DhtOpHash::with_data_sync(&dht_create_op);
-    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(
+        SignedAction::new(create_action.clone(), fixt!(Signature)),
+    )));
+    let dht_create_op_hash = dht_create_op_hashed.as_hash().clone();
 
     // create another op that will be validated successfully
-    let mut create = fixt!(Create);
-    create.entry_type = EntryType::App(AppEntryDef {
+    let mut create = fixt!(Action, CreateAction);
+    *create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: Default::default(),
     });
     let entry = fixt!(Entry);
-    let dht_store_entry_op =
-        ChainOp::StoreEntry(fixt!(Signature), NewEntryAction::Create(create), entry);
-    let dht_store_entry_op_hash = DhtOpHash::with_data_sync(&dht_store_entry_op);
-    let dht_store_entry_op_hashed = DhtOpHashed::from_content_sync(dht_store_entry_op);
+    let dht_store_entry_op_hashed =
+        DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateEntry(
+            SignedAction::new(create, fixt!(Signature)),
+            OpEntry::Present(entry),
+        )));
+    let dht_store_entry_op_hash = dht_store_entry_op_hashed.as_hash().clone();
 
     // Record both ops into the DhtStore as sys-validated and ready for app
     // validation.
@@ -849,7 +865,9 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
     for op in validation_ops.lock().iter() {
         match op {
             Op::StoreEntry(StoreEntry { action, entry: _ }) => {
-                if *action.hashed.entry_type().visibility() == EntryVisibility::Private {
+                // `StoreEntry`'s action data is always `Create` or `Update`, so
+                // it always has an entry type.
+                if *action.hashed.entry_type().unwrap().visibility() == EntryVisibility::Private {
                     num_store_entry_private += 1
                 }
             }
@@ -1020,19 +1038,17 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
     assert_eq!(ops_to_validate, 0);
 
     // Create op to validate
-    let mut create = fixt!(Create);
-    create.entry_type = EntryType::App(AppEntryDef {
+    let mut create = fixt!(Action, CreateAction);
+    *create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: Default::default(),
     });
-    let dht_create_op = ChainOp::StoreEntry(
-        fixt!(Signature),
-        NewEntryAction::Create(create),
-        fixt!(Entry),
-    );
-    let dht_create_op_hash = DhtOpHash::with_data_sync(&dht_create_op);
-    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateEntry(
+        SignedAction::new(create, fixt!(Signature)),
+        OpEntry::Present(fixt!(Entry)),
+    )));
+    let dht_create_op_hash = dht_create_op_hashed.as_hash().clone();
 
     // Record the op into the DhtStore and mark it ready for app validation.
     let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();

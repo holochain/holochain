@@ -4,6 +4,7 @@
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
+use holochain_types::dht_v2::ChainOp;
 use holochain_types::prelude::*;
 use kitsune2_api::{AgentInfoSigned, BoxFut};
 use kitsune2_api::{SpaceId, StoredOp};
@@ -340,7 +341,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .await
     }
 
-    /// Get [`ChainOp::StoreRecord`] or [`ChainOp::StoreEntry`] from the DHT.
+    /// Get [`ChainOp::CreateRecord`] or [`ChainOp::CreateEntry`] from the DHT.
     async fn get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,

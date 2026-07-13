@@ -3,6 +3,7 @@
 use crate::core::share::Share;
 use holochain_p2p::{event::CountersigningSessionNegotiationMessage, DynHolochainP2pDna};
 use holochain_state::prelude::*;
+use holochain_types::dht_v2::ChainOp;
 use std::time::Duration;
 #[cfg(feature = "unstable-countersigning")]
 use {
@@ -10,7 +11,6 @@ use {
     crate::conductor::space::Space,
     crate::core::queue_consumer::{TriggerSender, WorkComplete},
     holo_hash::AgentPubKey,
-    holochain_keystore::MetaLairClient,
     holochain_state::DhtStore,
     std::sync::Arc,
     tokio::sync::broadcast::Sender,
@@ -156,7 +156,6 @@ pub(crate) async fn countersigning_workflow(
     space: Space,
     workspace: Arc<CountersigningWorkspace>,
     network: DynHolochainP2pDna,
-    keystore: MetaLairClient,
     cell_id: CellId,
     signal_tx: Sender<Signal>,
     self_trigger: TriggerSender,
@@ -226,7 +225,6 @@ pub(crate) async fn countersigning_workflow(
             match complete::inner_countersigning_session_complete(
                 space.clone(),
                 network.clone(),
-                keystore.clone(),
                 cell_id.agent_pubkey().clone(),
                 signature_bundle.clone(),
                 integration_trigger.clone(),
@@ -319,8 +317,6 @@ pub(crate) async fn countersigning_workflow(
             } else if force_publish {
                 complete::force_publish_countersigning_session(
                     space.clone(),
-                    network.clone(),
-                    keystore.clone(),
                     integration_trigger.clone(),
                     publish_trigger.clone(),
                     cell_id.clone(),
@@ -619,26 +615,25 @@ async fn apply_timeout(
         .share_mut(|inner, _| {
             Ok(inner.session.as_mut().and_then(|session| {
                 let expired = match session {
-                    CountersigningSessionState::Accepted(preflight_request) => {
-                        if preflight_request.session_times.end < Timestamp::now() {
-                            if has_committed_session {
-                                *session = CountersigningSessionState::Unknown {
-                                    preflight_request: preflight_request.clone(),
-                                    resolution: SessionResolutionSummary {
-                                        required_reason: ResolutionRequiredReason::Timeout,
-                                        ..Default::default()
-                                    },
-                                    force_abandon: false,
-                                    force_publish: false,
-                                };
-                                false
-                            } else {
-                                true
-                            }
-                        } else {
+                    CountersigningSessionState::Accepted(preflight_request)
+                        if preflight_request.session_times.end < Timestamp::now() =>
+                    {
+                        if has_committed_session {
+                            *session = CountersigningSessionState::Unknown {
+                                preflight_request: preflight_request.clone(),
+                                resolution: SessionResolutionSummary {
+                                    required_reason: ResolutionRequiredReason::Timeout,
+                                    ..Default::default()
+                                },
+                                force_abandon: false,
+                                force_publish: false,
+                            };
                             false
+                        } else {
+                            true
                         }
                     }
+                    CountersigningSessionState::Accepted(_) => false,
                     CountersigningSessionState::SignaturesCollected {
                         preflight_request,
                         signature_bundles,

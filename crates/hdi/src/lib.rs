@@ -25,7 +25,7 @@
 //! - entry type definitions
 //! - link type definitions
 //! - a validation callback that constrains the kinds of data that can validly be called entries
-//!   and links of those types (see also [`Op`](crate::prelude::holochain_integrity_types::Op)).
+//!   and links of those types (see also [`Op`](crate::prelude::Op)).
 //!
 //! **The coordination zomes comprise the application's controller layer** — the code that actually
 //! writes and retrieves data, handles countersigning sessions and sends and receives messages
@@ -46,20 +46,20 @@
 //! # Data validation
 //!
 //! The second fundamental part of integrity zomes is data validation. For every
-//! [operation](crate::prelude::holochain_integrity_types::Op)
-//! that is produced by an [action](crate::prelude::holochain_integrity_types::Action), a
+//! [operation](crate::prelude::Op)
+//! that is produced by an [action](crate::prelude::Action), a
 //! validation rule can be specified. Both data types and data values can be
 //! validated.
 //!
 //! All of these validation rules are declared in the `validate` callback. It
 //! is executed for a new action by each validation authority.
 //!
-//! There's a helper type called [`FlatOp`](crate::flat_op::FlatOp) available for easy access to
-//! all link and entry variants when validating an operation. In many cases, this type can be
-//! easier to work with than the bare [`Op`](crate::prelude::holochain_integrity_types::Op).
+//! There's a helper type called [`FlatOp`](crate::flat_op::FlatOp) available for easy access
+//! to all link and entry variants when validating an operation. In many cases, this type can be
+//! easier to work with than the bare [`Op`](crate::prelude::Op).
 //! [`FlatOp`](crate::flat_op::FlatOp) contains the same information as
-//! [`Op`](crate::prelude::holochain_integrity_types::Op) but with a flatter, more accessible data
-//! structure than [`Op`](crate::prelude::holochain_integrity_types::Op)'s deeply nested and
+//! [`Op`](crate::prelude::Op) but with a flatter, more accessible data
+//! structure than [`Op`](crate::prelude::Op)'s deeply nested and
 //! concise structure.
 //!
 //! ```
@@ -85,21 +85,24 @@
 //! #   A,
 //! #   B,
 //! # }
-//! # let op = holochain_integrity_types::Op::RegisterCreateLink(
-//! # holochain_integrity_types::RegisterCreateLink {
-//! #     create_link: holochain_integrity_types::SignedHashed {
+//! # let op = Op::RegisterCreateLink(
+//! # RegisterCreateLink {
+//! #     create_link: SignedHashed {
 //! #         hashed: holo_hash::HoloHashed {
-//! #             content: holochain_integrity_types::CreateLink {
-//! #                 author: AgentPubKey::from_raw_36(vec![0u8; 36]),
-//! #                 timestamp: Timestamp(0),
-//! #                 action_seq: 1,
-//! #                 prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
-//! #                 base_address: EntryHash::from_raw_36(vec![0u8; 36]).into(),
-//! #                 target_address: EntryHash::from_raw_36(vec![0u8; 36]).into(),
-//! #                 zome_index: 0.into(),
-//! #                 link_type: 0.into(),
-//! #                 tag: ().into(),
-//! #                 weight: Default::default(),
+//! #             content: Action {
+//! #                 header: ActionHeader {
+//! #                     author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+//! #                     timestamp: Timestamp(0),
+//! #                     action_seq: 1,
+//! #                     prev_action: Some(ActionHash::from_raw_36(vec![0u8; 36])),
+//! #                 },
+//! #                 data: ActionData::CreateLink(CreateLinkData {
+//! #                     base_address: EntryHash::from_raw_36(vec![0u8; 36]).into(),
+//! #                     target_address: EntryHash::from_raw_36(vec![0u8; 36]).into(),
+//! #                     zome_index: 0.into(),
+//! #                     link_type: 0.into(),
+//! #                     tag: ().into(),
+//! #                 }),
 //! #             },
 //! #             hash: ActionHash::from_raw_36(vec![0u8; 36]),
 //! #         },
@@ -117,13 +120,13 @@
 //!             "No Bs allowed in this app".to_string(),
 //!         )),
 //!     },
-//!     FlatOp::RegisterCreateLink {
+//!     FlatOp::RegisterLink(OpLink::CreateLink {
 //!         base_address: _,
 //!         target_address: _,
 //!         tag: _,
 //!         link_type,
 //!         action: _,
-//!     } => match link_type {
+//!     }) => match link_type {
 //!         LinkTypes::A => Ok(ValidateCallbackResult::Valid),
 //!         LinkTypes::B => Ok(ValidateCallbackResult::Invalid(
 //!             "No Bs allowed in this app".to_string(),
@@ -341,13 +344,7 @@ pub mod chain;
 pub mod op;
 
 #[deny(missing_docs)]
-pub mod op_v2;
-
-#[deny(missing_docs)]
 pub mod flat_op;
-
-#[deny(missing_docs)]
-pub mod flat_op_v2;
 
 #[cfg(any(feature = "test_utils", test))]
 pub mod test_utils;

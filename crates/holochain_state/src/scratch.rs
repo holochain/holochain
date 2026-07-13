@@ -8,6 +8,9 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use thiserror::Error;
 
+use holochain_zome_types::record::Record;
+use holochain_zome_types::record::SignedActionHashed;
+
 /// The "scratch" is an in-memory space to stage Actions to be committed at the
 /// end of the CallZome workflow.
 ///
@@ -109,7 +112,8 @@ impl Scratch {
                 .entry_hash()
                 // TODO: let's use Arc<Entry> from here on instead of dereferencing
                 .and_then(|eh| self.entries.get(eh).map(|e| (**e).clone()));
-            Record::new(shh, entry)
+            let record_entry = RecordEntry::new(shh.action().entry_visibility(), entry);
+            Record::new(shh, record_entry)
         })
     }
 
@@ -119,13 +123,16 @@ impl Scratch {
     }
 
     fn get_exact_record(&self, hash: &ActionHash) -> StateQueryResult<Option<Record>> {
-        Ok(self.get_action(hash)?.map(|shh| {
-            let entry = shh
-                .action()
-                .entry_hash()
-                .and_then(|eh| self.get_entry(eh).ok());
-            Record::new(shh, entry.flatten())
-        }))
+        let Some(shh) = self.actions().find(|h| h.action_address() == hash).cloned() else {
+            return Ok(None);
+        };
+        let entry = shh
+            .action()
+            .entry_hash()
+            .and_then(|eh| self.get_entry(eh).ok())
+            .flatten();
+        let record_entry = RecordEntry::new(shh.action().entry_visibility(), entry);
+        Ok(Some(Record::new(shh, record_entry)))
     }
 
     fn get_any_record(&self, hash: &EntryHash) -> StateQueryResult<Option<Record>> {
@@ -139,7 +146,8 @@ impl Scratch {
                         .unwrap_or(false)
                 })?
                 .clone();
-            Some(Record::new(shh, Some(entry)))
+            let record_entry = RecordEntry::new(shh.action().entry_visibility(), Some(entry));
+            Some(Record::new(shh, record_entry))
         });
         Ok(r)
     }

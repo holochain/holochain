@@ -2301,7 +2301,8 @@ mod scheduler_impls {
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
     use holochain_conductor_api::{CellInfo, JsonDump};
-    use holochain_zome_types::{action::builder, Entry};
+    use holochain_zome_types::dht_v2::{ActionData, CreateData, DeleteData};
+    use holochain_zome_types::Entry;
     use kitsune2_api::{SpaceId, TransportStats};
     use std::sync::atomic::Ordering;
 
@@ -2326,14 +2327,14 @@ mod misc_impls {
 
             let cap_grant_entry = Entry::CapGrant(cap_grant);
             let entry_hash = EntryHash::with_data_sync(&cap_grant_entry);
-            let action_builder = builder::Create {
+            let action_data = ActionData::Create(CreateData {
                 entry_type: EntryType::CapGrant,
                 entry_hash,
-            };
+            });
 
             let action_hash = source_chain
-                .put_weightless(
-                    action_builder,
+                .put(
+                    action_data,
                     Some(cap_grant_entry),
                     ChainTopOrdering::default(),
                 )
@@ -2382,7 +2383,7 @@ mod misc_impls {
                 .await?
                 .into_iter()
                 .find_map(|record| {
-                    if record.action_hash() == &action_hash {
+                    if record.action_address() == &action_hash {
                         match record.entry {
                             RecordEntry::Present(entry) => Some(entry),
                             _ => None,
@@ -2394,12 +2395,12 @@ mod misc_impls {
                 .ok_or_else(|| ConductorApiError::other("No cap grant found for action hash"))?;
             let entry_hash = EntryHash::with_data_sync(&cap_grant_entry);
 
-            let action_builder = builder::Delete {
+            let action_data = ActionData::Delete(DeleteData {
                 deletes_address: action_hash,
                 deletes_entry_address: entry_hash,
-            };
+            });
             let action_hash = source_chain
-                .put_weightless(action_builder, None, ChainTopOrdering::default())
+                .put(action_data, None, ChainTopOrdering::default())
                 .await?;
 
             source_chain
@@ -2453,8 +2454,11 @@ mod misc_impls {
                     .await?
                     .iter()
                     .filter_map(|record| {
-                        if let Action::Delete(delete) = record.action() {
-                            Some((delete.deletes_address.clone(), delete.timestamp))
+                        if let ActionData::Delete(DeleteData {
+                            deletes_address, ..
+                        }) = &record.action().data
+                        {
+                            Some((deletes_address.clone(), record.action().timestamp()))
                         } else {
                             None
                         }
@@ -2466,7 +2470,7 @@ mod misc_impls {
                 // create a list of CapGrantInfo structs for each cell
                 let mut cap_grants: Vec<CapGrantInfo> = vec![];
                 for grant_record in grant_list {
-                    let cap_action_hash = grant_record.action_hash().clone();
+                    let cap_action_hash = grant_record.action_address().clone();
                     let mut revoke_time: Option<Timestamp> = None;
 
                     // skip grant info if include_revoked is false
@@ -3560,32 +3564,9 @@ pub fn app_manifest_from_dnas(
         .into()
 }
 
-/// Reconstruct legacy [`DhtOp`]s from v2 wire rows read off the [`DhtStore`].
-///
-/// Chain-op and warrant wire rows are rebuilt into v2 ops via the
-/// `holochain_p2p` reconstructors, then converted to the legacy `DhtOp`
-/// encoding the dump/consistency types expect. Rows that fail to rebuild or
-/// convert are dropped (the same lenient behaviour the wire path uses), so the
-/// result is a best-effort view of the ops the store holds.
-pub fn wire_rows_to_legacy_ops(
-    chain: Vec<holochain_state::dht_store::K2ChainOpForWireRow>,
-    warrants: Vec<holochain_state::dht_store::K2WarrantForWireRow>,
-) -> Vec<holochain_types::dht_op::DhtOp> {
-    chain
-        .into_iter()
-        .filter_map(|r| holochain_p2p::build_chain_dht_op_v2(r).ok())
-        .chain(
-            warrants
-                .into_iter()
-                .filter_map(|r| holochain_p2p::build_warrant_dht_op_v2(r).ok()),
-        )
-        .filter_map(|v2| holochain_types::dht_v2::to_legacy_dht_op(&v2).ok())
-        .collect()
-}
-
-/// Reconstruct v2 [`DhtOp`](holochain_types::dht_v2::DhtOp)s from wire rows for
-/// the integration dump. Rows that fail to reconstruct are dropped (the same
-/// lenient behaviour the wire path uses), so the result is a best-effort view.
+/// Build [`DhtOp`](holochain_types::dht_v2::DhtOp)s from wire rows for the
+/// integration dump. Rows that fail to build are dropped (the same lenient
+/// behaviour the wire path uses), so the result is a best-effort view.
 pub fn wire_rows_to_v2_ops(
     chain: Vec<holochain_state::dht_store::K2ChainOpForWireRow>,
     warrants: Vec<holochain_state::dht_store::K2WarrantForWireRow>,

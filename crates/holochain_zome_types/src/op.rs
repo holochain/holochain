@@ -1,8 +1,6 @@
 //! For more details see [`holochain_integrity_types::op`].
 
 use crate::prelude::{Deserialize, Serialize};
-use holo_hash::ActionHash;
-use holochain_integrity_types::Action;
 
 #[doc(no_inline)]
 pub use holochain_integrity_types::op;
@@ -42,34 +40,4 @@ pub enum ChainOpType {
     RegisterAddLink,
     #[display("RegisterRemoveLink")]
     RegisterRemoveLink,
-}
-
-impl ChainOpType {
-    /// Calculate the op's sys validation dependencies (action hashes)
-    pub fn sys_validation_dependencies(&self, action: &Action) -> Vec<ActionHash> {
-        match self {
-            ChainOpType::StoreRecord | ChainOpType::StoreEntry => vec![],
-            ChainOpType::RegisterAgentActivity => action
-                .prev_action()
-                .map(|p| vec![p.clone()])
-                .unwrap_or_default(),
-            ChainOpType::RegisterUpdatedContent | ChainOpType::RegisterUpdatedRecord => {
-                match action {
-                    Action::Update(update) => vec![update.original_action_address.clone()],
-                    _ => vec![],
-                }
-            }
-            ChainOpType::RegisterDeletedBy | ChainOpType::RegisterDeletedEntryAction => {
-                match action {
-                    Action::Delete(delete) => vec![delete.deletes_address.clone()],
-                    _ => vec![],
-                }
-            }
-            ChainOpType::RegisterAddLink => vec![],
-            ChainOpType::RegisterRemoveLink => match action {
-                Action::DeleteLink(delete_link) => vec![delete_link.link_add_address.clone()],
-                _ => vec![],
-            },
-        }
-    }
 }

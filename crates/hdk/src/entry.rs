@@ -5,7 +5,7 @@ pub use hdi::entry::*;
 ///
 /// This is used under the hood by [`create_entry`], [`create_cap_grant`] and [`create_cap_claim`].
 ///
-/// The host builds a [`Create`] action for the passed entry value and commits a new record to the
+/// The host builds a [`Create`](ActionData::Create) action for the passed entry value and commits a new record to the
 /// chain.
 ///
 /// Usually you don't need to use this function directly; it is the most general way to create an
@@ -20,7 +20,7 @@ pub fn create(create_input: CreateInput) -> ExternResult<ActionHash> {
 //
 // @todo implement update_cap_claim
 ///
-/// The host builds an [`Update`] action for the passed entry value and commits a new update to the
+/// The host builds an [`Update`](ActionData::Update) action for the passed entry value and commits a new update to the
 /// chain.
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
@@ -35,7 +35,7 @@ pub fn update(input: UpdateInput) -> ExternResult<ActionHash> {
 //
 // @todo implement delete_cap_claim
 ///
-/// The host builds a [`Delete`] action for the passed entry and commits a new record to the chain.
+/// The host builds a [`Delete`](ActionData::Delete) action for the passed entry and commits a new record to the chain.
 ///
 /// Usually you don't need to use this function directly; it is the most general way to delete an
 /// entry and standardizes the internals of higher level delete functions.

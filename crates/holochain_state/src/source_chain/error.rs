@@ -1,4 +1,3 @@
-// use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use super::HeadInfo;
 use crate::prelude::StateMutationError;
 use crate::query::StateQueryError;
@@ -9,6 +8,9 @@ use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use thiserror::Error;
+// `HeadMoved` carries back the staged actions from a failed flush attempt
+// so `source_chain.rs` can rebase and retry them.
+use holochain_zome_types::record::SignedActionHashed;
 
 #[derive(Error, Debug)]
 pub enum SourceChainError {

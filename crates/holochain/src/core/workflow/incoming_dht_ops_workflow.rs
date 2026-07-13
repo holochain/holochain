@@ -4,7 +4,7 @@ use super::sys_validation_workflow::counterfeit_check_action;
 use super::{error::WorkflowResult, sys_validation_workflow::counterfeit_check_warrant};
 use crate::{conductor::space::Space, core::queue_consumer::TriggerSender};
 use holo_hash::DhtOpHash;
-use holochain_state::prelude::*;
+use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
 use incoming_ops_batch::InOpBatchEntry;
 use std::{collections::HashSet, sync::Arc};
 
@@ -205,9 +205,8 @@ pub async fn incoming_dht_ops_workflow(
 async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
     match op {
         DhtOp::ChainOp(op) => {
-            let action = op.action();
-            let signature = op.signature();
-            counterfeit_check_action(signature, &action).await?;
+            let signed_action = op.signed_action();
+            counterfeit_check_action(signed_action.signature(), signed_action.data()).await?;
         }
         DhtOp::WarrantOp(op) => counterfeit_check_warrant(op).await?,
     }

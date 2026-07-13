@@ -50,10 +50,13 @@ pub(crate) async fn verify_rendered_ops_batch(rendered_all: Vec<RenderedOps>) ->
 
 async fn verify_rendered_ops_signatures(rendered: &RenderedOps) -> bool {
     for op in &rendered.ops {
-        let action = op.action.action();
+        // Verify over the signed action — the same bytes the action was signed
+        // over.
+        let sa = &op.action;
+        let action = &sa.hashed.content;
         match action
             .signer()
-            .verify_signature(op.action.signature(), action)
+            .verify_signature(sa.signature(), action)
             .await
         {
             Ok(true) => {}
@@ -110,16 +113,17 @@ pub(crate) async fn verify_activity_signatures(
 ) -> (Vec<RegisterAgentActivity>, Vec<WarrantOp>) {
     let mut verified_activity = Vec::with_capacity(activity.len());
     for ra in activity {
-        let action = ra.action.action();
-        match action
+        // Verify over the signed action — the same bytes it was signed over.
+        let action = &ra.action.hashed.content;
+        let verified = action
             .signer()
             .verify_signature(ra.action.signature(), action)
-            .await
-        {
+            .await;
+        match verified {
             Ok(true) => verified_activity.push(ra),
             Ok(false) => {
                 tracing::warn!(
-                    signer = ?action.signer(),
+                    signer = ?ra.action.hashed.content.signer(),
                     "Activity record signature failed verification; dropping"
                 );
             }

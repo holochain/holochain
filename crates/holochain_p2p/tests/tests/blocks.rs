@@ -558,7 +558,7 @@ impl TestActor {
         let mut handler = MockHcP2pHandler::new();
         handler.expect_handle_get().returning(|_, _, _| {
             Box::pin(async move {
-                Ok(holochain_types::dht_op::WireOps::Record(
+                Ok(holochain_types::wire_ops::WireOps::Record(
                     WireRecordOps::new(),
                 ))
             })
