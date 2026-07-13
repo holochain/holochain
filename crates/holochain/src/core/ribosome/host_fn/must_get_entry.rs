@@ -137,8 +137,7 @@ pub mod test {
         // initially Accepted. Crucially this is `locally_validated = false`, so
         // it can later be transitioned to Rejected — `reject_chain_ops` only
         // transitions network-cached ops, never an agent's own authored,
-        // locally-validated ops. The action's weight is defaulted; it is not
-        // carried by the `Action` model.
+        // locally-validated ops.
         let entry = Entry::try_from(Something(vec![1, 2, 3])).unwrap();
         let action = fixt!(Action, CreateAction);
         let entry_hash = action.entry_hash().unwrap().clone();

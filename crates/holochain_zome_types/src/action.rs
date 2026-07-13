@@ -4,7 +4,6 @@ use holo_hash::ActionHash;
 use holochain_serialized_bytes::prelude::*;
 use thiserror::Error;
 
-pub use holochain_integrity_types::action::builder::{ActionBuilder, ActionBuilderCommon};
 pub use holochain_integrity_types::action::*;
 
 /// The canonical action content type: a common header plus per-variant data.
@@ -12,7 +11,9 @@ pub use holochain_integrity_types::dht_v2::{Action, ActionData};
 
 #[derive(Error, Debug)]
 pub enum ActionError {
-    #[error("Tried to create a NewEntryAction with a type that isn't a Create or Update")]
+    #[error(
+        "Tried to create an entry-creating action from an action that isn't a Create or Update"
+    )]
     NotNewEntry,
     #[error(transparent)]
     WrongActionError(#[from] WrongActionError),

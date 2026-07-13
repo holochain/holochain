@@ -179,56 +179,6 @@ impl ActionRefMut for Action {
     }
 }
 
-impl ActionRefMut for NewEntryAction {
-    fn author_mut(&mut self) -> &mut AgentPubKey {
-        match self {
-            Self::Create(Create { ref mut author, .. }) => author,
-            Self::Update(Update { ref mut author, .. }) => author,
-        }
-    }
-
-    fn action_seq_mut(&mut self) -> Option<&mut u32> {
-        Some(match self {
-            Self::Create(Create {
-                ref mut action_seq, ..
-            }) => action_seq,
-            Self::Update(Update {
-                ref mut action_seq, ..
-            }) => action_seq,
-        })
-    }
-
-    fn prev_action_mut(&mut self) -> Option<&mut ActionHash> {
-        todo!()
-    }
-
-    fn entry_data_mut(&mut self) -> Option<(&mut EntryHash, &mut EntryType)> {
-        Some(match self {
-            Self::Create(Create {
-                ref mut entry_hash,
-                ref mut entry_type,
-                ..
-            }) => (entry_hash, entry_type),
-            Self::Update(Update {
-                ref mut entry_hash,
-                ref mut entry_type,
-                ..
-            }) => (entry_hash, entry_type),
-        })
-    }
-
-    fn timestamp_mut(&mut self) -> &mut Timestamp {
-        match self {
-            Self::Create(Create {
-                ref mut timestamp, ..
-            }) => timestamp,
-            Self::Update(Update {
-                ref mut timestamp, ..
-            }) => timestamp,
-        }
-    }
-}
-
 /// Create test chain data
 pub async fn valid_arbitrary_chain(
     keystore: &MetaLairClient,

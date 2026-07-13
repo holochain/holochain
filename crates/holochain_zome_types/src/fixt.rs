@@ -4,7 +4,6 @@ use crate::prelude::*;
 use ::fixt::prelude::*;
 use ::fixt::*;
 use holo_hash::fixt::*;
-use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 use rand::Rng;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -67,65 +66,12 @@ impl Iterator for AppEntryDefFixturator<EntryVisibility> {
 pub type MaybeMembraneProof = Option<Arc<SerializedBytes>>;
 
 fixturator!(
-    ActionBuilderCommon;
-    constructor fn new(AgentPubKey, Timestamp, u32, ActionHash);
-);
-
-fixturator!(
-    DeleteLink;
-    constructor fn from_builder(ActionBuilderCommon, ActionHash, AnyLinkableHash);
-);
-
-fixturator!(
-    CreateLink;
-    constructor fn from_builder(ActionBuilderCommon, AnyLinkableHash, AnyLinkableHash, ZomeIndex, LinkType, LinkTag);
-);
-
-fixturator!(
     LinkType; constructor fn new(u8);
 );
 
 fixturator!(
     LinkTag; from Bytes;
 );
-
-pub struct KnownCreateLink {
-    pub author: AgentPubKey,
-    pub base_address: AnyLinkableHash,
-    pub target_address: AnyLinkableHash,
-    pub tag: LinkTag,
-    pub zome_index: ZomeIndex,
-    pub link_type: LinkType,
-}
-
-pub struct KnownDeleteLink {
-    pub link_add_address: holo_hash::ActionHash,
-    pub base_address: AnyLinkableHash,
-}
-
-impl Iterator for CreateLinkFixturator<KnownCreateLink> {
-    type Item = CreateLink;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(CreateLink);
-        f.author = self.0.curve.author.clone();
-        f.base_address = self.0.curve.base_address.clone();
-        f.target_address = self.0.curve.target_address.clone();
-        f.tag = self.0.curve.tag.clone();
-        f.zome_index = self.0.curve.zome_index;
-        f.link_type = self.0.curve.link_type;
-        Some(f)
-    }
-}
-
-impl Iterator for DeleteLinkFixturator<KnownDeleteLink> {
-    type Item = DeleteLink;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(DeleteLink);
-        f.link_add_address = self.0.curve.link_add_address.clone();
-        f.base_address = self.0.curve.base_address.clone();
-        Some(f)
-    }
-}
 
 /// a curve to spit out Entry::App values
 #[derive(Clone)]
@@ -489,11 +435,6 @@ fixturator!(
     };
 );
 
-fixturator!(
-    Dna;
-    constructor fn from_builder(DnaHash, ActionBuilderCommon);
-);
-
 fixturator! {
     MaybeMembraneProof;
     enum [ Some None ];
@@ -531,95 +472,8 @@ fixturator! {
 }
 
 fixturator!(
-    AgentValidationPkg;
-    constructor fn from_builder(ActionBuilderCommon, MaybeMembraneProof);
-);
-
-fixturator!(
-    InitZomesComplete;
-    constructor fn from_builder(ActionBuilderCommon);
-);
-
-fixturator!(
     MigrationTarget;
     variants [ Dna(DnaHash) Agent(AgentPubKey) ];
-);
-
-fixturator!(
-    OpenChain;
-    constructor fn from_builder(ActionBuilderCommon, MigrationTarget, ActionHash);
-);
-
-fixturator!(
-    CloseChain;
-    constructor fn from_builder(ActionBuilderCommon, MigrationTarget);
-);
-
-fixturator!(
-    Create;
-    constructor fn from_builder(ActionBuilderCommon, EntryType, EntryHash);
-
-    curve PublicCurve {
-        let mut ec = fixt!(Create);
-        ec.entry_type = fixt!(EntryType, PublicCurve);
-        ec
-    };
-    curve EntryType {
-        let mut ec = CreateFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        ec.entry_type = get_fixt_curve!();
-        ec
-    };
-    curve Entry {
-        let et = match get_fixt_curve!() {
-            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryDefFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
-            Entry::Agent(_) => EntryType::AgentPubKey,
-            Entry::CapClaim(_) => EntryType::CapClaim,
-            Entry::CapGrant(_) => EntryType::CapGrant,
-        };
-        CreateFixturator::new_indexed(et, get_fixt_index!()).next().unwrap()
-    };
-);
-
-type EntryTypeEntryHash = (EntryType, EntryHash);
-
-fixturator!(
-    Update;
-    constructor fn from_builder(ActionBuilderCommon, EntryHash, ActionHash, EntryType, EntryHash);
-
-    curve PublicCurve {
-        let mut eu = fixt!(Update);
-        eu.entry_type = fixt!(EntryType, PublicCurve);
-        eu
-    };
-
-    curve EntryType {
-        let mut eu = UpdateFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        eu.entry_type = get_fixt_curve!();
-        eu
-    };
-
-    curve EntryTypeEntryHash {
-        let mut u = UpdateFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        u.entry_type = get_fixt_curve!().0;
-        u.entry_hash = get_fixt_curve!().1;
-        u
-    };
-
-    curve Entry {
-        let et = match get_fixt_curve!() {
-            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryDefFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
-            Entry::Agent(_) => EntryType::AgentPubKey,
-            Entry::CapClaim(_) => EntryType::CapClaim,
-            Entry::CapGrant(_) => EntryType::CapGrant,
-        };
-        let eh = EntryHash::with_data_sync(&get_fixt_curve!());
-        UpdateFixturator::new_indexed((et, eh), get_fixt_index!()).next().unwrap()
-    };
-);
-
-fixturator!(
-    Delete;
-    constructor fn from_builder(ActionBuilderCommon, ActionHash, EntryHash);
 );
 
 use crate::dht_v2::{

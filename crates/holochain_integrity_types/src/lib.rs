@@ -29,7 +29,6 @@ pub mod info;
 pub mod link;
 pub mod op;
 pub mod prelude;
-pub mod rate_limit;
 pub mod record;
 pub mod signature;
 pub use holochain_timestamp as timestamp;

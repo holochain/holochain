@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** Remove the legacy per-variant action types now that the v2 `Action` model (`ActionHeader` + `ActionData`) is canonical. The `holochain_integrity_types::action` per-variant structs (`Create`, `Update`, `Delete`, `Dna`, `CreateLink`, `DeleteLink`, `OpenChain`, `CloseChain`, `AgentValidationPkg`, `InitZomesComplete`), the `ActionBuilder`/`ActionBuilderCommon` builder, the `EntryCreationAction`/`NewEntryAction`/`NewEntryActionRef` wrapper enums, and the `rate_limit` module (`RateWeight`/`EntryRateWeight` and the action-weight machinery) are all removed. \#5860
 - Holochain gains a new `encryption` feature to control whether its databases are encrypted or not. This replaces the previous `sqlite-encrypted` feature which no longer has any effect.
 - **BREAKING CHANGE** Remove the `holochain_sqlite` crate now that persistence has moved to `holochain_data`.
 - **BREAKING CHANGE** Databases created by Holochain have been renamed now that the legacy databases are no longer in use.

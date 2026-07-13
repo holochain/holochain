@@ -12,7 +12,6 @@
 #![allow(non_local_definitions)]
 
 pub mod access;
-pub mod action;
 pub mod activity;
 pub mod app;
 pub mod cell_config_overrides;
@@ -26,7 +25,6 @@ pub mod error;
 pub mod link;
 mod macros;
 pub mod prelude;
-pub mod rate_limit;
 pub mod record;
 pub mod report;
 pub mod share;

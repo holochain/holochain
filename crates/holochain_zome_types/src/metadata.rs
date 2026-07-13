@@ -26,9 +26,9 @@ pub struct RecordDetails {
     pub record: Record,
     /// The validation status of this record.
     pub validation_status: ValidationStatus,
-    /// Any [`Delete`](crate::action::Delete) on this record.
+    /// Any [`Delete`](crate::dht_v2::ActionData::Delete) on this record.
     pub deletes: Vec<SignedActionHashed>,
-    /// Any [`Update`](crate::action::Update) on this record.
+    /// Any [`Update`](crate::dht_v2::ActionData::Update) on this record.
     pub updates: Vec<SignedActionHashed>,
 }
 
@@ -39,8 +39,8 @@ pub struct EntryDetails {
     pub entry: Entry,
     /// ## Create relationships.
     /// These are the actions that created this entry.
-    /// They can be either a [`Create`](crate::action::Create) or an
-    /// [`Update`](crate::action::Update) action
+    /// They can be either a [`Create`](crate::dht_v2::ActionData::Create) or an
+    /// [`Update`](crate::dht_v2::ActionData::Update) action
     /// where the `entry_hash` field is the hash of
     /// the above entry.
     ///
