@@ -895,7 +895,7 @@ where
                     ))
                 })
                 .collect();
-            scratch_records.sort_unstable_by_key(|e| e.action().header.action_seq);
+            scratch_records.sort_unstable_by_key(|e| e.action().action_seq());
             records.extend(scratch_records);
         })?;
 
@@ -1232,7 +1232,6 @@ pub(crate) fn encoded_chain_op_size(
     op: &v2::HashedChainOp,
     entries: &[holochain_types::EntryHashed],
 ) -> u32 {
-    use holochain_zome_types::op::ChainOpType;
     use v2::{ChainOp, DhtOp, OpEntry};
 
     let action = op.action.action();
@@ -1249,21 +1248,7 @@ pub(crate) fn encoded_chain_op_size(
         None => OpEntry::ActionOnly,
     };
 
-    let chain_op = match op.op_type {
-        ChainOpType::StoreRecord => ChainOp::CreateRecord(signed_action, op_entry(maybe_entry)),
-        ChainOpType::StoreEntry => ChainOp::CreateEntry(signed_action, op_entry(maybe_entry)),
-        ChainOpType::RegisterAgentActivity => ChainOp::AgentActivity(signed_action),
-        ChainOpType::RegisterUpdatedContent => {
-            ChainOp::UpdateEntry(signed_action, op_entry(maybe_entry))
-        }
-        ChainOpType::RegisterUpdatedRecord => {
-            ChainOp::UpdateRecord(signed_action, op_entry(maybe_entry))
-        }
-        ChainOpType::RegisterDeletedEntryAction => ChainOp::DeleteEntry(signed_action),
-        ChainOpType::RegisterDeletedBy => ChainOp::DeleteRecord(signed_action),
-        ChainOpType::RegisterAddLink => ChainOp::CreateLink(signed_action),
-        ChainOpType::RegisterRemoveLink => ChainOp::DeleteLink(signed_action),
-    };
+    let chain_op = ChainOp::from_type(op.op_type, signed_action, op_entry(maybe_entry));
     holochain_serialized_bytes::encode(&DhtOp::ChainOp(Box::new(chain_op)))
         .map(|b| b.len() as u32)
         .unwrap_or(0)

@@ -233,7 +233,7 @@ pub(crate) trait ChainSequenceAndHash {
 
 impl ChainSequenceAndHash for Record {
     fn action_seq(&self) -> u32 {
-        self.action().header.action_seq
+        self.action().action_seq()
     }
 
     fn address(&self) -> &ActionHash {

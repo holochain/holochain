@@ -71,7 +71,7 @@ impl TryFrom<i64> for RecordValidity {
 }
 
 /// Action-type discriminant.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 #[repr(i64)]
 pub enum ActionType {
     /// Genesis DNA action. Always `action_seq == 0` and `prev_action == None`.

@@ -666,17 +666,7 @@ async fn materialise_warranted_op_into_limbo(
         RecordEntry::Hidden => OpEntry::Hidden,
         RecordEntry::NA | RecordEntry::NotStored => OpEntry::ActionOnly,
     };
-    let chain_op = match op_type {
-        ChainOpType::StoreRecord => ChainOp::CreateRecord(signed_action, op_entry),
-        ChainOpType::StoreEntry => ChainOp::CreateEntry(signed_action, op_entry),
-        ChainOpType::RegisterAgentActivity => ChainOp::AgentActivity(signed_action),
-        ChainOpType::RegisterUpdatedContent => ChainOp::UpdateEntry(signed_action, op_entry),
-        ChainOpType::RegisterUpdatedRecord => ChainOp::UpdateRecord(signed_action, op_entry),
-        ChainOpType::RegisterDeletedEntryAction => ChainOp::DeleteEntry(signed_action),
-        ChainOpType::RegisterDeletedBy => ChainOp::DeleteRecord(signed_action),
-        ChainOpType::RegisterAddLink => ChainOp::CreateLink(signed_action),
-        ChainOpType::RegisterRemoveLink => ChainOp::DeleteLink(signed_action),
-    };
+    let chain_op = ChainOp::from_type(op_type, signed_action, op_entry);
     let op = DhtOpHashed::from_content_sync(DhtOp::from(chain_op));
 
     // Warranted deps do not require a validation receipt.

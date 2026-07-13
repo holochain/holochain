@@ -42,7 +42,7 @@ impl ChainItem for SignedActionHashed {
     type Hash = ActionHash;
 
     fn seq(&self) -> u32 {
-        self.hashed.content.header.action_seq
+        self.hashed.content.action_seq()
     }
 
     fn get_timestamp(&self) -> Timestamp {
@@ -156,7 +156,7 @@ impl From<(PrevActionErrorKind, Action)> for PrevActionError {
     fn from((inner, action): (PrevActionErrorKind, Action)) -> Self {
         PrevActionError {
             source: inner,
-            seq: action.header.action_seq,
+            seq: action.action_seq(),
             action_hash: action.to_hash(),
             action_display: format!("{action:?}"),
         }

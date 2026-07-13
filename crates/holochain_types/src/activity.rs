@@ -3,6 +3,7 @@
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::dht_v2::ActionHashed;
 use holochain_zome_types::prelude::*;
 
 /// An agents chain records returned from a agent_activity_query
@@ -60,7 +61,7 @@ impl AgentActivityResponse {
             ChainItems::Full(records) => ChainItems::Hashes(
                 records
                     .into_iter()
-                    .map(|r| (r.action().header.action_seq, r.action_address().clone()))
+                    .map(|r| (r.action().action_seq(), r.action_address().clone()))
                     .collect(),
             ),
             ChainItems::Hashes(h) => ChainItems::Hashes(h),
@@ -93,7 +94,7 @@ impl From<AgentActivityResponse> for AgentActivity {
         let valid_activity = match a.valid_activity {
             ChainItems::Full(records) => records
                 .into_iter()
-                .map(|el| (el.action().header.action_seq, el.action_address().clone()))
+                .map(|el| (el.action().action_seq(), el.action_address().clone()))
                 .collect(),
             ChainItems::Hashes(h) => h,
             ChainItems::NotRequested => Vec::new(),
@@ -101,7 +102,7 @@ impl From<AgentActivityResponse> for AgentActivity {
         let rejected_activity = match a.rejected_activity {
             ChainItems::Full(records) => records
                 .into_iter()
-                .map(|el| (el.action().header.action_seq, el.action_address().clone()))
+                .map(|el| (el.action().action_seq(), el.action_address().clone()))
                 .collect(),
             ChainItems::Hashes(h) => h,
             ChainItems::NotRequested => Vec::new(),
@@ -116,7 +117,7 @@ impl From<AgentActivityResponse> for AgentActivity {
     }
 }
 
-/// A helper trait to allow [Record]s, [SignedActionHashed]s, and [ActionHashed](holo_hash::HoloHashed)s to be converted into [ChainItems]
+/// A helper trait to allow [Record]s, [SignedActionHashed]s, and [ActionHashed]s to be converted into [ChainItems]
 /// without needing to know which source type is being operated on.
 pub trait ChainItemsSource {
     /// Convert a source type into a [ChainItems] value.
@@ -129,7 +130,7 @@ impl ChainItemsSource for Vec<Record> {
     }
 }
 
-impl ChainItemsSource for Vec<holo_hash::HoloHashed<Action>> {
+impl ChainItemsSource for Vec<ActionHashed> {
     fn to_chain_items(self) -> ChainItems {
         ChainItems::Hashes(
             self.into_iter()

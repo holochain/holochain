@@ -47,7 +47,7 @@ fn create_countersigned(
     })?;
 
     let signed_action: SignedActionHashed = must_get_action(action_hash.clone())?;
-    let entry_hash: EntryHash = signed_action.hashed.content.entry_hash().unwrap().clone();
+    let entry_hash: EntryHash = signed_action.action().entry_hash().unwrap().clone();
 
     Ok((action_hash, entry_hash))
 }

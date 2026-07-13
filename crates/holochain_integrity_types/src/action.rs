@@ -12,43 +12,9 @@ pub mod conversions;
 /// after genesis.
 pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
 
-/// a utility wrapper to declare the `ActionType` unit enum for our data types
-macro_rules! write_into_action {
-    ($($n:ident $(<$w : ty>)?),*,) => {
-
-        /// A unit enum which just names the different action variants,
-        /// without containing any extra data
-        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Eq, Clone, Debug)]
-        pub enum ActionType {
-            $($n,)*
-        }
-
-        impl std::fmt::Display for ActionType {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(
-                    f,
-                    "{}",
-                    match self {
-                        $( ActionType::$n => stringify!($n), )*
-                    }
-                )
-            }
-        }
-    };
-}
-
-write_into_action! {
-    Dna,
-    AgentValidationPkg,
-    InitZomesComplete,
-    OpenChain,
-    CloseChain,
-    Create,
-    Update,
-    Delete,
-    CreateLink,
-    DeleteLink,
-}
+/// The unit enum naming the action variants. Canonically defined on the v2
+/// action model and re-exported here as `holochain_integrity_types::ActionType`.
+pub use crate::dht_v2::ActionType;
 
 /// this id is an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def

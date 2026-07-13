@@ -131,10 +131,32 @@ impl HashableContent for ChainOpUniqueForm<'_> {
 }
 
 impl ChainOp {
+    /// Build a [`ChainOp`] from its op type, signed action, and the [`OpEntry`]
+    /// to carry for the entry-bearing variants (the link, delete, and
+    /// agent-activity variants ignore `op_entry`).
+    pub fn from_type(
+        op_type: holochain_zome_types::op::ChainOpType,
+        signed_action: SignedAction,
+        op_entry: OpEntry,
+    ) -> Self {
+        use holochain_zome_types::op::ChainOpType;
+        match op_type {
+            ChainOpType::StoreRecord => ChainOp::CreateRecord(signed_action, op_entry),
+            ChainOpType::StoreEntry => ChainOp::CreateEntry(signed_action, op_entry),
+            ChainOpType::RegisterAgentActivity => ChainOp::AgentActivity(signed_action),
+            ChainOpType::RegisterUpdatedContent => ChainOp::UpdateEntry(signed_action, op_entry),
+            ChainOpType::RegisterUpdatedRecord => ChainOp::UpdateRecord(signed_action, op_entry),
+            ChainOpType::RegisterDeletedEntryAction => ChainOp::DeleteEntry(signed_action),
+            ChainOpType::RegisterDeletedBy => ChainOp::DeleteRecord(signed_action),
+            ChainOpType::RegisterAddLink => ChainOp::CreateLink(signed_action),
+            ChainOpType::RegisterRemoveLink => ChainOp::DeleteLink(signed_action),
+        }
+    }
+
     /// The content-derived [`DhtOpHash`] for this op.
     ///
-    /// Excludes the signature and entry (see [`ChainOpUniqueForm`]) and carries
-    /// no `weight`, so it is reproducible from the op alone.
+    /// Excludes the signature and entry (see [`ChainOpUniqueForm`]), so it is
+    /// reproducible from the op alone.
     pub fn to_hash(&self) -> DhtOpHash {
         DhtOpHash::with_data_sync(&self.to_unique_form())
     }

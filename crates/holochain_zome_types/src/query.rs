@@ -388,9 +388,7 @@ impl ChainQueryFilter {
             .filter(|action| {
                 self.action_type
                     .as_ref()
-                    .map(|action_types| {
-                        action_types.contains(&action_type_of(&action.action().data))
-                    })
+                    .map(|action_types| action_types.contains(&action.action().action_type()))
                     .unwrap_or(true)
                     && self
                         .entry_type
@@ -421,23 +419,6 @@ impl ChainQueryFilter {
     /// [`Self::filter_actions`] specialised to records.
     pub fn filter_records(&self, records: Vec<Record>) -> Vec<Record> {
         self.filter_actions(records)
-    }
-}
-
-/// The [`ActionType`] discriminant for an [`ActionData`] variant (the type
-/// [`ChainQueryFilter`] filters against).
-fn action_type_of(data: &ActionData) -> ActionType {
-    match data {
-        ActionData::Dna(_) => ActionType::Dna,
-        ActionData::AgentValidationPkg(_) => ActionType::AgentValidationPkg,
-        ActionData::InitZomesComplete(_) => ActionType::InitZomesComplete,
-        ActionData::Create(_) => ActionType::Create,
-        ActionData::Update(_) => ActionType::Update,
-        ActionData::Delete(_) => ActionType::Delete,
-        ActionData::CreateLink(_) => ActionType::CreateLink,
-        ActionData::DeleteLink(_) => ActionType::DeleteLink,
-        ActionData::CloseChain(_) => ActionType::CloseChain,
-        ActionData::OpenChain(_) => ActionType::OpenChain,
     }
 }
 
@@ -507,12 +488,13 @@ mod tests {
     use ::fixt::prelude::*;
     use holo_hash::fixt::EntryHashFixturator;
     use holo_hash::HasHash;
+    use holochain_integrity_types::dht_v2::ActionHashed;
 
     /// Create hashed actions with various properties. The `Action`s are built
     /// directly (header + `ActionData`), seeded from the per-variant
     /// fixturators, so the content-derived hashes match the production
     /// authoring path.
-    fn fixtures() -> [HoloHashed<Action>; 7] {
+    fn fixtures() -> [ActionHashed; 7] {
         let entry_type_1 = EntryType::App(fixt!(AppEntryDef));
         let entry_type_2 = EntryType::AgentPubKey;
 
@@ -522,31 +504,31 @@ mod tests {
         *h0.entry_type_mut().unwrap() = entry_type_1.clone();
         h0.header.action_seq = 0;
         *h0.entry_hash_mut().unwrap() = entry_hash_0.clone();
-        let hh0: HoloHashed<Action> = HoloHashed::from_content_sync(h0);
+        let hh0: ActionHashed = ActionHashed::from_content_sync(h0);
 
         let mut h1 = fixt!(Action, UpdateAction);
         *h1.entry_type_mut().unwrap() = entry_type_2.clone();
         h1.header.action_seq = 1;
         h1.header.prev_action = Some(hh0.as_hash().clone());
-        let hh1: HoloHashed<Action> = HoloHashed::from_content_sync(h1);
+        let hh1: ActionHashed = ActionHashed::from_content_sync(h1);
 
         let mut h2 = fixt!(Action, CreateLinkAction);
         h2.header.action_seq = 2;
         h2.header.prev_action = Some(hh1.as_hash().clone());
-        let hh2: HoloHashed<Action> = HoloHashed::from_content_sync(h2);
+        let hh2: ActionHashed = ActionHashed::from_content_sync(h2);
 
         let mut h3 = fixt!(Action, CreateAction);
         *h3.entry_type_mut().unwrap() = entry_type_2.clone();
         h3.header.action_seq = 3;
         h3.header.prev_action = Some(hh2.as_hash().clone());
-        let hh3: HoloHashed<Action> = HoloHashed::from_content_sync(h3);
+        let hh3: ActionHashed = ActionHashed::from_content_sync(h3);
 
         // Cheeky forker!
         let mut h3a = fixt!(Action, CreateAction);
         *h3a.entry_type_mut().unwrap() = entry_type_1.clone();
         h3a.header.action_seq = 3;
         h3a.header.prev_action = Some(hh2.as_hash().clone());
-        let hh3a: HoloHashed<Action> = HoloHashed::from_content_sync(h3a);
+        let hh3a: ActionHashed = ActionHashed::from_content_sync(h3a);
 
         let mut h4 = fixt!(Action, UpdateAction);
         *h4.entry_type_mut().unwrap() = entry_type_1.clone();
@@ -554,17 +536,17 @@ mod tests {
         *h4.entry_hash_mut().unwrap() = entry_hash_0;
         h4.header.action_seq = 4;
         h4.header.prev_action = Some(hh3.as_hash().clone());
-        let hh4: HoloHashed<Action> = HoloHashed::from_content_sync(h4);
+        let hh4: ActionHashed = ActionHashed::from_content_sync(h4);
 
         let mut h5 = fixt!(Action, CreateLinkAction);
         h5.header.action_seq = 5;
         h5.header.prev_action = Some(hh4.as_hash().clone());
-        let hh5: HoloHashed<Action> = HoloHashed::from_content_sync(h5);
+        let hh5: ActionHashed = ActionHashed::from_content_sync(h5);
 
         [hh0, hh1, hh2, hh3, hh3a, hh4, hh5]
     }
 
-    fn map_query(query: &ChainQueryFilter, actions: &[HoloHashed<Action>]) -> Vec<bool> {
+    fn map_query(query: &ChainQueryFilter, actions: &[ActionHashed]) -> Vec<bool> {
         let filtered = query.filter_actions(actions.to_vec());
         actions
             .iter()
