@@ -33,8 +33,10 @@ pub trait Store {
 
     /// Get a [`Warrant`] from this store.
     /// The second parameter determines whether the warrant op should be checked for validity.
-    /// It should be set to false if reading from an Authored DB, where everything is valid,
-    /// and true if reading from a DHT DB, where validation status matters
+    /// Set it to `false` when the caller wants every warrant for the agent regardless of
+    /// validation status (e.g. when reading not-yet-validated content such as the scratch
+    /// space, where everything present is implicitly trusted); set it to `true` when the
+    /// caller needs only warrants that have passed validation.
     fn get_warrants_for_agent(
         &self,
         agent_key: &AgentPubKey,
