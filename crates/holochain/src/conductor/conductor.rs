@@ -3563,7 +3563,7 @@ pub fn app_manifest_from_dnas(
         .into()
 }
 
-/// Build [`DhtOp`](holochain_types::op::DhtOp)s from wire rows for the
+/// Build [`DhtOp`]s from wire rows for the
 /// integration dump. Rows that fail to build are dropped (the same lenient
 /// behaviour the wire path uses), so the result is a best-effort view.
 pub fn wire_rows_to_ops(
