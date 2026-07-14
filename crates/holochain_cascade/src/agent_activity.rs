@@ -1,7 +1,6 @@
 use super::*;
 use holochain_p2p::actor::GetActivityOptions;
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn merge_activities(
     agent: AgentPubKey,
     options: &GetActivityOptions,

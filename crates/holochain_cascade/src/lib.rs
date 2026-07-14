@@ -1,13 +1,19 @@
 //! The Cascade is a multi-tiered accessor for Holochain DHT data.
 //!
-//! Note that the docs for this crate are admittedly a bit *loose and imprecise*,
-//! but they are not expected to be *incorrect*.
+//! It is named "the cascade" because it performs cascading lookups across multiple sources.
+//! In general, the flow is:
+//! - Search in local storage, including the [`DhtStore`] and [`SyncScratch`].
+//! - If the data are not found locally, request the data from the network. Network responses are
+//!   cached into the [`DhtStore`]
 //!
-//! It is named "the Cascade" because it performs "cascading" gets across multiple sources.
-//! In general (but not in all cases), the flow is something like:
-//! - First attempts to read the local storage
-//! - If that fails, attempt to read data from the network cache
-//! - If that fails, do a network request for the data, caching it if found
+//! Not all lookups follow this pattern, namely links are treated differently. Where a lookup
+//! doesn't follow this pattern, it is documented in the method documentation.
+//!
+//! In order to support apps that want to be able to operate offline, a [`GetStrategy`] can be
+//! provided. Making a [`GetStrategy::Local`] request will avoid the network entirely. Making a
+//! [`GetStrategy::Network`] request will allow the cascade to go to the network, but not force it
+//! to. That means that if the requested data is available locally, the cascade won't attempt to
+//! fetch it again.
 //!
 //! ## Retrieve vs Get
 //!
@@ -20,8 +26,7 @@
 //!   "refined" form of fetching data.
 //! - "retrieve" only fetches the data if it exists, without regard to validation status.
 //!   This is a more "raw" form of fetching data.
-//!
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 use crate::error::CascadeError;
 use crate::get_options_ext::GetOptionsExt;
@@ -67,14 +72,15 @@ macro_rules! some_or_return {
 
 pub mod authority;
 pub mod error;
+pub mod get_options_ext;
 
 mod agent_activity;
 mod fetch;
-pub mod get_options_ext;
 mod metrics;
+mod verify;
+
 #[cfg(feature = "test_utils")]
 mod mock;
-mod verify;
 
 /// Marks whether data came from a local store or another node on the network
 #[derive(Debug, Clone)]
@@ -95,15 +101,22 @@ pub struct CascadeOptions {
     pub get_options: GetOptions,
 }
 
-/// The Cascade is a multi-tiered accessor for Holochain DHT data.
-///
-/// See the module-level docs for more info.
+/// The cascade is a multi-tiered accessor for Holochain DHT data.
 #[derive(Clone)]
 pub struct CascadeImpl {
-    scratch: Option<SyncScratch>,
-    network: Option<DynHolochainP2pDna>,
-    private_data: Option<Arc<AgentPubKey>>,
+    /// The [`DhtStore`] to read data from, and write cached responses to.
     dht_store: DhtStore,
+    /// A network handle, for requesting data from other peers.
+    network: Option<DynHolochainP2pDna>,
+    /// A scratch space, for content that is has been authored but not yet written to the agent's
+    /// source chain.
+    ///
+    /// This will only be available when the cascade is used from a zome invocation that may be
+    /// authoring new records.
+    scratch: Option<SyncScratch>,
+    /// Identify the agent making the request for data, to permit looking up private data for that
+    /// agent.
+    private_data: Option<Arc<AgentPubKey>>,
     /// Optional zome call origin for metrics attribution.
     zome_call_origin: Option<(ZomeName, FunctionName)>,
 }
@@ -204,7 +217,6 @@ impl CascadeImpl {
             scratch,
             network: Some(network),
             dht_store,
-
             zome_call_origin: None,
         }
     }
@@ -219,14 +231,15 @@ impl CascadeImpl {
             network: None,
             private_data: author,
             dht_store,
-
             zome_call_origin: None,
         }
     }
 
-    /// Get Entry data along with all CRUD actions associated with it.
+    /// Get an [`EntryDetails`], by its [`EntryHash`], which contains entry data along with all CRUD
+    /// actions associated with it.
     ///
-    /// Also returns Rejected actions, which may affect the interpreted validity status of this Entry.
+    /// Also returns rejected actions, which may affect the interpreted validity status of this
+    /// [`Entry`].
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn get_entry_details(
         &self,
@@ -262,9 +275,10 @@ impl CascadeImpl {
             .await?)
     }
 
-    /// Get the specified Record along with all Updates and Deletes associated with it.
+    /// Get a [`RecordDetails`], by its [`ActionHash`], which contains a [`Record`] along with all
+    /// updates and deletes associated with it.
     ///
-    /// Can return a Rejected Record.
+    /// Can return a rejected record.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn get_record_details(
         &self,
@@ -314,6 +328,7 @@ impl CascadeImpl {
     /// Returns the [Record] for this [ActionHash] if it is live
     /// by getting the latest available metadata from authorities
     /// combined with this agents authored data.
+    ///
     /// _Note: Deleted actions are a tombstone set_
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn dht_get_action(
@@ -864,7 +879,6 @@ impl CascadeImpl {
         Ok(chain_items)
     }
 
-    #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn am_i_authoring(&self, hash: &AnyDhtHash) -> CascadeResult<bool> {
         let scratch = some_or_return!(self.scratch.as_ref(), false);
         Ok(scratch.apply_and_then(|scratch| scratch.contains_hash(hash))?)
@@ -876,7 +890,7 @@ impl CascadeImpl {
     }
 }
 
-/// TODO
+/// A trait for accessing the cascade which can be mocked.
 #[async_trait::async_trait]
 #[cfg_attr(feature = "test_utils", mockall::automock)]
 pub trait Cascade {
