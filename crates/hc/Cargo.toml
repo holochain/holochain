@@ -50,3 +50,7 @@ wasmer-wasmi = [
 ]
 
 transport-iroh = ["holochain_cli_sandbox/transport-iroh"]
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
+predicates = "3.1.4"

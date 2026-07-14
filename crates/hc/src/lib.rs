@@ -108,12 +108,73 @@ impl CliSubcommand {
             CliSubcommand::Client(cmd) => cmd.run().await?,
             CliSubcommand::External(args) => {
                 let command_suffix = args.first().expect("Missing subcommand name");
-                Command::new(format!("hc-{command_suffix}"))
-                    .args(&args[1..])
-                    .status()
-                    .expect("Failed to run external subcommand");
+                let exe_name = format!("hc-{command_suffix}");
+
+                match Command::new(&exe_name).args(&args[1..]).status() {
+                    Ok(status) => {
+                        std::process::exit(status.code().unwrap_or(1));
+                    }
+                    Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
+                        eprintln!(
+                            "error: `{command_suffix}' is not a recognized internal hc subcommand, nor is '{exe_name}' an external command on your PATH."
+                        );
+
+                        std::process::exit(1);
+                    }
+                    Err(other_err) => {
+                        eprintln!("error: Failed to execute '{exe_name}': {other_err}");
+                        std::process::exit(1);
+                    }
+                }
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use assert_cmd::Command;
+    use predicates::prelude::*;
+
+    #[test]
+    fn test_help_flag() {
+        let mut cmd = Command::cargo_bin("hc").unwrap();
+
+        cmd.arg("--help")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Usage:"));
+    }
+
+    #[test]
+    fn test_no_subcommand() {
+        let mut cmd = Command::cargo_bin("hc").unwrap();
+
+        cmd.assert()
+            .failure()
+            .stderr(predicate::str::contains("Usage:"));
+    }
+
+    #[test]
+    fn test_predefined_subcommand() {
+        let mut cmd = Command::cargo_bin("hc").unwrap();
+
+        cmd.arg("sandbox")
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("Work with sandboxed environments"));
+    }
+
+    #[test]
+    fn test_undefined_subcommand() {
+        let mut cmd = Command::cargo_bin("hc").unwrap();
+
+        cmd.arg("blah")
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains(
+                "not a recognized internal hc subcommand",
+            ));
     }
 }
