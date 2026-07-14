@@ -44,28 +44,13 @@ pub enum ChainOp {
     DeleteLink(SignedAction),
 }
 
-/// A warrant op. Thin wrapper so `DhtOp` can carry both chain and warrant ops
-/// as a single sum type. Derefs to the wrapped [`SignedWarrant`] (which
-/// itself derefs to `Warrant`/`WarrantProof`) for field-access ergonomics.
-#[derive(
-    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, derive_more::Deref,
-)]
-pub struct WarrantOp(pub SignedWarrant);
-
-impl WarrantOp {
-    /// The wrapped warrant.
-    pub fn warrant(&self) -> &holochain_zome_types::warrant::Warrant {
-        self.0.data()
-    }
-}
-
 /// Top-level DHT op.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub enum DhtOp {
     /// A chain-level op (record/entry/activity/link).
     ChainOp(Box<ChainOp>),
     /// A warrant op.
-    WarrantOp(Box<WarrantOp>),
+    WarrantOp(Box<crate::warrant::WarrantOp>),
 }
 
 impl From<ChainOp> for DhtOp {
@@ -74,15 +59,15 @@ impl From<ChainOp> for DhtOp {
     }
 }
 
-impl From<WarrantOp> for DhtOp {
-    fn from(op: WarrantOp) -> Self {
+impl From<crate::warrant::WarrantOp> for DhtOp {
+    fn from(op: crate::warrant::WarrantOp) -> Self {
         DhtOp::WarrantOp(Box::new(op))
     }
 }
 
 impl From<SignedWarrant> for DhtOp {
     fn from(op: SignedWarrant) -> Self {
-        DhtOp::WarrantOp(Box::new(WarrantOp(op)))
+        DhtOp::WarrantOp(Box::new(crate::warrant::WarrantOp::from(op)))
     }
 }
 
@@ -256,11 +241,8 @@ impl DhtOp {
     pub fn to_hash(&self) -> DhtOpHash {
         match self {
             DhtOp::ChainOp(op) => op.to_hash(),
-            // Hash the warrant content via the `WarrantOp` wrapper, which
-            // carries the `DhtOp` hash type over the wrapped `SignedWarrant`.
-            DhtOp::WarrantOp(op) => {
-                DhtOpHash::with_data_sync(&crate::warrant::WarrantOp::from(op.0.clone()))
-            }
+            // `WarrantOp` implements `HashableContent` directly.
+            DhtOp::WarrantOp(op) => DhtOpHash::with_data_sync(op.as_ref()),
         }
     }
 
@@ -268,7 +250,7 @@ impl DhtOp {
     pub fn dht_basis(&self) -> AnyLinkableHash {
         match self {
             DhtOp::ChainOp(op) => op.dht_basis(),
-            DhtOp::WarrantOp(op) => op.0.data().warrantee.clone().into(),
+            DhtOp::WarrantOp(op) => op.data().warrantee.clone().into(),
         }
     }
 }

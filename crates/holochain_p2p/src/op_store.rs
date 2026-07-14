@@ -22,7 +22,7 @@ use holochain_serialized_bytes::prelude::{decode, encode};
 use holochain_state::dht_store::{K2ChainOpForWireRow, K2WarrantForWireRow};
 use holochain_state::DhtStore;
 use holochain_types::dht_v2::{
-    Action as ActionV2, ActionData, ActionHeader, ChainOp, DhtOp, OpEntry, SignedAction, WarrantOp,
+    Action as ActionV2, ActionData, ActionHeader, ChainOp, DhtOp, OpEntry, SignedAction,
 };
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::warrant::{SignedWarrant, Warrant, WarrantProof};
@@ -509,7 +509,7 @@ pub fn build_warrant_dht_op_v2(row: K2WarrantForWireRow) -> Result<DhtOp, String
         timestamp,
     };
     let signed = SignedWarrant::new(warrant, signature);
-    Ok(DhtOp::WarrantOp(Box::new(WarrantOp(signed))))
+    Ok(DhtOp::WarrantOp(Box::new(signed.into())))
 }
 
 fn decode_signature(bytes: &[u8]) -> Result<holochain_zome_types::signature::Signature, String> {

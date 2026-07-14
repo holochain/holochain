@@ -47,7 +47,7 @@ pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysVal
 
 /// Verify the signature for this warrant
 pub async fn verify_warrant_signature(
-    warrant_op: &holochain_types::dht_v2::WarrantOp,
+    warrant_op: &holochain_types::warrant::WarrantOp,
 ) -> SysValidationResult<()> {
     if warrant_op
         .author

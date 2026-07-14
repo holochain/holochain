@@ -1085,7 +1085,7 @@ async fn verify_signed_action_signature(
 }
 
 async fn validate_warrant_op(
-    op: &holochain_types::dht_v2::WarrantOp,
+    op: &holochain_types::warrant::WarrantOp,
     validation_dependencies: SysValDeps,
 ) -> SysValidationResult<()> {
     match &op.proof {
@@ -1333,7 +1333,7 @@ pub async fn counterfeit_check_action(
 
 /// Check if the warrant op has valid signature and author.
 pub async fn counterfeit_check_warrant(
-    warrant_op: &holochain_types::dht_v2::WarrantOp,
+    warrant_op: &holochain_types::warrant::WarrantOp,
 ) -> SysValidationResult<()> {
     verify_warrant_signature(warrant_op).await?;
     Ok(())
