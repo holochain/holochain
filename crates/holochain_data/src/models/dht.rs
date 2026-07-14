@@ -69,7 +69,7 @@ pub(crate) struct ValidatedActionRow {
 /// its validation status, and (Full mode) the referenced public entry.
 #[derive(Debug, Clone)]
 pub struct AgentActivityItem {
-    /// The signed, hashed v2 action.
+    /// The signed, hashed action.
     pub action: SignedActionHashed,
     /// Validation status of the action's `RegisterAgentActivity` op.
     pub validation_status: RecordValidity,
@@ -433,7 +433,7 @@ pub struct K2ChainOpForWireRow {
     pub seq: i64,
     /// Previous action hash; `None` only for the genesis `Dna` action.
     pub prev_hash: Option<Vec<u8>>,
-    /// Serialized `ActionData` blob (v2 form).
+    /// Serialized `ActionData` blob.
     pub action_data: Vec<u8>,
     /// 64-byte action signature.
     pub signature: Vec<u8>,
@@ -447,7 +447,7 @@ pub struct K2ChainOpForWireRow {
 /// (with `op_hash`) forms the cursor for the next page.
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct DumpChainOpRow {
-    /// The wire columns, reconstructed with `build_chain_dht_op_v2`.
+    /// The wire columns, reconstructed with `build_chain_dht_op`.
     #[sqlx(flatten)]
     pub wire: K2ChainOpForWireRow,
     /// Microsecond integration timestamp; the high-order part of the cursor.

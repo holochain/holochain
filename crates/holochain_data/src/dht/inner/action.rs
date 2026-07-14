@@ -540,7 +540,7 @@ where
     rows.into_iter().map(row_to_signed_action_hashed).collect()
 }
 
-/// Decode a `ValidatedActionRow` to a v2 action + its validation status.
+/// Decode a `ValidatedActionRow` to an action + its validation status.
 fn validated_action_row_to_item(
     row: ValidatedActionRow,
 ) -> sqlx::Result<(SignedActionHashed, RecordValidity)> {

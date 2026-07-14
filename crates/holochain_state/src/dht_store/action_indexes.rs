@@ -2,7 +2,7 @@
 //! (`Link`, `DeletedLink`, `UpdatedRecord`, `DeletedRecord`).
 //!
 //! Both the source-chain authored-data writer and the cache writer convert
-//! incoming actions to the v2 [`ActionData`] form and then need to insert
+//! incoming actions to the [`ActionData`] form and then need to insert
 //! into the same index tables based on the action variant. This helper
 //! holds the single dispatch.
 

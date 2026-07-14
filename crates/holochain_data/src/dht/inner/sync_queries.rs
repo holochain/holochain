@@ -385,7 +385,7 @@ where
 /// that cursor — so repeated dumps page forward through newly integrated ops.
 /// Passing `after = None` returns every integrated op (the dump's first page,
 /// and how the consistency harness reads the full set). Reconstruct each row
-/// with `build_chain_dht_op_v2`.
+/// with `build_chain_dht_op`.
 pub(crate) async fn integrated_chain_ops_for_dump<'e, E>(
     executor: E,
     after: Option<(i64, &[u8])>,

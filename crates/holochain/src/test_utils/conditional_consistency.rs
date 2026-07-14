@@ -366,7 +366,7 @@ fn display_op(op: &DhtOp) -> String {
 /// excluded** — a private entry never leaves its author, so
 /// `request_published_ops` (via `ops_to_publish_for_wire`) already omits them
 /// from the published set; the integrated set must match, or the author node
-/// could never reach consistency. Ops are reconstructed into v2 `DhtOp`s so
+/// could never reach consistency. Ops are reconstructed into `DhtOp`s so
 /// their hashes match the published set.
 async fn get_integrated_ops(dht_store: &DhtStoreRead) -> Vec<DhtOp> {
     let chain = dht_store
@@ -376,7 +376,7 @@ async fn get_integrated_ops(dht_store: &DhtStoreRead) -> Vec<DhtOp> {
         .into_iter()
         .map(|row| row.wire)
         .collect();
-    crate::conductor::wire_rows_to_v2_ops(chain, Vec::new())
+    crate::conductor::wire_rows_to_ops(chain, Vec::new())
         .into_iter()
         .filter(|op| !is_author_local_private_store_entry(op))
         .collect()

@@ -672,7 +672,7 @@ impl HashableContent for Action {
 
     fn hashable_content(&self) -> HashableContentBytes {
         HashableContentBytes::Content(
-            SerializedBytes::try_from(self).expect("Could not serialize v2 Action"),
+            SerializedBytes::try_from(self).expect("Could not serialize Action"),
         )
     }
 }

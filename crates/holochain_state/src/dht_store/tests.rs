@@ -1280,7 +1280,7 @@ fn build_rendered_store_record_for_move(seed: u8) -> (RenderedOps, holo_hash::Ac
     ));
     let sig = Signature::from([seed; 64]);
     // `RenderedOp::new` takes the wire's action; build it directly.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author,
             timestamp: Timestamp::from_micros(seed as i64 * 1000),
@@ -1298,7 +1298,7 @@ fn build_rendered_store_record_for_move(seed: u8) -> (RenderedOps, holo_hash::Ac
     };
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash);
     let rendered =
-        RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord).expect("rendered op build");
+        RenderedOp::new(action, sig, None, ChainOpType::StoreRecord).expect("rendered op build");
     let action_hash = rendered.action.as_hash().clone();
     let ops = RenderedOps {
         entry: Some(entry_hashed),
@@ -1647,7 +1647,7 @@ fn build_rendered_store_entry(
     ));
     let sig = Signature::from([seed; 64]);
     // `RenderedOp::new` takes the wire's action; build it directly.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author,
             timestamp: Timestamp::from_micros(seed as i64 * 1000),
@@ -1663,10 +1663,10 @@ fn build_rendered_store_entry(
             entry_hash: entry_hash.clone(),
         }),
     };
-    let action_hash = holo_hash::ActionHash::with_data_sync(&v2_action);
+    let action_hash = holo_hash::ActionHash::with_data_sync(&action);
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash.clone());
     let rendered =
-        RenderedOp::new(v2_action, sig, None, ChainOpType::StoreEntry).expect("rendered op");
+        RenderedOp::new(action, sig, None, ChainOpType::StoreEntry).expect("rendered op");
     let ops = RenderedOps {
         entry: Some(entry_hashed),
         ops: vec![rendered],
@@ -1759,7 +1759,7 @@ fn build_rendered_store_record_ops(
     ));
     let sig = Signature::from([seed; 64]);
     // `RenderedOp::new` takes the wire's action; build it directly.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author,
             timestamp: Timestamp::from_micros(seed as i64 * 1000),
@@ -1775,10 +1775,10 @@ fn build_rendered_store_record_ops(
             entry_hash: entry_hash.clone(),
         }),
     };
-    let action_hash = holo_hash::ActionHash::with_data_sync(&v2_action);
+    let action_hash = holo_hash::ActionHash::with_data_sync(&action);
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash.clone());
     let rendered =
-        RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord).expect("rendered op");
+        RenderedOp::new(action, sig, None, ChainOpType::StoreRecord).expect("rendered op");
     let ops = RenderedOps {
         entry: Some(entry_hashed),
         ops: vec![rendered],
@@ -2004,7 +2004,7 @@ fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHa
     );
     let sig = Signature::from([seed; 64]);
     // `RenderedOp::new` takes the wire's action; build it directly.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author,
             timestamp: Timestamp::from_micros(seed as i64 * 1000),
@@ -2020,7 +2020,7 @@ fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHa
         }),
     };
     let rendered =
-        RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterAddLink).expect("rendered op");
+        RenderedOp::new(action, sig, None, ChainOpType::RegisterAddLink).expect("rendered op");
     let create_link_hash = rendered.action.as_hash().clone();
     let ops = RenderedOps {
         entry: None,
@@ -2040,7 +2040,7 @@ fn build_rendered_delete_link_for(
     let author = AgentPubKey::from_raw_36(vec![seed.wrapping_add(1); 36]);
     let sig = Signature::from([seed.wrapping_add(1); 64]);
     // `RenderedOp::new` takes the wire's action; build it directly.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author,
             timestamp: Timestamp::from_micros(seed as i64 * 1000 + 500),
@@ -2052,8 +2052,8 @@ fn build_rendered_delete_link_for(
             link_add_address: create_link_hash,
         }),
     };
-    let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterRemoveLink)
-        .expect("rendered op");
+    let rendered =
+        RenderedOp::new(action, sig, None, ChainOpType::RegisterRemoveLink).expect("rendered op");
     RenderedOps {
         entry: None,
         ops: vec![rendered],
@@ -2261,7 +2261,7 @@ async fn integrate_link_op(
 
 fn build_cached_create_link(base: &holo_hash::AnyLinkableHash, seed: u8) -> RenderedOps {
     // `RenderedOp::new` takes the wire's action; build it directly.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author: AgentPubKey::from_raw_36(vec![seed; 36]),
             timestamp: Timestamp::from_micros(seed as i64 * 1000),
@@ -2280,7 +2280,7 @@ fn build_cached_create_link(base: &holo_hash::AnyLinkableHash, seed: u8) -> Rend
         }),
     };
     let rendered = RenderedOp::new(
-        v2_action,
+        action,
         Signature::from([seed; 64]),
         None,
         ChainOpType::RegisterAddLink,
@@ -2416,7 +2416,7 @@ async fn integrate_upgrades_cached_op_to_locally_validated() {
 
     // One action + signature, used to build BOTH the cached RenderedOps and
     // the incoming DhtOpHashed, so they share the same op hash.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author: AgentPubKey::from_raw_36(vec![6u8; 36]),
             timestamp: Timestamp::from_micros(6000),
@@ -2440,7 +2440,7 @@ async fn integrate_upgrades_cached_op_to_locally_validated() {
     let rendered = RenderedOps {
         entry: None,
         ops: vec![RenderedOp::new(
-            v2_action.clone(),
+            action.clone(),
             sig.clone(),
             None,
             ChainOpType::RegisterAddLink,
@@ -2462,7 +2462,7 @@ async fn integrate_upgrades_cached_op_to_locally_validated() {
     // Receive + validate + integrate the SAME op (same action + signature,
     // so it shares the cached op's hash).
     let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::CreateLink(
-        SignedAction::new(v2_action, sig),
+        SignedAction::new(action, sig),
     ))));
     let hash = op.as_hash().clone();
     store.record_incoming_ops(vec![(op, false)]).await.unwrap();

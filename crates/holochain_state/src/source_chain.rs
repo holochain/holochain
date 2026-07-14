@@ -2120,7 +2120,7 @@ mod tests {
             let entry = Entry::App(fixt!(AppEntryBytes));
             let entry_hashed = EntryHashed::from_content_sync(entry);
 
-            let v2_action = Action {
+            let action = Action {
                 header: ActionHeader {
                     author: alice.clone(),
                     timestamp: Timestamp::now(),
@@ -2132,9 +2132,9 @@ mod tests {
                     entry_hash: entry_hashed.hash.clone(),
                 }),
             };
-            let sig = alice.sign(&keystore, &v2_action).await.unwrap();
+            let sig = alice.sign(&keystore, &action).await.unwrap();
             let signed_action = SignedActionHashed::with_presigned(
-                HoloHashed::from_content_sync(v2_action.clone()),
+                HoloHashed::from_content_sync(action.clone()),
                 sig,
             );
 
@@ -2147,7 +2147,7 @@ mod tests {
                 .unwrap();
             chain.flush(vec![DhtArc::Empty]).await.unwrap();
 
-            v2_action
+            action
         };
 
         // Add an app entry to the scratch space
@@ -2157,7 +2157,7 @@ mod tests {
             let entry = Entry::App(fixt!(AppEntryBytes));
             let entry_hashed = EntryHashed::from_content_sync(entry);
 
-            let v2_action = Action {
+            let action = Action {
                 header: ActionHeader {
                     author: alice.clone(),
                     timestamp: Timestamp::now(),
@@ -2171,9 +2171,9 @@ mod tests {
                     entry_hash: entry_hashed.hash.clone(),
                 }),
             };
-            let sig = alice.sign(&keystore, &v2_action).await.unwrap();
+            let sig = alice.sign(&keystore, &action).await.unwrap();
             let signed_action =
-                SignedActionHashed::with_presigned(HoloHashed::from_content_sync(v2_action), sig);
+                SignedActionHashed::with_presigned(HoloHashed::from_content_sync(action), sig);
 
             chain
                 .scratch()
@@ -2296,7 +2296,7 @@ mod tests {
         // Commit a Create with a PRIVATE entry to the DhtStore via flush.
         let chain_top = chain.chain_head_nonempty().unwrap();
         let private_entry_hashed = EntryHashed::from_content_sync(Entry::App(fixt!(AppEntryBytes)));
-        let v2_private_create = Action {
+        let private_create_action = Action {
             header: ActionHeader {
                 author: alice.clone(),
                 timestamp: Timestamp::now(),
@@ -2308,9 +2308,9 @@ mod tests {
                 entry_hash: private_entry_hashed.hash.clone(),
             }),
         };
-        let sig = alice.sign(&keystore, &v2_private_create).await.unwrap();
+        let sig = alice.sign(&keystore, &private_create_action).await.unwrap();
         let private_sah = SignedActionHashed::with_presigned(
-            HoloHashed::from_content_sync(v2_private_create),
+            HoloHashed::from_content_sync(private_create_action),
             sig,
         );
         let private_action_hash = private_sah.as_hash().clone();
@@ -2329,7 +2329,7 @@ mod tests {
         // Add an uncommitted public Create to the scratch.
         let chain_top = chain.chain_head_nonempty().unwrap();
         let public_entry_hashed = EntryHashed::from_content_sync(Entry::App(fixt!(AppEntryBytes)));
-        let v2_public_create = Action {
+        let public_create_action = Action {
             header: ActionHeader {
                 author: alice.clone(),
                 timestamp: Timestamp::now(),
@@ -2341,9 +2341,9 @@ mod tests {
                 entry_hash: public_entry_hashed.hash.clone(),
             }),
         };
-        let sig = alice.sign(&keystore, &v2_public_create).await.unwrap();
+        let sig = alice.sign(&keystore, &public_create_action).await.unwrap();
         let public_sah = SignedActionHashed::with_presigned(
-            HoloHashed::from_content_sync(v2_public_create),
+            HoloHashed::from_content_sync(public_create_action),
             sig,
         );
         let scratch_action_hash = public_sah.as_hash().clone();

@@ -79,7 +79,7 @@ pub(crate) fn op_validation_attempts_metric() -> &'static OpValidationAttemptsMe
 /// Record integration metrics once per source-chain flush that integrated
 /// locally-authored ops.
 ///
-/// In the v2 model, locally-authored ops are integrated immediately at source
+/// Locally-authored ops are integrated immediately at source
 /// chain flush, bypassing the integration workflow's `summaries` path that
 /// records [`op_integration_delay_metric`] / [`op_validation_attempts_metric`]
 /// for network-received ops. Authored ops have no integration delay and need no

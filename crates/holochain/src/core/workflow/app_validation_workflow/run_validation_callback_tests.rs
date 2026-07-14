@@ -85,13 +85,13 @@ async fn validation_callback_must_get_action() {
     let mut create_action = fixt!(Action, CreateAction);
     create_action.header.author = alice.clone();
     // a delete by bob that references alice's create
-    let mut delete_action_v2 = fixt!(Action, DeleteAction);
-    delete_action_v2.header.author = bob.clone();
-    if let ActionData::Delete(d) = &mut delete_action_v2.data {
+    let mut delete_action = fixt!(Action, DeleteAction);
+    delete_action.header.author = bob.clone();
+    if let ActionData::Delete(d) = &mut delete_action.data {
         d.deletes_address = create_action.to_hash();
     }
     let delete_action_signed_hashed =
-        SignedActionHashed::new_unchecked(delete_action_v2, fixt!(Signature));
+        SignedActionHashed::new_unchecked(delete_action, fixt!(Signature));
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
     });
@@ -297,21 +297,21 @@ async fn validation_callback_awaiting_deps_agent_activity() {
             .await
             .unwrap();
     // a delete by alice that references the create
-    let mut delete_action_v2 = fixt!(Action, DeleteAction);
-    delete_action_v2.header.author = alice.clone();
-    delete_action_v2.header.action_seq = 1;
+    let mut delete_action = fixt!(Action, DeleteAction);
+    delete_action.header.author = alice.clone();
+    delete_action.header.action_seq = 1;
     // prev_action must be set, otherwise it will be filtered from the chain
     // that must_get_agent_activity returns
-    delete_action_v2.header.prev_action = Some(create_action.to_hash());
-    if let ActionData::Delete(d) = &mut delete_action_v2.data {
+    delete_action.header.prev_action = Some(create_action.to_hash());
+    if let ActionData::Delete(d) = &mut delete_action.data {
         d.deletes_address = create_action.to_hash();
     }
     let delete_action_signed_hashed =
-        SignedActionHashed::sign(&keystore, delete_action_v2.clone().into_hashed())
+        SignedActionHashed::sign(&keystore, delete_action.clone().into_hashed())
             .await
             .unwrap();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
-        delete: SignedActionHashed::new_unchecked(delete_action_v2, fixt!(Signature)),
+        delete: SignedActionHashed::new_unchecked(delete_action, fixt!(Signature)),
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 

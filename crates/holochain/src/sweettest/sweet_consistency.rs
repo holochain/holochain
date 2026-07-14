@@ -1,7 +1,7 @@
 //! Methods for awaiting consistency between cells of the same DNA
 
 use super::*;
-use crate::conductor::wire_rows_to_v2_ops;
+use crate::conductor::wire_rows_to_ops;
 use crate::prelude::*;
 use holochain_state::dht_store::DhtStoreRead;
 use std::{
@@ -91,7 +91,7 @@ fn is_author_local_private_store_entry(op: &DhtOp) -> bool {
 /// author, so its `StoreEntry` op only ever exists on the authoring node;
 /// including it would put a hash in the comparison set that no peer can hold
 /// and consistency could never be reached. This mirrors the SQL-level filter
-/// on `ops_to_publish_for_wire`. Ops are reconstructed into v2 `DhtOp`s so
+/// on `ops_to_publish_for_wire`. Ops are reconstructed into `DhtOp`s so
 /// their hashes match across nodes.
 async fn integrated_op_rows(dht_store: &DhtStoreRead) -> Result<Vec<DhtOpRow>, String> {
     let dump_rows = dht_store
@@ -99,13 +99,13 @@ async fn integrated_op_rows(dht_store: &DhtStoreRead) -> Result<Vec<DhtOpRow>, S
         .await
         .map_err(|e| e.to_string())?;
     // Reconstruct each row on its own so its `when_integrated` stays paired with
-    // the op: `wire_rows_to_v2_ops` drops rows that fail to rebuild, so
+    // the op: `wire_rows_to_ops` drops rows that fail to rebuild, so
     // zipping its output against the original list could misalign.
     Ok(dump_rows
         .into_iter()
         .flat_map(|row| {
             let when_integrated = row.when_integrated;
-            wire_rows_to_v2_ops(vec![row.wire], vec![])
+            wire_rows_to_ops(vec![row.wire], vec![])
                 .into_iter()
                 .map(move |op| (op, when_integrated))
         })
