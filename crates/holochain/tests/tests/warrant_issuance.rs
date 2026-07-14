@@ -64,7 +64,7 @@ async fn invalid_op_warrant_issuance_can_be_disabled() {
 
     // Bob must not have issued a warrant against Alice.
     // A warrant would have been created as part of app validating all of Alice's
-    // ops, so once consistency is reached, the authored DB can be checked
+    // ops, so once consistency is reached, the DHT store can be checked
     // for warrants.
     let warrants = conductors[1]
         .get_spaces()

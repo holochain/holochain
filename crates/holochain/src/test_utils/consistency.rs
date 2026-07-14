@@ -12,8 +12,8 @@ use kitsune2_api::OpId;
 /// Returns the ops `author` has authored and shares with the DHT — that is,
 /// self-authored, locally-validated ops, with private `StoreEntry` ops
 /// excluded so private entries never leak into the published set. Each op is
-/// returned as `(loc, op_id, op)`, matching the legacy authored-db query
-/// shape: `loc` is the basis location and `op_id` the located K2 op id.
+/// returned as `(loc, op_id, op)`, where `loc` is the basis location and
+/// `op_id` the located K2 op id.
 pub async fn request_published_ops(
     dht_store: &DhtStoreRead,
     author: &AgentPubKey,

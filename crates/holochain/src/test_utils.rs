@@ -472,18 +472,19 @@ pub fn fake_valid_dna_file(network_seed: &str) -> DnaFile {
 
 /// Run genesis on the source chain for testing.
 ///
-/// `dna_hash` must match the DNA the caller's `dht_db` was opened for; the
-/// helper reuses it for the genesis `Action::Dna` and for the new-DB
-/// `DhtStore` so the legacy and mirrored writes land in the same DNA space.
+/// Creates a fresh, self-contained `DhtStore` for `dna_hash` and writes the
+/// genesis records directly into its source chain. Use `fake_genesis_with_store`
+/// if the resulting store needs to be shared with a workspace.
 pub async fn fake_genesis(dna_hash: DnaHash, keystore: MetaLairClient) -> SourceChainResult<()> {
     fake_genesis_for_agent(dna_hash, fake_agent_pubkey_1(), keystore).await
 }
 
 /// Run genesis on the source chain for a specific agent for testing.
 ///
-/// `dna_hash` must match the DNA the caller's `dht_db` was opened for; the
-/// helper reuses it for the genesis `Action::Dna` and for the new-DB
-/// `DhtStore` so the legacy and mirrored writes land in the same DNA space.
+/// Creates a fresh, self-contained `DhtStore` for `dna_hash` and writes
+/// `agent`'s genesis records directly into its source chain. Use
+/// `fake_genesis_for_agent_with_store` if the resulting store needs to be
+/// shared with a workspace.
 pub async fn fake_genesis_for_agent(
     dna_hash: DnaHash,
     agent: AgentPubKey,

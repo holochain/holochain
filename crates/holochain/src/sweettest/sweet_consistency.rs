@@ -83,18 +83,17 @@ fn is_author_local_private_store_entry(op: &DhtOp) -> bool {
 
 /// Read the integrated ops a node holds, as `(hash, row)` pairs for reporting.
 ///
-/// "Integrated" follows the new store semantics: locally-validated chain ops,
-/// GET-cached copies excluded. **Warrants are deliberately excluded** — the
-/// legacy consistency check inner-joined `Action` (warrants have no `Action`
-/// row), so it only ever compared chain ops. Warrants are not guaranteed to
-/// reach every node (zero-arc nodes, gossip timing), so requiring cross-node
-/// warrant consistency here would hang; warrant propagation is asserted
-/// separately by the warrant tests. **Private `StoreEntry` ops are also
-/// excluded** — a private entry never leaves its author, so its `StoreEntry`
-/// op only ever exists on the authoring node; including it would put a hash in
-/// the comparison set that no peer can hold and consistency could never be
-/// reached. This mirrors the SQL-level filter on `ops_to_publish_for_wire`.
-/// Ops are reconstructed into v2 `DhtOp`s so their hashes match across nodes.
+/// "Integrated" follows the store semantics: locally-validated chain ops,
+/// GET-cached copies excluded. **Warrants are deliberately excluded** — they
+/// are not guaranteed to reach every node (zero-arc nodes, gossip timing), so
+/// requiring cross-node warrant consistency here would hang; warrant
+/// propagation is asserted separately by the warrant tests. **Private
+/// `StoreEntry` ops are also excluded** — a private entry never leaves its
+/// author, so its `StoreEntry` op only ever exists on the authoring node;
+/// including it would put a hash in the comparison set that no peer can hold
+/// and consistency could never be reached. This mirrors the SQL-level filter
+/// on `ops_to_publish_for_wire`. Ops are reconstructed into v2 `DhtOp`s so
+/// their hashes match across nodes.
 async fn integrated_op_rows(dht_store: &DhtStoreRead) -> Result<Vec<DhtOpRow>, String> {
     let dump_rows = dht_store
         .integrated_chain_ops_for_dump(None)

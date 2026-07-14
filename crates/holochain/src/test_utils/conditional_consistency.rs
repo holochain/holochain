@@ -356,17 +356,18 @@ fn display_op(op: &DhtOp) -> String {
 }
 
 /// Get all [`DhtOps`](holochain_types::prelude::DhtOp) integrated by this node,
-/// read from the new DHT store.
+/// read from the DHT store.
 ///
-/// "Integrated" follows the new store semantics: locally-validated chain ops
+/// "Integrated" follows the store semantics: locally-validated chain ops
 /// (GET-cached copies excluded, rejected ops included). **Warrants are
-/// deliberately excluded** — the legacy check inner-joined `Action` (warrants
-/// have none) and so compared chain ops only; warrants need not reach every
-/// node. **Private `StoreEntry` ops are also excluded** — a private entry never
-/// leaves its author, so `request_published_ops` (via `ops_to_publish_for_wire`)
-/// already omits them from the published set; the integrated set must match, or
-/// the author node could never reach consistency. Ops are reconstructed into v2
-/// `DhtOp`s so their hashes match the published set.
+/// deliberately excluded** — they are not guaranteed to reach every node
+/// (zero-arc nodes, gossip timing), so requiring cross-node warrant
+/// consistency here would hang. **Private `StoreEntry` ops are also
+/// excluded** — a private entry never leaves its author, so
+/// `request_published_ops` (via `ops_to_publish_for_wire`) already omits them
+/// from the published set; the integrated set must match, or the author node
+/// could never reach consistency. Ops are reconstructed into v2 `DhtOp`s so
+/// their hashes match the published set.
 async fn get_integrated_ops(dht_store: &DhtStoreRead) -> Vec<DhtOp> {
     let chain = dht_store
         .integrated_chain_ops_for_dump(None)
