@@ -20,7 +20,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::DynHcP2p;
 use holochain_state::data::{DbKey, DbSyncLevel};
 use holochain_state::{host_fn_workspace::SourceChainWorkspace, prelude::*};
-use holochain_types::dht_v2::ChainOp;
 use holochain_util::timed;
 use lair_keystore_api::prelude::SharedLockedArray;
 use std::convert::TryInto;
@@ -393,7 +392,7 @@ impl Spaces {
     pub async fn handle_publish(
         &self,
         dna_hash: &DnaHash,
-        ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
+        ops: Vec<(DhtOp, bool)>,
     ) -> ConductorResult<()> {
         let space = self.get_or_create_space(dna_hash)?;
         let trigger = match self

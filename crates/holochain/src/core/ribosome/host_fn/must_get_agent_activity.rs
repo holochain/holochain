@@ -1,13 +1,12 @@
 use crate::core::ribosome::host_fn::cascade_from_call_context;
-use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
+use crate::core::ribosome::{CallContext, Ribosome};
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::op::RegisterAgentActivity;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 

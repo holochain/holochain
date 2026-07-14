@@ -8,7 +8,6 @@ use holochain_p2p::DynHolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::Op;
 use std::sync::Arc;
 
 /// An invocation of the validate callback function.
@@ -128,9 +127,6 @@ mod test {
     use crate::fixt::ValidateHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_types::prelude::*;
-    use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-        Op, RegisterAgentActivity,
-    };
     use holochain_zome_types::fixt::{ActionFixturator, CreateLinkAction};
     use rand::seq::SliceRandom;
 
@@ -266,9 +262,6 @@ mod slow_tests {
     use holochain_types::inline_zome::InlineZomeSet;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-        Op, RegisterAgentActivity, StoreRecord,
-    };
     use holochain_zome_types::fixt::{ActionFixturator, CreateAction, CreateLinkAction};
     use std::sync::Arc;
 

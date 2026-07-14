@@ -6,7 +6,7 @@ use crate::test_utils::{assert_limbo_empty, wait_for_integration};
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::dht_v2::SignedAction;
+use holochain_zome_types::action::SignedAction;
 use holochain_zome_types::fixt::{ActionFixturator, CreateAction, DnaAction};
 use std::convert::TryFrom;
 use std::time::Duration;

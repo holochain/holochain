@@ -26,10 +26,11 @@ use holochain_state::prelude::{AppEntryBytesFixturator, HeadInfo};
 use holochain_state::prelude::{StateMutationError, StateMutationResult};
 use holochain_state::source_chain;
 use holochain_types::activity::AgentActivityResponse;
-use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
+use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use holochain_types::prelude::SystemSignal;
 use holochain_types::prelude::{ChainItems, SignedActionHashedExt};
 use holochain_types::signal::Signal;
+use holochain_zome_types::action::from_countersigning_data;
 use holochain_zome_types::cell::CellId;
 use holochain_zome_types::countersigning::PreflightResponse;
 use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
@@ -1932,12 +1933,9 @@ impl TestHarness {
         // Build the countersigning action via `from_countersigning_data` and
         // sign over its bytes, matching the signature basis used everywhere
         // else. The DhtStore writes below build the op from the same `signed`.
-        let my_action = holochain_zome_types::dht_v2::from_countersigning_data(
-            entry_hash.clone(),
-            session_data,
-            self.author.clone(),
-        )
-        .unwrap();
+        let my_action =
+            from_countersigning_data(entry_hash.clone(), session_data, self.author.clone())
+                .unwrap();
         let action = my_action.clone();
         let hashed = holo_hash::HoloHashed::from_content_sync(action.clone());
         let sah = SignedActionHashed::sign(&self.keystore, hashed)
@@ -2237,12 +2235,8 @@ impl RemoteAgent {
         entry_hash: &EntryHash,
         keystore: MetaLairClient,
     ) -> SignedAction {
-        let action = holochain_zome_types::dht_v2::from_countersigning_data(
-            entry_hash.clone(),
-            session_data,
-            self.agent.clone(),
-        )
-        .unwrap();
+        let action =
+            from_countersigning_data(entry_hash.clone(), session_data, self.agent.clone()).unwrap();
 
         let hashed = holo_hash::HoloHashed::from_content_sync(action);
         let sah = SignedActionHashed::sign(&keystore, hashed).await.unwrap();

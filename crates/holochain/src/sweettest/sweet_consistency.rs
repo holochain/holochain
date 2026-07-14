@@ -4,7 +4,6 @@ use super::*;
 use crate::conductor::wire_rows_to_v2_ops;
 use crate::prelude::*;
 use holochain_state::dht_store::DhtStoreRead;
-use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use std::{
     collections::HashSet,
     time::{Duration, Instant},
@@ -277,10 +276,11 @@ mod tests {
     use hdk::prelude::SignatureFixturator;
     use holo_hash::ActionHash;
     use holochain_serialized_bytes::SerializedBytes;
+    use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::fixt::ActionFixturator;
     use holochain_zome_types::{
-        action::ChainTopOrdering,
+        action::{ChainTopOrdering, SignedAction},
         entry::{AppEntryBytes, AppEntryDefLocation, CreateInput, EntryDefLocation},
         entry_def::{EntryDef, EntryVisibility},
         zome::inline_zome::InlineIntegrityZome,
@@ -447,15 +447,10 @@ mod tests {
             .await
             .unwrap();
 
-        // `record_incoming_ops` is v2-native; this arbitrary op only needs to
-        // exist unvalidated in limbo, so build it directly as v2.
-        let v2_action = fixt!(Action);
-        let op = holochain_types::dht_v2::ChainOp::AgentActivity(
-            holochain_zome_types::dht_v2::SignedAction::new(v2_action, fixt!(Signature)),
-        );
-        let unintegrated_op = holochain_types::dht_v2::DhtOpHashed::from_content_sync(
-            holochain_types::dht_v2::DhtOp::from(op),
-        );
+        // This arbitrary op only needs to exist unvalidated in limbo.
+        let action = fixt!(Action);
+        let op = ChainOp::AgentActivity(SignedAction::new(action, fixt!(Signature)));
+        let unintegrated_op = DhtOpHashed::from_content_sync(DhtOp::from(op));
         // Stage the op into the DHT store's validation limbo so it is present
         // but not integrated.
         conductors[0]

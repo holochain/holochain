@@ -4,7 +4,6 @@ use crate::conductor::wire_rows_to_v2_ops;
 use holo_hash::AgentPubKey;
 use holochain_state::dht_store::DhtStoreRead;
 use holochain_state::prelude::*;
-use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
 use kitsune2_api::OpId;
 
 /// Request the published ops for the given agent from the DHT store.

@@ -35,7 +35,7 @@ async fn test_validation_receipt() {
         .await
         .unwrap()
         .unwrap();
-    let ops = holochain_types::dht_v2::produce_ops_from_record(&record)
+    let ops = produce_ops_from_record(&record)
         .into_iter()
         .map(|op| op.op_hash)
         .collect::<Vec<_>>();

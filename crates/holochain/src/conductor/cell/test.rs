@@ -13,9 +13,6 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_state::prelude::*;
 use holochain_trace::test_run;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    Action, ActionData, ActionHeader, DnaData,
-};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
@@ -106,14 +103,11 @@ async fn test_cell_handle_publish() {
     )
     .await
     .unwrap();
-    let v2_op = holochain_types::dht_v2::DhtOp::ChainOp(Box::new(
-        holochain_types::dht_v2::ChainOp::CreateRecord(
-            holochain_types::dht_v2::SignedAction::new(v2_action, shh.signature().clone()),
-            holochain_types::dht_v2::OpEntry::ActionOnly,
-        ),
-    ));
-    let op_hash =
-        holochain_types::dht_v2::DhtOpHashed::from_content_sync(v2_op.clone()).into_hash();
+    let v2_op = DhtOp::ChainOp(Box::new(ChainOp::CreateRecord(
+        SignedAction::new(v2_action, shh.signature().clone()),
+        OpEntry::ActionOnly,
+    )));
+    let op_hash = DhtOpHashed::from_content_sync(v2_op.clone()).into_hash();
 
     spaces
         .spaces

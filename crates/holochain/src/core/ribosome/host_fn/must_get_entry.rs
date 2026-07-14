@@ -1,7 +1,7 @@
 use crate::core::ribosome::host_fn::cascade_from_call_context;
-use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeError;
+use crate::core::ribosome::{CallContext, Ribosome};
 use holochain_cascade::{Cascade, CascadeImpl};
 use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_types::prelude::*;
@@ -150,7 +150,7 @@ pub mod test {
             holochain_zome_types::op::ChainOpType::StoreRecord,
         )
         .unwrap();
-        let record_op_hash = holochain_types::dht_v2::ChainOpUniqueForm::op_hash(
+        let record_op_hash = holochain_types::op::ChainOpUniqueForm::op_hash(
             holochain_zome_types::op::ChainOpType::StoreRecord,
             &action,
         );

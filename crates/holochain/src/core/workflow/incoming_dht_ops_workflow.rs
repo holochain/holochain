@@ -4,7 +4,7 @@ use super::sys_validation_workflow::counterfeit_check_action;
 use super::{error::WorkflowResult, sys_validation_workflow::counterfeit_check_warrant};
 use crate::{conductor::space::Space, core::queue_consumer::TriggerSender};
 use holo_hash::DhtOpHash;
-use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
+use holochain_types::op::{DhtOp, DhtOpHashed};
 use incoming_ops_batch::InOpBatchEntry;
 use std::{collections::HashSet, sync::Arc};
 

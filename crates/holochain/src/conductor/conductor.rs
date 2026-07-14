@@ -2301,7 +2301,6 @@ mod scheduler_impls {
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
     use holochain_conductor_api::{CellInfo, JsonDump};
-    use holochain_zome_types::dht_v2::{ActionData, CreateData, DeleteData};
     use holochain_zome_types::Entry;
     use kitsune2_api::{SpaceId, TransportStats};
     use std::sync::atomic::Ordering;
@@ -3564,13 +3563,13 @@ pub fn app_manifest_from_dnas(
         .into()
 }
 
-/// Build [`DhtOp`](holochain_types::dht_v2::DhtOp)s from wire rows for the
+/// Build [`DhtOp`](holochain_types::op::DhtOp)s from wire rows for the
 /// integration dump. Rows that fail to build are dropped (the same lenient
 /// behaviour the wire path uses), so the result is a best-effort view.
 pub fn wire_rows_to_v2_ops(
     chain: Vec<holochain_state::dht_store::K2ChainOpForWireRow>,
     warrants: Vec<holochain_state::dht_store::K2WarrantForWireRow>,
-) -> Vec<holochain_types::dht_v2::DhtOp> {
+) -> Vec<holochain_types::op::DhtOp> {
     chain
         .into_iter()
         .filter_map(|r| holochain_p2p::build_chain_dht_op_v2(r).ok())

@@ -1,10 +1,9 @@
-use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
+use crate::core::ribosome::{CallContext, Ribosome};
 use holochain_wasmer_host::prelude::*;
 
 use holochain_types::prelude::*;
-use holochain_zome_types::dht_v2::{ActionData, CloseChainData};
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -60,32 +59,29 @@ pub fn close_chain(
 #[cfg(test)]
 mod tests {
     use super::close_chain;
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::core::ribosome::Ribosome;
     use crate::fixt::CallContextFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::Predictable;
     use ::fixt::{fixt, Unpredictable};
     use holochain_util::tokio_helper;
     use holochain_wasm_test_utils::{TestWasm, TestWasmPair};
     use holochain_zome_types::prelude::*;
     use std::sync::Arc;
-    use crate::core::ribosome::Ribosome;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_close_chain() {
         // Note that any zome will do here, we're not calling its functions!
-        let ribosome =
-            Ribosome::new_with_test_wasms(vec![TestWasm::MigrateInitial])
-                .await
-                .unwrap();
+        let ribosome = Ribosome::new_with_test_wasms(vec![TestWasm::MigrateInitial])
+            .await
+            .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
         call_context.zome =
             TestWasmPair::<IntegrityZome, CoordinatorZome>::from(TestWasm::MigrateInitial)
                 .coordinator
                 .erase_type();
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let mut input = CloseChainInput {
-            new_target: None,
-        };
+        let mut input = CloseChainInput { new_target: None };
 
         // If this is an agent migration, the agent keypair needs to exist
         // so the Close can be signed.

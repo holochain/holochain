@@ -1,11 +1,10 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::host_fn::cascade_from_call_context;
-use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::{CallContext, Ribosome};
 use holochain_cascade::error::CascadeResult;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::dht_v2::{ActionData, CreateLinkData, DeleteLinkData};
 use std::sync::Arc;
 use wasmer::RuntimeError;
 

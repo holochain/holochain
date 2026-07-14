@@ -6,8 +6,6 @@ use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
-use holochain_types::dht_v2::ChainOp;
-use holochain_zome_types::dht_v2::SignedAction;
 use holochain_zome_types::fixt::{ActionFixturator, CreateLinkAction};
 
 #[tokio::test(flavor = "multi_thread")]

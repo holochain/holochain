@@ -14,7 +14,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
-use holochain_zome_types::dht_v2::{ActionData, InitZomesCompleteData};
 use tokio::sync::broadcast;
 
 #[derive(Constructor)]
@@ -154,7 +153,6 @@ mod tests {
     use holochain_state::test_utils::test_db_dir;
     use holochain_types::inline_zome::InlineZomeSet;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::dht_v2::ActionData;
     use matches::assert_matches;
     use std::sync::Arc;
 

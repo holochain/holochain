@@ -13,7 +13,7 @@ use holochain::{
     test_utils::retry_fn_until_timeout,
 };
 use holochain_timestamp::Timestamp;
-use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
+use holochain_types::op::{DhtOp, DhtOpHashed};
 use holochain_types::prelude::WarrantOp;
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::{ChainIntegrityWarrant, Warrant};

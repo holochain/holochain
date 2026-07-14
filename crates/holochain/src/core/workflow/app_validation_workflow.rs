@@ -116,15 +116,6 @@ use holochain_p2p::actor::{NetworkRequestOptions as NetworkGetOptions, NetworkRe
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
-use holochain_types::dht_v2::{ChainOp, DhtOp, OpEntry};
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
-    RegisterUpdate, StoreEntry, StoreRecord,
-};
-use holochain_zome_types::dht_v2::{
-    ActionData, CreateData, CreateLinkData, DeleteData, DeleteLinkData, SignedActionHashed,
-    UpdateData,
-};
 use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::sync::atomic::AtomicUsize;
@@ -222,7 +213,7 @@ async fn app_validation_workflow_inner(
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity_ops = vec![];
     // Locally-validated warrant ops, self-published into the DhtStore.
-    let mut warrant_ops_vec: Vec<holochain_types::dht_v2::DhtOpHashed> = vec![];
+    let mut warrant_ops_vec: Vec<DhtOpHashed> = vec![];
     let mut app_validation_outcomes: Vec<(DhtOpHash, AppOutcome)> = vec![];
     // Track action hashes already warranted in this batch to avoid creating duplicate
     // warrants for the same action. Multiple op types (StoreRecord, StoreEntry,
@@ -442,8 +433,7 @@ pub async fn record_to_op(
         hidden_entry = entry.take().or(hidden_entry);
     }
 
-    let dht_op_hash =
-        holochain_types::dht_v2::ChainOpUniqueForm::op_hash(op_type, &sah.hashed.content);
+    let dht_op_hash = ChainOpUniqueForm::op_hash(op_type, &sah.hashed.content);
 
     let op = match op_type {
         ChainOpType::StoreRecord => {

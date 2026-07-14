@@ -3,10 +3,6 @@
 use crate::{core::ribosome::guest_callback::validate::ValidateResult, sweettest::*};
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    ActionType, Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
-    RegisterUpdate, StoreEntry, StoreRecord,
-};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Write,

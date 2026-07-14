@@ -10,7 +10,6 @@ use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
-use holochain_zome_types::dht_v2::OpValidity;
 use kitsune2_api::StoredOp;
 
 #[cfg(test)]

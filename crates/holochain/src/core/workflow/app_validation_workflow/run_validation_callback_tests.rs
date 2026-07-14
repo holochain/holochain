@@ -18,20 +18,17 @@ use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
-    dht_v2::{ChainOp, DhtOp, DhtOpHashed},
+    op::{ChainOp, DhtOp, DhtOpHashed},
     prelude::SignedActionHashedExt,
     record::WireRecordOps,
     wire_ops::{RenderedOp, RenderedOps, WireOps},
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    ActionData, DeleteData, Op, RegisterCreateLink, RegisterDelete,
-};
-use holochain_zome_types::dht_v2::SignedAction;
+use holochain_zome_types::action::{ActionData, DeleteData, SignedAction};
+use holochain_zome_types::op::{Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete};
 use holochain_zome_types::{
     chain::{ChainFilter, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
-    dht_v2::RegisterAgentActivity,
     entry::MustGetActionInput,
     fixt::{ActionFixturator, CreateAction, CreateLinkAction, DeleteAction, SignatureFixturator},
     judged::Judged,

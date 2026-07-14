@@ -159,10 +159,6 @@ async fn incoming_ops_filters_private_entry() {
 /// op, where a withheld body is expected.
 #[test]
 fn create_entry_op_rejects_private_entry() {
-    use holochain_types::dht_v2::ChainOp;
-    use holochain_types::dht_v2::OpEntry;
-    use holochain_types::dht_v2::SignedAction;
-
     let mut private_create = fixt!(Action, CreateAction);
     *private_create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef::new(
         0.into(),

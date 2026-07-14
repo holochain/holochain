@@ -15,7 +15,6 @@ use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_state::test_utils::test_dht_store;
-use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
 use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
 use std::sync::Arc;
 use std::time::Duration;

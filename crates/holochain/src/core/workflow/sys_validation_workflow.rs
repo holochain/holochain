@@ -114,10 +114,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
-use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
-use holochain_zome_types::dht_v2::{
-    build_action_set, ActionData, CreateLinkData, DeleteData, DeleteLinkData, UpdateData,
-};
 use std::sync::Arc;
 use std::time::Duration;
 use types::Outcome;
@@ -1584,7 +1580,7 @@ pub async fn make_invalid_chain_warrant_op(
     warrant_author: AgentPubKey,
     op: &ChainOp,
     reason: &str,
-) -> WorkflowResult<holochain_types::dht_v2::DhtOpHashed> {
+) -> WorkflowResult<DhtOpHashed> {
     let signed_action = op.signed_action();
     let action = signed_action.data();
     let action_author = action.author().clone();
@@ -1600,7 +1596,7 @@ pub async fn make_invalid_chain_warrant_op(
     let warrant_op = WarrantOp::sign(keystore, warrant)
         .await
         .map_err(|e| super::WorkflowError::Other(e.into()))?;
-    let op = holochain_types::dht_v2::DhtOp::from((*warrant_op).clone()).into_hashed();
+    let op = DhtOp::from((*warrant_op).clone()).into_hashed();
     Ok(op)
 }
 
@@ -1610,7 +1606,7 @@ pub async fn make_fork_warrant_op_inner(
     chain_author: AgentPubKey,
     action_pair: ((ActionHash, Signature), (ActionHash, Signature)),
     seq: u32,
-) -> WorkflowResult<holochain_types::dht_v2::DhtOpHashed> {
+) -> WorkflowResult<DhtOpHashed> {
     debug_assert_ne!(action_pair.0 .0, action_pair.1 .0);
     tracing::warn!(
         "Authoring warrant for chain fork by {chain_author}. Action hashes: ({}, {})",
@@ -1631,7 +1627,7 @@ pub async fn make_fork_warrant_op_inner(
     let warrant_op = WarrantOp::sign(keystore, warrant)
         .await
         .map_err(|e| super::WorkflowError::Other(e.into()))?;
-    let op = holochain_types::dht_v2::DhtOp::from((*warrant_op).clone()).into_hashed();
+    let op = DhtOp::from((*warrant_op).clone()).into_hashed();
     Ok(op)
 }
 

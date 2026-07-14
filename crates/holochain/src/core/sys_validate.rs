@@ -9,11 +9,7 @@ pub use holo_hash::*;
 use holochain_keystore::AgentPubKeyExt;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-use holochain_types::dht_v2::{ChainOp, DhtOp, OpEntry};
 use holochain_types::prelude::*;
-use holochain_zome_types::dht_v2::{
-    build_action_set, ActionData, CreateData, DnaData, SignedAction, UpdateData,
-};
 use std::sync::Arc;
 
 mod error;

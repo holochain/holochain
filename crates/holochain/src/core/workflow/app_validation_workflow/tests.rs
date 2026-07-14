@@ -22,13 +22,9 @@ use holochain_p2p::actor::MockHcP2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::dht_store::{DhtStore, SysOutcome};
 use holochain_state::test_utils::test_db_dir;
-use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::{TestWasm, TestWasmPair, TestZomes};
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    ActionData, DeleteData, Op, RegisterAgentActivity, RegisterDelete, StoreEntry, StoreRecord,
-};
 use holochain_zome_types::fixt::{
     ActionFixturator, CreateAction, DeleteAction, SignatureFixturator,
 };

@@ -4,7 +4,7 @@ use crate::sweettest::SweetCell;
 use crate::test_utils::consistency::request_published_ops;
 use holo_hash::*;
 use holochain_state::dht_store::DhtStoreRead;
-use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
+use holochain_types::op::{DhtOp, DhtOpHashed};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Write;
@@ -388,7 +388,7 @@ async fn get_integrated_ops(dht_store: &DhtStoreRead) -> Vec<DhtOp> {
 /// cross-node consistency comparison. Mirrors the SQL-level filter applied by
 /// `ops_to_publish_for_wire`.
 fn is_author_local_private_store_entry(op: &DhtOp) -> bool {
-    use holochain_types::dht_v2::{ChainOp, OpEntry};
+    use holochain_types::op::{ChainOp, OpEntry};
     matches!(
         op,
         DhtOp::ChainOp(chain_op) if matches!(**chain_op, ChainOp::CreateEntry(_, OpEntry::Hidden))

@@ -1,6 +1,5 @@
 use super::*;
 use holochain_p2p::{HolochainP2pError, HolochainP2pResult};
-use holochain_types::dht_v2::ChainOp;
 use kitsune2_api::BoxFut;
 
 impl Conductor {
@@ -51,7 +50,7 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
     fn handle_publish(
         &self,
         dna_hash: DnaHash,
-        ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
+        ops: Vec<(DhtOp, bool)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             self.spaces

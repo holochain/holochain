@@ -8,7 +8,6 @@ use crate::core::ribosome::HostFnAccess;
 use holo_hash::ActionHash;
 use holo_hash::EntryHash;
 use holochain_types::prelude::*;
-use holochain_zome_types::dht_v2::{ActionData, DeleteData};
 use std::sync::Arc;
 use wasmer::RuntimeError;
 

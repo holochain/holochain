@@ -10,7 +10,6 @@ use holochain::{
     core::workflow::WorkflowError,
 };
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
-use holochain_zome_types::{dht_v2::Op, record::RecordEntry};
 use matches::assert_matches;
 
 /// Simple scenario involving two agents using the same DNA

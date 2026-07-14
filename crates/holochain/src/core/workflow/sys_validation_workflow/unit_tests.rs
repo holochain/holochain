@@ -15,17 +15,18 @@ use holo_hash::HasHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::StateMutationResult;
-use holochain_types::dht_v2::ChainOp;
-use holochain_types::dht_v2::DhtOp;
-use holochain_types::dht_v2::DhtOpHashed;
-use holochain_types::dht_v2::OpEntry;
-use holochain_types::dht_v2::SignedAction;
+use holochain_types::op::ChainOp;
+use holochain_types::op::DhtOp;
+use holochain_types::op::DhtOpHashed;
+use holochain_types::op::OpEntry;
 use holochain_types::record::SignedActionHashedExt;
 use holochain_types::record::WireRecordOps;
 use holochain_types::wire_ops::WireOps;
+use holochain_zome_types::action::Action;
+use holochain_zome_types::action::ActionData;
 use holochain_zome_types::action::AppEntryDef;
 use holochain_zome_types::action::EntryType;
-use holochain_zome_types::dht_v2::{Action, ActionData};
+use holochain_zome_types::action::SignedAction;
 use holochain_zome_types::dna_def::{DnaDef, DnaDefHashed};
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::fixt::{
@@ -162,12 +163,10 @@ async fn validate_op_with_dependency_not_held() {
 
     let mut network = MockHolochainP2pDnaT::default();
     let mut ops: WireRecordOps = WireRecordOps::new();
-    ops.action = Some(Judged::valid(
-        holochain_zome_types::dht_v2::SignedAction::new(
-            previous_action.action().clone(),
-            previous_action.signature.clone(),
-        ),
-    ));
+    ops.action = Some(Judged::valid(SignedAction::new(
+        previous_action.action().clone(),
+        previous_action.signature.clone(),
+    )));
     let response = WireOps::Record(ops);
     network
         .expect_get()
@@ -405,12 +404,10 @@ async fn validate_valid_warrant_with_fetched_dependency() {
         let warranted_action = warranted_action.clone();
         move |_hash, _, _| {
             let mut ops: WireRecordOps = WireRecordOps::new();
-            ops.action = Some(Judged::valid(
-                holochain_zome_types::dht_v2::SignedAction::new(
-                    warranted_action.action().clone(),
-                    warranted_action.signature.clone(),
-                ),
-            ));
+            ops.action = Some(Judged::valid(SignedAction::new(
+                warranted_action.action().clone(),
+                warranted_action.signature.clone(),
+            )));
             ops.entry = Some(entry);
             let response = WireOps::Record(ops);
             Ok(vec![response])

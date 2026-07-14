@@ -20,10 +20,6 @@ use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::IncompleteCommitReason;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
-    RegisterUpdate, StoreEntry, StoreRecord,
-};
 use holochain_zome_types::record::Record;
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -311,7 +307,7 @@ pub async fn inline_validation(
     };
 
     for mut chain_record in records {
-        for op_type in holochain_types::dht_v2::action_to_op_types(chain_record.action()) {
+        for op_type in action_to_op_types(chain_record.action()) {
             let outcome =
                 app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;
 

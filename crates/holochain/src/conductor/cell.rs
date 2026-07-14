@@ -37,7 +37,6 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
-use holochain_types::dht_v2::ChainOp;
 use kitsune2_api::BoxFut;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -471,7 +470,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        _ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
+        _ops: Vec<(DhtOp, bool)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async { unimplemented!() })
     }
