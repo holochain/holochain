@@ -8,6 +8,7 @@ pub use crate::capability::*;
 // re-export takes priority over the glob re-exports above and below,
 // resolving the ambiguity in favor of the grant-access type at the crate
 // root. `action::CapAccess` remains reachable via its `action::` path.
+// Tracked for a proper fix (rename one of the two types): #5882
 pub use crate::capability::CapAccess;
 pub use crate::chain::*;
 pub use crate::countersigning::*;
