@@ -7,8 +7,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- **BREAKING CHANGE** `build_chain_dht_op_v2` and `build_warrant_dht_op_v2` are renamed to `build_chain_dht_op` and `build_warrant_dht_op` now that there is no legacy v1 op-construction path to distinguish them from.
-
 ## 0.7.0-dev.32
 
 ## 0.7.0-dev.31
