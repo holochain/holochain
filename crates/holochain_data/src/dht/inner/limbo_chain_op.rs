@@ -48,7 +48,7 @@ pub struct InsertLimboChainOp<'a> {
     /// Hash of the action carried by this op.
     pub action_hash: &'a ActionHash,
     /// `ChainOpType` discriminant; see
-    /// [`From<ChainOpType> for i64`](holochain_zome_types::dht_v2).
+    /// [`From<ChainOpType> for i64`](holochain_zome_types::op).
     pub op_type: i64,
     /// DHT basis hash (`OpBasis`) where the op is stored.
     /// `AnyLinkableHash`, not `AnyDhtHash`: link-op bases may be `External`
