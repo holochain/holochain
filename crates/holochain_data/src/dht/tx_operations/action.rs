@@ -4,8 +4,8 @@ use super::super::inner::action;
 use crate::handles::{TxRead, TxWrite};
 use crate::kind::Dht;
 use holo_hash::{ActionHash, AgentPubKey};
-use holochain_integrity_types::dht_v2::RecordValidity;
-use holochain_zome_types::dht_v2::SignedActionHashed;
+use holochain_integrity_types::action::RecordValidity;
+use holochain_zome_types::action::SignedActionHashed;
 
 impl TxWrite<Dht> {
     /// Insert an `Action` row, storing its signature and pre-computed hash.

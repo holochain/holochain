@@ -4,12 +4,12 @@
 //! `Option<T>`; booleans are stored as `i64` (0/1). For integer-encoded
 //! enum columns, the mapping lives on the corresponding enum's
 //! `From<T> for i64` / `TryFrom<i64> for T` impl (see
-//! [`holochain_integrity_types::dht_v2`] and
-//! [`holochain_zome_types::dht_v2`]).
+//! [`holochain_integrity_types::action`] and
+//! [`holochain_zome_types::action`]).
 
-use holochain_integrity_types::dht_v2::RecordValidity;
+use holochain_integrity_types::action::RecordValidity;
 use holochain_integrity_types::entry::Entry;
-use holochain_zome_types::dht_v2::SignedActionHashed;
+use holochain_zome_types::action::SignedActionHashed;
 
 /// Row from the `Action` table.
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
@@ -24,9 +24,9 @@ pub struct ActionRow {
     pub prev_hash: Option<Vec<u8>>,
     /// Microsecond authoring timestamp.
     pub timestamp: i64,
-    /// Encoded [`ActionType`](holochain_integrity_types::dht_v2::ActionType).
+    /// Encoded [`ActionType`](holochain_integrity_types::action::ActionType).
     pub action_type: i64,
-    /// Serialized [`ActionData`](holochain_integrity_types::dht_v2::ActionData) blob.
+    /// Serialized [`ActionData`](holochain_integrity_types::action::ActionData) blob.
     pub action_data: Vec<u8>,
     /// 64-byte author signature over the action content.
     pub signature: Vec<u8>,
@@ -102,7 +102,7 @@ pub struct PrivateEntryRow {
 pub struct CapGrantRow {
     /// Hash of the `CapGrant` action (primary key).
     pub action_hash: Vec<u8>,
-    /// Encoded [`CapAccess`](holochain_integrity_types::dht_v2::CapAccess).
+    /// Encoded [`CapAccess`](holochain_integrity_types::action::CapAccess).
     pub cap_access: i64,
     /// Optional human-readable tag.
     pub tag: Option<String>,

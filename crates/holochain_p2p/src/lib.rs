@@ -4,7 +4,7 @@
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
-use holochain_types::dht_v2::ChainOp;
+use holochain_types::op::ChainOp;
 use holochain_types::prelude::*;
 use kitsune2_api::{AgentInfoSigned, BoxFut};
 use kitsune2_api::{SpaceId, StoredOp};

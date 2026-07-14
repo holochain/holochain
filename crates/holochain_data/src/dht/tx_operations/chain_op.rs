@@ -5,7 +5,7 @@ use crate::handles::{TxRead, TxWrite};
 use crate::kind::Dht;
 use crate::models::dht::ChainOpRow;
 use holo_hash::{ActionHash, AnyDhtHash, DhtOpHash};
-use holochain_integrity_types::dht_v2::OpValidity;
+use holochain_integrity_types::action::OpValidity;
 
 impl TxWrite<Dht> {
     pub async fn insert_chain_op(&mut self, op: InsertChainOp<'_>) -> sqlx::Result<()> {

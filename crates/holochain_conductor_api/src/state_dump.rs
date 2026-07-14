@@ -2,7 +2,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holochain_state_types::SourceChainDump;
-use holochain_types::dht_v2::DhtOp;
+use holochain_types::op::DhtOp;
 use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;

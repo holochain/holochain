@@ -117,7 +117,7 @@ mod tests {
     use super::*;
     use crate::test_keystore::test_keystore;
     use holo_hash::DnaHash;
-    use holochain_zome_types::dht_v2::{Action, ActionData, ActionHeader, DnaData};
+    use holochain_zome_types::action::{Action, ActionData, ActionHeader, DnaData};
 
     /// Mirrors the two production call sites this crate's `sign`/
     /// `verify_signature` feed: `holochain_state`'s source chain signs over the

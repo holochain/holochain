@@ -4,7 +4,7 @@
 //! All reads go through `DhtStore` methods; this module is responsible only
 //! for marshalling K2 types (`OpId`, `MetaOp`, `DhtArc`, `Timestamp`) into
 //! and out of the row shapes returned by the store. The gossip wire carries
-//! the `holochain_types::dht_v2::DhtOp` encoding: chain-op wire bytes are
+//! the `holochain_types::op::DhtOp` encoding: chain-op wire bytes are
 //! built directly from the stored `Action` rows. Op hashes and `prev_action`
 //! chains are content-derived.
 //!
@@ -21,9 +21,8 @@ use holo_hash::{DhtOpHash, DnaHash, HOLO_HASH_CORE_LEN, HOLO_HASH_UNTYPED_LEN};
 use holochain_serialized_bytes::prelude::{decode, encode};
 use holochain_state::dht_store::{K2ChainOpForWireRow, K2WarrantForWireRow};
 use holochain_state::DhtStore;
-use holochain_types::dht_v2::{
-    Action as ActionV2, ActionData, ActionHeader, ChainOp, DhtOp, OpEntry, SignedAction,
-};
+use holochain_types::op::{ChainOp, DhtOp, OpEntry};
+use holochain_zome_types::action::{Action as ActionV2, ActionData, ActionHeader, SignedAction};
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::warrant::{SignedWarrant, Warrant, WarrantProof};
 use kitsune2_api::*;

@@ -2,7 +2,7 @@
 
 use crate::models::dht::LimboChainOpRow;
 use holo_hash::{ActionHash, AnyLinkableHash, DhtOpHash};
-use holochain_integrity_types::dht_v2::OpValidity;
+use holochain_integrity_types::action::OpValidity;
 use holochain_timestamp::Timestamp;
 use sqlx::{Executor, Sqlite, SqliteConnection};
 
