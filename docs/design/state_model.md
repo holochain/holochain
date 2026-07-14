@@ -357,26 +357,6 @@ CREATE TABLE SliceHash (
 
 ```
 
-**Differences to Current Implementation (Database Structure):**
-
-1. **Merged authored and DHT databases**: The current implementation uses separate per-agent authored and per-DNA DHT databases. The new design uses a single per-DNA database. For full-arc nodes (the common case), every authored write already results in a DHT write, so the separate write handle provides no meaningful performance benefit. The single database eliminates cross-database query complexity.
-
-2. **Private entries in dedicated table**: Private entries move from the general `Entry` table to a dedicated `PrivateEntry` table with an `author` column. This makes access control auditable at the schema level — code that queries `Entry` cannot accidentally leak private content.
-
-3. **Self-authored ops bypass limbo but still integrate**: Self-authored ops are pre-validated at authoring time and inserted directly into `ChainOp` with `validation_status = 1`, bypassing limbo. However, they still go through the integration step (populating index tables like `Link`, `DeletedLink`, `UpdatedRecord`, `DeletedRecord`) so the DHT model reflects the authored data. The existing duplicate check in the incoming ops workflow (`SELECT EXISTS(SELECT 1 FROM ChainOp WHERE hash = :hash)`) prevents double-processing when the same op arrives from the network.
-
-4. **Publishing state in dedicated tables**: Publishing fields (`last_publish_time`, `receipts_complete`) move from the removed `AuthoredChainOp` table into dedicated `ChainOpPublish` and `WarrantPublish` tables. Only locally authored ops/warrants have rows in these tables, avoiding sparse NULL columns in the much larger set of network-received data.
-
-5. **`CapClaim` gains `author` column**: Since the table is no longer in a per-agent database, an `author` column distinguishes which agent each claim belongs to. All cap claim queries filter by author.
-
-6. **`ValidationReceipt` references `ChainOp`**: Receipts now reference the integrated ops table directly instead of the removed `AuthoredChainOp` table.
-
-7. **Removed tables**: `AuthoredChainOp`, `AuthoredWarrantOp`, and the separate authored `Action`/`Entry` tables are removed. Their data is consolidated into the DHT tables.
-
-8. **Warrant content/op-metadata split**: The current implementation stores warrant content and per-storage metadata together. With chain-ops and warrants both flowing through Kitsune2's `OpStore`, warrants need the same first-class metadata `ChainOp` has — `when_integrated` for "since" queries, `serialized_size` for storage accounting, plus a top-level `signature` so gossip code doesn't deserialize the proof to find it. To keep content (what the wire carries / what's signed) separate from local op state, warrants split into `Warrant` (content) + `LimboWarrantOp` / `WarrantOp` (metadata), parallel to `Action` ⟷ `LimboChainOp` / `ChainOp`. `Warrant` is shared between limbo and integrated states; promotion only moves metadata.
-
-9. **`SliceHash` gossip cache moves into the DHT database**: Kitsune2 gossip caches a combined hash of integrated op hashes per `(arc_start, arc_end, slice_index)` bucket to detect divergence between peers without re-scanning the underlying ops. This is not new behaviour — the previous implementation kept an equivalent cache; the only difference here is that it lives in the unified per-DNA DHT database alongside the ops it summarises, so K2's whole `OpStore` state has a single home. `ON CONFLICT REPLACE` lets gossip overwrite a stale entry once it recomputes; nothing else writes to this table.
-
 ### Rust Structure
 
 Actions:
@@ -757,14 +737,6 @@ For each row returned:
    - `DeleteLink`: Requires `SignedAction` only
 3. **Wrap in `DhtOp`**: Wrap the `ChainOp` in `DhtOp::ChainOp(Box::new(chain_op))`
 4. **Group by `basis_hash`**: Collect ops by `basis_hash` for efficient network transmission
-
-**Differences to Current Implementation:**
-
-1. **Merged database eliminates cross-database publish query**: The current implementation uses separate authored and DHT databases, requiring a cross-database LEFT JOIN to check integration status before publishing. With the single database, self-authored ops are inserted directly into `ChainOp` with `validation_status = 1` at authoring time. The publish query simply filters by `validation_status = 1` within the same database.
-
-2. **No `withhold_publish` field**: The current code checks `ChainOp.withhold_publish IS NULL` to exclude countersigning ops. Countersigning completion produces ops from the action/entry instead of clearing a field. During the countersigning session, ops are not created at all — they are only created when the session successfully completes, at which point they are immediately publishable.
-
-3. **No `op_order` field**: The current `OpOrder` combines op type priority with timestamp. The publish query uses `ORDER BY timestamp, op_type` instead, providing consistent chronological ordering across chain ops and warrants with a stable tiebreak.
 
 ### Validation Flow
 
