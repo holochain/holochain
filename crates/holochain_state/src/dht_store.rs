@@ -782,12 +782,12 @@ impl DhtStore<DbWrite<Dht>> {
 
             // Look up the action to recover author + authored timestamp.
             let action_hash = holo_hash::ActionHash::from_raw_36(row.action_hash.clone());
-            let v2_action = tx
+            let action = tx
                 .as_mut()
                 .get_action(action_hash.clone())
                 .await
                 .map_err(StateMutationError::from)?;
-            let (action_author, authored_timestamp, action_data) = match v2_action {
+            let (action_author, authored_timestamp, action_data) = match action {
                 Some(sah) => (
                     Some(sah.hashed.content.header.author.clone()),
                     sah.hashed.content.header.timestamp,

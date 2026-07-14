@@ -224,7 +224,7 @@ async fn test_concurrency() {
 
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn publish_loop() {
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author: fixt!(AgentPubKey),
             timestamp: Timestamp::now(),
@@ -240,9 +240,9 @@ async fn publish_loop() {
             entry_hash: fixt!(EntryHash),
         }),
     };
-    let author = v2_action.author().clone();
+    let author = action.author().clone();
     let signature = Signature(vec![3; SIGNATURE_BYTES].try_into().unwrap());
-    let signed = SignedAction::new(v2_action, signature);
+    let signed = SignedAction::new(action, signature);
     let op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(signed)));
     let op_hash = op.to_hash();
 

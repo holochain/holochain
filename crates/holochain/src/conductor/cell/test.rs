@@ -86,7 +86,7 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author: agent.clone(),
             timestamp: Timestamp::now(),
@@ -99,19 +99,19 @@ async fn test_cell_handle_publish() {
     };
     let shh = SignedActionHashed::sign(
         &keystore,
-        holo_hash::HoloHashed::from_content_sync(v2_action.clone()),
+        holo_hash::HoloHashed::from_content_sync(action.clone()),
     )
     .await
     .unwrap();
-    let v2_op = DhtOp::ChainOp(Box::new(ChainOp::CreateRecord(
-        SignedAction::new(v2_action, shh.signature().clone()),
+    let op = DhtOp::ChainOp(Box::new(ChainOp::CreateRecord(
+        SignedAction::new(action, shh.signature().clone()),
         OpEntry::ActionOnly,
     )));
-    let op_hash = DhtOpHashed::from_content_sync(v2_op.clone()).into_hash();
+    let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
     spaces
         .spaces
-        .handle_publish(&dna, vec![(v2_op, true)])
+        .handle_publish(&dna, vec![(op, true)])
         .await
         .unwrap();
 

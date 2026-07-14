@@ -24,10 +24,10 @@ async fn incoming_ops_to_limbo() {
     for _ in 0..10 {
         let mut action = fixt!(Action, CreateLinkAction);
         action.header.author = author.clone();
-        let v2_action = action;
-        let signature = author.sign(&keystore, &v2_action).await.unwrap();
+        let action = action;
+        let signature = author.sign(&keystore, &action).await.unwrap();
 
-        let op = ChainOp::AgentActivity(SignedAction::new(v2_action, signature));
+        let op = ChainOp::AgentActivity(SignedAction::new(action, signature));
         let hash = DhtOpHash::with_data_sync(&op);
         hash_list.push(hash);
         op_list.push(op);
@@ -66,11 +66,11 @@ async fn can_retry_failed_op() {
 
     let mut action = fixt!(Action, CreateLinkAction);
     action.header.author = author.clone();
-    let v2_action = action;
+    let action = action;
     // Create a dummy signature that will fail validation
     let signature = Signature([0; SIGNATURE_BYTES]);
 
-    let op: DhtOp = ChainOp::AgentActivity(SignedAction::new(v2_action.clone(), signature)).into();
+    let op: DhtOp = ChainOp::AgentActivity(SignedAction::new(action.clone(), signature)).into();
     let hash = DhtOpHash::with_data_sync(&op);
 
     // Try running the workflow and...
@@ -86,8 +86,8 @@ async fn can_retry_failed_op() {
     verify_ops_present(&dht_store, vec![hash], false).await;
 
     // Now fix the signature
-    let signature = author.sign(&keystore, &v2_action).await.unwrap();
-    let op: DhtOp = ChainOp::AgentActivity(SignedAction::new(v2_action, signature)).into();
+    let signature = author.sign(&keystore, &action).await.unwrap();
+    let op: DhtOp = ChainOp::AgentActivity(SignedAction::new(action, signature)).into();
     let hash = DhtOpHash::with_data_sync(&op);
 
     // Run the workflow again to simulate a re-send of the op...
@@ -128,9 +128,9 @@ async fn require_validation_receipt_follows_publish_flag() {
     for _ in 0..2 {
         let mut action = fixt!(Action, CreateLinkAction);
         action.header.author = author.clone();
-        let v2_action = action;
-        let signature = author.sign(&keystore, &v2_action).await.unwrap();
-        let op: DhtOp = ChainOp::AgentActivity(SignedAction::new(v2_action, signature)).into();
+        let action = action;
+        let signature = author.sign(&keystore, &action).await.unwrap();
+        let op: DhtOp = ChainOp::AgentActivity(SignedAction::new(action, signature)).into();
         let hash = DhtOpHash::with_data_sync(&op);
         ops.push((op, hash));
     }

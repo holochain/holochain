@@ -263,27 +263,27 @@ async fn private_entries_are_not_published() {
     let agent = fixt!(AgentPubKey);
 
     // Create a private entry.
-    let mut v2_action = fixt!(Action, CreateAction);
-    v2_action.header.action_seq = 5;
-    v2_action.header.prev_action = Some(fixt!(ActionHash));
-    v2_action.header.timestamp = Timestamp::now();
-    v2_action.header.author = agent.clone();
-    *v2_action.entry_hash_mut().unwrap() = fixt!(EntryHash);
-    *v2_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.action_seq = 5;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
+    action.header.author = agent.clone();
+    *action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Private,
     });
 
     let register_agent_activity_op = DhtOpHashed::from_content_sync(DhtOp::from(
-        ChainOp::AgentActivity(SignedAction::new(v2_action.clone(), fixt!(Signature))),
+        ChainOp::AgentActivity(SignedAction::new(action.clone(), fixt!(Signature))),
     ));
     let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateEntry(
-        SignedAction::new(v2_action.clone(), fixt!(Signature)),
+        SignedAction::new(action.clone(), fixt!(Signature)),
         OpEntry::Present(fixt!(Entry)),
     )));
     let store_record_op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateRecord(
-        SignedAction::new(v2_action, fixt!(Signature)),
+        SignedAction::new(action, fixt!(Signature)),
         OpEntry::Hidden,
     )));
 
