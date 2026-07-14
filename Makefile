@@ -1,8 +1,7 @@
 # holochain Makefile
 
 # All default features of binaries excluding mutually exclusive features wasmer-sys-cranelift & wasmer-wasmi
-COMMON_DEFAULT_FEATURES=slow_tests,build_wasms,encryption
-DEFAULT_FEATURES=$(COMMON_DEFAULT_FEATURES)
+DEFAULT_FEATURES=slow_tests,build_wasms,encryption
 UNSTABLE_FEATURES=unstable-sharding,unstable-functions,unstable-migration,$(DEFAULT_FEATURES)
 
 # mark everything as phony because it doesn't represent a file-system output
