@@ -108,7 +108,7 @@ wasm_io_types! {
 
     // The guest decodes `RegisterAgentActivity`; keep in sync with the
     // matching entry in the ribosome's `HostFnApi` (`host_fn.rs`).
-    fn must_get_agent_activity (zt::chain::MustGetAgentActivityInput) -> Vec<zt::dht_v2::op::RegisterAgentActivity>;
+    fn must_get_agent_activity (zt::chain::MustGetAgentActivityInput) -> Vec<zt::op::RegisterAgentActivity>;
 
     // Query the source chain for data.
     fn query (zt::query::ChainQueryFilter) -> Vec<crate::prelude::Record>;

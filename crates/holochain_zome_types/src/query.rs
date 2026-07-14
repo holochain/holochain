@@ -488,7 +488,7 @@ mod tests {
     use ::fixt::prelude::*;
     use holo_hash::fixt::EntryHashFixturator;
     use holo_hash::HasHash;
-    use holochain_integrity_types::dht_v2::ActionHashed;
+    use holochain_integrity_types::action::ActionHashed;
 
     /// Create hashed actions with various properties. The `Action`s are built
     /// directly (header + `ActionData`), seeded from the per-variant

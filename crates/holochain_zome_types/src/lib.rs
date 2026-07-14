@@ -27,7 +27,6 @@ pub mod clone;
 pub mod countersigning;
 #[allow(missing_docs)]
 pub mod crdt;
-pub mod dht_v2;
 pub mod dna_def;
 pub mod entry;
 #[allow(missing_docs)]
@@ -71,7 +70,7 @@ pub mod fixt;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 
-pub use dht_v2::Action;
+pub use action::Action;
 pub use entry::Entry;
 
 /// Re-exported dependencies
