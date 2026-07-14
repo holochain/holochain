@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Disable `reqwest`'s default features, including `native-tls`, in `holochain_metrics`. We are using `rustls-tls` anyway and `native-tls` requires a non-vendored OpenSSL to be installed. \#5878
 - Implemented more graceful handling of invalid or missing `hc` subcommands. Originally the code panicked with an ambiguous "File or directory not found error". [\#5867](https://github.com/holochain/holochain/pull/5867)
 - **BREAKING CHANGE** Remove the legacy per-variant action types now that the v2 `Action` model (`ActionHeader` + `ActionData`) is canonical. The `holochain_integrity_types::action` per-variant structs (`Create`, `Update`, `Delete`, `Dna`, `CreateLink`, `DeleteLink`, `OpenChain`, `CloseChain`, `AgentValidationPkg`, `InitZomesComplete`), the `ActionBuilder`/`ActionBuilderCommon` builder, the `EntryCreationAction`/`NewEntryAction`/`NewEntryActionRef` wrapper enums, and the `rate_limit` module (`RateWeight`/`EntryRateWeight` and the action-weight machinery) are all removed. \#5860
 - Holochain gains a new `encryption` feature to control whether its databases are encrypted or not. This replaces the previous `sqlite-encrypted` feature which no longer has any effect.
