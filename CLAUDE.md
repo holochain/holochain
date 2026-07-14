@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build, lint, and test
 
 - `make static-all` — full static check suite (fmt, toml, clippy, clippy-unstable, doc).
+- `make build-workspace-wasmer-sys-cranelift` — builds all targets (including the `hc`/`hc_sandbox` binaries). Run this **before** `test-workspace-wasmer-sys-cranelift` if `target/debug/hc` doesn't already exist: the `hc_client`/`hc_sandbox` integration tests shell out to that compiled binary at a fixed path rather than building it themselves, and fail with "you need to build the workspace so the following file exists" if it's missing — a pure build-order gap, not a test failure. A fresh worktree/checkout that hasn't built `hc` yet will hit this on the first test run.
 - `make test-workspace-wasmer-sys-cranelift` — full workspace test run from the repo root (uses `cargo nextest`, default features + iroh transport + cranelift).
 - `cargo test -p <crate-name>` — focused tests for a single crate while iterating.
 - `cargo nextest run -p <crate-name> <test_name>` — run a single test (nextest is the configured runner; see `.config/nextest.toml`).
