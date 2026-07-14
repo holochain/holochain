@@ -33,6 +33,10 @@ holochain_cli_client = { path = "../hc_client", version = "^0.7.0-dev.32", defau
 holochain_trace = { version = "^0.7.0-dev.1", path = "../holochain_trace" }
 tokio = { version = "1.36.0", features = ["full"] }
 
+[dev-dependencies]
+assert_cmd = "2.2"
+predicates = "3.1"
+
 [lints]
 workspace = true
 
