@@ -3,7 +3,7 @@ use super::*;
 use holochain_integrity_types::MigrationTarget;
 
 /// Data specific to the
-/// [`Op::RegisterAgentActivity`](holochain_integrity_types::dht_v2::op::Op::RegisterAgentActivity)
+/// [`Op::RegisterAgentActivity`](holochain_integrity_types::op::Op::RegisterAgentActivity)
 /// operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpActivity<UnitType, LT> {
@@ -149,7 +149,7 @@ pub enum OpActivity<UnitType, LT> {
         action: Action,
     },
     /// This operation registers the Action for an
-    /// [`Action::Dna`](holochain_integrity_types::dht_v2::ActionData::Dna) to the author's chain.
+    /// [`Action::Dna`](holochain_integrity_types::action::ActionData::Dna) to the author's chain.
     Dna {
         /// The hash of the DNA
         dna_hash: DnaHash,
@@ -157,7 +157,7 @@ pub enum OpActivity<UnitType, LT> {
         action: Action,
     },
     /// This operation registers the Action for an
-    /// [`Action::OpenChain`](holochain_integrity_types::dht_v2::ActionData::OpenChain) to the author's
+    /// [`Action::OpenChain`](holochain_integrity_types::action::ActionData::OpenChain) to the author's
     /// chain and contains the previous chain's [`MigrationTarget`].
     OpenChain {
         /// Target for the previous chain that we are migrating from
@@ -168,7 +168,7 @@ pub enum OpActivity<UnitType, LT> {
         action: Action,
     },
     /// This operation registers the Action for an
-    /// [`Action::CloseChain`](holochain_integrity_types::dht_v2::ActionData::CloseChain) to the
+    /// [`Action::CloseChain`](holochain_integrity_types::action::ActionData::CloseChain) to the
     /// author's chain and contains the new chain's [`MigrationTarget`] if applicable.
     CloseChain {
         /// Target for the new chain that we are migrating to
@@ -177,7 +177,7 @@ pub enum OpActivity<UnitType, LT> {
         action: Action,
     },
     /// This operation registers the Action for an
-    /// [`Action::AgentValidationPkg`](holochain_integrity_types::dht_v2::ActionData::AgentValidationPkg)
+    /// [`Action::AgentValidationPkg`](holochain_integrity_types::action::ActionData::AgentValidationPkg)
     /// to the author's chain and contains the membrane proof if there is one.
     AgentValidationPkg {
         /// The membrane proof proving that the agent is allowed to participate in this DNA
@@ -186,7 +186,7 @@ pub enum OpActivity<UnitType, LT> {
         action: Action,
     },
     /// This operation registers the Action for an
-    /// [`Action::InitZomesComplete`](holochain_integrity_types::dht_v2::ActionData::InitZomesComplete)
+    /// [`Action::InitZomesComplete`](holochain_integrity_types::action::ActionData::InitZomesComplete)
     /// to the author's chain.
     InitZomesComplete {
         /// The InitZomesComplete action
@@ -196,10 +196,10 @@ pub enum OpActivity<UnitType, LT> {
 
 impl<UnitType, LT> OpActivity<UnitType, LT> {
     /// DRY constructor. `action.data` must be
-    /// [`ActionData::OpenChain`](holochain_integrity_types::dht_v2::ActionData::OpenChain).
+    /// [`ActionData::OpenChain`](holochain_integrity_types::action::ActionData::OpenChain).
     pub(crate) fn open_chain(action: Action) -> Self {
         let (previous_target, close_hash) = match &action.data {
-            holochain_integrity_types::dht_v2::ActionData::OpenChain(d) => {
+            holochain_integrity_types::action::ActionData::OpenChain(d) => {
                 (d.prev_target.clone(), d.close_hash.clone())
             }
             other => unreachable!("OpActivity::open_chain requires OpenChain data, got {other:?}"),
@@ -212,10 +212,10 @@ impl<UnitType, LT> OpActivity<UnitType, LT> {
     }
 
     /// DRY constructor. `action.data` must be
-    /// [`ActionData::CloseChain`](holochain_integrity_types::dht_v2::ActionData::CloseChain).
+    /// [`ActionData::CloseChain`](holochain_integrity_types::action::ActionData::CloseChain).
     pub(crate) fn close_chain(action: Action) -> Self {
         let new_target = match &action.data {
-            holochain_integrity_types::dht_v2::ActionData::CloseChain(d) => d.new_target.clone(),
+            holochain_integrity_types::action::ActionData::CloseChain(d) => d.new_target.clone(),
             other => {
                 unreachable!("OpActivity::close_chain requires CloseChain data, got {other:?}")
             }
@@ -228,7 +228,7 @@ impl<UnitType, LT> OpActivity<UnitType, LT> {
 mod tests {
     use super::*;
     use holo_hash::{ActionHash, AgentPubKey, DnaHash};
-    use holochain_integrity_types::dht_v2::{
+    use holochain_integrity_types::action::{
         ActionData, ActionHeader, CloseChainData, OpenChainData,
     };
 

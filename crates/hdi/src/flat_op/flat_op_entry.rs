@@ -2,7 +2,7 @@
 use super::*;
 use holochain_integrity_types::{CapClaimEntry, CapGrantEntry};
 
-/// Data specific to the [`Op::StoreEntry`](holochain_integrity_types::dht_v2::op::Op::StoreEntry)
+/// Data specific to the [`Op::StoreEntry`](holochain_integrity_types::op::Op::StoreEntry)
 /// operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpEntry<ET>
@@ -29,7 +29,7 @@ where
     /// This operation stores the [`Entry`](holochain_integrity_types::entry::Entry) for the newly
     /// created entry in an update.
     UpdateEntry {
-        /// The hash of the [`Action`](holochain_integrity_types::dht_v2::Action) that created the
+        /// The hash of the [`Action`](holochain_integrity_types::action::Action) that created the
         /// original entry
         original_action_hash: ActionHash,
         /// The hash of the original entry
@@ -47,7 +47,7 @@ where
         new_key: AgentPubKey,
         /// The original [`AgentPubKey`].
         original_key: AgentPubKey,
-        /// The hash of the original keys [`Action`](holochain_integrity_types::dht_v2::Action).
+        /// The hash of the original keys [`Action`](holochain_integrity_types::action::Action).
         original_action_hash: ActionHash,
         /// The Update action that updates this entry
         action: Action,
@@ -69,7 +69,7 @@ where
     /// This operation updates the [`Entry`](holochain_integrity_types::entry::Entry) for a
     /// CapGrant
     UpdateCapGrant {
-        /// The hash of the [`Action`](holochain_integrity_types::dht_v2::Action) that created the
+        /// The hash of the [`Action`](holochain_integrity_types::action::Action) that created the
         /// original [`CapGrant`](holochain_integrity_types::action::EntryType::CapGrant)
         original_action_hash: ActionHash,
         /// The hash of the original
@@ -84,7 +84,7 @@ where
     /// This operation updates the [`Entry`](holochain_integrity_types::entry::Entry) for a
     /// CapClaim
     UpdateCapClaim {
-        /// The hash of the [`Action`](holochain_integrity_types::dht_v2::Action) that created the
+        /// The hash of the [`Action`](holochain_integrity_types::action::Action) that created the
         /// original [`CapClaim`](holochain_integrity_types::action::EntryType::CapClaim)
         original_action_hash: ActionHash,
         /// The hash of the original
@@ -98,7 +98,7 @@ where
     },
 }
 
-/// Data specific to the [`Op::RegisterUpdate`](holochain_integrity_types::dht_v2::op::Op::RegisterUpdate)
+/// Data specific to the [`Op::RegisterUpdate`](holochain_integrity_types::op::Op::RegisterUpdate)
 /// operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpUpdate<ET>
@@ -118,7 +118,7 @@ where
     /// [`Entry`](holochain_integrity_types::entry::Entry).
     PrivateEntry {
         /// The hash of the original
-        /// [`Action`](holochain_integrity_types::dht_v2::Action).
+        /// [`Action`](holochain_integrity_types::action::Action).
         original_action_hash: ActionHash,
         /// The unit version of the app defined entry type for the new entry.
         app_entry_type: <ET as UnitEnum>::Unit,
@@ -132,7 +132,7 @@ where
         /// The original [`AgentPubKey`].
         original_key: AgentPubKey,
         /// The hash of the original
-        /// [`Action`](holochain_integrity_types::dht_v2::Action).
+        /// [`Action`](holochain_integrity_types::action::Action).
         original_action_hash: ActionHash,
         /// The Update action that updates the agent's key
         action: Action,
@@ -140,7 +140,7 @@ where
     /// This operation registers an update from a Capability Claim.
     CapClaim {
         /// The hash of the original
-        /// [`Action`](holochain_integrity_types::dht_v2::Action).
+        /// [`Action`](holochain_integrity_types::action::Action).
         original_action_hash: ActionHash,
         /// The Update action that updates the
         /// [`CapClaim`](holochain_integrity_types::action::EntryType::CapClaim)
@@ -149,7 +149,7 @@ where
     /// This operation registers an update from a Capability Grant.
     CapGrant {
         /// The hash of the original
-        /// [`Action`](holochain_integrity_types::dht_v2::Action).
+        /// [`Action`](holochain_integrity_types::action::Action).
         original_action_hash: ActionHash,
         /// The Update action that updates the
         /// [`CapGrant`](holochain_integrity_types::action::EntryType::CapGrant)
@@ -157,7 +157,7 @@ where
     },
 }
 
-/// Data specific to the [`Op::RegisterDelete`](holochain_integrity_types::dht_v2::op::Op::RegisterDelete)
+/// Data specific to the [`Op::RegisterDelete`](holochain_integrity_types::op::Op::RegisterDelete)
 /// operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OpDelete {
@@ -169,7 +169,7 @@ pub struct OpDelete {
 mod tests {
     use super::*;
     use holo_hash::{ActionHash, AgentPubKey, EntryHash};
-    use holochain_integrity_types::dht_v2::{ActionData, ActionHeader, DeleteData};
+    use holochain_integrity_types::action::{ActionData, ActionHeader, DeleteData};
 
     fn action_from_data(data: ActionData) -> Action {
         Action {

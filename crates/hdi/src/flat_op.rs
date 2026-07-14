@@ -1,9 +1,9 @@
-//! [`FlatOp`] flattens an [`Op`](holochain_integrity_types::dht_v2::Op)
+//! [`FlatOp`] flattens an [`Op`](holochain_integrity_types::op::Op)
 //! into a flatter, more accessible shape than
-//! [`Op`](holochain_integrity_types::dht_v2::Op)'s deeply nested variants.
+//! [`Op`](holochain_integrity_types::op::Op)'s deeply nested variants.
 
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
-use holochain_integrity_types::dht_v2::Action;
+use holochain_integrity_types::action::Action;
 use holochain_integrity_types::{LinkTag, MembraneProof, UnitEnum};
 
 mod flat_op_activity;
@@ -13,7 +13,7 @@ pub use flat_op_activity::*;
 pub use flat_op_entry::*;
 pub use flat_op_record::*;
 
-/// A flattened view of an [`Op`](holochain_integrity_types::dht_v2::Op),
+/// A flattened view of an [`Op`](holochain_integrity_types::op::Op),
 /// grouped by authority (record, entry, agent activity, link) rather than by
 /// the underlying action variant.
 #[derive(Debug, Clone, PartialEq, Eq)]

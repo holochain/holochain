@@ -17,9 +17,8 @@ pub trait OpHelper {
 }
 
 use crate::flat_op;
-use holochain_integrity_types::dht_v2::{self, ActionData};
 
-/// All possible variants that a [`dht_v2::RegisterAgentActivity`] with an
+/// All possible variants that a [`RegisterAgentActivity`] with an
 /// action that has an [`EntryType`] can produce.
 #[derive(Debug)]
 pub(crate) enum ActivityEntry<Unit> {
@@ -30,7 +29,7 @@ pub(crate) enum ActivityEntry<Unit> {
     CapGrant,
 }
 
-impl OpHelper for dht_v2::Op {
+impl OpHelper for Op {
     fn flattened<ET, LT>(&self) -> Result<flat_op::FlatOp<ET, LT>, WasmError>
     where
         ET: EntryTypesHelper + UnitEnum,
@@ -40,7 +39,7 @@ impl OpHelper for dht_v2::Op {
         WasmError: From<<LT as LinkTypesHelper>::Error>,
     {
         match self {
-            dht_v2::Op::StoreRecord(dht_v2::StoreRecord { record }) => {
+            Op::StoreRecord(StoreRecord { record }) => {
                 let a = record.action();
                 let r = match &a.data {
                     ActionData::Dna(d) => flat_op::OpRecord::Dna {
@@ -147,7 +146,7 @@ impl OpHelper for dht_v2::Op {
                 };
                 Ok(flat_op::FlatOp::StoreRecord(r))
             }
-            dht_v2::Op::StoreEntry(dht_v2::StoreEntry { action, entry }) => {
+            Op::StoreEntry(StoreEntry { action, entry }) => {
                 let a = &action.hashed.content;
                 let r = match &a.data {
                     ActionData::Create(d) => match &d.entry_type {
@@ -207,7 +206,7 @@ impl OpHelper for dht_v2::Op {
                 };
                 Ok(flat_op::FlatOp::StoreEntry(r))
             }
-            dht_v2::Op::RegisterUpdate(dht_v2::RegisterUpdate { update, new_entry }) => {
+            Op::RegisterUpdate(RegisterUpdate { update, new_entry }) => {
                 let a = &update.hashed.content;
                 let d = match &a.data {
                     ActionData::Update(d) => d,
@@ -252,7 +251,7 @@ impl OpHelper for dht_v2::Op {
                 };
                 Ok(flat_op::FlatOp::RegisterUpdate(r))
             }
-            dht_v2::Op::RegisterAgentActivity(dht_v2::RegisterAgentActivity { action, .. }) => {
+            Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
                 let a = &action.hashed.content;
                 let r = match &a.data {
                     ActionData::Dna(d) => flat_op::OpActivity::Dna {
@@ -353,7 +352,7 @@ impl OpHelper for dht_v2::Op {
                 };
                 Ok(flat_op::FlatOp::RegisterAgentActivity(r))
             }
-            dht_v2::Op::RegisterCreateLink(dht_v2::RegisterCreateLink { create_link }) => {
+            Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
                 let a = &create_link.hashed.content;
                 let d = match &a.data {
                     ActionData::CreateLink(d) => d,
@@ -373,7 +372,7 @@ impl OpHelper for dht_v2::Op {
                     action: a.clone(),
                 }))
             }
-            dht_v2::Op::RegisterDeleteLink(dht_v2::RegisterDeleteLink {
+            Op::RegisterDeleteLink(RegisterDeleteLink {
                 delete_link,
                 create_link,
             }) => {
@@ -406,7 +405,7 @@ impl OpHelper for dht_v2::Op {
                     action: delete_action.clone(),
                 }))
             }
-            dht_v2::Op::RegisterDelete(dht_v2::RegisterDelete { delete }) => {
+            Op::RegisterDelete(RegisterDelete { delete }) => {
                 let action = &delete.hashed.content;
                 match &action.data {
                     ActionData::Delete(_) => {
@@ -506,7 +505,7 @@ where
     }
 }
 
-/// Maps [`dht_v2::RegisterAgentActivity`] ops to their
+/// Maps [`RegisterAgentActivity`] ops to their
 /// entries. The entry type will be [`None`] if
 /// the zome id is not a dependency of this zome.
 pub(crate) fn activity_entry<ET>(
@@ -616,9 +615,6 @@ mod tests {
     use crate::test_utils::set_zome_types;
     use crate::test_utils::short_hand::{e, public_app_entry_def};
     use holo_hash::{ActionHash, AgentPubKey, DnaHash, EntryHash};
-    use holochain_integrity_types::dht_v2::{
-        Action, ActionHeader, CreateData, CreateLinkData, DeleteData, DnaData, Record,
-    };
     use holochain_integrity_types::record::{RecordEntry, SignedHashed};
     use holochain_integrity_types::signature::Signature;
     use holochain_integrity_types::{EntryType, LinkTag, LinkType, ZomeIndex};
@@ -672,7 +668,7 @@ mod tests {
         types();
         let signed = signed_from_data(create_app_data());
         let record = Record::new(signed, RecordEntry::Present(e(A {})));
-        let op = dht_v2::Op::StoreRecord(dht_v2::StoreRecord { record });
+        let op = Op::StoreRecord(StoreRecord { record });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
         assert!(matches!(
             flat,
@@ -691,7 +687,7 @@ mod tests {
             entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
         }));
         let record = Record::new(signed, RecordEntry::NA);
-        let op = dht_v2::Op::StoreRecord(dht_v2::StoreRecord { record });
+        let op = Op::StoreRecord(StoreRecord { record });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
         assert!(matches!(
             flat,
@@ -706,7 +702,7 @@ mod tests {
             dna_hash: DnaHash::from_raw_36(vec![4u8; 36]),
         }));
         let record = Record::new(signed, RecordEntry::NA);
-        let op = dht_v2::Op::StoreRecord(dht_v2::StoreRecord { record });
+        let op = Op::StoreRecord(StoreRecord { record });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
         assert!(matches!(flat, FlatOp::StoreRecord(OpRecord::Dna { .. })));
     }
@@ -722,7 +718,7 @@ mod tests {
             tag: LinkTag(vec![]),
         }));
         let record = Record::new(signed, RecordEntry::NA);
-        let op = dht_v2::Op::StoreRecord(dht_v2::StoreRecord { record });
+        let op = Op::StoreRecord(StoreRecord { record });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
         assert!(matches!(
             flat,
@@ -737,7 +733,7 @@ mod tests {
     fn store_entry_create_app_flattens_to_create_entry() {
         types();
         let signed = signed_from_data(create_app_data());
-        let op = dht_v2::Op::StoreEntry(dht_v2::StoreEntry {
+        let op = Op::StoreEntry(StoreEntry {
             action: signed,
             entry: e(A {}),
         });
@@ -755,7 +751,7 @@ mod tests {
     fn register_agent_activity_create_app_flattens_with_unit_type() {
         types();
         let signed = signed_from_data(create_app_data());
-        let op = dht_v2::Op::RegisterAgentActivity(dht_v2::RegisterAgentActivity {
+        let op = Op::RegisterAgentActivity(RegisterAgentActivity {
             action: signed,
             cached_entry: None,
         });
@@ -776,7 +772,7 @@ mod tests {
             deletes_address: ActionHash::from_raw_36(vec![7u8; 36]),
             deletes_entry_address: EntryHash::from_raw_36(vec![8u8; 36]),
         }));
-        let op = dht_v2::Op::RegisterDelete(dht_v2::RegisterDelete { delete: signed });
+        let op = Op::RegisterDelete(RegisterDelete { delete: signed });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
         assert!(matches!(flat, FlatOp::RegisterDelete(_)));
     }

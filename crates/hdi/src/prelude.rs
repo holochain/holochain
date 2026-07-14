@@ -61,16 +61,6 @@ pub use tracing;
 #[cfg(feature = "trace")]
 pub use tracing::{debug, error, info, instrument, trace, warn};
 
-// Pin the `dht_v2` types for names that `holochain_integrity_types::prelude`
-// also brings into scope (for example `ActionType`).
-pub use holochain_integrity_types::dht_v2::{
-    Action, ActionData, ActionHashed, ActionHeader, ActionType, AgentValidationPkgData,
-    CloseChainData, CreateData, CreateLinkData, DeleteData, DeleteLinkData, DnaData,
-    InitZomesCompleteData, Op, OpenChainData, Record, RegisterAgentActivity, RegisterCreateLink,
-    RegisterDelete, RegisterDeleteLink, RegisterUpdate, SignedActionHashed, StoreEntry,
-    StoreRecord, UpdateData,
-};
-
 /// Needed as a noop for map_extern! when trace is off.
 #[doc(hidden)]
 #[cfg(not(feature = "trace"))]
