@@ -3,7 +3,7 @@
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::dht_v2::ActionHashed;
+use holochain_zome_types::action::ActionHashed;
 use holochain_zome_types::prelude::*;
 
 /// An agents chain records returned from a agent_activity_query

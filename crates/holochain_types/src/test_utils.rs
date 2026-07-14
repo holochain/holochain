@@ -1,6 +1,6 @@
 //! Some common testing helpers.
 
-use crate::dht_v2::{
+use holochain_zome_types::action::{
     ActionHeader, AgentValidationPkgData, CreateData, DnaData, InitZomesCompleteData, UpdateData,
 };
 use crate::dna::wasm::DnaWasm;

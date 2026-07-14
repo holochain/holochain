@@ -1,10 +1,10 @@
 //! Defines a Record, the basic unit of Holochain data.
 
-use crate::dht_v2::CloseChainData;
 use crate::prelude::*;
 use holochain_keystore::KeystoreError;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
+use holochain_zome_types::action::CloseChainData;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::warrant::SignedWarrant;
 
@@ -168,9 +168,9 @@ mod tests {
     use super::SignedAction;
     use super::SignedActionHashed;
     use super::SignedActionHashedExt;
-    use crate::dht_v2::{ActionHeader, DnaData};
     use crate::prelude::*;
     use holo_hash::{AgentPubKey, DnaHash, HasHash, HoloHashed};
+    use holochain_zome_types::action::{ActionHeader, DnaData};
 
     fn sample_action() -> Action {
         Action {

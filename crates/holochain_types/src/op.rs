@@ -1,13 +1,12 @@
 //! DHT state-model op types (see `docs/design/state_model.md`).
 
-pub use holochain_zome_types::dht_v2::*;
-
 use holo_hash::{
     hash_type, ActionHash, AgentPubKey, AnyLinkableHash, DhtOpHash, EntryHash, HasHash,
     HashableContent, HashableContentBytes, HoloHashed,
 };
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::op::ChainOpType;
+use holochain_zome_types::prelude::*;
 use holochain_zome_types::Entry;
 
 /// How an entry is represented inside a `ChainOp`.
@@ -642,9 +641,8 @@ mod produce_ops_tests {
     use super::*;
     use holo_hash::{ActionHash, AgentPubKey, EntryHash, HoloHashed};
     use holochain_timestamp::Timestamp;
-    use holochain_zome_types::dht_v2::Record;
     use holochain_zome_types::prelude::{AppEntryDef, EntryType, EntryVisibility};
-    use holochain_zome_types::record::{RecordEntry, SignedHashed};
+    use holochain_zome_types::record::{Record, RecordEntry, SignedHashed};
     use holochain_zome_types::signature::Signature;
     use holochain_zome_types::Entry;
 
