@@ -225,7 +225,7 @@ impl SourceChain<DbWrite<Dht>> {
     /// Drain the scratch space and persist its contents to the databases.
     ///
     /// This drains all actions, entries, scheduled functions, and warrants from the scratch
-    /// and writes them to the authored and DHT databases. The flush proceeds as follows:
+    /// and writes them to the per-DNA DHT store. The flush proceeds as follows:
     ///
     /// 1. Validates countersigning invariants: a countersigning entry must be the only
     ///    action in the scratch, its chain lock must match and not be expired.

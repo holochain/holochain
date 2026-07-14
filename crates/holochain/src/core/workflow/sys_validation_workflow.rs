@@ -1640,7 +1640,7 @@ struct OutcomeSummary {
     warranted: usize,
     /// The number of warrant ops that were rejected during sys validation
     warrants_rejected: usize,
-    /// The number of warrant dependencies that were copied from the cache to the DHT db
+    /// The number of warrant dependencies that were moved into limbo for validation
     warrant_deps_copied: usize,
 }
 
