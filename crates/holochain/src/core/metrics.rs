@@ -94,10 +94,13 @@ pub(crate) fn record_authored_op_integration(dna_hash: &DnaHash) {
     op_validation_attempts_metric().record(0, &attributes);
 }
 
+#[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
 pub(crate) type WasmUsageMetric = metrics::Counter<u64>;
 
+#[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
 static WASM_USAGE_METRIC: OnceLock<WasmUsageMetric> = OnceLock::new();
 
+#[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
 pub(crate) fn ribosome_wasm_usage_metric() -> &'static WasmUsageMetric {
     WASM_USAGE_METRIC.get_or_init(|| {
         meter("hc.ribosome.wasm")

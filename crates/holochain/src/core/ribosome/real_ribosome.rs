@@ -4,9 +4,7 @@ use super::host_fn::disable_clone_cell::disable_clone_cell;
 use super::host_fn::enable_clone_cell::enable_clone_cell;
 use super::host_fn::get_agent_activity::get_agent_activity;
 use super::{HostContext, Ribosome};
-use crate::core::metrics::{
-    host_fn_call_duration_metric, ribosome_wasm_call_duration_metric, ribosome_wasm_usage_metric,
-};
+use crate::core::metrics::{host_fn_call_duration_metric, ribosome_wasm_call_duration_metric};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 #[cfg(feature = "unstable-countersigning")]
@@ -621,7 +619,8 @@ impl RibosomeImplT for RealRibosome {
                     // Get metering points consumed in zome call and save to usage_meter
                     let points_used =
                         wasmer_sys::get_used_metering_points(instance_with_store.clone());
-                    ribosome_wasm_usage_metric().add(points_used, &attributes);
+                    crate::core::metrics::ribosome_wasm_usage_metric()
+                        .add(points_used, &attributes);
                 }
 
                 // remove context from map after call
