@@ -2,10 +2,9 @@ use super::*;
 use ::fixt::fixt;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::HoloHashed;
-use holochain_zome_types::action::ChainTopOrdering;
-use holochain_zome_types::dht_v2::{
-    Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
-    DnaData, SignedActionHashed,
+use holochain_zome_types::action::{
+    Action, ActionData, ActionHeader, ChainTopOrdering, CreateData, CreateLinkData, DeleteData,
+    DeleteLinkData, DnaData, SignedActionHashed,
 };
 
 async fn empty_store() -> holochain_state::dht_store::DhtStore {
@@ -125,8 +124,8 @@ async fn integrate_store_record(
     entry: holochain_zome_types::entry::Entry,
 ) -> ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
-    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
-    use holochain_zome_types::action::AppEntryDef;
+    use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
+    use holochain_zome_types::action::{AppEntryDef, SignedAction};
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::prelude::Signature;
 
@@ -183,8 +182,8 @@ async fn integrate_store_entry(
     entry: holochain_zome_types::entry::Entry,
 ) -> ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
-    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
-    use holochain_zome_types::action::AppEntryDef;
+    use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
+    use holochain_zome_types::action::{AppEntryDef, SignedAction};
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::prelude::Signature;
 
@@ -386,7 +385,8 @@ async fn integrate_link_op(
     seed: u8,
 ) -> holo_hash::ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
-    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, SignedAction};
+    use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed};
+    use holochain_zome_types::action::SignedAction;
     use holochain_zome_types::link::LinkTag;
 
     let action = Action {
@@ -700,7 +700,8 @@ async fn integrate_activity_op(
     when: i64,
 ) -> holo_hash::ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
-    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, SignedAction};
+    use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed};
+    use holochain_zome_types::action::SignedAction;
 
     let action_hash = holo_hash::ActionHash::with_data_sync(&action);
     let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::AgentActivity(

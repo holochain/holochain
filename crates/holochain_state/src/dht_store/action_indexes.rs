@@ -12,7 +12,7 @@ use holochain_data::dht::{
 };
 use holochain_data::kind::Dht;
 use holochain_data::TxWrite;
-use holochain_zome_types::dht_v2::ActionData;
+use holochain_zome_types::action::ActionData;
 
 use crate::mutations::{StateMutationError, StateMutationResult};
 

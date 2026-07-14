@@ -2,7 +2,7 @@
 
 use holochain_serialized_bytes::prelude::*;
 
-/// The status of a [`DhtOp`](holochain_types::dht_v2::DhtOp) in limbo
+/// The status of a [`DhtOp`](holochain_types::op::DhtOp) in limbo
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum ValidationStage {
     /// Is awaiting system validation

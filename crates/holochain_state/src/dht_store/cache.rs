@@ -12,7 +12,7 @@ use holochain_data::DbWrite;
 use holochain_types::prelude::Timestamp;
 use holochain_types::warrant::WarrantOp;
 use holochain_types::wire_ops::RenderedOps;
-use holochain_zome_types::dht_v2::RecordValidity;
+use holochain_zome_types::action::RecordValidity;
 
 use super::action_indexes::insert_action_indexes;
 use super::DhtStore;
@@ -127,7 +127,7 @@ mod tests {
     use holochain_types::prelude::{AppEntryBytes, Entry, EntryHashed, Signature};
     use holochain_types::warrant::WarrantOp;
     use holochain_types::wire_ops::{RenderedOp, RenderedOps};
-    use holochain_zome_types::dht_v2::{
+    use holochain_zome_types::action::{
         Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
         UpdateData,
     };

@@ -1,11 +1,11 @@
 use super::*;
 use holo_hash::{ActionHash, AnyLinkableHash, DnaHash, EntryHash};
-use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
+use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use holochain_types::prelude::Signature;
 use holochain_types::wire_ops::{RenderedOp, RenderedOps};
 // This test module seeds the op-cache/limbo pipeline directly with
 // `ChainOp`/`DhtOp`, building actions (header + `ActionData`) directly.
-use holochain_zome_types::dht_v2::{
+use holochain_zome_types::action::{
     Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
     SignedAction, UpdateData,
 };
@@ -293,7 +293,7 @@ fn build_test_store_record_op_hashed(seed: u8) -> (DhtOpHashed, bool) {
 /// Build a `WarrantOp` (`ChainIntegrityWarrant::InvalidChainOp`) for
 /// testing.  `seed` drives distinct key bytes.
 fn build_test_warrant_op_hashed(seed: u8) -> (DhtOpHashed, bool) {
-    use holochain_types::dht_v2::WarrantOp;
+    use holochain_types::warrant::WarrantOp;
     use holochain_zome_types::prelude::{
         ChainIntegrityWarrant, Signature, SignedWarrant, Warrant, WarrantProof,
     };
@@ -315,7 +315,7 @@ fn build_test_warrant_op_hashed(seed: u8) -> (DhtOpHashed, bool) {
         ),
         Signature::from([seed.wrapping_add(1); 64]),
     );
-    let op = DhtOp::WarrantOp(Box::new(WarrantOp(warrant)));
+    let op = DhtOp::WarrantOp(Box::new(WarrantOp::from(warrant)));
     (DhtOpHashed::from_content_sync(op), false)
 }
 
@@ -565,7 +565,7 @@ async fn integrate_ready_ops_promotes_ready_chain_op() {
     assert_eq!(row.when_integrated, 999);
     assert_eq!(
         row.validation_status,
-        i64::from(holochain_zome_types::dht_v2::RecordValidity::Accepted)
+        i64::from(holochain_zome_types::action::RecordValidity::Accepted)
     );
 }
 
@@ -980,7 +980,7 @@ fn build_invalid_chain_op_warrant(
         Signature::from([seed; 64]),
     );
     DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(
-        holochain_types::dht_v2::WarrantOp(warrant),
+        holochain_types::warrant::WarrantOp::from(warrant),
     )))
 }
 
@@ -1161,7 +1161,7 @@ async fn op_validation_status_reads_decided_limbo_op() {
 
 #[tokio::test]
 async fn reject_chain_op_rejects_integrated_op() {
-    use holochain_zome_types::dht_v2::RecordValidity;
+    use holochain_zome_types::action::RecordValidity;
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let op = build_test_store_record_op_hashed(100);
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
@@ -1206,7 +1206,7 @@ async fn reject_chain_op_rejects_integrated_op() {
 
 #[tokio::test]
 async fn reject_chain_op_no_op_for_locally_validated_integrated_op() {
-    use holochain_zome_types::dht_v2::RecordValidity;
+    use holochain_zome_types::action::RecordValidity;
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let op = build_test_store_record_op_hashed(102);
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
@@ -1524,7 +1524,7 @@ async fn record_locally_validated_warrants_inserts_warrant() {
     assert_eq!(summary.warrantee.as_ref(), Some(&expected_warrantee));
     assert_eq!(
         summary.validation_status,
-        holochain_zome_types::dht_v2::OpValidity::Accepted
+        holochain_zome_types::action::OpValidity::Accepted
     );
 
     let row = store
@@ -2753,9 +2753,6 @@ mod publish_query {
     use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator, DnaHashFixturator};
     use holochain_types::fixt::SignatureFixturator;
     use holochain_types::prelude::*;
-    // Disambiguate op-pipeline names brought in by `holochain_types::prelude::*`;
-    // this module seeds `ChainOp`s built from a v2 `Create` action fixture.
-    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, WarrantOp};
     use holochain_zome_types::fixt::{
         ActionFixturator, AppEntryBytesFixturator, AppEntryDefFixturator, CreateAction,
     };
@@ -2838,7 +2835,7 @@ mod publish_query {
             ),
             fixt!(Signature),
         );
-        DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(WarrantOp(warrant))))
+        DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(WarrantOp::from(warrant))))
     }
 
     async fn num_to_publish(dht_store: &DhtStore, agent: &AgentPubKey) -> usize {

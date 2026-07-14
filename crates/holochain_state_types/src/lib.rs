@@ -1,6 +1,5 @@
 use holo_hash::ActionHash;
-use holochain_integrity_types::dht_v2::Action;
-use holochain_integrity_types::{Entry, Signature};
+use holochain_integrity_types::{Action, Entry, Signature};
 use serde::{Deserialize, Serialize};
 
 // TODO fix this.  We shouldn't really have nil values but this would
