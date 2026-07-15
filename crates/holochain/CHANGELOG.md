@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Disable `reqwest`'s default features, including `native-tls`, in `holochain_metrics`. We are using `rustls-tls` anyway and `native-tls` requires a non-vendored OpenSSL to be installed.
+
 ## 0.6.2
 
 ## 0.6.2-rc.0
