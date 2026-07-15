@@ -161,6 +161,25 @@ fn parse_publish_error() {
             },
         },
         TestCase {
+            package: "holochain_nonce",
+            version: "0.7.0-rc.0",
+            string: indoc::indoc!(
+                r#"
+                    Updating crates.io index
+                      Credential cargo:token get crates-io
+                    error: crate holochain_nonce@0.7.0-rc.0 already exists on crates.io index
+                "#
+            ),
+
+            expected_error: PublishError::AlreadyUploaded {
+                package: "holochain_nonce".to_string(),
+                version: "0.7.0-rc.0".to_string(),
+                path: "".to_string(),
+                location: "crates.io index".to_string(),
+                version_found: "0.7.0-rc.0".to_string(),
+            },
+        },
+        TestCase {
             package: "",
             version: "",
             string: indoc::indoc!(

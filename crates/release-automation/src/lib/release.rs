@@ -500,6 +500,7 @@ impl PublishError {
         static PACKAGE_NOT_FOUND_RE: OnceCell<regex::Regex> = OnceCell::new();
         static PACKAGE_VERSION_NOT_FOUND_RE: OnceCell<regex::Regex> = OnceCell::new();
         static ALREADY_UPLOADED_RE: OnceCell<regex::Regex> = OnceCell::new();
+        static ALREADY_EXISTS_RE: OnceCell<regex::Regex> = OnceCell::new();
         static PUBLISH_LIMIT_EXCEEDED_RE: OnceCell<regex::Regex> = OnceCell::new();
 
         if let Some(captures) = PACKAGE_NOT_FOUND_RE
@@ -613,6 +614,33 @@ impl PublishError {
                     package,
                     version,
                     path: path.map(|path| path.as_str().to_string()).unwrap_or_default(),
+                    location: location.as_str().to_string(),
+                    version_found,
+                }
+            }
+        } else if let Some(captures) = ALREADY_EXISTS_RE
+            .get_or_init(|| {
+                regex::Regex::new(indoc::indoc!(
+                    r#"
+                    error: crate \S+@(?P<version>\S+) already exists on (?P<location>.*)
+                    "#
+                ))
+                .expect("regex should compile")
+            })
+            .captures(&input)
+        {
+            if let (Some(location), Some(version_found)) = (
+                captures.name("location"),
+                captures.name("version"),
+            ) {
+                let version_found= version_found.as_str().to_string();
+                if version_found != version {
+                    warn!("version mismatch. got '{}' expected '{}'", version_found, version);
+                }
+                return PublishError::AlreadyUploaded {
+                    package,
+                    version,
+                    path: String::new(),
                     location: location.as_str().to_string(),
                     version_found,
                 }
