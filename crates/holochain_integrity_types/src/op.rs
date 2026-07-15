@@ -1,10 +1,10 @@
 //! # Dht Operations
 
 use crate::action::conversions::WrongActionError;
-use crate::action::{Action, ActionData, ActionHashed, ActionType, EntryType};
+use crate::action::{Action, ActionData, ActionType, EntryType};
 use crate::record::{Record, SignedHashed};
 use crate::Entry;
-use holo_hash::{ActionHash, AgentPubKey, EntryHash, HasHash};
+use holo_hash::{ActionHash, AgentPubKey, EntryHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
 
@@ -188,10 +188,15 @@ impl RegisterCreateLink {
 
 impl RegisterDeleteLink {
     /// Construct, validating the delete action is a `DeleteLink`, the referenced
-    /// original action is a `CreateLink`, the two share a base address, and the
+    /// original action is a `CreateLink`, and the two share a base address.
+    ///
+    /// When the `hashing` feature is enabled, this also validates that the
     /// create-link's own hash matches the delete's `link_add_address` (so the
     /// delete actually targets the supplied create-link action, not merely a
-    /// different link that happens to share its base).
+    /// different link that happens to share its base). That check needs real
+    /// hash computation, which isn't available in the minimal, no-default-features
+    /// build this crate supports for WASM zomes (see `hdi`'s dependency comment) —
+    /// callers that need the guarantee unconditionally should enable `hashing`.
     pub fn new(
         delete_link: SignedHashed<Action>,
         create_link: Action,
@@ -203,12 +208,18 @@ impl RegisterDeleteLink {
                         "RegisterDeleteLink requires the DeleteLink and CreateLink to share a base address".into(),
                     ));
                 }
-                let create_link_hash = ActionHashed::from_content_sync(create_link.clone()).into_hash();
-                if create_link_hash != dl.link_add_address {
-                    return Err(WrongActionError(format!(
-                        "RegisterDeleteLink requires the CreateLink action referenced by link_add_address ({}), got a CreateLink action hashing to {}",
-                        dl.link_add_address, create_link_hash
-                    )));
+                #[cfg(feature = "hashing")]
+                {
+                    use crate::action::ActionHashed;
+                    use holo_hash::HasHash;
+                    let create_link_hash =
+                        ActionHashed::from_content_sync(create_link.clone()).into_hash();
+                    if create_link_hash != dl.link_add_address {
+                        return Err(WrongActionError(format!(
+                            "RegisterDeleteLink requires the CreateLink action referenced by link_add_address ({}), got a CreateLink action hashing to {}",
+                            dl.link_add_address, create_link_hash
+                        )));
+                    }
                 }
                 Ok(Self {
                     delete_link,
@@ -286,11 +297,13 @@ impl Op {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::action::{Action, ActionData, ActionHeader, CreateData, DeleteData, DeleteLinkData};
+    use crate::action::{
+        Action, ActionData, ActionHashed, ActionHeader, CreateData, DeleteData, DeleteLinkData,
+    };
     use crate::record::SignedHashed;
     use crate::signature::Signature;
     use crate::EntryType;
-    use holo_hash::{ActionHash, AgentPubKey, EntryHash, HoloHashed};
+    use holo_hash::{ActionHash, AgentPubKey, EntryHash, HasHash, HoloHashed};
 
     fn signed_action(data: ActionData) -> SignedHashed<Action> {
         let action = Action {
