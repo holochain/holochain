@@ -25,10 +25,6 @@ use serde::{Deserialize, Serialize};
 // Alice creates an invalid op and publishes it to Bob. Bob issues a warrant and
 // blocks Alice.
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(
-    not(feature = "transport-iroh"),
-    ignore = "requires Iroh transport for stability"
-)]
 async fn warranted_agent_is_blocked() {
     holochain_trace::test_run();
 

@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Removed the `transport-iroh` feature flag from `holochain`, `holochain_p2p`, `holochain_cascade`, `holochain_client`, `hc`, `hc_client`, and `hc_sandbox`. The iroh (QUIC) transport is the only network backend and is now compiled in unconditionally rather than gated behind an (on-by-default) optional feature. Downstream crates that built with `default-features = false` and explicitly listed `transport-iroh` must drop it, as the feature no longer exists.
+- Made the workspace crates' feature flags build independently and removed unused dependencies across the workspace, trimming the dependency tree.
 - **BREAKING CHANGE** `wire_rows_to_v2_ops` is renamed to `wire_rows_to_ops` now that there is no legacy v1 op form to distinguish it from.
 - **BREAKING CHANGE** `build_chain_dht_op_v2` and `build_warrant_dht_op_v2` (in `holochain_p2p`) are renamed to `build_chain_dht_op` and `build_warrant_dht_op` now that there is no legacy v1 op-construction path to distinguish them from.
 - Disable `reqwest`’s default features, including `native-tls`, in `holochain_metrics`. We are using `rustls-tls` anyway and `native-tls` requires a non-vendored OpenSSL to be installed. \#5878

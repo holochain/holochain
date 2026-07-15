@@ -20,7 +20,6 @@ holochain_p2p = { version = "^0.7.0-dev.32", default-features = false, path = ".
 holochain_serialized_bytes = "=0.0.57"
 holochain_state = { version = "^0.7.0-dev.32", path = "../holochain_state" }
 holochain_types = { version = "^0.7.0-dev.31", path = "../holochain_types" }
-holochain_trace = { version = "^0.7.0-dev.1", path = "../holochain_trace" }
 holochain_util = { version = "^0.7.0-dev.1", path = "../holochain_util" }
 holochain_zome_types = { version = "^0.7.0-dev.20", path = "../holochain_zome_types" }
 parking_lot = "0.12.1"
@@ -39,15 +38,10 @@ holochain_cascade = { path = ".", default-features = false, features = [
   "test_utils",
 ] }
 
-pretty_assertions = "1.4"
-test-case = "3.3"
-
 [lints]
 workspace = true
 
 [features]
-default = ["transport-iroh"]
-
 test_utils = [
   "dep:mockall",
   "holochain_p2p/test_utils",
@@ -56,5 +50,3 @@ test_utils = [
 ]
 
 instrument = []
-
-transport-iroh = ["holochain_p2p/transport-iroh"]

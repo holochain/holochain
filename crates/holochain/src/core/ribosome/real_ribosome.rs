@@ -4,9 +4,7 @@ use super::host_fn::disable_clone_cell::disable_clone_cell;
 use super::host_fn::enable_clone_cell::enable_clone_cell;
 use super::host_fn::get_agent_activity::get_agent_activity;
 use super::{HostContext, Ribosome};
-use crate::core::metrics::{
-    host_fn_call_duration_metric, ribosome_wasm_call_duration_metric, ribosome_wasm_usage_metric,
-};
+use crate::core::metrics::{host_fn_call_duration_metric, ribosome_wasm_call_duration_metric};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 #[cfg(feature = "unstable-countersigning")]
@@ -61,6 +59,7 @@ use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_create_rand
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_export::x_salsa20_poly1305_shared_secret_export;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_ingest::x_salsa20_poly1305_shared_secret_ingest;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
+use crate::core::ribosome::real_ribosome::module_cache::{make_module_cache, ModuleCache};
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeImplT;
@@ -93,15 +92,6 @@ pub mod module_cache;
 
 #[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
 mod wasmer_sys;
-#[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
-use wasmer_sys::*;
-
-#[cfg(feature = "wasmer-wasmi")]
-mod wasmer_wasmi;
-
-use crate::core::ribosome::real_ribosome::module_cache::{make_module_cache, ModuleCache};
-#[cfg(feature = "wasmer-wasmi")]
-use wasmer_wasmi::*;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[non_exhaustive]
@@ -607,7 +597,8 @@ impl RibosomeImplT for RealRibosome {
                 }
 
                 // Reset available metering points to the maximum allowed per zome call
-                reset_metering_points(instance_with_store.clone());
+                #[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
+                wasmer_sys::reset_metering_points(instance_with_store.clone());
 
                 let input = invocation
                     .take_host_input()?
@@ -623,9 +614,14 @@ impl RibosomeImplT for RealRibosome {
                 let elapsed = start.elapsed().as_secs_f64();
                 ribosome_wasm_call_duration_metric().record(elapsed, &attributes);
 
-                // Get metering points consumed in zome call and save to usage_meter
-                let points_used = get_used_metering_points(instance_with_store.clone());
-                ribosome_wasm_usage_metric().add(points_used, &attributes);
+                #[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
+                {
+                    // Get metering points consumed in zome call and save to usage_meter
+                    let points_used =
+                        wasmer_sys::get_used_metering_points(instance_with_store.clone());
+                    crate::core::metrics::ribosome_wasm_usage_metric()
+                        .add(points_used, &attributes);
+                }
 
                 // remove context from map after call
                 {

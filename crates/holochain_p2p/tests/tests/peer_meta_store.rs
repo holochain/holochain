@@ -221,10 +221,6 @@ async fn set_peer_unresponsive_in_peer_meta_store() {
 }
 
 #[tokio::test]
-#[cfg_attr(
-    not(feature = "transport-iroh"),
-    ignore = "requires Iroh transport for stability"
-)]
 async fn unresponsive_peers_are_removed_from_store_after_expiry() {
     let db = holochain_state::data::test_open_db(test_db_id())
         .await

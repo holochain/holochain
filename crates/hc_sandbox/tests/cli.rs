@@ -516,7 +516,6 @@ async fn generate_sandbox_with_roles_settings_override() {
 /// Generates a new sandbox, setting the iroh relay URL via
 /// the quic argument and verifies that conductor config file has
 /// been written correctly.
-#[cfg(feature = "transport-iroh")]
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_with_iroh_network_type() {
     use serde_json::json;
@@ -581,7 +580,6 @@ async fn generate_sandbox_with_target_arc_factor_override() {
         .unwrap()
         .join("tests/fixtures/my-app/");
 
-    #[cfg(feature = "transport-iroh")]
     let (network_type, relay_url) = ("quic", "https://iroh-relay");
 
     holochain_trace::test_run();

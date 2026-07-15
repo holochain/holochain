@@ -162,7 +162,7 @@ path = "src/bin/holochain/main.rs"
 workspace = true
 
 [features]
-default = ["encryption", "schema", "wasmer-sys-cranelift", "transport-iroh"]
+default = ["encryption", "schema", "wasmer-sys-cranelift"]
 
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
@@ -201,11 +201,6 @@ schema = ["holochain_conductor_api/schema"]
 
 # Enables at-rest encryption of the database.
 encryption = ["holochain_state/encryption"]
-
-transport-iroh = [
-  "holochain_p2p/transport-iroh",
-  "holochain_cascade/transport-iroh",
-]
 
 # Extremely verbose wasm memory read/write logging
 wasmer-debug-memory = ["holochain_wasmer_host/debug-memory"]

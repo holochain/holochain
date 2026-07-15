@@ -1270,7 +1270,6 @@ async fn spawn_test(
                 let conductor_store = conductor_store.clone();
                 Box::pin(async move { conductor_store })
             }),
-            #[cfg(feature = "transport-iroh")]
             network_config: Some(serde_json::json!({
                 "coreBootstrap": {
                     "serverUrl": format!("http://{bootstrap_addr}"),

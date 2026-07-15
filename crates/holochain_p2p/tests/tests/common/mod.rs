@@ -210,8 +210,8 @@ pub(crate) async fn spawn_test_bootstrap(
     // We have mixed features between ring and aws_lc so the "lookup by crate features" doesn't
     // return a default.
     // If this is called twice due to parallel tests, ignore result, because it'll fail.
-    #[cfg(feature = "transport-iroh")]
     let _ = rustls::crypto::ring::default_provider().install_default();
+
     let mut config = kitsune2_bootstrap_srv::Config::testing();
     config.listen_address_list = vec![SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0))];
 

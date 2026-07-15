@@ -45,56 +45,59 @@ macro_rules! timed {
     }};
 }
 
-#[tokio::test]
-async fn test_timed() {
-    use std::sync::{Arc, Mutex};
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn test_timed() {
+        use std::sync::{Arc, Mutex};
 
-    #[derive(Default, Clone)]
-    struct Logs(Arc<Mutex<String>>);
+        #[derive(Default, Clone)]
+        struct Logs(Arc<Mutex<String>>);
 
-    impl std::io::Write for Logs {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            let mut logs = self.0.lock().unwrap();
-            logs.push_str(&String::from_utf8_lossy(buf));
-            Ok(buf.len())
+        impl std::io::Write for Logs {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                let mut logs = self.0.lock().unwrap();
+                logs.push_str(&String::from_utf8_lossy(buf));
+                Ok(buf.len())
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
         }
 
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
+        impl Logs {
+            pub fn get(&self) -> String {
+                self.0.lock().unwrap().clone()
+            }
         }
+
+        let logs = Logs::default();
+        let logs2 = logs.clone();
+
+        tracing_subscriber::FmtSubscriber::builder()
+            .with_max_level(tracing::Level::TRACE)
+            .with_writer(move || logs2.clone())
+            .init();
+
+        tokio::time::pause();
+
+        timed!([10, 20, 30], "ctx1", {
+            tokio::time::advance(tokio::time::Duration::from_millis(15)).await;
+        });
+        assert!(logs.get().contains("ctx1"));
+        assert!(logs.get().contains("LOW"));
+
+        timed!([1000, 2000, 3000], {
+            tokio::time::advance(tokio::time::Duration::from_millis(2001)).await;
+        });
+        assert!(logs.get().contains("MID"));
+        assert!(logs.get().contains("from_millis(2001)"));
+
+        timed!([1, 2, 3], {
+            tokio::time::advance(tokio::time::Duration::from_millis(3)).await;
+        });
+        assert!(logs.get().contains("HIGH"));
+        assert!(logs.get().contains("from_millis(3)"));
     }
-
-    impl Logs {
-        pub fn get(&self) -> String {
-            self.0.lock().unwrap().clone()
-        }
-    }
-
-    let logs = Logs::default();
-    let logs2 = logs.clone();
-
-    tracing_subscriber::FmtSubscriber::builder()
-        .with_max_level(tracing::Level::TRACE)
-        .with_writer(move || logs2.clone())
-        .init();
-
-    tokio::time::pause();
-
-    timed!([10, 20, 30], "ctx1", {
-        tokio::time::advance(tokio::time::Duration::from_millis(15)).await;
-    });
-    assert!(logs.get().contains("ctx1"));
-    assert!(logs.get().contains("LOW"));
-
-    timed!([1000, 2000, 3000], {
-        tokio::time::advance(tokio::time::Duration::from_millis(2001)).await;
-    });
-    assert!(logs.get().contains("MID"));
-    assert!(logs.get().contains("from_millis(2001)"));
-
-    timed!([1, 2, 3], {
-        tokio::time::advance(tokio::time::Duration::from_millis(3)).await;
-    });
-    assert!(logs.get().contains("HIGH"));
-    assert!(logs.get().contains("from_millis(3)"));
 }
