@@ -1,10 +1,10 @@
 //! # Dht Operations
 
 use crate::action::conversions::WrongActionError;
-use crate::action::{Action, ActionData, ActionType, EntryType};
+use crate::action::{Action, ActionData, ActionHashed, ActionType, EntryType};
 use crate::record::{Record, SignedHashed};
 use crate::Entry;
-use holo_hash::{ActionHash, AgentPubKey, EntryHash};
+use holo_hash::{ActionHash, AgentPubKey, EntryHash, HasHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
 
@@ -188,8 +188,10 @@ impl RegisterCreateLink {
 
 impl RegisterDeleteLink {
     /// Construct, validating the delete action is a `DeleteLink`, the referenced
-    /// original action is a `CreateLink`, and the two share a base address (so
-    /// the delete actually targets the supplied create-link's base).
+    /// original action is a `CreateLink`, the two share a base address, and the
+    /// create-link's own hash matches the delete's `link_add_address` (so the
+    /// delete actually targets the supplied create-link action, not merely a
+    /// different link that happens to share its base).
     pub fn new(
         delete_link: SignedHashed<Action>,
         create_link: Action,
@@ -200,6 +202,13 @@ impl RegisterDeleteLink {
                     return Err(WrongActionError(
                         "RegisterDeleteLink requires the DeleteLink and CreateLink to share a base address".into(),
                     ));
+                }
+                let create_link_hash = ActionHashed::from_content_sync(create_link.clone()).into_hash();
+                if create_link_hash != dl.link_add_address {
+                    return Err(WrongActionError(format!(
+                        "RegisterDeleteLink requires the CreateLink action referenced by link_add_address ({}), got a CreateLink action hashing to {}",
+                        dl.link_add_address, create_link_hash
+                    )));
                 }
                 Ok(Self {
                     delete_link,
@@ -347,9 +356,8 @@ mod tests {
         assert!(RegisterDelete::new(signed_action(delete_data())).is_ok());
     }
 
-    #[test]
-    fn register_delete_link_requires_delete_link_and_create_link() {
-        let create_link = Action {
+    fn create_link_action(base: u8, target: u8) -> Action {
+        Action {
             header: ActionHeader {
                 author: AgentPubKey::from_raw_36(vec![1u8; 36]),
                 timestamp: holochain_timestamp::Timestamp::from_micros(1),
@@ -357,34 +365,49 @@ mod tests {
                 prev_action: None,
             },
             data: ActionData::CreateLink(crate::action::CreateLinkData {
-                base_address: EntryHash::from_raw_36(vec![6u8; 36]).into(),
-                target_address: EntryHash::from_raw_36(vec![8u8; 36]).into(),
+                base_address: EntryHash::from_raw_36(vec![base; 36]).into(),
+                target_address: EntryHash::from_raw_36(vec![target; 36]).into(),
                 zome_index: crate::action::ZomeIndex(0),
                 link_type: crate::link::LinkType(0),
                 tag: crate::link::LinkTag(vec![]),
             }),
-        };
-        assert!(RegisterDeleteLink::new(signed_action(delete_link_data()), create_link).is_ok());
+        }
+    }
+
+    #[test]
+    fn register_delete_link_requires_delete_link_and_create_link() {
+        let create_link = create_link_action(6, 8);
+        let create_link_hash = ActionHashed::from_content_sync(create_link.clone()).into_hash();
+        let delete_link_data = ActionData::DeleteLink(DeleteLinkData {
+            base_address: EntryHash::from_raw_36(vec![6u8; 36]).into(),
+            link_add_address: create_link_hash,
+        });
+        assert!(RegisterDeleteLink::new(signed_action(delete_link_data), create_link).is_ok());
     }
 
     #[test]
     fn register_delete_link_rejects_mismatched_base_address() {
         // create_link's base differs from delete_link_data()'s base.
-        let create_link = Action {
-            header: ActionHeader {
-                author: AgentPubKey::from_raw_36(vec![1u8; 36]),
-                timestamp: holochain_timestamp::Timestamp::from_micros(1),
-                action_seq: 0,
-                prev_action: None,
-            },
-            data: ActionData::CreateLink(crate::action::CreateLinkData {
-                base_address: EntryHash::from_raw_36(vec![9u8; 36]).into(),
-                target_address: EntryHash::from_raw_36(vec![8u8; 36]).into(),
-                zome_index: crate::action::ZomeIndex(0),
-                link_type: crate::link::LinkType(0),
-                tag: crate::link::LinkTag(vec![]),
-            }),
-        };
+        let create_link = create_link_action(9, 8);
+        assert!(RegisterDeleteLink::new(signed_action(delete_link_data()), create_link).is_err());
+    }
+
+    #[test]
+    fn register_delete_link_rejects_matching_base_but_wrong_hash() {
+        // create_link shares delete_link_data()'s base address, but isn't the
+        // exact CreateLink action referenced by link_add_address — a
+        // different CreateLink action can share a base with the one being
+        // deleted (e.g. two links from the same base with different targets).
+        let create_link = create_link_action(6, 8);
+        assert_ne!(
+            ActionHashed::from_content_sync(create_link.clone()).into_hash(),
+            match delete_link_data() {
+                ActionData::DeleteLink(DeleteLinkData {
+                    link_add_address, ..
+                }) => link_add_address,
+                _ => unreachable!(),
+            }
+        );
         assert!(RegisterDeleteLink::new(signed_action(delete_link_data()), create_link).is_err());
     }
 
