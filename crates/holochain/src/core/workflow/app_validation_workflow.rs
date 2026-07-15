@@ -454,15 +454,11 @@ pub async fn record_to_op(
             action: sah,
             cached_entry: entry,
         }),
-        ChainOpType::UpdateEntry | ChainOpType::UpdateRecord => {
-            Op::Update(Update {
-                update: sah,
-                new_entry: entry,
-            })
-        }
-        ChainOpType::DeleteRecord | ChainOpType::DeleteEntry => {
-            Op::Delete(Delete { delete: sah })
-        }
+        ChainOpType::UpdateEntry | ChainOpType::UpdateRecord => Op::Update(Update {
+            update: sah,
+            new_entry: entry,
+        }),
+        ChainOpType::DeleteRecord | ChainOpType::DeleteEntry => Op::Delete(Delete { delete: sah }),
         ChainOpType::CreateLink => Op::CreateLink(CreateLink { create_link: sah }),
         ChainOpType::DeleteLink => {
             let link_add_address = match &sah.hashed.content.data {
@@ -562,9 +558,7 @@ async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppVal
                 new_entry,
             })
         }
-        ChainOp::DeleteRecord(_) | ChainOp::DeleteEntry(_) => {
-            Op::Delete(Delete { delete: sah })
-        }
+        ChainOp::DeleteRecord(_) | ChainOp::DeleteEntry(_) => Op::Delete(Delete { delete: sah }),
         ChainOp::CreateLink(_) => Op::CreateLink(CreateLink { create_link: sah }),
         ChainOp::DeleteLink(_) => {
             let ActionData::DeleteLink(DeleteLinkData {

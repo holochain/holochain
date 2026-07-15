@@ -351,9 +351,7 @@ fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
         Op::Update(Update {
             update, new_entry, ..
         }) => record_from_signed_action(update, new_entry),
-        Op::Delete(Delete { delete, .. }) => {
-            record_from_signed_action(delete, omitted_entry)
-        }
+        Op::Delete(Delete { delete, .. }) => record_from_signed_action(delete, omitted_entry),
         Op::AgentActivity(AgentActivity { action, .. }) => {
             record_from_signed_action(action, omitted_entry)
         }

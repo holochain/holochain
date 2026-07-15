@@ -408,11 +408,9 @@ impl OpHelper for Op {
             Op::Delete(Delete { delete }) => {
                 let action = &delete.hashed.content;
                 match &action.data {
-                    ActionData::Delete(_) => {
-                        Ok(flat_op::FlatOp::Delete(flat_op::OpDelete {
-                            action: action.clone(),
-                        }))
-                    }
+                    ActionData::Delete(_) => Ok(flat_op::FlatOp::Delete(flat_op::OpDelete {
+                        action: action.clone(),
+                    })),
                     other => Err(wasm_error!(WasmErrorInner::Guest(format!(
                         "Delete op carried a non-Delete action: {:?}",
                         other.action_type()

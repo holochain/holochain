@@ -68,4 +68,6 @@ pub use crate::action::SignedActionHashed;
 // use (e.g. every per-action item built while scanning a chain). Consumers
 // that need the richer query-response type instead import
 // `crate::query::AgentActivity` explicitly.
-pub use crate::op::{Op, AgentActivity, CreateLink, Delete, DeleteLink, Update, CreateEntry, CreateRecord};
+pub use crate::op::{
+    AgentActivity, CreateEntry, CreateLink, CreateRecord, Delete, DeleteLink, Op, Update,
+};

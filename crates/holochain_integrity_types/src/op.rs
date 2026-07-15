@@ -205,7 +205,8 @@ impl DeleteLink {
             (ActionData::DeleteLink(dl), ActionData::CreateLink(cl)) => {
                 if dl.base_address != cl.base_address {
                     return Err(WrongActionError(
-                        "DeleteLink requires the DeleteLink and CreateLink to share a base address".into(),
+                        "DeleteLink requires the DeleteLink and CreateLink to share a base address"
+                            .into(),
                     ));
                 }
                 #[cfg(feature = "hashing")]

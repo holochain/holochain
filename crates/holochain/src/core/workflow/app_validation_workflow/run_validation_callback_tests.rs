@@ -25,7 +25,7 @@ use holochain_types::{
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::action::{ActionData, DeleteData, SignedAction};
-use holochain_zome_types::op::{Op, AgentActivity, CreateLink, Delete};
+use holochain_zome_types::op::{AgentActivity, CreateLink, Delete, Op};
 use holochain_zome_types::{
     chain::{ChainFilter, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},

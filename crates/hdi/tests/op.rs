@@ -564,10 +564,7 @@ fn register_update_cap_claim_flattens_to_cap_claim() {
     types();
     let op = register_update(update_data(EntryType::CapClaim), None);
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
-    assert!(matches!(
-        flat,
-        FlatOp::Update(OpUpdate::CapClaim { .. })
-    ));
+    assert!(matches!(flat, FlatOp::Update(OpUpdate::CapClaim { .. })));
 }
 
 #[test]

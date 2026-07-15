@@ -16,8 +16,8 @@ use holochain_data::kind::Dht;
 use holochain_data::DbRead;
 use holochain_types::op::DhtOpHashed;
 use holochain_types::prelude::{
-    ActionHashedContainer, AgentActivityResponse, ChainItems, ChainItemsSource,
-    MustGetAgentActivityResponse, AgentActivity, ScheduledFn, Timestamp,
+    ActionHashedContainer, AgentActivity, AgentActivityResponse, ChainItems, ChainItemsSource,
+    MustGetAgentActivityResponse, ScheduledFn, Timestamp,
 };
 use holochain_types::warrant::WarrantOp;
 use holochain_zome_types::chain::{ChainFilter, LimitConditions};
@@ -3155,10 +3155,7 @@ enum MustGetAgentActivityCompleteness {
 
 /// Remove forked actions by walking the chain backwards from `chain_top`.
 /// Input must already be sorted by action seq descending.
-fn exclude_forked_activity(
-    activity: &mut Vec<AgentActivity>,
-    chain_top: &holo_hash::ActionHash,
-) {
+fn exclude_forked_activity(activity: &mut Vec<AgentActivity>, chain_top: &holo_hash::ActionHash) {
     if activity.is_empty() {
         return;
     }

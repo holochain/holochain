@@ -308,7 +308,10 @@ impl HdiT for ErrHdk {
 
 /// Every call is an error for the ErrHdk.
 impl HdkT for ErrHdk {
-    fn get_agent_activity(&self, _: GetAgentActivityInput) -> ExternResult<holochain_zome_types::query::AgentActivity> {
+    fn get_agent_activity(
+        &self,
+        _: GetAgentActivityInput,
+    ) -> ExternResult<holochain_zome_types::query::AgentActivity> {
         Self::err()
     }
     fn query(&self, _: ChainQueryFilter) -> ExternResult<Vec<Record>> {

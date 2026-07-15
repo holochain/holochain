@@ -321,8 +321,8 @@ async fn author_of_invalid_warrant_is_blocked() {
 mod zero_arc {
     use super::*;
     use hdk::prelude::{AgentActivity as OpAgentActivity, BlockTargetId};
-    use holochain_zome_types::query::AgentActivity;
     use holochain::prelude::DisabledAppReason;
+    use holochain_zome_types::query::AgentActivity;
 
     // Alice creates an invalid op, Bob receives it and issues a warrant.
     // Carol is a zero arc node and makes a get_agent_activity request to Bob.

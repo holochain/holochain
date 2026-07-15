@@ -17,8 +17,7 @@ use holochain_zome_types::fixt::{
     EntryFixturator, SignatureFixturator, UpdateAction,
 };
 use holochain_zome_types::op::{
-    Op, AgentActivity, CreateLink, Delete, DeleteLink,
-    Update, CreateEntry, CreateRecord,
+    AgentActivity, CreateEntry, CreateLink, CreateRecord, Delete, DeleteLink, Op, Update,
 };
 use holochain_zome_types::record::{Record, RecordEntry, SignedActionHashed};
 use holochain_zome_types::timestamp::Timestamp;
