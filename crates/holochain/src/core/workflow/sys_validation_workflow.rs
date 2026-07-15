@@ -702,10 +702,10 @@ async fn retrieve_dependencies(
                     ValidationDependencyType::Warranted(chain_op_type) => {
                         let fetched = match chain_op_type {
                             // These chain op types require the entry to be present.
-                            ChainOpType::StoreRecord |
-                            ChainOpType::StoreEntry |
-                            ChainOpType::RegisterUpdatedContent |
-                            ChainOpType::RegisterUpdatedRecord => {
+                            ChainOpType::CreateRecord |
+                            ChainOpType::CreateEntry |
+                            ChainOpType::UpdateEntry |
+                            ChainOpType::UpdateRecord => {
                                 cascade.retrieve_public_record(hash.clone().into(), Default::default()).await.map(|ok|ok.map(|(a, s)|(a.signed_action, s)))
                             }
                             // Other top types can be constructed without an entry.

@@ -476,15 +476,15 @@ pub fn build_chain_dht_op(row: K2ChainOpForWireRow) -> Result<DhtOp, String> {
     };
 
     let chain_op = match op_type {
-        ChainOpType::StoreRecord => ChainOp::CreateRecord(signed_action, op_entry),
-        ChainOpType::StoreEntry => ChainOp::CreateEntry(signed_action, op_entry),
-        ChainOpType::RegisterAgentActivity => ChainOp::AgentActivity(signed_action),
-        ChainOpType::RegisterUpdatedContent => ChainOp::UpdateEntry(signed_action, op_entry),
-        ChainOpType::RegisterUpdatedRecord => ChainOp::UpdateRecord(signed_action, op_entry),
-        ChainOpType::RegisterDeletedBy => ChainOp::DeleteRecord(signed_action),
-        ChainOpType::RegisterDeletedEntryAction => ChainOp::DeleteEntry(signed_action),
-        ChainOpType::RegisterAddLink => ChainOp::CreateLink(signed_action),
-        ChainOpType::RegisterRemoveLink => ChainOp::DeleteLink(signed_action),
+        ChainOpType::CreateRecord => ChainOp::CreateRecord(signed_action, op_entry),
+        ChainOpType::CreateEntry => ChainOp::CreateEntry(signed_action, op_entry),
+        ChainOpType::AgentActivity => ChainOp::AgentActivity(signed_action),
+        ChainOpType::UpdateEntry => ChainOp::UpdateEntry(signed_action, op_entry),
+        ChainOpType::UpdateRecord => ChainOp::UpdateRecord(signed_action, op_entry),
+        ChainOpType::DeleteRecord => ChainOp::DeleteRecord(signed_action),
+        ChainOpType::DeleteEntry => ChainOp::DeleteEntry(signed_action),
+        ChainOpType::CreateLink => ChainOp::CreateLink(signed_action),
+        ChainOpType::DeleteLink => ChainOp::DeleteLink(signed_action),
     };
     Ok(DhtOp::ChainOp(Box::new(chain_op)))
 }

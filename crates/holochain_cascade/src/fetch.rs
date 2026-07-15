@@ -117,7 +117,7 @@ impl CascadeImpl {
                             ra.action.action().clone(),
                             ra.action.signature().clone(),
                             None,
-                            ChainOpType::RegisterAgentActivity,
+                            ChainOpType::AgentActivity,
                         )
                     })
                     .collect::<Result<Vec<_>, _>>()?,

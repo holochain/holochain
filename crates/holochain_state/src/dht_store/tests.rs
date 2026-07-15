@@ -306,7 +306,7 @@ fn build_test_warrant_op_hashed(seed: u8) -> (DhtOpHashed, bool) {
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: action_author.clone(),
                 action: (action_hash, Signature::from([seed; 64])),
-                chain_op_type: ChainOpType::StoreRecord,
+                chain_op_type: ChainOpType::CreateRecord,
                 reason: "test warrant".into(),
             }),
             AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),
@@ -970,7 +970,7 @@ fn build_invalid_chain_op_warrant(
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: warrantee.clone(),
                 action: (action_hash.clone(), Signature::from([seed; 64])),
-                chain_op_type: ChainOpType::StoreRecord,
+                chain_op_type: ChainOpType::CreateRecord,
                 reason: "test warrant".into(),
             }),
             agent(seed.wrapping_add(1)),
@@ -1069,7 +1069,7 @@ async fn op_validation_status_returns_status_only_when_locally_validated() {
     assert_eq!(
         store
             .as_read()
-            .op_validation_status(&action_hash, ChainOpType::StoreRecord)
+            .op_validation_status(&action_hash, ChainOpType::CreateRecord)
             .await
             .unwrap(),
         Some(ValidationStatus::Valid)
@@ -1085,7 +1085,7 @@ async fn op_validation_status_returns_status_only_when_locally_validated() {
     assert_eq!(
         store
             .as_read()
-            .op_validation_status(&limbo_action_hash, ChainOpType::StoreRecord)
+            .op_validation_status(&limbo_action_hash, ChainOpType::CreateRecord)
             .await
             .unwrap(),
         None
@@ -1097,7 +1097,7 @@ async fn op_validation_status_returns_status_only_when_locally_validated() {
             .as_read()
             .op_validation_status(
                 &ActionHash::from_raw_36(vec![0xEE; 36]),
-                ChainOpType::StoreRecord
+                ChainOpType::CreateRecord
             )
             .await
             .unwrap(),
@@ -1131,7 +1131,7 @@ async fn op_validation_status_reads_decided_limbo_op() {
     assert_eq!(
         store
             .as_read()
-            .op_validation_status(&valid_action, ChainOpType::StoreRecord)
+            .op_validation_status(&valid_action, ChainOpType::CreateRecord)
             .await
             .unwrap(),
         Some(ValidationStatus::Valid)
@@ -1152,7 +1152,7 @@ async fn op_validation_status_reads_decided_limbo_op() {
     assert_eq!(
         store
             .as_read()
-            .op_validation_status(&rejected_action, ChainOpType::StoreRecord)
+            .op_validation_status(&rejected_action, ChainOpType::CreateRecord)
             .await
             .unwrap(),
         Some(ValidationStatus::Rejected)
@@ -1298,7 +1298,7 @@ fn build_rendered_store_record_for_move(seed: u8) -> (RenderedOps, holo_hash::Ac
     };
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash);
     let rendered =
-        RenderedOp::new(action, sig, None, ChainOpType::StoreRecord).expect("rendered op build");
+        RenderedOp::new(action, sig, None, ChainOpType::CreateRecord).expect("rendered op build");
     let action_hash = rendered.action.as_hash().clone();
     let ops = RenderedOps {
         entry: Some(entry_hashed),
@@ -1329,7 +1329,7 @@ async fn move_warranted_op_to_limbo_moves_locally_validated_false() {
 
     // Move to limbo.
     let moved = store
-        .move_warranted_op_to_limbo(&action_hash, ChainOpType::StoreRecord)
+        .move_warranted_op_to_limbo(&action_hash, ChainOpType::CreateRecord)
         .await
         .unwrap();
     assert!(moved, "expected row to be moved");
@@ -1371,7 +1371,7 @@ async fn move_warranted_op_to_limbo_returns_false_when_not_cached() {
     let action_hash = holo_hash::ActionHash::from_raw_36(vec![0xBB; 36]);
 
     let moved = store
-        .move_warranted_op_to_limbo(&action_hash, ChainOpType::StoreRecord)
+        .move_warranted_op_to_limbo(&action_hash, ChainOpType::CreateRecord)
         .await
         .unwrap();
     assert!(!moved, "expected false when no matching cached row exists");
@@ -1407,7 +1407,7 @@ async fn move_warranted_op_to_limbo_no_match_for_locally_validated_true() {
 
     // ChainOp now has locally_validated = 1. The move should not match it.
     let moved = store
-        .move_warranted_op_to_limbo(&action_hash, ChainOpType::StoreRecord)
+        .move_warranted_op_to_limbo(&action_hash, ChainOpType::CreateRecord)
         .await
         .unwrap();
     assert!(!moved, "should not move a locally_validated = 1 row");
@@ -1666,7 +1666,7 @@ fn build_rendered_store_entry(
     let action_hash = holo_hash::ActionHash::with_data_sync(&action);
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash.clone());
     let rendered =
-        RenderedOp::new(action, sig, None, ChainOpType::StoreEntry).expect("rendered op");
+        RenderedOp::new(action, sig, None, ChainOpType::CreateEntry).expect("rendered op");
     let ops = RenderedOps {
         entry: Some(entry_hashed),
         ops: vec![rendered],
@@ -1778,7 +1778,7 @@ fn build_rendered_store_record_ops(
     let action_hash = holo_hash::ActionHash::with_data_sync(&action);
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash.clone());
     let rendered =
-        RenderedOp::new(action, sig, None, ChainOpType::StoreRecord).expect("rendered op");
+        RenderedOp::new(action, sig, None, ChainOpType::CreateRecord).expect("rendered op");
     let ops = RenderedOps {
         entry: Some(entry_hashed),
         ops: vec![rendered],
@@ -2020,7 +2020,7 @@ fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHa
         }),
     };
     let rendered =
-        RenderedOp::new(action, sig, None, ChainOpType::RegisterAddLink).expect("rendered op");
+        RenderedOp::new(action, sig, None, ChainOpType::CreateLink).expect("rendered op");
     let create_link_hash = rendered.action.as_hash().clone();
     let ops = RenderedOps {
         entry: None,
@@ -2053,7 +2053,7 @@ fn build_rendered_delete_link_for(
         }),
     };
     let rendered =
-        RenderedOp::new(action, sig, None, ChainOpType::RegisterRemoveLink).expect("rendered op");
+        RenderedOp::new(action, sig, None, ChainOpType::DeleteLink).expect("rendered op");
     RenderedOps {
         entry: None,
         ops: vec![rendered],
@@ -2283,7 +2283,7 @@ fn build_cached_create_link(base: &holo_hash::AnyLinkableHash, seed: u8) -> Rend
         action,
         Signature::from([seed; 64]),
         None,
-        ChainOpType::RegisterAddLink,
+        ChainOpType::CreateLink,
     )
     .expect("rendered op build");
     RenderedOps {
@@ -2439,13 +2439,10 @@ async fn integrate_upgrades_cached_op_to_locally_validated() {
     // Cache the op first (locally_validated = 0). The authority read excludes it.
     let rendered = RenderedOps {
         entry: None,
-        ops: vec![RenderedOp::new(
-            action.clone(),
-            sig.clone(),
-            None,
-            ChainOpType::RegisterAddLink,
-        )
-        .expect("rendered op build")],
+        ops: vec![
+            RenderedOp::new(action.clone(), sig.clone(), None, ChainOpType::CreateLink)
+                .expect("rendered op build"),
+        ],
         warrant: None,
     };
     store.cache_chain_ops(&rendered).await.unwrap();
@@ -2826,7 +2823,7 @@ mod publish_query {
                 WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                     action_author: fixt!(AgentPubKey),
                     action: (fixt!(ActionHash), fixt!(Signature)),
-                    chain_op_type: ChainOpType::RegisterAddLink,
+                    chain_op_type: ChainOpType::CreateLink,
                     reason: "test warrant".into(),
                 }),
                 agent.clone(),

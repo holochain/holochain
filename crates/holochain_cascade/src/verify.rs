@@ -170,7 +170,7 @@ mod rejected_warrant_invariant_tests {
             fixt!(Action),
             fixt!(Signature),
             Some(status),
-            ChainOpType::StoreRecord,
+            ChainOpType::CreateRecord,
         )
         .unwrap();
         RenderedOps {
@@ -196,7 +196,7 @@ mod rejected_warrant_invariant_tests {
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: author.clone(),
                 action: (action_hash, fixt!(Signature)),
-                chain_op_type: ChainOpType::StoreRecord,
+                chain_op_type: ChainOpType::CreateRecord,
                 reason: "test".to_string(),
             }),
             author,

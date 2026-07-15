@@ -55,7 +55,7 @@ impl WireRecordOps {
                 action,
                 signature,
                 status,
-                ChainOpType::StoreRecord,
+                ChainOpType::CreateRecord,
             )?);
         }
         for op in deletes {
@@ -65,7 +65,7 @@ impl WireRecordOps {
                 action,
                 signature,
                 status,
-                ChainOpType::RegisterDeletedBy,
+                ChainOpType::DeleteRecord,
             )?);
         }
         for op in updates {
@@ -75,7 +75,7 @@ impl WireRecordOps {
                 action,
                 signature,
                 status,
-                ChainOpType::RegisterUpdatedRecord,
+                ChainOpType::UpdateRecord,
             )?);
         }
         Ok(RenderedOps {

@@ -943,7 +943,7 @@ impl DhtStore<DbRead<Dht>> {
         let ops = self.db().get_chain_ops_for_action(hash.clone()).await?;
         let Some(store_op) = ops
             .iter()
-            .find(|r| ChainOpType::try_from(r.op_type) == Ok(ChainOpType::StoreRecord))
+            .find(|r| ChainOpType::try_from(r.op_type) == Ok(ChainOpType::CreateRecord))
         else {
             return Ok(None);
         };
@@ -1016,7 +1016,7 @@ impl DhtStore<DbRead<Dht>> {
         let ops = self.db().get_chain_ops_for_action(hash.clone()).await?;
         let store_op = ops
             .iter()
-            .find(|r| ChainOpType::try_from(r.op_type) == Ok(ChainOpType::StoreRecord));
+            .find(|r| ChainOpType::try_from(r.op_type) == Ok(ChainOpType::CreateRecord));
         let validation_status = match store_op {
             Some(store_op) => match RecordValidity::try_from(store_op.validation_status) {
                 Ok(RecordValidity::Accepted) => ValidationStatus::Valid,
@@ -2944,8 +2944,8 @@ fn chain_op_from_joined_row(
     };
 
     let chain_op = match op_type {
-        ChainOpType::StoreRecord => ChainOp::CreateRecord(signed_action, op_entry_for(entry_type)),
-        ChainOpType::StoreEntry => {
+        ChainOpType::CreateRecord => ChainOp::CreateRecord(signed_action, op_entry_for(entry_type)),
+        ChainOpType::CreateEntry => {
             if entry_type.is_none() {
                 return Err(crate::query::StateQueryError::Other(
                     "StoreEntry action is not a Create/Update".into(),
@@ -2956,8 +2956,8 @@ fn chain_op_from_joined_row(
             })?;
             ChainOp::CreateEntry(signed_action, OpEntry::Present(entry))
         }
-        ChainOpType::RegisterAgentActivity => ChainOp::AgentActivity(signed_action),
-        ChainOpType::RegisterUpdatedContent => {
+        ChainOpType::AgentActivity => ChainOp::AgentActivity(signed_action),
+        ChainOpType::UpdateEntry => {
             if !matches!(action.data, ActionData::Update(_)) {
                 return Err(crate::query::StateQueryError::Other(
                     "RegisterUpdatedContent action is not Update".into(),
@@ -2965,7 +2965,7 @@ fn chain_op_from_joined_row(
             }
             ChainOp::UpdateEntry(signed_action, op_entry_for(entry_type))
         }
-        ChainOpType::RegisterUpdatedRecord => {
+        ChainOpType::UpdateRecord => {
             if !matches!(action.data, ActionData::Update(_)) {
                 return Err(crate::query::StateQueryError::Other(
                     "RegisterUpdatedRecord action is not Update".into(),
@@ -2973,7 +2973,7 @@ fn chain_op_from_joined_row(
             }
             ChainOp::UpdateRecord(signed_action, op_entry_for(entry_type))
         }
-        ChainOpType::RegisterDeletedEntryAction => {
+        ChainOpType::DeleteEntry => {
             if !matches!(action.data, ActionData::Delete(_)) {
                 return Err(crate::query::StateQueryError::Other(
                     "RegisterDeletedEntryAction action is not Delete".into(),
@@ -2981,7 +2981,7 @@ fn chain_op_from_joined_row(
             }
             ChainOp::DeleteEntry(signed_action)
         }
-        ChainOpType::RegisterDeletedBy => {
+        ChainOpType::DeleteRecord => {
             if !matches!(action.data, ActionData::Delete(_)) {
                 return Err(crate::query::StateQueryError::Other(
                     "RegisterDeletedBy action is not Delete".into(),
@@ -2989,7 +2989,7 @@ fn chain_op_from_joined_row(
             }
             ChainOp::DeleteRecord(signed_action)
         }
-        ChainOpType::RegisterAddLink => {
+        ChainOpType::CreateLink => {
             if !matches!(action.data, ActionData::CreateLink(_)) {
                 return Err(crate::query::StateQueryError::Other(
                     "RegisterAddLink action is not CreateLink".into(),
@@ -2997,7 +2997,7 @@ fn chain_op_from_joined_row(
             }
             ChainOp::CreateLink(signed_action)
         }
-        ChainOpType::RegisterRemoveLink => {
+        ChainOpType::DeleteLink => {
             if !matches!(action.data, ActionData::DeleteLink(_)) {
                 return Err(crate::query::StateQueryError::Other(
                     "RegisterRemoveLink action is not DeleteLink".into(),
@@ -4282,7 +4282,7 @@ mod tests {
                 WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                     action_author,
                     action: (action_hash, Signature::from([seed; 64])),
-                    chain_op_type: ChainOpType::StoreRecord,
+                    chain_op_type: ChainOpType::CreateRecord,
                     reason: "test warrant".into(),
                 }),
                 AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),
@@ -4407,7 +4407,7 @@ mod tests {
                 WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                     action_author,
                     action: (action_hash, Signature::from([seed; 64])),
-                    chain_op_type: ChainOpType::StoreRecord,
+                    chain_op_type: ChainOpType::CreateRecord,
                     reason: "scratch warrant".into(),
                 }),
                 AgentPubKey::from_raw_36(vec![seed.wrapping_add(50); 36]),

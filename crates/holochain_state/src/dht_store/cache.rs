@@ -191,7 +191,7 @@ mod tests {
         );
         let entry_hashed = EntryHashed::with_pre_hashed(entry.clone(), entry_hash);
 
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::StoreRecord)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::CreateRecord)
             .expect("rendered op build");
 
         RenderedOps {
@@ -228,8 +228,8 @@ mod tests {
             }),
         );
 
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterAddLink)
-            .expect("rendered op build");
+        let rendered =
+            RenderedOp::new(action, sig, None, ChainOpType::CreateLink).expect("rendered op build");
         RenderedOps {
             entry: None,
             ops: vec![rendered],
@@ -257,8 +257,8 @@ mod tests {
                 link_add_address: link_add,
             }),
         );
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterRemoveLink)
-            .expect("rendered op build");
+        let rendered =
+            RenderedOp::new(action, sig, None, ChainOpType::DeleteLink).expect("rendered op build");
         RenderedOps {
             entry: None,
             ops: vec![rendered],
@@ -290,7 +290,7 @@ mod tests {
             }),
         );
         let entry_hashed = EntryHashed::with_pre_hashed(entry.clone(), entry_hash);
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterUpdatedRecord)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::UpdateRecord)
             .expect("rendered op build");
         RenderedOps {
             entry: Some(entry_hashed),
@@ -316,7 +316,7 @@ mod tests {
                 deletes_entry_address: deletes_entry,
             }),
         );
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterDeletedBy)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::DeleteRecord)
             .expect("rendered op build");
         RenderedOps {
             entry: None,
@@ -339,7 +339,7 @@ mod tests {
                 entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
             }),
         );
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterAgentActivity)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::AgentActivity)
             .expect("rendered op build");
         RenderedOps {
             entry: None,
@@ -358,7 +358,7 @@ mod tests {
                 WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                     action_author,
                     action: (action_hash, Signature::from([seed; 64])),
-                    chain_op_type: ChainOpType::StoreRecord,
+                    chain_op_type: ChainOpType::CreateRecord,
                     reason: "test warrant".into(),
                 }),
                 AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),

@@ -236,7 +236,7 @@ where
     };
     let rows: Vec<AgentActivityRow> = sqlx::query_as(sql)
         .bind(author.get_raw_36())
-        .bind(i64::from(ChainOpType::RegisterAgentActivity))
+        .bind(i64::from(ChainOpType::AgentActivity))
         .fetch_all(executor)
         .await?;
     rows.into_iter().map(agent_activity_row_to_item).collect()
@@ -265,7 +265,7 @@ where
            AND (? IS NULL OR a.seq >= ?)
          ORDER BY a.seq DESC, a.hash DESC",
     )
-    .bind(i64::from(ChainOpType::RegisterAgentActivity))
+    .bind(i64::from(ChainOpType::AgentActivity))
     .bind(author.get_raw_36())
     .bind(chain_top_seq as i64)
     .bind(until_seq.map(|s| s as i64))
@@ -293,7 +293,7 @@ where
     )
     .bind(action_hash.get_raw_36())
     .bind(author.get_raw_36())
-    .bind(i64::from(ChainOpType::RegisterAgentActivity))
+    .bind(i64::from(ChainOpType::AgentActivity))
     .fetch_optional(executor)
     .await?;
     Ok(row.map(|(seq, ts)| (seq as u32, holochain_timestamp::Timestamp::from_micros(ts))))
@@ -350,7 +350,7 @@ where
            AND (a.private_entry = 0 OR a.private_entry IS NULL OR a.author = ?)",
     )
     .bind(entry_hash.get_raw_36())
-    .bind(i64::from(ChainOpType::StoreEntry))
+    .bind(i64::from(ChainOpType::CreateEntry))
     .bind(i64::from(RecordValidity::Accepted))
     .bind(author.map(|a| a.get_raw_36().to_vec()))
     .fetch_all(executor)
@@ -382,7 +382,7 @@ where
            AND (a.private_entry = 0 OR a.private_entry IS NULL OR a.author = ?)",
     )
     .bind(entry_hash.get_raw_36())
-    .bind(i64::from(ChainOpType::StoreEntry))
+    .bind(i64::from(ChainOpType::CreateEntry))
     .bind(i64::from(validation_status))
     .bind(author.map(|a| a.get_raw_36().to_vec()))
     .fetch_all(executor)
@@ -573,7 +573,7 @@ where
          JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
          WHERE l.base_hash = ? AND c.locally_validated = 1",
     )
-    .bind(i64::from(ChainOpType::RegisterAddLink))
+    .bind(i64::from(ChainOpType::CreateLink))
     .bind(base.get_raw_36())
     .fetch_all(executor)
     .await?;
@@ -600,7 +600,7 @@ where
          WHERE c.locally_validated = 1
            AND d.create_link_hash IN (SELECT l.action_hash FROM Link l WHERE l.base_hash = ?)",
     )
-    .bind(i64::from(ChainOpType::RegisterRemoveLink))
+    .bind(i64::from(ChainOpType::DeleteLink))
     .bind(base.get_raw_36())
     .fetch_all(executor)
     .await?;
@@ -625,7 +625,7 @@ where
          JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
          WHERE a.hash = ? AND c.locally_validated = 1",
     )
-    .bind(i64::from(ChainOpType::StoreRecord))
+    .bind(i64::from(ChainOpType::CreateRecord))
     .bind(action_hash.get_raw_36())
     .fetch_optional(executor)
     .await?;
@@ -651,7 +651,7 @@ where
          JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
          WHERE d.deletes_action_hash = ? AND c.locally_validated = 1",
     )
-    .bind(i64::from(ChainOpType::RegisterDeletedBy))
+    .bind(i64::from(ChainOpType::DeleteRecord))
     .bind(record_action_hash.get_raw_36())
     .fetch_all(executor)
     .await?;
@@ -677,7 +677,7 @@ where
          JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
          WHERE u.original_action_hash = ? AND c.locally_validated = 1",
     )
-    .bind(i64::from(ChainOpType::RegisterUpdatedRecord))
+    .bind(i64::from(ChainOpType::UpdateRecord))
     .bind(record_action_hash.get_raw_36())
     .fetch_all(executor)
     .await?;
@@ -703,7 +703,7 @@ where
          WHERE c.basis_hash = ? AND c.op_type = ? AND c.locally_validated = 1",
     )
     .bind(entry_hash.get_raw_36())
-    .bind(i64::from(ChainOpType::StoreEntry))
+    .bind(i64::from(ChainOpType::CreateEntry))
     .fetch_all(executor)
     .await?;
     rows.into_iter().map(validated_action_row_to_item).collect()
@@ -728,7 +728,7 @@ where
          JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
          WHERE d.deletes_entry_hash = ? AND c.locally_validated = 1",
     )
-    .bind(i64::from(ChainOpType::RegisterDeletedEntryAction))
+    .bind(i64::from(ChainOpType::DeleteEntry))
     .bind(entry_hash.get_raw_36())
     .fetch_all(executor)
     .await?;
@@ -754,7 +754,7 @@ where
          JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
          WHERE u.original_entry_hash = ? AND c.locally_validated = 1",
     )
-    .bind(i64::from(ChainOpType::RegisterUpdatedContent))
+    .bind(i64::from(ChainOpType::UpdateEntry))
     .bind(entry_hash.get_raw_36())
     .fetch_all(executor)
     .await?;

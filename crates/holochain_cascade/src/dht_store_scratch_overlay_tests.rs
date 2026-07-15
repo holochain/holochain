@@ -111,7 +111,7 @@ async fn dht_get_entry_reflects_scratch_create() {
     );
 }
 
-/// Helper: integrate a `StoreRecord` op for a `Create` action so that
+/// Helper: integrate a `CreateRecord` op for a `Create` action so that
 /// `get_record_details_with_scratch` can locate the action via its store gate.
 ///
 /// The entry is included in the op so `retrieve_record` can locate it in
@@ -173,7 +173,7 @@ async fn integrate_store_record(
     action_hash
 }
 
-/// Helper: integrate a `StoreEntry` op for a `Create` action.
+/// Helper: integrate a `CreateEntry` op for a `Create` action.
 async fn integrate_store_entry(
     store: &holochain_state::dht_store::DhtStore,
     seed: u8,
@@ -248,7 +248,7 @@ async fn get_record_details_reflects_scratch_delete() {
     let entry = Entry::Agent(agent_key.clone());
     let entry_hash = holo_hash::EntryHash::with_data_sync(&entry);
 
-    // Integrate a StoreRecord op so get_record_details_with_scratch can find it.
+    // Integrate a CreateRecord op so get_record_details_with_scratch can find it.
     let action_hash =
         integrate_store_record(&store, seed, &author, entry_hash.clone(), entry).await;
 
@@ -318,7 +318,7 @@ async fn get_entry_details_reflects_scratch_delete() {
     let entry = Entry::Agent(agent_key.clone());
     let entry_hash = holo_hash::EntryHash::with_data_sync(&entry);
 
-    // Integrate a StoreEntry op so the entry exists in the store and is Live.
+    // Integrate a CreateEntry op so the entry exists in the store and is Live.
     let store_action_hash =
         integrate_store_entry(&store, seed, &author, entry_hash.clone(), entry).await;
 
@@ -375,7 +375,7 @@ async fn get_entry_details_reflects_scratch_delete() {
     );
 }
 
-/// Helper: integrate a `RegisterAddLink` op into the store, returning the action hash.
+/// Helper: integrate a `CreateLink` op into the store, returning the action hash.
 async fn integrate_link_op(
     store: &holochain_state::dht_store::DhtStore,
     base: &holo_hash::AnyLinkableHash,
@@ -691,7 +691,7 @@ async fn dht_count_links_reflects_scratch_create_and_delete() {
 
 // ---- agent-activity helpers ----
 
-/// Integrate a `RegisterAgentActivity` op for the given `action` into the
+/// Integrate a `AgentActivity` op for the given `action` into the
 /// store so it is marked accepted and integrated.
 async fn integrate_activity_op(
     store: &holochain_state::dht_store::DhtStore,

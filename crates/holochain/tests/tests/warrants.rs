@@ -242,7 +242,7 @@ async fn author_of_invalid_warrant_is_blocked() {
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
             action_author: alice.agent_pubkey().clone(),
             action: (action.hashed.hash.clone(), action.signature.clone()),
-            chain_op_type: ChainOpType::StoreRecord,
+            chain_op_type: ChainOpType::CreateRecord,
             reason: "test warrant".into(),
         }),
         bob.agent_pubkey().clone(),

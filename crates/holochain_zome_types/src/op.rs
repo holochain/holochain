@@ -22,24 +22,24 @@ pub use holochain_integrity_types::op::*;
     strum_macros::EnumString,
 )]
 pub enum ChainOpType {
-    #[display("StoreRecord")]
-    StoreRecord,
-    #[display("StoreEntry")]
-    StoreEntry,
-    #[display("RegisterAgentActivity")]
-    RegisterAgentActivity,
-    #[display("RegisterUpdatedContent")]
-    RegisterUpdatedContent,
-    #[display("RegisterUpdatedRecord")]
-    RegisterUpdatedRecord,
-    #[display("RegisterDeletedBy")]
-    RegisterDeletedBy,
-    #[display("RegisterDeletedEntryAction")]
-    RegisterDeletedEntryAction,
-    #[display("RegisterAddLink")]
-    RegisterAddLink,
-    #[display("RegisterRemoveLink")]
-    RegisterRemoveLink,
+    #[display("CreateRecord")]
+    CreateRecord,
+    #[display("CreateEntry")]
+    CreateEntry,
+    #[display("AgentActivity")]
+    AgentActivity,
+    #[display("UpdateEntry")]
+    UpdateEntry,
+    #[display("UpdateRecord")]
+    UpdateRecord,
+    #[display("DeleteRecord")]
+    DeleteRecord,
+    #[display("DeleteEntry")]
+    DeleteEntry,
+    #[display("CreateLink")]
+    CreateLink,
+    #[display("DeleteLink")]
+    DeleteLink,
 }
 
 /// Maps [`ChainOpType`] onto the schema `op_type` INTEGER column (`1..=9`).
@@ -47,29 +47,29 @@ pub enum ChainOpType {
 ///
 /// Variant ordering is pinned to `docs/design/state_model.md`:
 ///
-/// | `op_type` | [`ChainOpType`] variant         | Semantic name  | Authority       |
-/// |-----------|---------------------------------|----------------|-----------------|
-/// | 1         | `StoreRecord`                   | CreateRecord   | action          |
-/// | 2         | `StoreEntry`                    | CreateEntry    | entry           |
-/// | 3         | `RegisterAgentActivity`         | AgentActivity  | agent           |
-/// | 4         | `RegisterUpdatedContent`        | UpdateEntry    | entry           |
-/// | 5         | `RegisterUpdatedRecord`         | UpdateRecord   | action          |
-/// | 6         | `RegisterDeletedEntryAction`    | DeleteEntry    | entry           |
-/// | 7         | `RegisterDeletedBy`             | DeleteRecord   | action          |
-/// | 8         | `RegisterAddLink`               | CreateLink     | link base       |
-/// | 9         | `RegisterRemoveLink`            | DeleteLink     | link base       |
+/// | `op_type` | [`ChainOpType`] variant | Authority       |
+/// |-----------|-------------------------|-----------------|
+/// | 1         | `CreateRecord`          | action          |
+/// | 2         | `CreateEntry`           | entry           |
+/// | 3         | `AgentActivity`         | agent           |
+/// | 4         | `UpdateEntry`           | entry           |
+/// | 5         | `UpdateRecord`          | action          |
+/// | 6         | `DeleteEntry`           | entry           |
+/// | 7         | `DeleteRecord`          | action          |
+/// | 8         | `CreateLink`            | link base       |
+/// | 9         | `DeleteLink`            | link base       |
 impl From<ChainOpType> for i64 {
     fn from(t: ChainOpType) -> Self {
         match t {
-            ChainOpType::StoreRecord => 1,
-            ChainOpType::StoreEntry => 2,
-            ChainOpType::RegisterAgentActivity => 3,
-            ChainOpType::RegisterUpdatedContent => 4,
-            ChainOpType::RegisterUpdatedRecord => 5,
-            ChainOpType::RegisterDeletedEntryAction => 6,
-            ChainOpType::RegisterDeletedBy => 7,
-            ChainOpType::RegisterAddLink => 8,
-            ChainOpType::RegisterRemoveLink => 9,
+            ChainOpType::CreateRecord => 1,
+            ChainOpType::CreateEntry => 2,
+            ChainOpType::AgentActivity => 3,
+            ChainOpType::UpdateEntry => 4,
+            ChainOpType::UpdateRecord => 5,
+            ChainOpType::DeleteEntry => 6,
+            ChainOpType::DeleteRecord => 7,
+            ChainOpType::CreateLink => 8,
+            ChainOpType::DeleteLink => 9,
         }
     }
 }
@@ -81,15 +81,15 @@ impl TryFrom<i64> for ChainOpType {
 
     fn try_from(n: i64) -> Result<Self, Self::Error> {
         Ok(match n {
-            1 => ChainOpType::StoreRecord,
-            2 => ChainOpType::StoreEntry,
-            3 => ChainOpType::RegisterAgentActivity,
-            4 => ChainOpType::RegisterUpdatedContent,
-            5 => ChainOpType::RegisterUpdatedRecord,
-            6 => ChainOpType::RegisterDeletedEntryAction,
-            7 => ChainOpType::RegisterDeletedBy,
-            8 => ChainOpType::RegisterAddLink,
-            9 => ChainOpType::RegisterRemoveLink,
+            1 => ChainOpType::CreateRecord,
+            2 => ChainOpType::CreateEntry,
+            3 => ChainOpType::AgentActivity,
+            4 => ChainOpType::UpdateEntry,
+            5 => ChainOpType::UpdateRecord,
+            6 => ChainOpType::DeleteEntry,
+            7 => ChainOpType::DeleteRecord,
+            8 => ChainOpType::CreateLink,
+            9 => ChainOpType::DeleteLink,
             other => return Err(other),
         })
     }
@@ -104,15 +104,15 @@ mod tests {
         // Pinned forward-direction mapping. If a future change reorders
         // variants (e.g. a 6/7 swap) this will fail compilation or assertion.
         let expected = [
-            (ChainOpType::StoreRecord, 1_i64),
-            (ChainOpType::StoreEntry, 2),
-            (ChainOpType::RegisterAgentActivity, 3),
-            (ChainOpType::RegisterUpdatedContent, 4),
-            (ChainOpType::RegisterUpdatedRecord, 5),
-            (ChainOpType::RegisterDeletedEntryAction, 6),
-            (ChainOpType::RegisterDeletedBy, 7),
-            (ChainOpType::RegisterAddLink, 8),
-            (ChainOpType::RegisterRemoveLink, 9),
+            (ChainOpType::CreateRecord, 1_i64),
+            (ChainOpType::CreateEntry, 2),
+            (ChainOpType::AgentActivity, 3),
+            (ChainOpType::UpdateEntry, 4),
+            (ChainOpType::UpdateRecord, 5),
+            (ChainOpType::DeleteEntry, 6),
+            (ChainOpType::DeleteRecord, 7),
+            (ChainOpType::CreateLink, 8),
+            (ChainOpType::DeleteLink, 9),
         ];
         for (variant, n) in expected {
             assert_eq!(i64::from(variant), n);

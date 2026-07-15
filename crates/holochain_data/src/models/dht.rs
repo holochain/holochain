@@ -65,13 +65,13 @@ pub(crate) struct ValidatedActionRow {
     pub validation_status: i64,
 }
 
-/// Decoded agent-activity item: an integrated `RegisterAgentActivity` action,
+/// Decoded agent-activity item: an integrated `AgentActivity` action,
 /// its validation status, and (Full mode) the referenced public entry.
 #[derive(Debug, Clone)]
 pub struct AgentActivityItem {
     /// The signed, hashed action.
     pub action: SignedActionHashed,
-    /// Validation status of the action's `RegisterAgentActivity` op.
+    /// Validation status of the action's `AgentActivity` op.
     pub validation_status: RecordValidity,
     /// The referenced public entry, when fetched (Full mode) and present.
     pub entry: Option<Entry>,

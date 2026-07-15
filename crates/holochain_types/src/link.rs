@@ -53,7 +53,7 @@ impl WireLinkOps {
     /// Expand the served records into the request-relevant ops for caching.
     ///
     /// Each served action becomes the single op the get-links request
-    /// represents (`RegisterAddLink` per create, `RegisterRemoveLink` per
+    /// represents (`CreateLink` per create, `DeleteLink` per
     /// delete), tagged with the served validation status. Warrants are handled
     /// separately by the requester.
     pub fn render(self) -> DhtOpResult<RenderedOps> {
@@ -70,7 +70,7 @@ impl WireLinkOps {
                 action,
                 signature,
                 status,
-                ChainOpType::RegisterAddLink,
+                ChainOpType::CreateLink,
             )?);
         }
         for op in deletes {
@@ -80,7 +80,7 @@ impl WireLinkOps {
                 action,
                 signature,
                 status,
-                ChainOpType::RegisterRemoveLink,
+                ChainOpType::DeleteLink,
             )?);
         }
         Ok(RenderedOps {

@@ -277,7 +277,7 @@ async fn create_signed_warrant(author: &AgentPubKey, keystore: &MetaLairClient) 
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
             action_author: fixt!(AgentPubKey),
             action: (fixt!(ActionHash), fixt!(Signature)),
-            chain_op_type: ChainOpType::StoreEntry,
+            chain_op_type: ChainOpType::CreateEntry,
             reason: "test warrant".into(),
         }),
         (*author).clone(),

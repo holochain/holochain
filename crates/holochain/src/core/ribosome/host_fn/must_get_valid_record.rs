@@ -182,7 +182,7 @@ mod tests {
             create_action.clone(),
             fixt!(Signature),
             None,
-            holochain_zome_types::op::ChainOpType::StoreRecord,
+            holochain_zome_types::op::ChainOpType::CreateRecord,
         )
         .unwrap();
         let create_op_hash = rendered.op_hash.clone();

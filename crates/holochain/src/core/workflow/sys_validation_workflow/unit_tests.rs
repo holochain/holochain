@@ -333,7 +333,7 @@ async fn validate_valid_warrant_with_cached_dependency() {
         .create_and_sign_warrant(
             &warranted_action,
             &warrant_agent,
-            holochain_zome_types::op::ChainOpType::StoreRecord,
+            holochain_zome_types::op::ChainOpType::CreateRecord,
         )
         .await
         .unwrap();
@@ -420,7 +420,7 @@ async fn validate_valid_warrant_with_fetched_dependency() {
         .create_and_sign_warrant(
             &warranted_action,
             &warrant_agent,
-            holochain_zome_types::op::ChainOpType::StoreRecord,
+            holochain_zome_types::op::ChainOpType::CreateRecord,
         )
         .await
         .unwrap();
@@ -501,7 +501,7 @@ async fn reject_invalid_warrant() {
         .create_and_sign_warrant(
             &valid_action,
             &bad_warrant_agent,
-            holochain_zome_types::op::ChainOpType::StoreRecord,
+            holochain_zome_types::op::ChainOpType::CreateRecord,
         )
         .await
         .unwrap();
@@ -534,7 +534,7 @@ async fn reject_invalid_warrant() {
         .as_read()
         .op_validation_status(
             valid_action.as_hash(),
-            holochain_zome_types::op::ChainOpType::StoreRecord,
+            holochain_zome_types::op::ChainOpType::CreateRecord,
         )
         .await
         .unwrap()
@@ -604,7 +604,7 @@ async fn validate_warrant_with_validated_dependency() {
         .create_and_sign_warrant(
             &valid_action,
             &bad_warrant_agent,
-            holochain_zome_types::op::ChainOpType::StoreRecord,
+            holochain_zome_types::op::ChainOpType::CreateRecord,
         )
         .await
         .unwrap();
@@ -675,7 +675,7 @@ async fn avoid_duplicate_warrant() {
         .create_and_sign_warrant(
             &valid_action,
             &warrant_agent,
-            holochain_zome_types::op::ChainOpType::StoreRecord,
+            holochain_zome_types::op::ChainOpType::CreateRecord,
         )
         .await
         .unwrap();

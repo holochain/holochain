@@ -248,7 +248,7 @@ pub enum AdminRequest {
     /// Note that the response to this call can be very big, as it's requesting for
     /// the full database of the cell.
     ///
-    /// Also note that while DHT ops about private entries will be returned (like `StoreRecord`),
+    /// Also note that while DHT ops about private entries will be returned (like `CreateRecord`),
     /// the entry in itself will be missing, as it's not actually stored publicly in the DHT shard.
     ///
     /// # Returns

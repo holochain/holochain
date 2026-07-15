@@ -232,7 +232,7 @@ impl DbRead<Dht> {
     }
 
     /// Chain-op rows authored and shared by `author`, joined for wire
-    /// reconstruction. Excludes private `StoreEntry` ops so private entries
+    /// reconstruction. Excludes private `CreateEntry` ops so private entries
     /// never leak into the published set.
     pub async fn ops_to_publish_for_wire(
         &self,

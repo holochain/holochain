@@ -30,7 +30,7 @@ impl Default for Event {
     fn default() -> Self {
         Self {
             action: Default::default(),
-            op_type: ChainOpType::RegisterAgentActivity,
+            op_type: ChainOpType::AgentActivity,
             called_zome: Default::default(),
             with_zome_index: Default::default(),
             with_entry_def_index: Default::default(),
@@ -100,14 +100,14 @@ impl Expected {
     }
 
     fn activity_and_record_all_zomes(&mut self, mut event: Event) {
-        event.op_type = ChainOpType::RegisterAgentActivity;
+        event.op_type = ChainOpType::AgentActivity;
         self.all_zomes(event.clone());
-        event.op_type = ChainOpType::StoreRecord;
+        event.op_type = ChainOpType::CreateRecord;
         self.all_zomes(event.clone());
     }
 
     fn activity_all_zomes(&mut self, mut event: Event) {
-        event.op_type = ChainOpType::RegisterAgentActivity;
+        event.op_type = ChainOpType::AgentActivity;
         self.all_zomes(event.clone());
     }
 
@@ -119,17 +119,17 @@ impl Expected {
     }
 
     fn activity_and_record_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
-        event.op_type = ChainOpType::RegisterAgentActivity;
+        event.op_type = ChainOpType::AgentActivity;
 
         self.zomes(event.clone(), zomes);
 
-        event.op_type = ChainOpType::StoreRecord;
+        event.op_type = ChainOpType::CreateRecord;
 
         self.zomes(event.clone(), zomes);
     }
 
     fn record_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
-        event.op_type = ChainOpType::StoreRecord;
+        event.op_type = ChainOpType::CreateRecord;
 
         self.zomes(event.clone(), zomes);
     }
@@ -153,7 +153,7 @@ impl Expected {
         };
         self.activity_and_record_for_zomes(event.clone(), zomes);
 
-        event.op_type = ChainOpType::StoreEntry;
+        event.op_type = ChainOpType::CreateEntry;
         self.zomes(event.clone(), zomes);
     }
 
@@ -211,7 +211,7 @@ async fn app_validation_ops() {
                 let event = match op {
                     Op::StoreRecord(StoreRecord { record }) => Event {
                         action: ActionLocation::new(record.action().clone(), &agents),
-                        op_type: ChainOpType::StoreRecord,
+                        op_type: ChainOpType::CreateRecord,
                         called_zome: zome,
                         with_zome_index: None,
                         with_entry_def_index: None,
@@ -228,7 +228,7 @@ async fn app_validation_ops() {
                             };
                         Event {
                             action: ActionLocation::new(action.hashed.content.clone(), &agents),
-                            op_type: ChainOpType::StoreEntry,
+                            op_type: ChainOpType::CreateEntry,
                             called_zome: zome,
                             with_zome_index,
                             with_entry_def_index,
@@ -246,7 +246,7 @@ async fn app_validation_ops() {
                             };
                         Event {
                             action: ActionLocation::new(update.hashed.content.clone(), &agents),
-                            op_type: ChainOpType::RegisterUpdatedContent,
+                            op_type: ChainOpType::UpdateEntry,
                             called_zome: zome,
                             with_zome_index,
                             with_entry_def_index,
@@ -268,7 +268,7 @@ async fn app_validation_ops() {
                             };
                         Event {
                             action: ActionLocation::new(delete.hashed.content.clone(), &agents),
-                            op_type: ChainOpType::RegisterDeletedBy,
+                            op_type: ChainOpType::DeleteRecord,
                             called_zome: zome,
                             with_zome_index,
                             with_entry_def_index,
@@ -276,21 +276,21 @@ async fn app_validation_ops() {
                     }
                     Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Event {
                         action: ActionLocation::new(action.hashed.content.clone(), &agents),
-                        op_type: ChainOpType::RegisterAgentActivity,
+                        op_type: ChainOpType::AgentActivity,
                         called_zome: zome,
                         with_zome_index: None,
                         with_entry_def_index: None,
                     },
                     Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => Event {
                         action: ActionLocation::new(create_link.hashed.content.clone(), &agents),
-                        op_type: ChainOpType::RegisterAddLink,
+                        op_type: ChainOpType::CreateLink,
                         called_zome: zome,
                         with_zome_index: None,
                         with_entry_def_index: None,
                     },
                     Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => Event {
                         action: ActionLocation::new(delete_link.hashed.content.clone(), &agents),
-                        op_type: ChainOpType::RegisterRemoveLink,
+                        op_type: ChainOpType::DeleteLink,
                         called_zome: zome,
                         with_zome_index: None,
                         with_entry_def_index: None,
@@ -402,7 +402,7 @@ async fn app_validation_ops() {
     expected.activity_all_zomes(event.clone());
     expected.record_for_zomes(event.clone(), &[ZOME_A_0, ZOME_B_0]);
 
-    event.op_type = ChainOpType::StoreEntry;
+    event.op_type = ChainOpType::CreateEntry;
     event.called_zome = ZOME_A_0;
     event.with_zome_index = Some(ZomeIndex(0));
     event.with_entry_def_index = Some(0.into());

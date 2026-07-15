@@ -242,7 +242,7 @@ async fn app_validation_workflow_inner(
         let action = chain_op.signed_action().data();
 
         // If this is agent activity, track it for the cache.
-        let agent_activity_op = matches!(op_type, ChainOpType::RegisterAgentActivity)
+        let agent_activity_op = matches!(op_type, ChainOpType::AgentActivity)
             .then(|| (action.author().clone(), action.action_seq()));
 
         // Validate this op
@@ -413,7 +413,7 @@ pub async fn record_to_op(
     cascade: Arc<impl Cascade>,
 ) -> AppValidationOutcome<(Op, DhtOpHash, Option<Entry>)> {
     // Hide private data where appropriate
-    let (record, mut hidden_entry) = if matches!(op_type, ChainOpType::StoreEntry) {
+    let (record, mut hidden_entry) = if matches!(op_type, ChainOpType::CreateEntry) {
         // We don't want to hide private data for a StoreEntry, because when doing
         // inline validation as an author, we want to validate and integrate our own entry!
         // Publishing and gossip rules state that a private StoreEntry will never be transmitted
@@ -429,20 +429,20 @@ pub async fn record_to_op(
     let mut entry = entry.into_option();
     // Register agent activity doesn't store the entry so we need to
     // save it so we can reconstruct the record later.
-    if matches!(op_type, ChainOpType::RegisterAgentActivity) {
+    if matches!(op_type, ChainOpType::AgentActivity) {
         hidden_entry = entry.take().or(hidden_entry);
     }
 
     let dht_op_hash = ChainOpUniqueForm::op_hash(op_type, &sah.hashed.content);
 
     let op = match op_type {
-        ChainOpType::StoreRecord => {
+        ChainOpType::CreateRecord => {
             let visibility = sah.hashed.content.entry_visibility().copied();
             Op::StoreRecord(StoreRecord {
                 record: Record::new(sah, RecordEntry::new(visibility.as_ref(), entry)),
             })
         }
-        ChainOpType::StoreEntry => {
+        ChainOpType::CreateEntry => {
             let entry = entry.ok_or_else(|| {
                 AppValidationError::DhtOpError(DhtOpError::ActionWithoutEntry(Box::new(
                     sah.hashed.content.clone(),
@@ -450,23 +450,21 @@ pub async fn record_to_op(
             })?;
             Op::StoreEntry(StoreEntry { action: sah, entry })
         }
-        ChainOpType::RegisterAgentActivity => Op::RegisterAgentActivity(RegisterAgentActivity {
+        ChainOpType::AgentActivity => Op::RegisterAgentActivity(RegisterAgentActivity {
             action: sah,
             cached_entry: entry,
         }),
-        ChainOpType::RegisterUpdatedContent | ChainOpType::RegisterUpdatedRecord => {
+        ChainOpType::UpdateEntry | ChainOpType::UpdateRecord => {
             Op::RegisterUpdate(RegisterUpdate {
                 update: sah,
                 new_entry: entry,
             })
         }
-        ChainOpType::RegisterDeletedBy | ChainOpType::RegisterDeletedEntryAction => {
+        ChainOpType::DeleteRecord | ChainOpType::DeleteEntry => {
             Op::RegisterDelete(RegisterDelete { delete: sah })
         }
-        ChainOpType::RegisterAddLink => {
-            Op::RegisterCreateLink(RegisterCreateLink { create_link: sah })
-        }
-        ChainOpType::RegisterRemoveLink => {
+        ChainOpType::CreateLink => Op::RegisterCreateLink(RegisterCreateLink { create_link: sah }),
+        ChainOpType::DeleteLink => {
             let link_add_address = match &sah.hashed.content.data {
                 ActionData::DeleteLink(DeleteLinkData {
                     link_add_address, ..
@@ -535,7 +533,7 @@ async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppVal
         ChainOp::UpdateEntry(_, op_entry) | ChainOp::UpdateRecord(_, op_entry) => {
             let ActionData::Update(update) = &action.data else {
                 return Err(AppValidationError::DhtOpError(DhtOpError::OpActionMismatch(
-                    ChainOpType::RegisterUpdatedContent,
+                    ChainOpType::UpdateEntry,
                     action.data.action_type(),
                 ))
                 .into());
@@ -574,7 +572,7 @@ async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppVal
             }) = &action.data
             else {
                 return Err(AppValidationError::DhtOpError(DhtOpError::OpActionMismatch(
-                    ChainOpType::RegisterRemoveLink,
+                    ChainOpType::DeleteLink,
                     action.data.action_type(),
                 ))
                 .into());

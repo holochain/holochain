@@ -83,7 +83,7 @@ impl WireEntryOps {
                         action,
                         signature,
                         status,
-                        ChainOpType::StoreEntry,
+                        ChainOpType::CreateEntry,
                     )?);
                 }
                 for op in deletes {
@@ -93,7 +93,7 @@ impl WireEntryOps {
                         action,
                         signature,
                         status,
-                        ChainOpType::RegisterDeletedEntryAction,
+                        ChainOpType::DeleteEntry,
                     )?);
                 }
                 for op in updates {
@@ -103,7 +103,7 @@ impl WireEntryOps {
                         action,
                         signature,
                         status,
-                        ChainOpType::RegisterUpdatedContent,
+                        ChainOpType::UpdateEntry,
                     )?);
                 }
                 Ok(RenderedOps {

@@ -274,7 +274,7 @@ async fn validate_invalid_chain_op_warrant_accepted() {
     let action = test_case.create_signed_action().await;
     test_case.insert_warranted_validated_action(
         &action,
-        ChainOpType::RegisterAgentActivity,
+        ChainOpType::AgentActivity,
         ValidationStatus::Rejected,
     );
 
@@ -305,7 +305,7 @@ async fn validate_invalid_chain_op_warrant_rejected_oversized_reason() {
     let action = test_case.create_signed_action().await;
     test_case.insert_warranted_validated_action(
         &action,
-        ChainOpType::RegisterAgentActivity,
+        ChainOpType::AgentActivity,
         ValidationStatus::Rejected,
     );
 
@@ -345,7 +345,7 @@ async fn make_invalid_chain_op_warrant_truncates_so_it_validates() {
     let action = test_case.create_signed_action().await;
     test_case.insert_warranted_validated_action(
         &action,
-        ChainOpType::RegisterAgentActivity,
+        ChainOpType::AgentActivity,
         ValidationStatus::Rejected,
     );
 
@@ -594,7 +594,7 @@ impl ChainForkWarrantTestCase {
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: action_author.clone(),
                 action: (action.as_hash().clone(), action.signature.clone()),
-                chain_op_type: ChainOpType::RegisterAgentActivity,
+                chain_op_type: ChainOpType::AgentActivity,
                 reason,
             }),
             self.warrant_author.clone(),

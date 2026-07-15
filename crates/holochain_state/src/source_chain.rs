@@ -2563,7 +2563,7 @@ mod tests {
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: warrantee.clone(),
                 action: (fixt!(ActionHash), fixt!(Signature)),
-                chain_op_type: ChainOpType::RegisterAgentActivity,
+                chain_op_type: ChainOpType::AgentActivity,
                 reason: "invalid chain op".into(),
             }),
             agent_key.clone(),
@@ -2889,7 +2889,7 @@ mod tests {
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: warrantee.clone(),
                 action: (fixt!(ActionHash), fixt!(Signature)),
-                chain_op_type: ChainOpType::RegisterAgentActivity,
+                chain_op_type: ChainOpType::AgentActivity,
                 reason: "invalid chain op".into(),
             }),
             author.clone(),

@@ -2407,8 +2407,8 @@ mod tests {
     async fn remove_countersigning_session_deletes_withheld_public_entry() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let entry_hash = EntryHash::from_raw_36(vec![0x77; 36]);
-        // Two withheld self-authored ops for one action (e.g. StoreRecord +
-        // StoreEntry) plus the public entry.
+        // Two withheld self-authored ops for one action (e.g. CreateRecord +
+        // CreateEntry) plus the public entry.
         let (action_hash, op_hashes) = seed_countersigning_record(
             &db,
             0x30,

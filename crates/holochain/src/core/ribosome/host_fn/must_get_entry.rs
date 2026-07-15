@@ -147,11 +147,11 @@ pub mod test {
             action.clone(),
             fixt!(Signature),
             None,
-            holochain_zome_types::op::ChainOpType::StoreRecord,
+            holochain_zome_types::op::ChainOpType::CreateRecord,
         )
         .unwrap();
         let record_op_hash = holochain_types::op::ChainOpUniqueForm::op_hash(
-            holochain_zome_types::op::ChainOpType::StoreRecord,
+            holochain_zome_types::op::ChainOpType::CreateRecord,
             &action,
         );
         let rendered_ops = holochain_types::wire_ops::RenderedOps {

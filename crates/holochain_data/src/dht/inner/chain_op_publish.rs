@@ -98,7 +98,7 @@ where
 /// warrants authored by `author`, ordered for stable publishing. The filters
 /// mirror the historical authored-database query:
 ///
-/// - **Private entries never leave the device.** `StoreEntry` ops (`op_type =
+/// - **Private entries never leave the device.** `CreateEntry` ops (`op_type =
 ///   2`) whose action carries a private entry (`Action.private_entry = 1`) are
 ///   excluded. All other op types are published even for private entries
 ///   because they do not contain the entry data.

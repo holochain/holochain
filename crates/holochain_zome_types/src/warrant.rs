@@ -272,7 +272,7 @@ mod tests {
                 ActionHash::from_raw_36(vec![2u8; 36]),
                 Signature::from([3u8; 64]),
             ),
-            chain_op_type: ChainOpType::StoreRecord,
+            chain_op_type: ChainOpType::CreateRecord,
             reason: reason.to_string(),
         }
     }
@@ -289,7 +289,7 @@ mod tests {
         let a = invalid_chain_op("r");
         let mut b = invalid_chain_op("r");
         if let ChainIntegrityWarrant::InvalidChainOp { chain_op_type, .. } = &mut b {
-            *chain_op_type = ChainOpType::StoreEntry;
+            *chain_op_type = ChainOpType::CreateEntry;
         }
         assert_ne!(a, b);
     }

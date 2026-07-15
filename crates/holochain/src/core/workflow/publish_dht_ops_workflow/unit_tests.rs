@@ -389,7 +389,7 @@ fn build_warrant_op(agent: &AgentPubKey) -> DhtOpHashed {
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: fixt!(AgentPubKey),
                 action: (fixt!(ActionHash), fixt!(Signature)),
-                chain_op_type: ChainOpType::RegisterAddLink,
+                chain_op_type: ChainOpType::CreateLink,
                 reason: "test warrant".into(),
             }),
             agent.clone(),

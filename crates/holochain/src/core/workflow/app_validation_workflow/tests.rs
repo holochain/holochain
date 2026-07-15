@@ -1472,7 +1472,7 @@ async fn expected_invalid_store_entry_op(
     matches!(
         dht_store
             .as_read()
-            .op_validation_status(invalid_action_hash, ChainOpType::StoreEntry)
+            .op_validation_status(invalid_action_hash, ChainOpType::CreateEntry)
             .await
             .unwrap(),
         Some(ValidationStatus::Rejected)
@@ -1487,7 +1487,7 @@ async fn expected_invalid_register_add_link_op(
     matches!(
         dht_store
             .as_read()
-            .op_validation_status(invalid_link_hash, ChainOpType::RegisterAddLink)
+            .op_validation_status(invalid_link_hash, ChainOpType::CreateLink)
             .await
             .unwrap(),
         Some(ValidationStatus::Rejected)
@@ -1502,7 +1502,7 @@ async fn expected_invalid_remove_link_op(
     matches!(
         dht_store
             .as_read()
-            .op_validation_status(invalid_remove_hash, ChainOpType::RegisterRemoveLink)
+            .op_validation_status(invalid_remove_hash, ChainOpType::DeleteLink)
             .await
             .unwrap(),
         Some(ValidationStatus::Rejected)
