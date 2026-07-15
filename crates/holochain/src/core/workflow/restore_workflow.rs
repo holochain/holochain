@@ -10,9 +10,11 @@
 //!   is being restored. It submits the received warrants for local validation and, if all warrants
 //!   are rejected, proceeds to Step 3. Otherwise, if any single warrant is validated, restore will
 //!   fail permanently for this cell.
-//! * **Step 3** walks the collected records backward from the agreed head, then writes the verified
-//!   chain directly into the per-DNA database as authored state, this bypasses validation limbo.
+//! * **Step 3** in [`chain_reconstruction`] walks the collected records backward from the agreed
+//!   head, then writes the verified chain directly into the per-DNA database as authored state,
+//!   this bypasses validation limbo.
 //! * **Step 4** reports completion to the per-app orchestrator and emits a restore complete system
 //!   signal with the cell_id.
 
 pub(crate) mod agent_activity;
+pub(crate) mod chain_reconstruction;
