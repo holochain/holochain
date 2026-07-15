@@ -1,6 +1,9 @@
 # Operates on open PRs and automatically merges updates on the target branch into the PR branch.
 # Like autorebase.yml, but with merging instead of rebasing.
-# Is triggered on a PR if labeled `autoupdate:opt-in`.
+
+# It is triggered on a PR if labeled `autoupdate:opt-in`.
+#
+# Uses the GitHub CLI directly (`gh pr update-branch`) to perform the update.
 
 name: autoupdate
 
@@ -9,21 +12,41 @@ on:
     push:
         branches:
             - "develop"
+            - "develop-*"
     # Run when pull requests get labeled
     pull_request:
         types: [labeled, opened, ready_for_review, reopened]
         branches:
             - "develop"
+            - "develop-*"
 
 jobs:
-    autoupdate:
-        name: autoupdate
+    update:
         runs-on: ubuntu-latest
+        env:
+            # See autorebase.yml for why a PAT/App token is needed instead of
+            # the built-in secrets.GITHUB_TOKEN.
+            GH_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
+            GH_REPO: ${{ github.repository }}
         steps:
-            - uses: docker://chinthakagodawita/autoupdate-action:v1
+            - name: Update the labeled PR
+              if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'autoupdate:opt-in')
               env:
-                  GITHUB_TOKEN: "${{ secrets.HRA_GITHUB_TOKEN }}"
-                  PR_FILTER: "labelled"
-                  PR_LABELS: "autoupdate:opt-in"
-                  MERGE_CONFLICT_ACTION: "fail"
-                  MERGE_MSG: "Branch was auto-updated."
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
+              run: gh pr update-branch "$PR_NUMBER"
+
+            - name: Update all opted-in PRs targeting "${{ github.ref_name }}"
+              if: github.event_name == 'push'
+              env:
+                  BASE_REF: ${{ github.ref_name }}
+              run: |
+                  status=0
+                  prs=$(gh pr list --limit 1000 --base "$BASE_REF" --label "autoupdate:opt-in" --state open --json number --jq '.[].number')
+                  for pr in $prs; do
+                      echo "Updating PR #$pr"
+                      if ! gh pr update-branch "$pr"; then
+                          echo "::error::Failed to update PR #$pr"
+                          status=1
+                      fi
+                  done
+                  exit $status
