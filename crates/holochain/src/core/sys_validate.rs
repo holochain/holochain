@@ -427,7 +427,7 @@ pub trait DhtOpSender {
     /// Send a CreateEntry DhtOp
     async fn send_store_entry(&self, record: Record) -> SysValidationResult<()>;
 
-    /// Send a RegisterAddLink DhtOp
+    /// Send a CreateLink DhtOp
     async fn send_register_add_link(&self, record: Record) -> SysValidationResult<()>;
 
     /// Send a AgentActivity DhtOp
@@ -551,7 +551,7 @@ fn make_store_entry(record: Record) -> Option<ChainOp> {
     ))
 }
 
-/// Make a RegisterAddLink ChainOp from a Record.
+/// Make a CreateLink ChainOp from a Record.
 /// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them

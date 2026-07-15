@@ -555,7 +555,7 @@ fn validated_action_row_to_item(
 }
 
 /// Authority-serving create-link actions for `base`: locally-validated
-/// (`locally_validated = 1`) `RegisterAddLink` ops only, each with its
+/// (`locally_validated = 1`) `CreateLink` ops only, each with its
 /// validation status. Cached links (`locally_validated = 0`) are excluded.
 pub(crate) async fn get_authority_link_creates<'e, E>(
     executor: E,
@@ -581,7 +581,7 @@ where
 }
 
 /// Authority-serving delete-link actions targeting `base`'s links:
-/// locally-validated `RegisterRemoveLink` ops only, each with its validation
+/// locally-validated `DeleteLink` ops only, each with its validation
 /// status.
 pub(crate) async fn get_authority_delete_links<'e, E>(
     executor: E,
@@ -633,7 +633,7 @@ where
 }
 
 /// Authority-serving delete actions targeting record `record_action_hash`:
-/// locally-validated `RegisterDeletedBy` ops only, each with its validation status.
+/// locally-validated `DeleteRecord` ops only, each with its validation status.
 /// Cached ops (`locally_validated = 0`) are excluded.
 pub(crate) async fn get_authority_deletes_for_record<'e, E>(
     executor: E,
@@ -659,7 +659,7 @@ where
 }
 
 /// Authority-serving update actions targeting record `record_action_hash`:
-/// locally-validated `RegisterUpdatedRecord` ops only, each with its validation status.
+/// locally-validated `UpdateRecord` ops only, each with its validation status.
 /// Cached ops (`locally_validated = 0`) are excluded.
 pub(crate) async fn get_authority_updates_for_record<'e, E>(
     executor: E,
@@ -710,7 +710,7 @@ where
 }
 
 /// Authority-serving delete actions targeting entry `entry_hash`:
-/// locally-validated `RegisterDeletedEntryAction` ops only, each with its validation status.
+/// locally-validated `DeleteEntry` ops only, each with its validation status.
 /// Cached ops (`locally_validated = 0`) are excluded.
 pub(crate) async fn get_authority_deletes_for_entry<'e, E>(
     executor: E,
@@ -736,7 +736,7 @@ where
 }
 
 /// Authority-serving update actions targeting entry `entry_hash`:
-/// locally-validated `RegisterUpdatedContent` ops only, each with its validation status.
+/// locally-validated `UpdateEntry` ops only, each with its validation status.
 /// Cached ops (`locally_validated = 0`) are excluded.
 pub(crate) async fn get_authority_updates_for_entry<'e, E>(
     executor: E,

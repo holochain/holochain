@@ -1069,15 +1069,15 @@ fn entry_hash_from_chain_op_action(
 ///
 /// | `op_type` | Basis hash type |
 /// |-----------|-----------------|
-/// | 1 (CreateRecord)                 | `ActionHash`  |
-/// | 2 (CreateEntry)                  | `EntryHash`   |
-/// | 3 (AgentActivity)       | `AgentPubKey` |
-/// | 4 (RegisterUpdatedContent)      | `EntryHash`   |
-/// | 5 (RegisterUpdatedRecord)       | `ActionHash`  |
-/// | 6 (RegisterDeletedEntryAction)  | `EntryHash`   |
-/// | 7 (RegisterDeletedBy)           | `ActionHash`  |
-/// | 8 (RegisterAddLink)             | `EntryHash`   |
-/// | 9 (RegisterRemoveLink)          | `EntryHash`   |
+/// | 1 (CreateRecord)   | `ActionHash`  |
+/// | 2 (CreateEntry)    | `EntryHash`   |
+/// | 3 (AgentActivity)  | `AgentPubKey` |
+/// | 4 (UpdateEntry)    | `EntryHash`   |
+/// | 5 (UpdateRecord)   | `ActionHash`  |
+/// | 6 (DeleteEntry)    | `EntryHash`   |
+/// | 7 (DeleteRecord)   | `ActionHash`  |
+/// | 8 (CreateLink)     | `EntryHash`   |
+/// | 9 (DeleteLink)     | `EntryHash`   |
 ///
 /// Link bases (8, 9) can technically be any `AnyLinkableHash` variant, but
 /// the new schema stores them in the same 36-byte slot. Non-Holochain external
@@ -1085,12 +1085,12 @@ fn entry_hash_from_chain_op_action(
 /// `EntryHash` is used as the fallback for those rows.
 fn chain_op_basis_hash_from_row(op_type: i64, raw: Vec<u8>) -> holo_hash::AnyLinkableHash {
     match op_type {
-        // CreateRecord, RegisterUpdatedRecord, RegisterDeletedBy → ActionHash basis
+        // CreateRecord, UpdateRecord, DeleteRecord → ActionHash basis
         1 | 5 | 7 => holo_hash::ActionHash::from_raw_36(raw).into(),
         // AgentActivity → AgentPubKey basis
         3 => holo_hash::AgentPubKey::from_raw_36(raw).into(),
-        // CreateEntry, RegisterUpdatedContent, RegisterDeletedEntryAction,
-        // RegisterAddLink, RegisterRemoveLink → EntryHash basis (or Agent as Entry)
+        // CreateEntry, UpdateEntry, DeleteEntry,
+        // CreateLink, DeleteLink → EntryHash basis (or Agent as Entry)
         _ => holo_hash::EntryHash::from_raw_36(raw).into(),
     }
 }

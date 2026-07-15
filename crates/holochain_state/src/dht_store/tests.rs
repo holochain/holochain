@@ -1986,7 +1986,7 @@ async fn get_record_details_assembles_record_deletes_and_updates() {
     assert_eq!(details.updates[0].as_hash(), &update_action_hash);
 }
 
-/// Build a single-op `RenderedOps` for a `RegisterAddLink(CreateLink)` chain
+/// Build a single-op `RenderedOps` for a `CreateLink` chain
 /// op.  Returns `(RenderedOps, base_address, create_link_action_hash)` so
 /// callers can query by base and assert on the returned link hash.
 ///
@@ -2030,7 +2030,7 @@ fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHa
     (ops, base, create_link_hash)
 }
 
-/// Build a single-op `RenderedOps` for a `RegisterRemoveLink(DeleteLink)` chain
+/// Build a single-op `RenderedOps` for a `DeleteLink` chain
 /// op that tombstones the given `create_link_hash` on `base`.
 fn build_rendered_delete_link_for(
     create_link_hash: ActionHash,
@@ -2125,7 +2125,7 @@ async fn get_link_details_pairs_creates_with_their_deletes() {
     assert_eq!(deletes.len(), 1, "the create has one DeleteLink");
 }
 
-/// Build a `RegisterAddLink` (CreateLink) op for `base`.
+/// Build a `CreateLink` op for `base`.
 fn make_create_link_op(base: &AnyLinkableHash, seed: u8) -> DhtOpHashed {
     let action = Action {
         header: ActionHeader {
@@ -2184,7 +2184,7 @@ async fn integration_indexes_create_link() {
     assert_eq!(creates.len(), 1, "integrated CreateLink should be indexed");
 }
 
-/// Build a `RegisterRemoveLink` (DeleteLink) op targeting `link_add`.
+/// Build a `DeleteLink` op targeting `link_add`.
 fn make_delete_link_op(base: &AnyLinkableHash, link_add: &ActionHash, seed: u8) -> DhtOpHashed {
     let action = Action {
         header: ActionHeader {

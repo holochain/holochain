@@ -986,7 +986,7 @@ impl DhtStore<DbRead<Dht>> {
     /// still returns `None`.
     ///
     /// Deletes and updates are the **union** of:
-    /// - store-integrated `RegisterDeletedBy` / `RegisterUpdatedRecord` actions, and
+    /// - store-integrated `DeleteRecord` / `UpdateRecord` actions, and
     /// - scratch `Delete`/`Update` actions targeting `hash`.
     ///
     /// Use this on the **requester** path only. Authority handlers must never
@@ -2960,7 +2960,7 @@ fn chain_op_from_joined_row(
         ChainOpType::UpdateEntry => {
             if !matches!(action.data, ActionData::Update(_)) {
                 return Err(crate::query::StateQueryError::Other(
-                    "RegisterUpdatedContent action is not Update".into(),
+                    "UpdateEntry action is not Update".into(),
                 ));
             }
             ChainOp::UpdateEntry(signed_action, op_entry_for(entry_type))
@@ -2968,7 +2968,7 @@ fn chain_op_from_joined_row(
         ChainOpType::UpdateRecord => {
             if !matches!(action.data, ActionData::Update(_)) {
                 return Err(crate::query::StateQueryError::Other(
-                    "RegisterUpdatedRecord action is not Update".into(),
+                    "UpdateRecord action is not Update".into(),
                 ));
             }
             ChainOp::UpdateRecord(signed_action, op_entry_for(entry_type))
@@ -2976,7 +2976,7 @@ fn chain_op_from_joined_row(
         ChainOpType::DeleteEntry => {
             if !matches!(action.data, ActionData::Delete(_)) {
                 return Err(crate::query::StateQueryError::Other(
-                    "RegisterDeletedEntryAction action is not Delete".into(),
+                    "DeleteEntry action is not Delete".into(),
                 ));
             }
             ChainOp::DeleteEntry(signed_action)
@@ -2984,7 +2984,7 @@ fn chain_op_from_joined_row(
         ChainOpType::DeleteRecord => {
             if !matches!(action.data, ActionData::Delete(_)) {
                 return Err(crate::query::StateQueryError::Other(
-                    "RegisterDeletedBy action is not Delete".into(),
+                    "DeleteRecord action is not Delete".into(),
                 ));
             }
             ChainOp::DeleteRecord(signed_action)
@@ -2992,7 +2992,7 @@ fn chain_op_from_joined_row(
         ChainOpType::CreateLink => {
             if !matches!(action.data, ActionData::CreateLink(_)) {
                 return Err(crate::query::StateQueryError::Other(
-                    "RegisterAddLink action is not CreateLink".into(),
+                    "CreateLink op action is not a CreateLink action".into(),
                 ));
             }
             ChainOp::CreateLink(signed_action)
@@ -3000,7 +3000,7 @@ fn chain_op_from_joined_row(
         ChainOpType::DeleteLink => {
             if !matches!(action.data, ActionData::DeleteLink(_)) {
                 return Err(crate::query::StateQueryError::Other(
-                    "RegisterRemoveLink action is not DeleteLink".into(),
+                    "DeleteLink op action is not a DeleteLink action".into(),
                 ));
             }
             ChainOp::DeleteLink(signed_action)
@@ -6064,7 +6064,7 @@ mod tests {
             integrate_store_entry_op(&store, seed, &author, entry_hash.clone(), entry.clone())
                 .await;
 
-        // Integrate a RegisterDeletedEntryAction so the store-create is deleted.
+        // Integrate a DeleteEntry so the store-create is deleted.
         {
             use crate::dht_store::{AppOutcome, SysOutcome};
             let delete_action = Action {
@@ -6282,7 +6282,7 @@ mod tests {
 
     // ---- get_links_with_scratch / get_link_details_with_scratch helpers ----
 
-    /// Build and integrate a `RegisterAddLink` op into the store.
+    /// Build and integrate a `CreateLink` op into the store.
     /// Returns `(action_hash, base_address)` of the created link.
     async fn integrate_link_op_for_base(
         store: &crate::dht_store::DhtStore<DbWrite<Dht>>,

@@ -202,7 +202,7 @@ mod tests {
     }
 
     /// Build a single-op `RenderedOps` for a CreateLink chain op
-    /// (`RegisterAddLink`). No entry.
+    /// (`CreateLink`). No entry.
     fn build_rendered_create_link(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let base = AnyLinkableHash::from_raw_36_and_type(
@@ -238,7 +238,7 @@ mod tests {
     }
 
     /// Build a single-op `RenderedOps` for a DeleteLink chain op
-    /// (`RegisterRemoveLink`). No entry.
+    /// (`DeleteLink`). No entry.
     fn build_rendered_delete_link(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let base = AnyLinkableHash::from_raw_36_and_type(
@@ -267,7 +267,7 @@ mod tests {
     }
 
     /// Build a single-op `RenderedOps` for an Update chain op
-    /// (`RegisterUpdatedRecord`).
+    /// (`UpdateRecord`).
     fn build_rendered_update(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
@@ -300,7 +300,7 @@ mod tests {
     }
 
     /// Build a single-op `RenderedOps` for a Delete chain op
-    /// (`RegisterDeletedBy`).
+    /// (`DeleteRecord`).
     fn build_rendered_delete(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let deletes_address = ActionHash::from_raw_36(vec![seed.wrapping_add(20); 36]);
