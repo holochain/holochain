@@ -168,21 +168,21 @@ mod tests {
             ..
         } = RibosomeTestFixture::new(TestWasm::Validate).await;
 
-        // Build a StoreRecord op for a Create action.
+        // Build a CreateRecord op for a Create action.
         let mut create_action = fixt!(Action, CreateAction);
         // Set author to the cell's agent to keep data coherent.
         create_action.header.author = alice_cell.agent_pubkey().clone();
         let create_entry = fixt!(Entry);
         let create_entry_hash = create_action.entry_hash().unwrap().clone();
 
-        // Cache the StoreRecord record into the new DhtStore (integrated, as a
+        // Cache the CreateRecord record into the new DhtStore (integrated, as a
         // fetched op would be) and mark it Rejected, so the cascade's
         // DhtStore-backed get_record_details sees it as invalid.
         let rendered = holochain_types::wire_ops::RenderedOp::new(
             create_action.clone(),
             fixt!(Signature),
             None,
-            holochain_zome_types::op::ChainOpType::StoreRecord,
+            holochain_zome_types::op::ChainOpType::CreateRecord,
         )
         .unwrap();
         let create_op_hash = rendered.op_hash.clone();

@@ -181,7 +181,7 @@ host_fn_api_impls! {
     fn must_get_action (zt::entry::MustGetActionInput) -> SignedActionHashed;
 
     // Retrieve an agent activity chain segment from the DHT or short circuit.
-    fn must_get_agent_activity (zt::chain::MustGetAgentActivityInput) -> Vec<zt::dht_v2::op::RegisterAgentActivity>;
+    fn must_get_agent_activity (zt::chain::MustGetAgentActivityInput) -> Vec<zt::op::AgentActivity>;
 
     // Query the source chain for data.
     fn query (zt::query::ChainQueryFilter) -> Vec<Record>;

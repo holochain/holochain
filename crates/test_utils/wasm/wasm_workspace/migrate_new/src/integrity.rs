@@ -49,19 +49,19 @@ pub enum EntryTypes {
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, ()>()? {
-        FlatOp::StoreEntry(OpEntry::CreateEntry {
+        FlatOp::CreateEntry(OpEntry::CreateEntry {
             app_entry: EntryTypes::MigrationRecord(record),
             ..
         })
-        | FlatOp::StoreRecord(OpRecord::CreateEntry {
+        | FlatOp::CreateRecord(OpRecord::CreateEntry {
             app_entry: EntryTypes::MigrationRecord(record),
             ..
         }) => validate_migration_record(record),
-        FlatOp::StoreEntry(OpEntry::UpdateEntry {
+        FlatOp::CreateEntry(OpEntry::UpdateEntry {
             app_entry: EntryTypes::MigrationRecord(_),
             ..
         })
-        | FlatOp::StoreRecord(OpRecord::UpdateEntry {
+        | FlatOp::CreateRecord(OpRecord::UpdateEntry {
             app_entry: EntryTypes::MigrationRecord(_),
             ..
         }) => Ok(ValidateCallbackResult::Invalid(

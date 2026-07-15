@@ -18,20 +18,17 @@ use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
-    dht_v2::{ChainOp, DhtOp, DhtOpHashed},
+    op::{ChainOp, DhtOp, DhtOpHashed},
     prelude::SignedActionHashedExt,
     record::WireRecordOps,
     wire_ops::{RenderedOp, RenderedOps, WireOps},
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    ActionData, DeleteData, Op, RegisterCreateLink, RegisterDelete,
-};
-use holochain_zome_types::dht_v2::SignedAction;
+use holochain_zome_types::action::{ActionData, DeleteData, SignedAction};
+use holochain_zome_types::op::{AgentActivity, CreateLink, Delete, Op};
 use holochain_zome_types::{
     chain::{ChainFilter, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
-    dht_v2::RegisterAgentActivity,
     entry::MustGetActionInput,
     fixt::{ActionFixturator, CreateAction, CreateLinkAction, DeleteAction, SignatureFixturator},
     judged::Judged,
@@ -47,7 +44,7 @@ use std::{sync::Arc, time::Duration};
 async fn validation_callback_must_get_action() {
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+            if let Op::Delete(Delete { delete }) = op {
                 let deletes_address = match &delete.hashed.content.data {
                     ActionData::Delete(DeleteData {
                         deletes_address, ..
@@ -55,7 +52,7 @@ async fn validation_callback_must_get_action() {
                     // App validation only runs on ops that have passed sys
                     // validation, which rejects a delete op whose action is not
                     // a `Delete` (`malformed` in the sys validation workflow), so
-                    // a `RegisterDelete` op always carries `ActionData::Delete`.
+                    // a `Delete` op always carries `ActionData::Delete`.
                     _ => unreachable!(),
                 };
                 let result = api.must_get_action(MustGetActionInput(deletes_address.clone()));
@@ -88,14 +85,14 @@ async fn validation_callback_must_get_action() {
     let mut create_action = fixt!(Action, CreateAction);
     create_action.header.author = alice.clone();
     // a delete by bob that references alice's create
-    let mut delete_action_v2 = fixt!(Action, DeleteAction);
-    delete_action_v2.header.author = bob.clone();
-    if let ActionData::Delete(d) = &mut delete_action_v2.data {
+    let mut delete_action = fixt!(Action, DeleteAction);
+    delete_action.header.author = bob.clone();
+    if let ActionData::Delete(d) = &mut delete_action.data {
         d.deletes_address = create_action.to_hash();
     }
     let delete_action_signed_hashed =
-        SignedActionHashed::new_unchecked(delete_action_v2, fixt!(Signature));
-    let delete_action_op = Op::RegisterDelete(RegisterDelete {
+        SignedActionHashed::new_unchecked(delete_action, fixt!(Signature));
+    let delete_action_op = Op::Delete(Delete {
         delete: delete_action_signed_hashed.clone(),
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
@@ -141,7 +138,7 @@ async fn validation_callback_awaiting_deps_hashes() {
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+            if let Op::Delete(Delete { delete }) = op {
                 let deletes_address = match &delete.hashed.content.data {
                     ActionData::Delete(DeleteData {
                         deletes_address, ..
@@ -149,7 +146,7 @@ async fn validation_callback_awaiting_deps_hashes() {
                     // App validation only runs on ops that have passed sys
                     // validation, which rejects a delete op whose action is not
                     // a `Delete` (`malformed` in the sys validation workflow), so
-                    // a `RegisterDelete` op always carries `ActionData::Delete`.
+                    // a `Delete` op always carries `ActionData::Delete`.
                     _ => unreachable!(),
                 };
                 let result = api.must_get_action(MustGetActionInput(deletes_address.clone()));
@@ -190,7 +187,7 @@ async fn validation_callback_awaiting_deps_hashes() {
         d.deletes_address = create_action.to_hash();
     }
     let delete_action_signed_hashed = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
-    let delete_action_op = Op::RegisterDelete(RegisterDelete {
+    let delete_action_op = Op::Delete(Delete {
         delete: delete_action_signed_hashed.clone(),
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
@@ -249,7 +246,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+            if let Op::Delete(Delete { delete }) = op {
                 let deletes_address = match &delete.hashed.content.data {
                     ActionData::Delete(DeleteData {
                         deletes_address, ..
@@ -257,7 +254,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
                     // App validation only runs on ops that have passed sys
                     // validation, which rejects a delete op whose action is not
                     // a `Delete` (`malformed` in the sys validation workflow), so
-                    // a `RegisterDelete` op always carries `ActionData::Delete`.
+                    // a `Delete` op always carries `ActionData::Delete`.
                     _ => unreachable!(),
                 };
                 let author = delete.hashed.content.author().clone();
@@ -300,21 +297,21 @@ async fn validation_callback_awaiting_deps_agent_activity() {
             .await
             .unwrap();
     // a delete by alice that references the create
-    let mut delete_action_v2 = fixt!(Action, DeleteAction);
-    delete_action_v2.header.author = alice.clone();
-    delete_action_v2.header.action_seq = 1;
+    let mut delete_action = fixt!(Action, DeleteAction);
+    delete_action.header.author = alice.clone();
+    delete_action.header.action_seq = 1;
     // prev_action must be set, otherwise it will be filtered from the chain
     // that must_get_agent_activity returns
-    delete_action_v2.header.prev_action = Some(create_action.to_hash());
-    if let ActionData::Delete(d) = &mut delete_action_v2.data {
+    delete_action.header.prev_action = Some(create_action.to_hash());
+    if let ActionData::Delete(d) = &mut delete_action.data {
         d.deletes_address = create_action.to_hash();
     }
     let delete_action_signed_hashed =
-        SignedActionHashed::sign(&keystore, delete_action_v2.clone().into_hashed())
+        SignedActionHashed::sign(&keystore, delete_action.clone().into_hashed())
             .await
             .unwrap();
-    let delete_action_op = Op::RegisterDelete(RegisterDelete {
-        delete: SignedActionHashed::new_unchecked(delete_action_v2, fixt!(Signature)),
+    let delete_action_op = Op::Delete(Delete {
+        delete: SignedActionHashed::new_unchecked(delete_action, fixt!(Signature)),
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
@@ -335,11 +332,11 @@ async fn validation_callback_awaiting_deps_agent_activity() {
             assert_eq!(filter.get_until_hash(), Some(&expected_until_hash));
 
             Ok(vec![MustGetAgentActivityResponse::activity(vec![
-                RegisterAgentActivity {
+                AgentActivity {
                     action: create_action_signed_hashed.clone(),
                     cached_entry: None,
                 },
-                RegisterAgentActivity {
+                AgentActivity {
                     action: delete_action_signed_hashed.clone(),
                     cached_entry: None,
                 },
@@ -425,7 +422,7 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
     }
     let create_link_signed_hashed =
         SignedActionHashed::new_unchecked(create_link_action, fixt!(Signature));
-    let create_link_op = Op::RegisterCreateLink(RegisterCreateLink {
+    let create_link_op = Op::CreateLink(CreateLink {
         create_link: create_link_signed_hashed,
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &create_link_op).unwrap();
@@ -438,7 +435,7 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
         create_action.clone(),
         fixt!(Signature),
         None,
-        holochain_zome_types::op::ChainOpType::StoreRecord,
+        holochain_zome_types::op::ChainOpType::CreateRecord,
     )
     .unwrap();
     let create_op_hash = rendered.op_hash.clone();

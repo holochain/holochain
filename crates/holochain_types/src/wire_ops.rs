@@ -1,8 +1,8 @@
 //! Wire representations of DHT ops served in response to GET requests, and the
 //! rendered form they expand into for caching.
 
-use crate::dht_v2::HashedChainOp;
 use crate::error::{DhtOpError, DhtOpResult};
+use crate::op::HashedChainOp;
 use crate::warrant::WarrantOp;
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::*;
@@ -73,13 +73,13 @@ impl RenderedOp {
     /// The entry (if any) is carried separately on the parent [`RenderedOps`],
     /// so it is not attached here.
     pub fn new(
-        action: holochain_zome_types::dht_v2::Action,
+        action: holochain_zome_types::action::Action,
         signature: Signature,
         validation_status: Option<ValidationStatus>,
         op_type: ChainOpType,
     ) -> DhtOpResult<Self> {
         let action_hashed = holo_hash::HoloHashed::from_content_sync(action);
-        let signed_action = holochain_zome_types::dht_v2::SignedActionHashed::with_presigned(
+        let signed_action = holochain_zome_types::action::SignedActionHashed::with_presigned(
             action_hashed,
             signature,
         );

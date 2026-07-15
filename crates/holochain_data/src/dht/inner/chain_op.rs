@@ -2,7 +2,7 @@
 
 use crate::models::dht::ChainOpRow;
 use holo_hash::{ActionHash, AnyDhtHash, AnyLinkableHash, DhtOpHash};
-use holochain_integrity_types::dht_v2::OpValidity;
+use holochain_integrity_types::action::OpValidity;
 use holochain_timestamp::Timestamp;
 use sqlx::{Executor, Sqlite};
 
@@ -13,7 +13,7 @@ pub struct InsertChainOp<'a> {
     /// Hash of the action carried by this op.
     pub action_hash: &'a ActionHash,
     /// `ChainOpType` discriminant; see
-    /// [`From<ChainOpType> for i64`](holochain_zome_types::dht_v2).
+    /// [`From<ChainOpType> for i64`](holochain_zome_types::op).
     pub op_type: i64,
     /// DHT basis hash (`OpBasis`) where the op is stored.
     /// `AnyLinkableHash`, not `AnyDhtHash`: link-op bases may be `External`
@@ -186,11 +186,10 @@ where
 /// decided result. Returns `None` when the op is still pending validation,
 /// cache-only, or absent. Used by the warrant-dependency readiness check.
 ///
-/// The `LimboChainOp` branch matches the legacy `get_dht_op_validation_state`,
-/// which surfaced a validation decision *before* the op was integrated: a
-/// dependency that has been validated (sys-rejected, or sys-accepted with an
-/// app decision) is ready even though the integration workflow has not yet
-/// promoted it.
+/// The `LimboChainOp` branch surfaces a validation decision *before* the op
+/// is integrated: a dependency that has been validated (sys-rejected, or
+/// sys-accepted with an app decision) is ready even though the integration
+/// workflow has not yet promoted it.
 pub(crate) async fn op_validation_outcome<'e, E>(
     executor: E,
     action_hash: &ActionHash,

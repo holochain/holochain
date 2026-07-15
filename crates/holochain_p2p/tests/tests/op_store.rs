@@ -13,8 +13,8 @@ use holochain_state::DhtStore;
 use holochain_timestamp::Timestamp;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::chain::MustGetAgentActivityResponse;
-use holochain_types::dht_v2::{ChainOp, DhtOp};
 use holochain_types::link::{CountLinksResponse, WireLinkKey, WireLinkOps, WireLinkQuery};
+use holochain_types::op::{ChainOp, DhtOp};
 use holochain_types::prelude::ValidationReceiptBundle;
 use holochain_types::wire_ops::WireOps;
 use holochain_zome_types::fixt::{
@@ -57,16 +57,16 @@ impl HcP2pHandler for StubHost {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
+        ops: Vec<(holochain_types::op::DhtOp, bool)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let store = self.store.clone();
         Box::pin(async move {
             // Hash the wire op directly.
-            let hashed: Vec<(holochain_types::dht_v2::DhtOpHashed, bool)> = ops
+            let hashed: Vec<(holochain_types::op::DhtOpHashed, bool)> = ops
                 .into_iter()
                 .map(|(op, require_receipt)| {
                     (
-                        holochain_types::dht_v2::DhtOpHashed::from_content_sync(op),
+                        holochain_types::op::DhtOpHashed::from_content_sync(op),
                         require_receipt,
                     )
                 })
@@ -156,9 +156,10 @@ impl HcP2pHandler for StubHost {
     }
 }
 
-/// Build a `StoreRecord` op, as it travels on the gossip wire.
-fn test_dht_op(authored_timestamp: Timestamp) -> holochain_types::dht_v2::DhtOp {
-    use holochain_types::dht_v2::{OpEntry, SignedAction};
+/// Build a `CreateRecord` op, as it travels on the gossip wire.
+fn test_dht_op(authored_timestamp: Timestamp) -> holochain_types::op::DhtOp {
+    use holochain_types::op::OpEntry;
+    use holochain_zome_types::action::SignedAction;
 
     let mut action = fixt!(Action, CreateAction);
     action.header.timestamp = authored_timestamp;
@@ -171,7 +172,7 @@ fn test_dht_op(authored_timestamp: Timestamp) -> holochain_types::dht_v2::DhtOp 
 
 /// The `serialized_size` the store records for an op: the wire op's own
 /// encoded length (used only for gossip budgeting).
-fn stored_size(op: &holochain_types::dht_v2::DhtOp) -> usize {
+fn stored_size(op: &holochain_types::op::DhtOp) -> usize {
     holochain_serialized_bytes::encode(op).unwrap().len()
 }
 

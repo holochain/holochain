@@ -108,9 +108,9 @@ async fn verify_rendered_ops_signatures(rendered: &RenderedOps) -> bool {
 /// `MustGetAgentActivityResponse::Activity`. Records or warrants with bad
 /// signatures are logged at warn and dropped.
 pub(crate) async fn verify_activity_signatures(
-    activity: Vec<RegisterAgentActivity>,
+    activity: Vec<AgentActivity>,
     warrants: Vec<WarrantOp>,
-) -> (Vec<RegisterAgentActivity>, Vec<WarrantOp>) {
+) -> (Vec<AgentActivity>, Vec<WarrantOp>) {
     let mut verified_activity = Vec::with_capacity(activity.len());
     for ra in activity {
         // Verify over the signed action — the same bytes it was signed over.
@@ -170,7 +170,7 @@ mod rejected_warrant_invariant_tests {
             fixt!(Action),
             fixt!(Signature),
             Some(status),
-            ChainOpType::StoreRecord,
+            ChainOpType::CreateRecord,
         )
         .unwrap();
         RenderedOps {
@@ -196,7 +196,7 @@ mod rejected_warrant_invariant_tests {
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: author.clone(),
                 action: (action_hash, fixt!(Signature)),
-                chain_op_type: ChainOpType::StoreRecord,
+                chain_op_type: ChainOpType::CreateRecord,
                 reason: "test".to_string(),
             }),
             author,

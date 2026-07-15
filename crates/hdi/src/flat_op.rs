@@ -1,9 +1,9 @@
-//! [`FlatOp`] flattens an [`Op`](holochain_integrity_types::dht_v2::Op)
+//! [`FlatOp`] flattens an [`Op`](holochain_integrity_types::op::Op)
 //! into a flatter, more accessible shape than
-//! [`Op`](holochain_integrity_types::dht_v2::Op)'s deeply nested variants.
+//! [`Op`](holochain_integrity_types::op::Op)'s deeply nested variants.
 
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
-use holochain_integrity_types::dht_v2::Action;
+use holochain_integrity_types::action::Action;
 use holochain_integrity_types::{LinkTag, MembraneProof, UnitEnum};
 
 mod flat_op_activity;
@@ -13,7 +13,7 @@ pub use flat_op_activity::*;
 pub use flat_op_entry::*;
 pub use flat_op_record::*;
 
-/// A flattened view of an [`Op`](holochain_integrity_types::dht_v2::Op),
+/// A flattened view of an [`Op`](holochain_integrity_types::op::Op),
 /// grouped by authority (record, entry, agent activity, link) rather than by
 /// the underlying action variant.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,18 +22,18 @@ where
     ET: UnitEnum,
 {
     /// Received by the action authority; see [`OpRecord`].
-    StoreRecord(OpRecord<ET, LT>),
+    CreateRecord(OpRecord<ET, LT>),
     /// Received by the entry authority; see [`OpEntry`].
-    StoreEntry(OpEntry<ET>),
+    CreateEntry(OpEntry<ET>),
     /// Received by the chain authority for every action; see [`OpActivity`].
-    RegisterAgentActivity(OpActivity<<ET as UnitEnum>::Unit, LT>),
+    AgentActivity(OpActivity<<ET as UnitEnum>::Unit, LT>),
     /// A link create or delete operation, grouped into [`OpLink`] to mirror the
     /// [`OpRecord`]/[`OpEntry`]/[`OpActivity`] sub-types.
-    RegisterLink(OpLink<LT>),
+    Link(OpLink<LT>),
     /// Received by the entry authority when an entry is updated; see [`OpUpdate`].
-    RegisterUpdate(OpUpdate<ET>),
+    Update(OpUpdate<ET>),
     /// Received by the entry authority when an entry is deleted; see [`OpDelete`].
-    RegisterDelete(OpDelete),
+    Delete(OpDelete),
 }
 
 /// The link operations of [`FlatOp`], grouped into a sub-type to mirror

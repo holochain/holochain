@@ -75,19 +75,19 @@ concise structure.
 
 ```rust
 match op.flattened()? {
-    FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
+    FlatOp::CreateEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
         EntryTypes::A(_) => Ok(ValidateCallbackResult::Valid),
         EntryTypes::B(_) => Ok(ValidateCallbackResult::Invalid(
             "No Bs allowed in this app".to_string(),
         )),
     },
-    FlatOp::RegisterCreateLink {
+    FlatOp::Link(OpLink::CreateLink {
         base_address: _,
         target_address: _,
         tag: _,
         link_type,
         action: _,
-    } => match link_type {
+    }) => match link_type {
         LinkTypes::A => Ok(ValidateCallbackResult::Valid),
         LinkTypes::B => Ok(ValidateCallbackResult::Invalid(
             "No Bs allowed in this app".to_string(),

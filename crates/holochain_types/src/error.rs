@@ -4,7 +4,7 @@
 
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_zome_types::action::conversions::WrongActionError;
-use holochain_zome_types::dht_v2::{Action, ActionType};
+use holochain_zome_types::action::{Action, ActionType};
 use holochain_zome_types::op::ChainOpType;
 use thiserror::Error;
 

@@ -25,10 +25,10 @@ fn validate_create_thing(action: Action) -> ExternResult<ValidateCallbackResult>
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, ()>()? {
-        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, action }) => match app_entry {
+        FlatOp::CreateEntry(OpEntry::CreateEntry { app_entry, action }) => match app_entry {
             EntryTypes::Thing(_) => validate_create_thing(action),
         },
-        FlatOp::StoreRecord(OpRecord::CreateEntry { app_entry, action }) => match app_entry {
+        FlatOp::CreateRecord(OpRecord::CreateEntry { app_entry, action }) => match app_entry {
             EntryTypes::Thing(_) => validate_create_thing(action),
         },
         _ => Ok(ValidateCallbackResult::Valid),

@@ -10,7 +10,6 @@ use holochain::{
     core::workflow::WorkflowError,
 };
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
-use holochain_zome_types::{dht_v2::Op, record::RecordEntry};
 use matches::assert_matches;
 
 /// Simple scenario involving two agents using the same DNA
@@ -260,7 +259,7 @@ fn simple_validation_zome() -> InlineZomeSet {
         })
         .integrity_function("validate", |_api, data: Op| {
             let s = match data {
-                Op::StoreEntry(StoreEntry {
+                Op::CreateEntry(CreateEntry {
                     entry: Entry::App(bytes),
                     ..
                 }) => AppString::try_from(bytes.into_sb()).unwrap(),

@@ -15,10 +15,8 @@ use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
 // This module builds op-pipeline types (`ChainOp`/`DhtOp`) directly and feeds
 // them to `validate_op`. The `fixt!(Action, <Variant>Action)` fixturators yield
-// v2 `Action` values (an `ActionHeader` + `ActionData` envelope) that are
+// `Action` values (an `ActionHeader` + `ActionData` envelope) that are
 // authored, hashed, and signed.
-use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
-use holochain_zome_types::dht_v2::{Action, ActionData};
 use holochain_zome_types::fixt::{
     ActionFixturator, AgentValidationPkgAction, CloseChainAction, CreateAction, CreateLinkAction,
     DeleteAction, DeleteLinkAction, DnaAction, InitZomesCompleteAction, UpdateAction,

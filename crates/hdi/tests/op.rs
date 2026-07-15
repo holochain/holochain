@@ -195,46 +195,46 @@ fn cap_grant() -> ZomeCallCapGrant {
 }
 
 fn store_record(data: ActionData, entry: RecordEntry) -> Op {
-    Op::StoreRecord(StoreRecord {
+    Op::CreateRecord(CreateRecord {
         record: Record::new(signed(data), entry),
     })
 }
 
 fn store_entry(data: ActionData, entry: Entry) -> Op {
-    Op::StoreEntry(StoreEntry {
+    Op::CreateEntry(CreateEntry {
         action: signed(data),
         entry,
     })
 }
 
 fn register_update(data: ActionData, new_entry: Option<Entry>) -> Op {
-    Op::RegisterUpdate(RegisterUpdate {
+    Op::Update(Update {
         update: signed(data),
         new_entry,
     })
 }
 
 fn register_delete(data: ActionData) -> Op {
-    Op::RegisterDelete(RegisterDelete {
+    Op::Delete(Delete {
         delete: signed(data),
     })
 }
 
 fn register_agent_activity(data: ActionData) -> Op {
-    Op::RegisterAgentActivity(RegisterAgentActivity {
+    Op::AgentActivity(AgentActivity {
         action: signed(data),
         cached_entry: None,
     })
 }
 
 fn register_create_link(zome_index: u8, link_type: u8) -> Op {
-    Op::RegisterCreateLink(RegisterCreateLink {
+    Op::CreateLink(CreateLink {
         create_link: signed(create_link_data(zome_index, link_type)),
     })
 }
 
 fn register_delete_link(create_zome_index: u8, create_link_type: u8) -> Op {
-    Op::RegisterDeleteLink(RegisterDeleteLink {
+    Op::DeleteLink(DeleteLink {
         delete_link: signed(delete_link_data()),
         create_link: action(create_link_data(create_zome_index, create_link_type)),
     })
@@ -249,76 +249,76 @@ fn register_delete_link(create_zome_index: u8, create_link_type: u8) -> Op {
 // every `Op` variant carries the same `Action` type, so `flattened` checks
 // at runtime that `action.data` is the variant each `Op` case requires.
 
-// RegisterAgentActivity
+// AgentActivity
 #[test_case(register_agent_activity(create_app_data(0, 100, EntryVisibility::Public))
-    => matches WasmErrorInner::Guest(_) ; "RegisterAgentActivity: create entry type index out of range")]
+    => matches WasmErrorInner::Guest(_) ; "AgentActivity: create entry type index out of range")]
 #[test_case(register_agent_activity(create_link_data(0, 100))
-    => matches WasmErrorInner::Guest(_) ; "RegisterAgentActivity: create link type out of range")]
-// StoreRecord
+    => matches WasmErrorInner::Guest(_) ; "AgentActivity: create link type out of range")]
+// CreateRecord
 #[test_case(store_record(create_app_data(0, 100, EntryVisibility::Private), RecordEntry::Hidden)
-    => matches WasmErrorInner::Guest(_) ; "StoreRecord: private entry type index out of range")]
+    => matches WasmErrorInner::Guest(_) ; "CreateRecord: private entry type index out of range")]
 #[test_case(store_record(create_app_data(100, 0, EntryVisibility::Private), RecordEntry::Hidden)
-    => matches WasmErrorInner::Host(_) ; "StoreRecord: private entry zome out of scope")]
+    => matches WasmErrorInner::Host(_) ; "CreateRecord: private entry zome out of scope")]
 #[test_case(store_record(create_app_data(0, 0, EntryVisibility::Public), RecordEntry::Present(e(D::default())))
     => WasmErrorInner::Serialize(SerializedBytesError::Deserialize("invalid type: map, expected unit struct A".to_string()))
-    ; "StoreRecord: entry fails to deserialize as the target app entry type")]
+    ; "CreateRecord: entry fails to deserialize as the target app entry type")]
 #[test_case(store_record(create_app_data(0, 100, EntryVisibility::Public), RecordEntry::Present(e(A {})))
-    => matches WasmErrorInner::Guest(_) ; "StoreRecord: public entry type index out of range")]
+    => matches WasmErrorInner::Guest(_) ; "CreateRecord: public entry type index out of range")]
 #[test_case(store_record(create_app_data(100, 0, EntryVisibility::Public), RecordEntry::Present(e(A {})))
-    => matches WasmErrorInner::Host(_) ; "StoreRecord: public entry zome out of scope")]
+    => matches WasmErrorInner::Host(_) ; "CreateRecord: public entry zome out of scope")]
 #[test_case(store_record(create_app_data(0, 0, EntryVisibility::Private), RecordEntry::Present(e(A {})))
-    => matches WasmErrorInner::Guest(_) ; "StoreRecord: private entry type but entry is present")]
+    => matches WasmErrorInner::Guest(_) ; "CreateRecord: private entry type but entry is present")]
 #[test_case(store_record(create_app_data(0, 0, EntryVisibility::Public), RecordEntry::NA)
-    => matches WasmErrorInner::Guest(_) ; "StoreRecord: public entry type but entry is absent")]
+    => matches WasmErrorInner::Guest(_) ; "CreateRecord: public entry type but entry is absent")]
 #[test_case(store_record(create_link_data(0, 100), RecordEntry::NA)
-    => matches WasmErrorInner::Guest(_) ; "StoreRecord: link type out of range")]
+    => matches WasmErrorInner::Guest(_) ; "CreateRecord: link type out of range")]
 #[test_case(store_record(create_link_data(100, 0), RecordEntry::NA)
-    => matches WasmErrorInner::Host(_) ; "StoreRecord: link zome out of scope")]
-// StoreEntry
+    => matches WasmErrorInner::Host(_) ; "CreateRecord: link zome out of scope")]
+// CreateEntry
 #[test_case(store_entry(create_app_data(0, 100, EntryVisibility::Public), e(A {}))
-    => matches WasmErrorInner::Guest(_) ; "StoreEntry: entry type index out of range")]
+    => matches WasmErrorInner::Guest(_) ; "CreateEntry: entry type index out of range")]
 #[test_case(store_entry(create_app_data(100, 0, EntryVisibility::Public), e(A {}))
-    => matches WasmErrorInner::Host(_) ; "StoreEntry: entry zome out of scope")]
+    => matches WasmErrorInner::Host(_) ; "CreateEntry: entry zome out of scope")]
 #[test_case(store_entry(create_app_data(0, 0, EntryVisibility::Public), e(D::default()))
     => WasmErrorInner::Serialize(SerializedBytesError::Deserialize("invalid type: map, expected unit struct A".to_string()))
-    ; "StoreEntry: entry fails to deserialize as the target app entry type")]
+    ; "CreateEntry: entry fails to deserialize as the target app entry type")]
 #[test_case(store_entry(create_data(EntryType::CapClaim), e(A {}))
-    => matches WasmErrorInner::Guest(_) ; "StoreEntry: entry does not match CapClaim")]
+    => matches WasmErrorInner::Guest(_) ; "CreateEntry: entry does not match CapClaim")]
 #[test_case(store_entry(create_data(EntryType::CapGrant), e(A {}))
-    => matches WasmErrorInner::Guest(_) ; "StoreEntry: entry does not match CapGrant")]
+    => matches WasmErrorInner::Guest(_) ; "CreateEntry: entry does not match CapGrant")]
 #[test_case(store_entry(delete_data(), e(A {}))
-    => matches WasmErrorInner::Guest(_) ; "StoreEntry: action data is not an entry-creation action")]
-// RegisterUpdate
+    => matches WasmErrorInner::Guest(_) ; "CreateEntry: action data is not an entry-creation action")]
+// Update
 #[test_case(register_update(update_app_data(0, 0, EntryVisibility::Public), Some(e(D::default())))
-    => matches WasmErrorInner::Serialize(_) ; "RegisterUpdate: new entry fails to deserialize")]
+    => matches WasmErrorInner::Serialize(_) ; "Update: new entry fails to deserialize")]
 #[test_case(register_update(update_app_data(0, 0, EntryVisibility::Public), None)
-    => matches WasmErrorInner::Guest(_) ; "RegisterUpdate: new entry is missing")]
+    => matches WasmErrorInner::Guest(_) ; "Update: new entry is missing")]
 #[test_case(register_update(update_app_data(0, 0, EntryVisibility::Private), Some(e(A {})))
-    => matches WasmErrorInner::Guest(_) ; "RegisterUpdate: new entry is private but also present")]
+    => matches WasmErrorInner::Guest(_) ; "Update: new entry is private but also present")]
 #[test_case(register_update(update_app_data(0, 100, EntryVisibility::Public), Some(e(A {})))
-    => matches WasmErrorInner::Guest(_) ; "RegisterUpdate: entry type index out of range")]
+    => matches WasmErrorInner::Guest(_) ; "Update: entry type index out of range")]
 #[test_case(register_update(update_app_data(100, 0, EntryVisibility::Public), Some(e(A {})))
-    => matches WasmErrorInner::Host(_) ; "RegisterUpdate: zome id out of range")]
+    => matches WasmErrorInner::Host(_) ; "Update: zome id out of range")]
 #[test_case(register_update(create_app_data(0, 0, EntryVisibility::Public), Some(e(A {})))
-    => matches WasmErrorInner::Guest(_) ; "RegisterUpdate: action data is not an Update action")]
-// RegisterCreateLink / RegisterDeleteLink
+    => matches WasmErrorInner::Guest(_) ; "Update: action data is not an Update action")]
+// CreateLink / DeleteLink
 #[test_case(register_create_link(0, 100)
-    => matches WasmErrorInner::Guest(_) ; "RegisterCreateLink: link type out of range")]
+    => matches WasmErrorInner::Guest(_) ; "CreateLink: link type out of range")]
 #[test_case(register_create_link(100, 0)
-    => matches WasmErrorInner::Host(_) ; "RegisterCreateLink: zome id out of range")]
-#[test_case(Op::RegisterCreateLink(RegisterCreateLink { create_link: signed(delete_data()) })
-    => matches WasmErrorInner::Guest(_) ; "RegisterCreateLink: action data is not a CreateLink action")]
+    => matches WasmErrorInner::Host(_) ; "CreateLink: zome id out of range")]
+#[test_case(Op::CreateLink(CreateLink { create_link: signed(delete_data()) })
+    => matches WasmErrorInner::Guest(_) ; "CreateLink: action data is not a CreateLink action")]
 #[test_case(register_delete_link(0, 100)
-    => matches WasmErrorInner::Guest(_) ; "RegisterDeleteLink: original link type out of range")]
+    => matches WasmErrorInner::Guest(_) ; "DeleteLink: original link type out of range")]
 #[test_case(register_delete_link(100, 0)
-    => matches WasmErrorInner::Host(_) ; "RegisterDeleteLink: original zome id out of range")]
-#[test_case(Op::RegisterDeleteLink(RegisterDeleteLink { delete_link: signed(delete_data()), create_link: action(create_link_data(0, 0)) })
-    => matches WasmErrorInner::Guest(_) ; "RegisterDeleteLink: delete action is not a DeleteLink action")]
-#[test_case(Op::RegisterDeleteLink(RegisterDeleteLink { delete_link: signed(delete_link_data()), create_link: action(delete_data()) })
-    => matches WasmErrorInner::Guest(_) ; "RegisterDeleteLink: original action is not a CreateLink action")]
-// RegisterDelete
+    => matches WasmErrorInner::Host(_) ; "DeleteLink: original zome id out of range")]
+#[test_case(Op::DeleteLink(DeleteLink { delete_link: signed(delete_data()), create_link: action(create_link_data(0, 0)) })
+    => matches WasmErrorInner::Guest(_) ; "DeleteLink: delete action is not a DeleteLink action")]
+#[test_case(Op::DeleteLink(DeleteLink { delete_link: signed(delete_link_data()), create_link: action(delete_data()) })
+    => matches WasmErrorInner::Guest(_) ; "DeleteLink: original action is not a CreateLink action")]
+// Delete
 #[test_case(register_delete(create_app_data(0, 0, EntryVisibility::Public))
-    => matches WasmErrorInner::Guest(_) ; "RegisterDelete: action data is not a Delete action")]
+    => matches WasmErrorInner::Guest(_) ; "Delete: action data is not a Delete action")]
 fn op_errors(op: Op) -> WasmErrorInner {
     types();
     op.flattened::<EntryTypes, LinkTypes>().unwrap_err().error
@@ -337,7 +337,7 @@ fn store_record_create_public_entry_flattens_to_create_entry() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::StoreRecord(OpRecord::CreateEntry {
+        FlatOp::CreateRecord(OpRecord::CreateEntry {
             app_entry: EntryTypes::A(A {}),
             ..
         })
@@ -354,7 +354,7 @@ fn store_record_create_private_entry_flattens_to_create_private_entry() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::StoreRecord(OpRecord::CreatePrivateEntry {
+        FlatOp::CreateRecord(OpRecord::CreatePrivateEntry {
             app_entry_type: UnitEntryTypes::B,
             ..
         })
@@ -371,7 +371,7 @@ fn store_record_update_entry_flattens_to_update_entry() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::StoreRecord(OpRecord::UpdateEntry {
+        FlatOp::CreateRecord(OpRecord::UpdateEntry {
             app_entry: EntryTypes::C(C {}),
             ..
         })
@@ -385,7 +385,7 @@ fn store_record_delete_entry_flattens_to_delete_entry() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::StoreRecord(OpRecord::DeleteEntry { .. })
+        FlatOp::CreateRecord(OpRecord::DeleteEntry { .. })
     ));
 }
 
@@ -396,7 +396,7 @@ fn store_record_create_link_flattens_to_create_link() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::StoreRecord(OpRecord::CreateLink {
+        FlatOp::CreateRecord(OpRecord::CreateLink {
             link_type: LinkTypes::A,
             ..
         })
@@ -410,7 +410,7 @@ fn store_record_delete_link_flattens_to_delete_link() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::StoreRecord(OpRecord::DeleteLink { .. })
+        FlatOp::CreateRecord(OpRecord::DeleteLink { .. })
     ));
 }
 
@@ -421,7 +421,7 @@ fn store_record_dna_flattens_to_dna() {
     let op = store_record(dna_data(hash.clone()), RecordEntry::NA);
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     match flat {
-        FlatOp::StoreRecord(OpRecord::Dna { dna_hash, .. }) => assert_eq!(dna_hash, hash),
+        FlatOp::CreateRecord(OpRecord::Dna { dna_hash, .. }) => assert_eq!(dna_hash, hash),
         _ => panic!("expected Dna"),
     }
 }
@@ -433,7 +433,7 @@ fn store_record_open_chain_flattens_to_open_chain() {
     let op = store_record(open_chain_data(target.clone(), ah(9)), RecordEntry::NA);
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     match flat {
-        FlatOp::StoreRecord(OpRecord::OpenChain {
+        FlatOp::CreateRecord(OpRecord::OpenChain {
             previous_target,
             close_hash,
             ..
@@ -452,7 +452,7 @@ fn store_record_close_chain_flattens_to_close_chain() {
     let op = store_record(close_chain_data(Some(target.clone())), RecordEntry::NA);
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     match flat {
-        FlatOp::StoreRecord(OpRecord::CloseChain { new_target, .. }) => {
+        FlatOp::CreateRecord(OpRecord::CloseChain { new_target, .. }) => {
             assert_eq!(new_target, Some(target));
         }
         _ => panic!("expected CloseChain"),
@@ -466,7 +466,7 @@ fn store_record_agent_validation_pkg_flattens_to_agent_validation_pkg() {
     let op = store_record(avp_data(Some(proof.clone())), RecordEntry::NA);
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     match flat {
-        FlatOp::StoreRecord(OpRecord::AgentValidationPkg { membrane_proof, .. }) => {
+        FlatOp::CreateRecord(OpRecord::AgentValidationPkg { membrane_proof, .. }) => {
             assert_eq!(membrane_proof, Some(proof));
         }
         _ => panic!("expected AgentValidationPkg"),
@@ -480,7 +480,7 @@ fn store_record_init_zomes_complete_flattens_to_init_zomes_complete() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::StoreRecord(OpRecord::InitZomesComplete { .. })
+        FlatOp::CreateRecord(OpRecord::InitZomesComplete { .. })
     ));
 }
 
@@ -491,7 +491,7 @@ fn store_entry_create_entry_flattens_to_create_entry() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::StoreEntry(OpEntry::CreateEntry {
+        FlatOp::CreateEntry(OpEntry::CreateEntry {
             app_entry: EntryTypes::A(A {}),
             ..
         })
@@ -508,7 +508,7 @@ fn store_entry_create_cap_claim_flattens_to_create_cap_claim() {
     );
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     match flat {
-        FlatOp::StoreEntry(OpEntry::CreateCapClaim { entry, .. }) => assert_eq!(entry, claim),
+        FlatOp::CreateEntry(OpEntry::CreateCapClaim { entry, .. }) => assert_eq!(entry, claim),
         _ => panic!("expected CreateCapClaim"),
     }
 }
@@ -523,7 +523,7 @@ fn store_entry_create_cap_grant_flattens_to_create_cap_grant() {
     );
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     match flat {
-        FlatOp::StoreEntry(OpEntry::CreateCapGrant { entry, .. }) => assert_eq!(entry, grant),
+        FlatOp::CreateEntry(OpEntry::CreateCapGrant { entry, .. }) => assert_eq!(entry, grant),
         _ => panic!("expected CreateCapGrant"),
     }
 }
@@ -538,7 +538,7 @@ fn register_update_entry_flattens_to_update_entry() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::RegisterUpdate(OpUpdate::Entry {
+        FlatOp::Update(OpUpdate::Entry {
             app_entry: EntryTypes::A(A {}),
             ..
         })
@@ -552,7 +552,7 @@ fn register_update_private_entry_flattens_to_update_private_entry() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::RegisterUpdate(OpUpdate::PrivateEntry {
+        FlatOp::Update(OpUpdate::PrivateEntry {
             app_entry_type: UnitEntryTypes::B,
             ..
         })
@@ -564,10 +564,7 @@ fn register_update_cap_claim_flattens_to_cap_claim() {
     types();
     let op = register_update(update_data(EntryType::CapClaim), None);
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
-    assert!(matches!(
-        flat,
-        FlatOp::RegisterUpdate(OpUpdate::CapClaim { .. })
-    ));
+    assert!(matches!(flat, FlatOp::Update(OpUpdate::CapClaim { .. })));
 }
 
 #[test]
@@ -575,7 +572,7 @@ fn register_delete_flattens_to_register_delete() {
     types();
     let op = register_delete(delete_data());
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
-    assert!(matches!(flat, FlatOp::RegisterDelete(_)));
+    assert!(matches!(flat, FlatOp::Delete(_)));
 }
 
 #[test]
@@ -585,7 +582,7 @@ fn register_agent_activity_create_private_entry_flattens_with_unit_type() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::RegisterAgentActivity(OpActivity::CreatePrivateEntry {
+        FlatOp::AgentActivity(OpActivity::CreatePrivateEntry {
             app_entry_type: Some(UnitEntryTypes::B),
             ..
         })
@@ -599,7 +596,7 @@ fn register_agent_activity_create_entry_out_of_scope_zome_flattens_with_none_typ
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::RegisterAgentActivity(OpActivity::CreateEntry {
+        FlatOp::AgentActivity(OpActivity::CreateEntry {
             app_entry_type: None,
             ..
         })
@@ -613,7 +610,7 @@ fn register_agent_activity_create_link_flattens_with_link_type() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::RegisterAgentActivity(OpActivity::CreateLink {
+        FlatOp::AgentActivity(OpActivity::CreateLink {
             link_type: Some(LinkTypes::B),
             ..
         })
@@ -627,7 +624,7 @@ fn register_agent_activity_create_link_out_of_scope_zome_flattens_with_none_type
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::RegisterAgentActivity(OpActivity::CreateLink {
+        FlatOp::AgentActivity(OpActivity::CreateLink {
             link_type: None,
             ..
         })
@@ -641,7 +638,7 @@ fn register_create_link_flattens_to_register_link_create() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::RegisterLink(OpLink::CreateLink {
+        FlatOp::Link(OpLink::CreateLink {
             link_type: LinkTypes::C,
             ..
         })
@@ -655,7 +652,7 @@ fn register_delete_link_flattens_to_register_link_delete() {
     let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
     assert!(matches!(
         flat,
-        FlatOp::RegisterLink(OpLink::DeleteLink {
+        FlatOp::Link(OpLink::DeleteLink {
             link_type: LinkTypes::A,
             ..
         })
@@ -673,7 +670,7 @@ fn op_match_sanity() {
         RecordEntry::Present(e(A {})),
     );
     match op.flattened::<EntryTypes, LinkTypes>().unwrap() {
-        FlatOp::StoreRecord(r) => match r {
+        FlatOp::CreateRecord(r) => match r {
             OpRecord::CreateEntry {
                 app_entry: EntryTypes::A(_),
                 ..
@@ -734,9 +731,9 @@ fn op_match_sanity() {
             OpRecord::AgentValidationPkg { .. } => (),
             OpRecord::InitZomesComplete { .. } => (),
         },
-        FlatOp::StoreEntry(_) => (),
-        FlatOp::RegisterAgentActivity(_) => (),
-        FlatOp::RegisterLink(link) => match link {
+        FlatOp::CreateEntry(_) => (),
+        FlatOp::AgentActivity(_) => (),
+        FlatOp::Link(link) => match link {
             OpLink::CreateLink { link_type, .. } => match link_type {
                 LinkTypes::A => (),
                 LinkTypes::B => (),
@@ -748,7 +745,7 @@ fn op_match_sanity() {
                 LinkTypes::C => (),
             },
         },
-        FlatOp::RegisterUpdate(_) => (),
-        FlatOp::RegisterDelete(_) => (),
+        FlatOp::Update(_) => (),
+        FlatOp::Delete(_) => (),
     }
 }

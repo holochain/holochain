@@ -25,7 +25,7 @@ fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
 #[hdk_extern]
 fn call_must_get_agent_activity(
     input: (AgentPubKey, ChainFilter),
-) -> ExternResult<Vec<RegisterAgentActivity>> {
+) -> ExternResult<Vec<AgentActivity>> {
     let (author, filter) = input;
     must_get_agent_activity(author, filter)
 }

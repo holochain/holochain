@@ -8,8 +8,6 @@ use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
-use holochain_types::dht_v2::{ChainOp, OpEntry};
-use holochain_zome_types::dht_v2::build_action_set;
 use std::collections::HashMap;
 
 /// A cheaply cloneable, thread-safe and in-memory store for
@@ -139,7 +137,7 @@ pub(crate) fn receive_incoming_countersigning_ops(
                 tracing::warn!(?op, "Incoming countersigning op is not a CounterSign entry");
             }
         } else {
-            tracing::warn!(?op, "Incoming countersigning op is not a StoreEntry op");
+            tracing::warn!(?op, "Incoming countersigning op is not a CreateEntry op");
         }
     }
 
@@ -257,7 +255,6 @@ mod tests {
     use ::fixt::*;
     use holo_hash::fixt::DhtOpHashFixturator;
     use holo_hash::fixt::EntryHashFixturator;
-    use holochain_zome_types::dht_v2::{Action, ActionData, ActionHeader, CreateLinkData};
 
     /// Build a `CreateLink` chain op, distinct per `seed`. The session
     /// bookkeeping under test only cares about action identity and hash, not

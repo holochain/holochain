@@ -1,7 +1,7 @@
 use crate::core::ribosome::host_fn::cascade_from_call_context;
-use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeError;
+use crate::core::ribosome::{CallContext, Ribosome};
 use holochain_cascade::{Cascade, CascadeImpl};
 use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_types::prelude::*;
@@ -147,11 +147,11 @@ pub mod test {
             action.clone(),
             fixt!(Signature),
             None,
-            holochain_zome_types::op::ChainOpType::StoreRecord,
+            holochain_zome_types::op::ChainOpType::CreateRecord,
         )
         .unwrap();
-        let record_op_hash = holochain_types::dht_v2::ChainOpUniqueForm::op_hash(
-            holochain_zome_types::op::ChainOpType::StoreRecord,
+        let record_op_hash = holochain_types::op::ChainOpUniqueForm::op_hash(
+            holochain_zome_types::op::ChainOpType::CreateRecord,
             &action,
         );
         let rendered_ops = holochain_types::wire_ops::RenderedOps {
@@ -171,7 +171,7 @@ pub mod test {
             .call(&bob, "must_get_valid_record", action_hash.clone())
             .await;
 
-        // Reject the cached StoreRecord op.
+        // Reject the cached CreateRecord op.
         alice_host_fn_caller
             .dht_store
             .reject_chain_ops(vec![record_op_hash])

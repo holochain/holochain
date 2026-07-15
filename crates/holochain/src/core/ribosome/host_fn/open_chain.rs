@@ -1,10 +1,9 @@
-use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
+use crate::core::ribosome::{CallContext, Ribosome};
 use holochain_wasmer_host::prelude::*;
 
 use holochain_types::prelude::*;
-use holochain_zome_types::dht_v2::{ActionData, OpenChainData};
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -60,16 +59,16 @@ pub fn open_chain(
 
 #[cfg(test)]
 mod tests {
-    use holo_hash::fixt::ActionHashFixturator;
-use super::open_chain;
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use super::open_chain;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
     use crate::fixt::CallContextFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
+    use holo_hash::fixt::ActionHashFixturator;
     use holochain_util::tokio_helper;
     use holochain_wasm_test_utils::{TestWasm, TestWasmPair};
     use holochain_zome_types::prelude::*;
     use std::sync::Arc;
-    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_open_chain() {

@@ -15,12 +15,12 @@
 //! The op-discovery reads (`op_hashes_in_time_slice`, `op_ids_since_time_batch`),
 //! the by-hash content read (`get_chain_ops_for_wire`), and the earliest-data
 //! boundary (`earliest_authored_timestamp_in_arc`) additionally exclude
-//! `StoreEntry` ops (`op_type = 2`) whose action carries a private entry
+//! `CreateEntry` ops (`op_type = 2`) whose action carries a private entry
 //! (`Action.private_entry = 1`), matching [`super::chain_op_publish::get_ops_to_publish`].
-//! A private `StoreEntry` op is produced and stored locally so its author can
+//! A private `CreateEntry` op is produced and stored locally so its author can
 //! validate their own entry, but it must never be advertised or served to
 //! peers: `check_entry_visibility` in `holochain`'s sys-validation rejects any
-//! `StoreEntry` op whose action declares a private entry as
+//! `CreateEntry` op whose action declares a private entry as
 //! `PrivateEntryLeaked`, so a peer that received one anyway could never
 //! converge on it — leaving it permanently unreconciled between the author's
 //! slice hash and every peer's.
@@ -299,7 +299,7 @@ where
 }
 
 /// Fetch full chain-op rows (joined with `Action` and optional `Entry`) for
-/// the given op hashes, filtered to `locally_validated = 1`. A `StoreEntry`
+/// the given op hashes, filtered to `locally_validated = 1`. A `CreateEntry`
 /// op carrying a private entry is excluded even if directly requested by
 /// hash — see the module-level doc for why it must never be served.
 pub(crate) async fn get_chain_ops_for_wire<'e, E>(
@@ -385,7 +385,7 @@ where
 /// that cursor — so repeated dumps page forward through newly integrated ops.
 /// Passing `after = None` returns every integrated op (the dump's first page,
 /// and how the consistency harness reads the full set). Reconstruct each row
-/// with `build_chain_dht_op_v2`.
+/// with `build_chain_dht_op`.
 pub(crate) async fn integrated_chain_ops_for_dump<'e, E>(
     executor: E,
     after: Option<(i64, &[u8])>,
@@ -430,7 +430,7 @@ where
 /// Fetch the chain-op rows that `author` has authored and shares with the
 /// DHT, joined for full wire reconstruction. Same columns as
 /// [`all_integrated_chain_ops_for_wire`] but scoped to a single author and
-/// with the private-entry filter applied: `StoreEntry` ops (`op_type = 2`)
+/// with the private-entry filter applied: `CreateEntry` ops (`op_type = 2`)
 /// carrying a private entry are excluded so private entries never leak into
 /// the published set. Ordered by `ChainOp.hash` for a stable result.
 pub(crate) async fn ops_to_publish_for_wire<'e, E>(
@@ -534,7 +534,7 @@ where
 /// Minimum authored timestamp across both `ChainOp` (joined with `Action`)
 /// and integrated warrants (`Warrant` joined with `WarrantOp`), filtered
 /// to `arc` and (for chain ops) `locally_validated = 1` with private
-/// `StoreEntry` ops excluded so a withheld private op never sets the
+/// `CreateEntry` ops excluded so a withheld private op never sets the
 /// advertised earliest-data boundary. `None` when no rows match.
 pub(crate) async fn earliest_authored_timestamp_in_arc<'e, E>(
     executor: E,
@@ -870,9 +870,9 @@ mod tests {
     use sqlx::{Pool, Sqlite};
     use std::sync::Arc;
 
-    /// `ChainOpType::StoreEntry` discriminant.
+    /// `ChainOpType::CreateEntry` discriminant.
     const STORE_ENTRY: i64 = 2;
-    /// `ChainOpType::StoreRecord` discriminant.
+    /// `ChainOpType::CreateRecord` discriminant.
     const STORE_RECORD: i64 = 1;
     /// Author shared by every seeded op so the publish read finds them all.
     const AUTHOR: u8 = 7;
@@ -934,9 +934,9 @@ mod tests {
     }
 
     /// Seed three integrated ops that exercise the private-entry filter:
-    /// a public `StoreEntry` (servable), a private `StoreEntry` (must be
+    /// a public `CreateEntry` (servable), a private `CreateEntry` (must be
     /// withheld — it is authored *earliest*, at timestamp 1000, to also probe
-    /// the earliest-timestamp boundary), and a `StoreRecord` carrying a private
+    /// the earliest-timestamp boundary), and a `CreateRecord` carrying a private
     /// entry (servable, since it withholds the entry body). Returns
     /// `(db, public_store_entry, private_store_entry, private_store_record)`.
     async fn seed_filter_fixture() -> (DbWrite<Dht>, Vec<u8>, Vec<u8>, Vec<u8>) {
@@ -960,14 +960,17 @@ mod tests {
             .map(|r| r.hash)
             .collect();
 
-        assert!(hashes.contains(&public), "public StoreEntry must be served");
+        assert!(
+            hashes.contains(&public),
+            "public CreateEntry must be served"
+        );
         assert!(
             hashes.contains(&record),
-            "StoreRecord op with a private entry must be served (body withheld)"
+            "CreateRecord op with a private entry must be served (body withheld)"
         );
         assert!(
             !hashes.contains(&private),
-            "private StoreEntry op must never be advertised in a time slice"
+            "private CreateEntry op must never be advertised in a time slice"
         );
     }
 
@@ -984,11 +987,14 @@ mod tests {
             .map(|r| r.hash)
             .collect();
 
-        assert!(hashes.contains(&public), "public StoreEntry must be served");
-        assert!(hashes.contains(&record), "StoreRecord op must be served");
+        assert!(
+            hashes.contains(&public),
+            "public CreateEntry must be served"
+        );
+        assert!(hashes.contains(&record), "CreateRecord op must be served");
         assert!(
             !hashes.contains(&private),
-            "private StoreEntry op must never be advertised in the since cursor"
+            "private CreateEntry op must never be advertised in the since cursor"
         );
     }
 
@@ -996,7 +1002,7 @@ mod tests {
     async fn for_wire_read_withholds_private_store_entry_even_when_requested() {
         let (db, public, private, record) = seed_filter_fixture().await;
 
-        // Request all three by hash — the private StoreEntry must still be
+        // Request all three by hash — the private CreateEntry must still be
         // withheld even though it was named explicitly.
         let requested = vec![public.clone(), private.clone(), record.clone()];
         let hashes: Vec<Vec<u8>> = db
@@ -1008,11 +1014,14 @@ mod tests {
             .map(|r| r.op_hash)
             .collect();
 
-        assert!(hashes.contains(&public), "public StoreEntry must be served");
-        assert!(hashes.contains(&record), "StoreRecord op must be served");
+        assert!(
+            hashes.contains(&public),
+            "public CreateEntry must be served"
+        );
+        assert!(hashes.contains(&record), "CreateRecord op must be served");
         assert!(
             !hashes.contains(&private),
-            "private StoreEntry op must never be served by hash"
+            "private CreateEntry op must never be served by hash"
         );
     }
 
@@ -1026,9 +1035,9 @@ mod tests {
             .await
             .unwrap();
 
-        // The private StoreEntry is authored at 1000 but is never servable, so
+        // The private CreateEntry is authored at 1000 but is never servable, so
         // it must not set the advertised earliest-data boundary. The earliest
-        // servable op is the public StoreEntry at 2000.
+        // servable op is the public CreateEntry at 2000.
         assert_eq!(
             earliest,
             Some(2000),
@@ -1052,12 +1061,15 @@ mod tests {
 
         assert!(
             hashes.contains(&public),
-            "public StoreEntry must be published"
+            "public CreateEntry must be published"
         );
-        assert!(hashes.contains(&record), "StoreRecord op must be published");
+        assert!(
+            hashes.contains(&record),
+            "CreateRecord op must be published"
+        );
         assert!(
             !hashes.contains(&private),
-            "private StoreEntry op must never be published"
+            "private CreateEntry op must never be published"
         );
     }
 }

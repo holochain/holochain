@@ -114,10 +114,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
-use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
-use holochain_zome_types::dht_v2::{
-    build_action_set, ActionData, CreateLinkData, DeleteData, DeleteLinkData, UpdateData,
-};
 use std::sync::Arc;
 use std::time::Duration;
 use types::Outcome;
@@ -397,8 +393,8 @@ async fn sys_validation_workflow_inner(
     {
         let mut warrants = vec![];
         // Track action hashes already warranted in this batch to avoid creating duplicate
-        // warrants for the same action. Multiple op types (StoreRecord, StoreEntry,
-        // RegisterAgentActivity) can share the same action, and without this deduplication
+        // warrants for the same action. Multiple op types (CreateRecord, CreateEntry,
+        // AgentActivity) can share the same action, and without this deduplication
         // all of them would trigger a separate warrant when processed in the same run.
         let mut warranted_in_batch = std::collections::HashSet::new();
         for (op_hash, chain_op, reason) in
@@ -706,10 +702,10 @@ async fn retrieve_dependencies(
                     ValidationDependencyType::Warranted(chain_op_type) => {
                         let fetched = match chain_op_type {
                             // These chain op types require the entry to be present.
-                            ChainOpType::StoreRecord |
-                            ChainOpType::StoreEntry |
-                            ChainOpType::RegisterUpdatedContent |
-                            ChainOpType::RegisterUpdatedRecord => {
+                            ChainOpType::CreateRecord |
+                            ChainOpType::CreateEntry |
+                            ChainOpType::UpdateEntry |
+                            ChainOpType::UpdateRecord => {
                                 cascade.retrieve_public_record(hash.clone().into(), Default::default()).await.map(|ok|ok.map(|(a, s)|(a.signed_action, s)))
                             }
                             // Other top types can be constructed without an entry.
@@ -1085,7 +1081,7 @@ async fn verify_signed_action_signature(
 }
 
 async fn validate_warrant_op(
-    op: &holochain_types::dht_v2::WarrantOp,
+    op: &holochain_types::warrant::WarrantOp,
     validation_dependencies: SysValDeps,
 ) -> SysValidationResult<()> {
     match &op.proof {
@@ -1333,7 +1329,7 @@ pub async fn counterfeit_check_action(
 
 /// Check if the warrant op has valid signature and author.
 pub async fn counterfeit_check_warrant(
-    warrant_op: &holochain_types::dht_v2::WarrantOp,
+    warrant_op: &holochain_types::warrant::WarrantOp,
 ) -> SysValidationResult<()> {
     verify_warrant_signature(warrant_op).await?;
     Ok(())
@@ -1584,7 +1580,7 @@ pub async fn make_invalid_chain_warrant_op(
     warrant_author: AgentPubKey,
     op: &ChainOp,
     reason: &str,
-) -> WorkflowResult<holochain_types::dht_v2::DhtOpHashed> {
+) -> WorkflowResult<DhtOpHashed> {
     let signed_action = op.signed_action();
     let action = signed_action.data();
     let action_author = action.author().clone();
@@ -1600,7 +1596,7 @@ pub async fn make_invalid_chain_warrant_op(
     let warrant_op = WarrantOp::sign(keystore, warrant)
         .await
         .map_err(|e| super::WorkflowError::Other(e.into()))?;
-    let op = holochain_types::dht_v2::DhtOp::from((*warrant_op).clone()).into_hashed();
+    let op = DhtOp::from((*warrant_op).clone()).into_hashed();
     Ok(op)
 }
 
@@ -1610,7 +1606,7 @@ pub async fn make_fork_warrant_op_inner(
     chain_author: AgentPubKey,
     action_pair: ((ActionHash, Signature), (ActionHash, Signature)),
     seq: u32,
-) -> WorkflowResult<holochain_types::dht_v2::DhtOpHashed> {
+) -> WorkflowResult<DhtOpHashed> {
     debug_assert_ne!(action_pair.0 .0, action_pair.1 .0);
     tracing::warn!(
         "Authoring warrant for chain fork by {chain_author}. Action hashes: ({}, {})",
@@ -1631,7 +1627,7 @@ pub async fn make_fork_warrant_op_inner(
     let warrant_op = WarrantOp::sign(keystore, warrant)
         .await
         .map_err(|e| super::WorkflowError::Other(e.into()))?;
-    let op = holochain_types::dht_v2::DhtOp::from((*warrant_op).clone()).into_hashed();
+    let op = DhtOp::from((*warrant_op).clone()).into_hashed();
     Ok(op)
 }
 
@@ -1644,7 +1640,7 @@ struct OutcomeSummary {
     warranted: usize,
     /// The number of warrant ops that were rejected during sys validation
     warrants_rejected: usize,
-    /// The number of warrant dependencies that were copied from the cache to the DHT db
+    /// The number of warrant dependencies that were moved into limbo for validation
     warrant_deps_copied: usize,
 }
 

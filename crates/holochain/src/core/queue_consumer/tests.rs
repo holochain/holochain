@@ -7,7 +7,6 @@ use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_state::test_utils::test_dht_store;
-use holochain_zome_types::dht_v2::{Action, ActionData, ActionHeader, CreateData};
 
 #[tokio::test]
 async fn test_trigger_receiver_waits_for_sender() {
@@ -225,7 +224,7 @@ async fn test_concurrency() {
 
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn publish_loop() {
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author: fixt!(AgentPubKey),
             timestamp: Timestamp::now(),
@@ -241,14 +240,10 @@ async fn publish_loop() {
             entry_hash: fixt!(EntryHash),
         }),
     };
-    let author = v2_action.author().clone();
+    let author = action.author().clone();
     let signature = Signature(vec![3; SIGNATURE_BYTES].try_into().unwrap());
-    let signed = holochain_types::dht_v2::SignedAction::new(v2_action, signature);
-    let op = holochain_types::dht_v2::DhtOpHashed::from_content_sync(
-        holochain_types::dht_v2::DhtOp::from(holochain_types::dht_v2::ChainOp::AgentActivity(
-            signed,
-        )),
-    );
+    let signed = SignedAction::new(action, signature);
+    let op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(signed)));
     let op_hash = op.to_hash();
 
     // The DhtStore's sqlx pool has an acquire_timeout driven by tokio time.

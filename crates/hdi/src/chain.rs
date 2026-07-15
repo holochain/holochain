@@ -15,7 +15,7 @@ use holo_hash::AgentPubKey;
 pub fn must_get_agent_activity(
     author: AgentPubKey,
     filter: ChainFilter,
-) -> ExternResult<Vec<RegisterAgentActivity>> {
+) -> ExternResult<Vec<AgentActivity>> {
     HDI.with(|h| {
         h.borrow()
             .must_get_agent_activity(MustGetAgentActivityInput {

@@ -2301,7 +2301,6 @@ mod scheduler_impls {
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
     use holochain_conductor_api::{CellInfo, JsonDump};
-    use holochain_zome_types::dht_v2::{ActionData, CreateData, DeleteData};
     use holochain_zome_types::Entry;
     use kitsune2_api::{SpaceId, TransportStats};
     use std::sync::atomic::Ordering;
@@ -3564,20 +3563,20 @@ pub fn app_manifest_from_dnas(
         .into()
 }
 
-/// Build [`DhtOp`](holochain_types::dht_v2::DhtOp)s from wire rows for the
+/// Build [`DhtOp`]s from wire rows for the
 /// integration dump. Rows that fail to build are dropped (the same lenient
 /// behaviour the wire path uses), so the result is a best-effort view.
-pub fn wire_rows_to_v2_ops(
+pub fn wire_rows_to_ops(
     chain: Vec<holochain_state::dht_store::K2ChainOpForWireRow>,
     warrants: Vec<holochain_state::dht_store::K2WarrantForWireRow>,
-) -> Vec<holochain_types::dht_v2::DhtOp> {
+) -> Vec<holochain_types::op::DhtOp> {
     chain
         .into_iter()
-        .filter_map(|r| holochain_p2p::build_chain_dht_op_v2(r).ok())
+        .filter_map(|r| holochain_p2p::build_chain_dht_op(r).ok())
         .chain(
             warrants
                 .into_iter()
-                .filter_map(|r| holochain_p2p::build_warrant_dht_op_v2(r).ok()),
+                .filter_map(|r| holochain_p2p::build_warrant_dht_op(r).ok()),
         )
         .collect()
 }
@@ -3617,7 +3616,7 @@ pub async fn full_integration_dump(
 
     let mut integrated: Vec<_> = integrated_rows
         .into_iter()
-        .filter_map(|row| holochain_p2p::build_chain_dht_op_v2(row.wire).ok())
+        .filter_map(|row| holochain_p2p::build_chain_dht_op(row.wire).ok())
         .collect();
     // Warrants are returned in full on every call (not cursor-paged); the cursor
     // above tracks only the growing integrated chain-op list, so warrants can
@@ -3627,14 +3626,14 @@ pub async fn full_integration_dump(
             .integrated_warrants_for_dump()
             .await?
             .into_iter()
-            .filter_map(|r| holochain_p2p::build_warrant_dht_op_v2(r).ok()),
+            .filter_map(|r| holochain_p2p::build_warrant_dht_op(r).ok()),
     );
 
     // Limbo sets are small and transient, so they are returned in full.
     let validation_limbo =
-        wire_rows_to_v2_ops(dht_store.limbo_chain_ops_for_dump(false).await?, Vec::new());
+        wire_rows_to_ops(dht_store.limbo_chain_ops_for_dump(false).await?, Vec::new());
     let integration_limbo =
-        wire_rows_to_v2_ops(dht_store.limbo_chain_ops_for_dump(true).await?, Vec::new());
+        wire_rows_to_ops(dht_store.limbo_chain_ops_for_dump(true).await?, Vec::new());
 
     Ok(FullIntegrationStateDump {
         validation_limbo,

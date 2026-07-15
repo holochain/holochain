@@ -1,7 +1,7 @@
 use holo_hash::ActionHash;
 use holochain::sweettest::{await_consistency_s, SweetConductorBatch, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::prelude::AgentActivity;
+use holochain_zome_types::query::AgentActivity;
 use holochain_zome_types::query::ChainStatus;
 use matches::assert_matches;
 

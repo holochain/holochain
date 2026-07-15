@@ -73,6 +73,7 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holochain_nonce::fresh_nonce;
     use holochain_state::source_chain::SourceChainError;
+    use holochain_zome_types::query::AgentActivity;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallParams;
     use matches::assert_matches;

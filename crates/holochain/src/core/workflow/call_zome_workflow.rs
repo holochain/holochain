@@ -20,10 +20,6 @@ use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::IncompleteCommitReason;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
-    RegisterUpdate, StoreEntry, StoreRecord,
-};
 use holochain_zome_types::record::Record;
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -311,7 +307,7 @@ pub async fn inline_validation(
     };
 
     for mut chain_record in records {
-        for op_type in holochain_types::dht_v2::action_to_op_types(chain_record.action()) {
+        for op_type in action_to_op_types(chain_record.action()) {
             let outcome =
                 app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;
 
@@ -340,7 +336,7 @@ pub async fn inline_validation(
 
 fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     match op {
-        Op::StoreRecord(StoreRecord { mut record }) => {
+        Op::CreateRecord(CreateRecord { mut record }) => {
             if let Some(e) = omitted_entry {
                 // NOTE: this is only possible in this situation because we already removed
                 // this exact entry from this Record earlier. DON'T set entries on records
@@ -349,22 +345,20 @@ fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
             }
             record
         }
-        Op::StoreEntry(StoreEntry { action, entry }) => {
+        Op::CreateEntry(CreateEntry { action, entry }) => {
             record_from_signed_action(action, Some(entry))
         }
-        Op::RegisterUpdate(RegisterUpdate {
+        Op::Update(Update {
             update, new_entry, ..
         }) => record_from_signed_action(update, new_entry),
-        Op::RegisterDelete(RegisterDelete { delete, .. }) => {
-            record_from_signed_action(delete, omitted_entry)
-        }
-        Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
+        Op::Delete(Delete { delete, .. }) => record_from_signed_action(delete, omitted_entry),
+        Op::AgentActivity(AgentActivity { action, .. }) => {
             record_from_signed_action(action, omitted_entry)
         }
-        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => {
+        Op::CreateLink(CreateLink { create_link, .. }) => {
             record_from_signed_action(create_link, omitted_entry)
         }
-        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => {
+        Op::DeleteLink(DeleteLink { delete_link, .. }) => {
             record_from_signed_action(delete_link, omitted_entry)
         }
     }

@@ -1,10 +1,9 @@
 //! Methods for awaiting consistency between cells of the same DNA
 
 use super::*;
-use crate::conductor::wire_rows_to_v2_ops;
+use crate::conductor::wire_rows_to_ops;
 use crate::prelude::*;
 use holochain_state::dht_store::DhtStoreRead;
-use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use std::{
     collections::HashSet,
     time::{Duration, Instant},
@@ -70,7 +69,7 @@ struct DhtOpRow {
     when_integrated: i64,
 }
 
-/// A `StoreEntry` op whose entry is `Hidden` references a private entry. The
+/// A `CreateEntry` op whose entry is `Hidden` references a private entry. The
 /// entry is withheld from all peers, so this op only ever exists on the author
 /// (reconstructed from the dump without its entry blob). Such ops must not
 /// enter the cross-node consistency comparison.
@@ -83,31 +82,30 @@ fn is_author_local_private_store_entry(op: &DhtOp) -> bool {
 
 /// Read the integrated ops a node holds, as `(hash, row)` pairs for reporting.
 ///
-/// "Integrated" follows the new store semantics: locally-validated chain ops,
-/// GET-cached copies excluded. **Warrants are deliberately excluded** — the
-/// legacy consistency check inner-joined `Action` (warrants have no `Action`
-/// row), so it only ever compared chain ops. Warrants are not guaranteed to
-/// reach every node (zero-arc nodes, gossip timing), so requiring cross-node
-/// warrant consistency here would hang; warrant propagation is asserted
-/// separately by the warrant tests. **Private `StoreEntry` ops are also
-/// excluded** — a private entry never leaves its author, so its `StoreEntry`
-/// op only ever exists on the authoring node; including it would put a hash in
-/// the comparison set that no peer can hold and consistency could never be
-/// reached. This mirrors the SQL-level filter on `ops_to_publish_for_wire`.
-/// Ops are reconstructed into v2 `DhtOp`s so their hashes match across nodes.
+/// "Integrated" follows the store semantics: locally-validated chain ops,
+/// GET-cached copies excluded. **Warrants are deliberately excluded** — they
+/// are not guaranteed to reach every node (zero-arc nodes, gossip timing), so
+/// requiring cross-node warrant consistency here would hang; warrant
+/// propagation is asserted separately by the warrant tests. **Private
+/// `CreateEntry` ops are also excluded** — a private entry never leaves its
+/// author, so its `CreateEntry` op only ever exists on the authoring node;
+/// including it would put a hash in the comparison set that no peer can hold
+/// and consistency could never be reached. This mirrors the SQL-level filter
+/// on `ops_to_publish_for_wire`. Ops are reconstructed into `DhtOp`s so
+/// their hashes match across nodes.
 async fn integrated_op_rows(dht_store: &DhtStoreRead) -> Result<Vec<DhtOpRow>, String> {
     let dump_rows = dht_store
         .integrated_chain_ops_for_dump(None)
         .await
         .map_err(|e| e.to_string())?;
     // Reconstruct each row on its own so its `when_integrated` stays paired with
-    // the op: `wire_rows_to_v2_ops` drops rows that fail to rebuild, so
+    // the op: `wire_rows_to_ops` drops rows that fail to rebuild, so
     // zipping its output against the original list could misalign.
     Ok(dump_rows
         .into_iter()
         .flat_map(|row| {
             let when_integrated = row.when_integrated;
-            wire_rows_to_v2_ops(vec![row.wire], vec![])
+            wire_rows_to_ops(vec![row.wire], vec![])
                 .into_iter()
                 .map(move |op| (op, when_integrated))
         })
@@ -278,10 +276,11 @@ mod tests {
     use hdk::prelude::SignatureFixturator;
     use holo_hash::ActionHash;
     use holochain_serialized_bytes::SerializedBytes;
+    use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::fixt::ActionFixturator;
     use holochain_zome_types::{
-        action::ChainTopOrdering,
+        action::{ChainTopOrdering, SignedAction},
         entry::{AppEntryBytes, AppEntryDefLocation, CreateInput, EntryDefLocation},
         entry_def::{EntryDef, EntryVisibility},
         zome::inline_zome::InlineIntegrityZome,
@@ -448,15 +447,10 @@ mod tests {
             .await
             .unwrap();
 
-        // `record_incoming_ops` is v2-native; this arbitrary op only needs to
-        // exist unvalidated in limbo, so build it directly as v2.
-        let v2_action = fixt!(Action);
-        let op = holochain_types::dht_v2::ChainOp::AgentActivity(
-            holochain_zome_types::dht_v2::SignedAction::new(v2_action, fixt!(Signature)),
-        );
-        let unintegrated_op = holochain_types::dht_v2::DhtOpHashed::from_content_sync(
-            holochain_types::dht_v2::DhtOp::from(op),
-        );
+        // This arbitrary op only needs to exist unvalidated in limbo.
+        let action = fixt!(Action);
+        let op = ChainOp::AgentActivity(SignedAction::new(action, fixt!(Signature)));
+        let unintegrated_op = DhtOpHashed::from_content_sync(DhtOp::from(op));
         // Stage the op into the DHT store's validation limbo so it is present
         // but not integrated.
         conductors[0]

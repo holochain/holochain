@@ -2,10 +2,9 @@ use super::*;
 use ::fixt::fixt;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::HoloHashed;
-use holochain_zome_types::action::ChainTopOrdering;
-use holochain_zome_types::dht_v2::{
-    Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
-    DnaData, SignedActionHashed,
+use holochain_zome_types::action::{
+    Action, ActionData, ActionHeader, ChainTopOrdering, CreateData, CreateLinkData, DeleteData,
+    DeleteLinkData, DnaData, SignedActionHashed,
 };
 
 async fn empty_store() -> holochain_state::dht_store::DhtStore {
@@ -112,7 +111,7 @@ async fn dht_get_entry_reflects_scratch_create() {
     );
 }
 
-/// Helper: integrate a `StoreRecord` op for a `Create` action so that
+/// Helper: integrate a `CreateRecord` op for a `Create` action so that
 /// `get_record_details_with_scratch` can locate the action via its store gate.
 ///
 /// The entry is included in the op so `retrieve_record` can locate it in
@@ -125,8 +124,8 @@ async fn integrate_store_record(
     entry: holochain_zome_types::entry::Entry,
 ) -> ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
-    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
-    use holochain_zome_types::action::AppEntryDef;
+    use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
+    use holochain_zome_types::action::{AppEntryDef, SignedAction};
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::prelude::Signature;
 
@@ -174,7 +173,7 @@ async fn integrate_store_record(
     action_hash
 }
 
-/// Helper: integrate a `StoreEntry` op for a `Create` action.
+/// Helper: integrate a `CreateEntry` op for a `Create` action.
 async fn integrate_store_entry(
     store: &holochain_state::dht_store::DhtStore,
     seed: u8,
@@ -183,8 +182,8 @@ async fn integrate_store_entry(
     entry: holochain_zome_types::entry::Entry,
 ) -> ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
-    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
-    use holochain_zome_types::action::AppEntryDef;
+    use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
+    use holochain_zome_types::action::{AppEntryDef, SignedAction};
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::prelude::Signature;
 
@@ -249,7 +248,7 @@ async fn get_record_details_reflects_scratch_delete() {
     let entry = Entry::Agent(agent_key.clone());
     let entry_hash = holo_hash::EntryHash::with_data_sync(&entry);
 
-    // Integrate a StoreRecord op so get_record_details_with_scratch can find it.
+    // Integrate a CreateRecord op so get_record_details_with_scratch can find it.
     let action_hash =
         integrate_store_record(&store, seed, &author, entry_hash.clone(), entry).await;
 
@@ -319,7 +318,7 @@ async fn get_entry_details_reflects_scratch_delete() {
     let entry = Entry::Agent(agent_key.clone());
     let entry_hash = holo_hash::EntryHash::with_data_sync(&entry);
 
-    // Integrate a StoreEntry op so the entry exists in the store and is Live.
+    // Integrate a CreateEntry op so the entry exists in the store and is Live.
     let store_action_hash =
         integrate_store_entry(&store, seed, &author, entry_hash.clone(), entry).await;
 
@@ -376,7 +375,7 @@ async fn get_entry_details_reflects_scratch_delete() {
     );
 }
 
-/// Helper: integrate a `RegisterAddLink` op into the store, returning the action hash.
+/// Helper: integrate a `CreateLink` op into the store, returning the action hash.
 async fn integrate_link_op(
     store: &holochain_state::dht_store::DhtStore,
     base: &holo_hash::AnyLinkableHash,
@@ -386,7 +385,8 @@ async fn integrate_link_op(
     seed: u8,
 ) -> holo_hash::ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
-    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, SignedAction};
+    use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed};
+    use holochain_zome_types::action::SignedAction;
     use holochain_zome_types::link::LinkTag;
 
     let action = Action {
@@ -691,7 +691,7 @@ async fn dht_count_links_reflects_scratch_create_and_delete() {
 
 // ---- agent-activity helpers ----
 
-/// Integrate a `RegisterAgentActivity` op for the given `action` into the
+/// Integrate a `AgentActivity` op for the given `action` into the
 /// store so it is marked accepted and integrated.
 async fn integrate_activity_op(
     store: &holochain_state::dht_store::DhtStore,
@@ -700,7 +700,8 @@ async fn integrate_activity_op(
     when: i64,
 ) -> holo_hash::ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
-    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, SignedAction};
+    use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed};
+    use holochain_zome_types::action::SignedAction;
 
     let action_hash = holo_hash::ActionHash::with_data_sync(&action);
     let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::AgentActivity(

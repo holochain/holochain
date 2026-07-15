@@ -3,7 +3,6 @@
 use crate::core::share::Share;
 use holochain_p2p::{event::CountersigningSessionNegotiationMessage, DynHolochainP2pDna};
 use holochain_state::prelude::*;
-use holochain_types::dht_v2::ChainOp;
 use std::time::Duration;
 #[cfg(feature = "unstable-countersigning")]
 use {

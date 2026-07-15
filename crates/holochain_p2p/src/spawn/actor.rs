@@ -94,7 +94,7 @@ impl event::HcP2pHandler for WrapEvtSender {
     fn handle_publish(
         &self,
         dna_hash: DnaHash,
-        ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
+        ops: Vec<(DhtOp, bool)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let op_count = ops.len();
         timing_trace!(
@@ -3025,7 +3025,7 @@ mod tests {
         fn handle_publish(
             &self,
             _dna_hash: DnaHash,
-            _ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
+            _ops: Vec<(DhtOp, bool)>,
         ) -> BoxFut<'_, HolochainP2pResult<()>> {
             // Increment counter
             let mut count = self.handle_publish_count.lock().unwrap();
@@ -3712,22 +3712,18 @@ mod tests {
 
         // PublishCountersignEvt is not limited
         let msg = WireMessage::PublishCountersignEvt {
-            op: holochain_types::dht_v2::ChainOp::AgentActivity(
-                holochain_types::dht_v2::SignedAction::new(
-                    holochain_types::dht_v2::Action {
-                        header: holochain_types::dht_v2::ActionHeader {
-                            author: AgentPubKey::from_raw_32(vec![1; 32]),
-                            timestamp: holochain_types::prelude::Timestamp::now(),
-                            action_seq: 0,
-                            prev_action: Some(ActionHash::from_raw_32(vec![2; 32])),
-                        },
-                        data: holochain_types::dht_v2::ActionData::InitZomesComplete(
-                            holochain_types::dht_v2::InitZomesCompleteData {},
-                        ),
+            op: ChainOp::AgentActivity(SignedAction::new(
+                Action {
+                    header: ActionHeader {
+                        author: AgentPubKey::from_raw_32(vec![1; 32]),
+                        timestamp: holochain_types::prelude::Timestamp::now(),
+                        action_seq: 0,
+                        prev_action: Some(ActionHash::from_raw_32(vec![2; 32])),
                     },
-                    Signature([0; 64]),
-                ),
-            ),
+                    data: ActionData::InitZomesComplete(InitZomesCompleteData {}),
+                },
+                Signature([0; 64]),
+            )),
         };
         let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
         harness

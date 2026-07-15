@@ -4,7 +4,7 @@
 //! All reads go through `DhtStore` methods; this module is responsible only
 //! for marshalling K2 types (`OpId`, `MetaOp`, `DhtArc`, `Timestamp`) into
 //! and out of the row shapes returned by the store. The gossip wire carries
-//! the `holochain_types::dht_v2::DhtOp` encoding: chain-op wire bytes are
+//! the `holochain_types::op::DhtOp` encoding: chain-op wire bytes are
 //! built directly from the stored `Action` rows. Op hashes and `prev_action`
 //! chains are content-derived.
 //!
@@ -21,9 +21,8 @@ use holo_hash::{DhtOpHash, DnaHash, HOLO_HASH_CORE_LEN, HOLO_HASH_UNTYPED_LEN};
 use holochain_serialized_bytes::prelude::{decode, encode};
 use holochain_state::dht_store::{K2ChainOpForWireRow, K2WarrantForWireRow};
 use holochain_state::DhtStore;
-use holochain_types::dht_v2::{
-    Action as ActionV2, ActionData, ActionHeader, ChainOp, DhtOp, OpEntry, SignedAction, WarrantOp,
-};
+use holochain_types::op::{ChainOp, DhtOp, OpEntry};
+use holochain_zome_types::action::{Action, ActionData, ActionHeader, SignedAction};
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::warrant::{SignedWarrant, Warrant, WarrantProof};
 use kitsune2_api::*;
@@ -217,7 +216,7 @@ impl OpStore for HolochainOpStore {
                 // The op id comes from the stored hash + basis — both already
                 // the canonical identity, so no rehash is needed on read.
                 let op_id = k2_op_id_from_raw(&row.op_hash, &row.basis_hash);
-                let op = match build_chain_dht_op_v2(row) {
+                let op = match build_chain_dht_op(row) {
                     Ok(op) => op,
                     Err(e) => {
                         tracing::warn!("Failed to build chain op for wire: {e}");
@@ -235,7 +234,7 @@ impl OpStore for HolochainOpStore {
             for row in warrant_rows {
                 // Warrant op id = (warrant hash, warrantee basis), both stored.
                 let op_id = k2_op_id_from_raw(&row.hash, &row.warrantee);
-                let op = match build_warrant_dht_op_v2(row) {
+                let op = match build_warrant_dht_op(row) {
                     Ok(op) => op,
                     Err(e) => {
                         tracing::warn!("Failed to build warrant op for wire: {e}");
@@ -435,7 +434,7 @@ impl OpStore for HolochainOpStore {
 /// The row already stores the `ActionData` + header fields, so the op is
 /// assembled directly. The op id is taken from the stored hash/basis, so this
 /// builder does not re-hash.
-pub fn build_chain_dht_op_v2(row: K2ChainOpForWireRow) -> Result<DhtOp, String> {
+pub fn build_chain_dht_op(row: K2ChainOpForWireRow) -> Result<DhtOp, String> {
     use holo_hash::{ActionHash, AgentPubKey};
 
     let op_type: ChainOpType = ChainOpType::try_from(row.op_type)
@@ -451,7 +450,7 @@ pub fn build_chain_dht_op_v2(row: K2ChainOpForWireRow) -> Result<DhtOp, String> 
         action_seq: row.seq.max(0) as u32,
         prev_action,
     };
-    let action = ActionV2 {
+    let action = Action {
         header,
         data: action_data,
     };
@@ -477,22 +476,22 @@ pub fn build_chain_dht_op_v2(row: K2ChainOpForWireRow) -> Result<DhtOp, String> 
     };
 
     let chain_op = match op_type {
-        ChainOpType::StoreRecord => ChainOp::CreateRecord(signed_action, op_entry),
-        ChainOpType::StoreEntry => ChainOp::CreateEntry(signed_action, op_entry),
-        ChainOpType::RegisterAgentActivity => ChainOp::AgentActivity(signed_action),
-        ChainOpType::RegisterUpdatedContent => ChainOp::UpdateEntry(signed_action, op_entry),
-        ChainOpType::RegisterUpdatedRecord => ChainOp::UpdateRecord(signed_action, op_entry),
-        ChainOpType::RegisterDeletedBy => ChainOp::DeleteRecord(signed_action),
-        ChainOpType::RegisterDeletedEntryAction => ChainOp::DeleteEntry(signed_action),
-        ChainOpType::RegisterAddLink => ChainOp::CreateLink(signed_action),
-        ChainOpType::RegisterRemoveLink => ChainOp::DeleteLink(signed_action),
+        ChainOpType::CreateRecord => ChainOp::CreateRecord(signed_action, op_entry),
+        ChainOpType::CreateEntry => ChainOp::CreateEntry(signed_action, op_entry),
+        ChainOpType::AgentActivity => ChainOp::AgentActivity(signed_action),
+        ChainOpType::UpdateEntry => ChainOp::UpdateEntry(signed_action, op_entry),
+        ChainOpType::UpdateRecord => ChainOp::UpdateRecord(signed_action, op_entry),
+        ChainOpType::DeleteRecord => ChainOp::DeleteRecord(signed_action),
+        ChainOpType::DeleteEntry => ChainOp::DeleteEntry(signed_action),
+        ChainOpType::CreateLink => ChainOp::CreateLink(signed_action),
+        ChainOpType::DeleteLink => ChainOp::DeleteLink(signed_action),
     };
     Ok(DhtOp::ChainOp(Box::new(chain_op)))
 }
 
 /// Build a [`DhtOp::WarrantOp`] from a warrant wire row; shared with the
 /// integration-dump + consistency reads.
-pub fn build_warrant_dht_op_v2(row: K2WarrantForWireRow) -> Result<DhtOp, String> {
+pub fn build_warrant_dht_op(row: K2WarrantForWireRow) -> Result<DhtOp, String> {
     use holo_hash::AgentPubKey;
 
     let author = AgentPubKey::from_raw_36(row.author);
@@ -509,7 +508,7 @@ pub fn build_warrant_dht_op_v2(row: K2WarrantForWireRow) -> Result<DhtOp, String
         timestamp,
     };
     let signed = SignedWarrant::new(warrant, signature);
-    Ok(DhtOp::WarrantOp(Box::new(WarrantOp(signed))))
+    Ok(DhtOp::WarrantOp(Box::new(signed.into())))
 }
 
 fn decode_signature(bytes: &[u8]) -> Result<holochain_zome_types::signature::Signature, String> {

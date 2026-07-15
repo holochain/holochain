@@ -15,7 +15,6 @@ use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_state::test_utils::test_dht_store;
-use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
 use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
 use std::sync::Arc;
 use std::time::Duration;
@@ -254,7 +253,7 @@ async fn ignores_data_by_other_authors() {
     assert!(rx.is_paused());
 }
 
-// Even though ops are created for actions with private entries, the StoreEntry
+// Even though ops are created for actions with private entries, the CreateEntry
 // op (which carries the entry) must not be published.
 #[tokio::test(flavor = "multi_thread")]
 async fn private_entries_are_not_published() {
@@ -264,27 +263,27 @@ async fn private_entries_are_not_published() {
     let agent = fixt!(AgentPubKey);
 
     // Create a private entry.
-    let mut v2_action = fixt!(Action, CreateAction);
-    v2_action.header.action_seq = 5;
-    v2_action.header.prev_action = Some(fixt!(ActionHash));
-    v2_action.header.timestamp = Timestamp::now();
-    v2_action.header.author = agent.clone();
-    *v2_action.entry_hash_mut().unwrap() = fixt!(EntryHash);
-    *v2_action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+    let mut action = fixt!(Action, CreateAction);
+    action.header.action_seq = 5;
+    action.header.prev_action = Some(fixt!(ActionHash));
+    action.header.timestamp = Timestamp::now();
+    action.header.author = agent.clone();
+    *action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    *action.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Private,
     });
 
     let register_agent_activity_op = DhtOpHashed::from_content_sync(DhtOp::from(
-        ChainOp::AgentActivity(SignedAction::new(v2_action.clone(), fixt!(Signature))),
+        ChainOp::AgentActivity(SignedAction::new(action.clone(), fixt!(Signature))),
     ));
     let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateEntry(
-        SignedAction::new(v2_action.clone(), fixt!(Signature)),
+        SignedAction::new(action.clone(), fixt!(Signature)),
         OpEntry::Present(fixt!(Entry)),
     )));
     let store_record_op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateRecord(
-        SignedAction::new(v2_action, fixt!(Signature)),
+        SignedAction::new(action, fixt!(Signature)),
         OpEntry::Hidden,
     )));
 
@@ -307,8 +306,8 @@ async fn private_entries_are_not_published() {
             .unwrap();
     }
 
-    // RegisterAgentActivity and StoreRecord are expected to be published.
-    // StoreEntry contains the entry and is expected to not be published.
+    // AgentActivity and CreateRecord are expected to be published.
+    // CreateEntry contains the entry and is expected to not be published.
     let mut network = MockHolochainP2pDnaT::new();
     let agent2 = agent.clone();
     network
@@ -353,7 +352,7 @@ async fn verify_published_recently(dht_store: &DhtStore, op_hash: DhtOpHash) {
     );
 }
 
-/// Seed an integrated, self-authored `RegisterAgentActivity` op (with an empty
+/// Seed an integrated, self-authored `AgentActivity` op (with an empty
 /// publish row) and return its hash.
 async fn create_op(dht_store: &DhtStore, author: AgentPubKey) -> StateMutationResult<DhtOpHash> {
     let mut create_action = fixt!(Action, CreateAction);
@@ -390,7 +389,7 @@ fn build_warrant_op(agent: &AgentPubKey) -> DhtOpHashed {
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: fixt!(AgentPubKey),
                 action: (fixt!(ActionHash), fixt!(Signature)),
-                chain_op_type: ChainOpType::RegisterAddLink,
+                chain_op_type: ChainOpType::CreateLink,
                 reason: "test warrant".into(),
             }),
             agent.clone(),

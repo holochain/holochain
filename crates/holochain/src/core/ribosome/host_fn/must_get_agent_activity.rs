@@ -1,13 +1,12 @@
 use crate::core::ribosome::host_fn::cascade_from_call_context;
-use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
+use crate::core::ribosome::{CallContext, Ribosome};
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::op::RegisterAgentActivity;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -19,7 +18,7 @@ pub fn must_get_agent_activity(
     _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: MustGetAgentActivityInput,
-) -> Result<Vec<RegisterAgentActivity>, RuntimeError> {
+) -> Result<Vec<AgentActivity>, RuntimeError> {
     tracing::debug!("begin must_get_agent_activity");
     let ret = match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
@@ -264,7 +263,7 @@ pub mod test {
 
         let filter = ChainFilter::until_hash(c.clone(), a.clone());
 
-        let r: Vec<RegisterAgentActivity> = conductor
+        let r: Vec<AgentActivity> = conductor
             .call(
                 &alice,
                 "call_must_get_agent_activity",

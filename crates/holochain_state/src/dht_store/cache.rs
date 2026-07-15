@@ -12,7 +12,7 @@ use holochain_data::DbWrite;
 use holochain_types::prelude::Timestamp;
 use holochain_types::warrant::WarrantOp;
 use holochain_types::wire_ops::RenderedOps;
-use holochain_zome_types::dht_v2::RecordValidity;
+use holochain_zome_types::action::RecordValidity;
 
 use super::action_indexes::insert_action_indexes;
 use super::DhtStore;
@@ -127,7 +127,7 @@ mod tests {
     use holochain_types::prelude::{AppEntryBytes, Entry, EntryHashed, Signature};
     use holochain_types::warrant::WarrantOp;
     use holochain_types::wire_ops::{RenderedOp, RenderedOps};
-    use holochain_zome_types::dht_v2::{
+    use holochain_zome_types::action::{
         Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
         UpdateData,
     };
@@ -170,7 +170,7 @@ mod tests {
         ))
     }
 
-    /// Build a single-op `RenderedOps` for a `StoreRecord(Create)` chain op
+    /// Build a single-op `RenderedOps` for a `CreateRecord(Create)` chain op
     /// carrying a public entry.
     fn build_rendered_store_record(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
@@ -191,7 +191,7 @@ mod tests {
         );
         let entry_hashed = EntryHashed::with_pre_hashed(entry.clone(), entry_hash);
 
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::StoreRecord)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::CreateRecord)
             .expect("rendered op build");
 
         RenderedOps {
@@ -202,7 +202,7 @@ mod tests {
     }
 
     /// Build a single-op `RenderedOps` for a CreateLink chain op
-    /// (`RegisterAddLink`). No entry.
+    /// (`CreateLink`). No entry.
     fn build_rendered_create_link(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let base = AnyLinkableHash::from_raw_36_and_type(
@@ -228,8 +228,8 @@ mod tests {
             }),
         );
 
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterAddLink)
-            .expect("rendered op build");
+        let rendered =
+            RenderedOp::new(action, sig, None, ChainOpType::CreateLink).expect("rendered op build");
         RenderedOps {
             entry: None,
             ops: vec![rendered],
@@ -238,7 +238,7 @@ mod tests {
     }
 
     /// Build a single-op `RenderedOps` for a DeleteLink chain op
-    /// (`RegisterRemoveLink`). No entry.
+    /// (`DeleteLink`). No entry.
     fn build_rendered_delete_link(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let base = AnyLinkableHash::from_raw_36_and_type(
@@ -257,8 +257,8 @@ mod tests {
                 link_add_address: link_add,
             }),
         );
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterRemoveLink)
-            .expect("rendered op build");
+        let rendered =
+            RenderedOp::new(action, sig, None, ChainOpType::DeleteLink).expect("rendered op build");
         RenderedOps {
             entry: None,
             ops: vec![rendered],
@@ -267,7 +267,7 @@ mod tests {
     }
 
     /// Build a single-op `RenderedOps` for an Update chain op
-    /// (`RegisterUpdatedRecord`).
+    /// (`UpdateRecord`).
     fn build_rendered_update(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
@@ -290,7 +290,7 @@ mod tests {
             }),
         );
         let entry_hashed = EntryHashed::with_pre_hashed(entry.clone(), entry_hash);
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterUpdatedRecord)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::UpdateRecord)
             .expect("rendered op build");
         RenderedOps {
             entry: Some(entry_hashed),
@@ -300,7 +300,7 @@ mod tests {
     }
 
     /// Build a single-op `RenderedOps` for a Delete chain op
-    /// (`RegisterDeletedBy`).
+    /// (`DeleteRecord`).
     fn build_rendered_delete(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let deletes_address = ActionHash::from_raw_36(vec![seed.wrapping_add(20); 36]);
@@ -316,7 +316,7 @@ mod tests {
                 deletes_entry_address: deletes_entry,
             }),
         );
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterDeletedBy)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::DeleteRecord)
             .expect("rendered op build");
         RenderedOps {
             entry: None,
@@ -325,7 +325,7 @@ mod tests {
         }
     }
 
-    /// Build a `RegisterAgentActivity` chain op as `RenderedOps`.
+    /// Build a `AgentActivity` chain op as `RenderedOps`.
     fn build_rendered_activity(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let sig = Signature::from([seed; 64]);
@@ -339,7 +339,7 @@ mod tests {
                 entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
             }),
         );
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterAgentActivity)
+        let rendered = RenderedOp::new(action, sig, None, ChainOpType::AgentActivity)
             .expect("rendered op build");
         RenderedOps {
             entry: None,
@@ -358,7 +358,7 @@ mod tests {
                 WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                     action_author,
                     action: (action_hash, Signature::from([seed; 64])),
-                    chain_op_type: ChainOpType::StoreRecord,
+                    chain_op_type: ChainOpType::CreateRecord,
                     reason: "test warrant".into(),
                 }),
                 AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),

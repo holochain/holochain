@@ -1,10 +1,10 @@
 //! Defines a Record, the basic unit of Holochain data.
 
-use crate::dht_v2::CloseChainData;
 use crate::prelude::*;
 use holochain_keystore::KeystoreError;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
+use holochain_zome_types::action::CloseChainData;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::warrant::SignedWarrant;
 
@@ -36,8 +36,8 @@ impl WireRecordOps {
     /// Expand the served records into the request-relevant ops for caching.
     ///
     /// Each served action becomes the single op the get-record request
-    /// represents (`StoreRecord` for the record itself, `RegisterDeletedBy`
-    /// per delete, `RegisterUpdatedRecord` per update), tagged with the served
+    /// represents (`CreateRecord` for the record itself, `DeleteRecord`
+    /// per delete, `UpdateRecord` per update), tagged with the served
     /// validation status. Warrants are handled separately by the requester.
     pub fn render(self) -> DhtOpResult<RenderedOps> {
         let Self {
@@ -55,7 +55,7 @@ impl WireRecordOps {
                 action,
                 signature,
                 status,
-                ChainOpType::StoreRecord,
+                ChainOpType::CreateRecord,
             )?);
         }
         for op in deletes {
@@ -65,7 +65,7 @@ impl WireRecordOps {
                 action,
                 signature,
                 status,
-                ChainOpType::RegisterDeletedBy,
+                ChainOpType::DeleteRecord,
             )?);
         }
         for op in updates {
@@ -75,7 +75,7 @@ impl WireRecordOps {
                 action,
                 signature,
                 status,
-                ChainOpType::RegisterUpdatedRecord,
+                ChainOpType::UpdateRecord,
             )?);
         }
         Ok(RenderedOps {
@@ -168,9 +168,9 @@ mod tests {
     use super::SignedAction;
     use super::SignedActionHashed;
     use super::SignedActionHashedExt;
-    use crate::dht_v2::{ActionHeader, DnaData};
     use crate::prelude::*;
     use holo_hash::{AgentPubKey, DnaHash, HasHash, HoloHashed};
+    use holochain_zome_types::action::{ActionHeader, DnaData};
 
     fn sample_action() -> Action {
         Action {

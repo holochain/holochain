@@ -1,11 +1,11 @@
 use super::*;
 use holo_hash::{ActionHash, AnyLinkableHash, DnaHash, EntryHash};
-use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
+use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use holochain_types::prelude::Signature;
 use holochain_types::wire_ops::{RenderedOp, RenderedOps};
 // This test module seeds the op-cache/limbo pipeline directly with
 // `ChainOp`/`DhtOp`, building actions (header + `ActionData`) directly.
-use holochain_zome_types::dht_v2::{
+use holochain_zome_types::action::{
     Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
     SignedAction, UpdateData,
 };
@@ -253,7 +253,7 @@ async fn purge_all_empties_every_table() {
     }
 }
 
-/// Build a `StoreRecord` chain op for a `Create` action carrying a public
+/// Build a `CreateRecord` chain op for a `Create` action carrying a public
 /// entry.  `seed` is used to make each call produce distinct keys /
 /// hashes (it drives the raw bytes of the author key and entry hash).
 fn build_test_store_record_op_hashed(seed: u8) -> (DhtOpHashed, bool) {
@@ -293,7 +293,7 @@ fn build_test_store_record_op_hashed(seed: u8) -> (DhtOpHashed, bool) {
 /// Build a `WarrantOp` (`ChainIntegrityWarrant::InvalidChainOp`) for
 /// testing.  `seed` drives distinct key bytes.
 fn build_test_warrant_op_hashed(seed: u8) -> (DhtOpHashed, bool) {
-    use holochain_types::dht_v2::WarrantOp;
+    use holochain_types::warrant::WarrantOp;
     use holochain_zome_types::prelude::{
         ChainIntegrityWarrant, Signature, SignedWarrant, Warrant, WarrantProof,
     };
@@ -306,7 +306,7 @@ fn build_test_warrant_op_hashed(seed: u8) -> (DhtOpHashed, bool) {
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: action_author.clone(),
                 action: (action_hash, Signature::from([seed; 64])),
-                chain_op_type: ChainOpType::StoreRecord,
+                chain_op_type: ChainOpType::CreateRecord,
                 reason: "test warrant".into(),
             }),
             AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),
@@ -315,7 +315,7 @@ fn build_test_warrant_op_hashed(seed: u8) -> (DhtOpHashed, bool) {
         ),
         Signature::from([seed.wrapping_add(1); 64]),
     );
-    let op = DhtOp::WarrantOp(Box::new(WarrantOp(warrant)));
+    let op = DhtOp::WarrantOp(Box::new(WarrantOp::from(warrant)));
     (DhtOpHashed::from_content_sync(op), false)
 }
 
@@ -565,7 +565,7 @@ async fn integrate_ready_ops_promotes_ready_chain_op() {
     assert_eq!(row.when_integrated, 999);
     assert_eq!(
         row.validation_status,
-        i64::from(holochain_zome_types::dht_v2::RecordValidity::Accepted)
+        i64::from(holochain_zome_types::action::RecordValidity::Accepted)
     );
 }
 
@@ -915,7 +915,7 @@ async fn validation_receipts_for_action_reconstructs_receipt() {
 
     let store = DhtStore::new_test(dht_id()).await.unwrap();
 
-    // Seed an integrated, self-authored StoreRecord op.
+    // Seed an integrated, self-authored CreateRecord op.
     let (op, _) = build_test_store_record_op_hashed(50);
     let op_hash = op.as_hash().clone();
     let action_hash = {
@@ -970,7 +970,7 @@ fn build_invalid_chain_op_warrant(
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: warrantee.clone(),
                 action: (action_hash.clone(), Signature::from([seed; 64])),
-                chain_op_type: ChainOpType::StoreRecord,
+                chain_op_type: ChainOpType::CreateRecord,
                 reason: "test warrant".into(),
             }),
             agent(seed.wrapping_add(1)),
@@ -980,7 +980,7 @@ fn build_invalid_chain_op_warrant(
         Signature::from([seed; 64]),
     );
     DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(
-        holochain_types::dht_v2::WarrantOp(warrant),
+        holochain_types::warrant::WarrantOp::from(warrant),
     )))
 }
 
@@ -1069,7 +1069,7 @@ async fn op_validation_status_returns_status_only_when_locally_validated() {
     assert_eq!(
         store
             .as_read()
-            .op_validation_status(&action_hash, ChainOpType::StoreRecord)
+            .op_validation_status(&action_hash, ChainOpType::CreateRecord)
             .await
             .unwrap(),
         Some(ValidationStatus::Valid)
@@ -1085,7 +1085,7 @@ async fn op_validation_status_returns_status_only_when_locally_validated() {
     assert_eq!(
         store
             .as_read()
-            .op_validation_status(&limbo_action_hash, ChainOpType::StoreRecord)
+            .op_validation_status(&limbo_action_hash, ChainOpType::CreateRecord)
             .await
             .unwrap(),
         None
@@ -1097,7 +1097,7 @@ async fn op_validation_status_returns_status_only_when_locally_validated() {
             .as_read()
             .op_validation_status(
                 &ActionHash::from_raw_36(vec![0xEE; 36]),
-                ChainOpType::StoreRecord
+                ChainOpType::CreateRecord
             )
             .await
             .unwrap(),
@@ -1131,7 +1131,7 @@ async fn op_validation_status_reads_decided_limbo_op() {
     assert_eq!(
         store
             .as_read()
-            .op_validation_status(&valid_action, ChainOpType::StoreRecord)
+            .op_validation_status(&valid_action, ChainOpType::CreateRecord)
             .await
             .unwrap(),
         Some(ValidationStatus::Valid)
@@ -1152,7 +1152,7 @@ async fn op_validation_status_reads_decided_limbo_op() {
     assert_eq!(
         store
             .as_read()
-            .op_validation_status(&rejected_action, ChainOpType::StoreRecord)
+            .op_validation_status(&rejected_action, ChainOpType::CreateRecord)
             .await
             .unwrap(),
         Some(ValidationStatus::Rejected)
@@ -1161,7 +1161,7 @@ async fn op_validation_status_reads_decided_limbo_op() {
 
 #[tokio::test]
 async fn reject_chain_op_rejects_integrated_op() {
-    use holochain_zome_types::dht_v2::RecordValidity;
+    use holochain_zome_types::action::RecordValidity;
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let op = build_test_store_record_op_hashed(100);
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
@@ -1206,7 +1206,7 @@ async fn reject_chain_op_rejects_integrated_op() {
 
 #[tokio::test]
 async fn reject_chain_op_no_op_for_locally_validated_integrated_op() {
-    use holochain_zome_types::dht_v2::RecordValidity;
+    use holochain_zome_types::action::RecordValidity;
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let op = build_test_store_record_op_hashed(102);
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
@@ -1267,7 +1267,7 @@ async fn reject_chain_op_rejects_limbo_op() {
     assert_eq!(row.app_validation_status, None);
 }
 
-/// Build a single-op `RenderedOps` for a `StoreRecord(Create)` using the
+/// Build a single-op `RenderedOps` for a `CreateRecord(Create)` using the
 /// same style as `cache.rs` tests.  Returns `(RenderedOps, action_hash)`.
 fn build_rendered_store_record_for_move(seed: u8) -> (RenderedOps, holo_hash::ActionHash) {
     use holo_hash::{ActionHash, EntryHash};
@@ -1280,7 +1280,7 @@ fn build_rendered_store_record_for_move(seed: u8) -> (RenderedOps, holo_hash::Ac
     ));
     let sig = Signature::from([seed; 64]);
     // `RenderedOp::new` takes the wire's action; build it directly.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author,
             timestamp: Timestamp::from_micros(seed as i64 * 1000),
@@ -1298,7 +1298,7 @@ fn build_rendered_store_record_for_move(seed: u8) -> (RenderedOps, holo_hash::Ac
     };
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash);
     let rendered =
-        RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord).expect("rendered op build");
+        RenderedOp::new(action, sig, None, ChainOpType::CreateRecord).expect("rendered op build");
     let action_hash = rendered.action.as_hash().clone();
     let ops = RenderedOps {
         entry: Some(entry_hashed),
@@ -1329,7 +1329,7 @@ async fn move_warranted_op_to_limbo_moves_locally_validated_false() {
 
     // Move to limbo.
     let moved = store
-        .move_warranted_op_to_limbo(&action_hash, ChainOpType::StoreRecord)
+        .move_warranted_op_to_limbo(&action_hash, ChainOpType::CreateRecord)
         .await
         .unwrap();
     assert!(moved, "expected row to be moved");
@@ -1371,7 +1371,7 @@ async fn move_warranted_op_to_limbo_returns_false_when_not_cached() {
     let action_hash = holo_hash::ActionHash::from_raw_36(vec![0xBB; 36]);
 
     let moved = store
-        .move_warranted_op_to_limbo(&action_hash, ChainOpType::StoreRecord)
+        .move_warranted_op_to_limbo(&action_hash, ChainOpType::CreateRecord)
         .await
         .unwrap();
     assert!(!moved, "expected false when no matching cached row exists");
@@ -1407,7 +1407,7 @@ async fn move_warranted_op_to_limbo_no_match_for_locally_validated_true() {
 
     // ChainOp now has locally_validated = 1. The move should not match it.
     let moved = store
-        .move_warranted_op_to_limbo(&action_hash, ChainOpType::StoreRecord)
+        .move_warranted_op_to_limbo(&action_hash, ChainOpType::CreateRecord)
         .await
         .unwrap();
     assert!(!moved, "should not move a locally_validated = 1 row");
@@ -1524,7 +1524,7 @@ async fn record_locally_validated_warrants_inserts_warrant() {
     assert_eq!(summary.warrantee.as_ref(), Some(&expected_warrantee));
     assert_eq!(
         summary.validation_status,
-        holochain_zome_types::dht_v2::OpValidity::Accepted
+        holochain_zome_types::action::OpValidity::Accepted
     );
 
     let row = store
@@ -1632,7 +1632,7 @@ async fn get_live_record_returns_none_when_deleted() {
         .is_none());
 }
 
-/// Build a single-op `RenderedOps` for a `StoreEntry(Create)`.
+/// Build a single-op `RenderedOps` for a `CreateEntry(Create)`.
 /// Returns `(RenderedOps, action_hash, entry_hash)`.
 fn build_rendered_store_entry(
     seed: u8,
@@ -1647,7 +1647,7 @@ fn build_rendered_store_entry(
     ));
     let sig = Signature::from([seed; 64]);
     // `RenderedOp::new` takes the wire's action; build it directly.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author,
             timestamp: Timestamp::from_micros(seed as i64 * 1000),
@@ -1663,10 +1663,10 @@ fn build_rendered_store_entry(
             entry_hash: entry_hash.clone(),
         }),
     };
-    let action_hash = holo_hash::ActionHash::with_data_sync(&v2_action);
+    let action_hash = holo_hash::ActionHash::with_data_sync(&action);
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash.clone());
     let rendered =
-        RenderedOp::new(v2_action, sig, None, ChainOpType::StoreEntry).expect("rendered op");
+        RenderedOp::new(action, sig, None, ChainOpType::CreateEntry).expect("rendered op");
     let ops = RenderedOps {
         entry: Some(entry_hashed),
         ops: vec![rendered],
@@ -1744,7 +1744,7 @@ async fn get_live_entry_returns_none_when_create_deleted() {
         .is_none());
 }
 
-/// Build a single-op `RenderedOps` for a `StoreRecord(Create)` with a public
+/// Build a single-op `RenderedOps` for a `CreateRecord(Create)` with a public
 /// entry.  Returns `(RenderedOps, action_hash, entry_hash)`.
 fn build_rendered_store_record_ops(
     seed: u8,
@@ -1759,7 +1759,7 @@ fn build_rendered_store_record_ops(
     ));
     let sig = Signature::from([seed; 64]);
     // `RenderedOp::new` takes the wire's action; build it directly.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author,
             timestamp: Timestamp::from_micros(seed as i64 * 1000),
@@ -1775,10 +1775,10 @@ fn build_rendered_store_record_ops(
             entry_hash: entry_hash.clone(),
         }),
     };
-    let action_hash = holo_hash::ActionHash::with_data_sync(&v2_action);
+    let action_hash = holo_hash::ActionHash::with_data_sync(&action);
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash.clone());
     let rendered =
-        RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord).expect("rendered op");
+        RenderedOp::new(action, sig, None, ChainOpType::CreateRecord).expect("rendered op");
     let ops = RenderedOps {
         entry: Some(entry_hashed),
         ops: vec![rendered],
@@ -1986,7 +1986,7 @@ async fn get_record_details_assembles_record_deletes_and_updates() {
     assert_eq!(details.updates[0].as_hash(), &update_action_hash);
 }
 
-/// Build a single-op `RenderedOps` for a `RegisterAddLink(CreateLink)` chain
+/// Build a single-op `RenderedOps` for a `CreateLink` chain
 /// op.  Returns `(RenderedOps, base_address, create_link_action_hash)` so
 /// callers can query by base and assert on the returned link hash.
 ///
@@ -2004,7 +2004,7 @@ fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHa
     );
     let sig = Signature::from([seed; 64]);
     // `RenderedOp::new` takes the wire's action; build it directly.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author,
             timestamp: Timestamp::from_micros(seed as i64 * 1000),
@@ -2020,7 +2020,7 @@ fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHa
         }),
     };
     let rendered =
-        RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterAddLink).expect("rendered op");
+        RenderedOp::new(action, sig, None, ChainOpType::CreateLink).expect("rendered op");
     let create_link_hash = rendered.action.as_hash().clone();
     let ops = RenderedOps {
         entry: None,
@@ -2030,7 +2030,7 @@ fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHa
     (ops, base, create_link_hash)
 }
 
-/// Build a single-op `RenderedOps` for a `RegisterRemoveLink(DeleteLink)` chain
+/// Build a single-op `RenderedOps` for a `DeleteLink` chain
 /// op that tombstones the given `create_link_hash` on `base`.
 fn build_rendered_delete_link_for(
     create_link_hash: ActionHash,
@@ -2040,7 +2040,7 @@ fn build_rendered_delete_link_for(
     let author = AgentPubKey::from_raw_36(vec![seed.wrapping_add(1); 36]);
     let sig = Signature::from([seed.wrapping_add(1); 64]);
     // `RenderedOp::new` takes the wire's action; build it directly.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author,
             timestamp: Timestamp::from_micros(seed as i64 * 1000 + 500),
@@ -2052,8 +2052,8 @@ fn build_rendered_delete_link_for(
             link_add_address: create_link_hash,
         }),
     };
-    let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterRemoveLink)
-        .expect("rendered op");
+    let rendered =
+        RenderedOp::new(action, sig, None, ChainOpType::DeleteLink).expect("rendered op");
     RenderedOps {
         entry: None,
         ops: vec![rendered],
@@ -2125,7 +2125,7 @@ async fn get_link_details_pairs_creates_with_their_deletes() {
     assert_eq!(deletes.len(), 1, "the create has one DeleteLink");
 }
 
-/// Build a `RegisterAddLink` (CreateLink) op for `base`.
+/// Build a `CreateLink` op for `base`.
 fn make_create_link_op(base: &AnyLinkableHash, seed: u8) -> DhtOpHashed {
     let action = Action {
         header: ActionHeader {
@@ -2184,7 +2184,7 @@ async fn integration_indexes_create_link() {
     assert_eq!(creates.len(), 1, "integrated CreateLink should be indexed");
 }
 
-/// Build a `RegisterRemoveLink` (DeleteLink) op targeting `link_add`.
+/// Build a `DeleteLink` op targeting `link_add`.
 fn make_delete_link_op(base: &AnyLinkableHash, link_add: &ActionHash, seed: u8) -> DhtOpHashed {
     let action = Action {
         header: ActionHeader {
@@ -2261,7 +2261,7 @@ async fn integrate_link_op(
 
 fn build_cached_create_link(base: &holo_hash::AnyLinkableHash, seed: u8) -> RenderedOps {
     // `RenderedOp::new` takes the wire's action; build it directly.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author: AgentPubKey::from_raw_36(vec![seed; 36]),
             timestamp: Timestamp::from_micros(seed as i64 * 1000),
@@ -2280,10 +2280,10 @@ fn build_cached_create_link(base: &holo_hash::AnyLinkableHash, seed: u8) -> Rend
         }),
     };
     let rendered = RenderedOp::new(
-        v2_action,
+        action,
         Signature::from([seed; 64]),
         None,
-        ChainOpType::RegisterAddLink,
+        ChainOpType::CreateLink,
     )
     .expect("rendered op build");
     RenderedOps {
@@ -2416,7 +2416,7 @@ async fn integrate_upgrades_cached_op_to_locally_validated() {
 
     // One action + signature, used to build BOTH the cached RenderedOps and
     // the incoming DhtOpHashed, so they share the same op hash.
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author: AgentPubKey::from_raw_36(vec![6u8; 36]),
             timestamp: Timestamp::from_micros(6000),
@@ -2439,13 +2439,10 @@ async fn integrate_upgrades_cached_op_to_locally_validated() {
     // Cache the op first (locally_validated = 0). The authority read excludes it.
     let rendered = RenderedOps {
         entry: None,
-        ops: vec![RenderedOp::new(
-            v2_action.clone(),
-            sig.clone(),
-            None,
-            ChainOpType::RegisterAddLink,
-        )
-        .expect("rendered op build")],
+        ops: vec![
+            RenderedOp::new(action.clone(), sig.clone(), None, ChainOpType::CreateLink)
+                .expect("rendered op build"),
+        ],
         warrant: None,
     };
     store.cache_chain_ops(&rendered).await.unwrap();
@@ -2462,7 +2459,7 @@ async fn integrate_upgrades_cached_op_to_locally_validated() {
     // Receive + validate + integrate the SAME op (same action + signature,
     // so it shares the cached op's hash).
     let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::CreateLink(
-        SignedAction::new(v2_action, sig),
+        SignedAction::new(action, sig),
     ))));
     let hash = op.as_hash().clone();
     store.record_incoming_ops(vec![(op, false)]).await.unwrap();
@@ -2596,7 +2593,7 @@ async fn authority_updates_for_record_returns_integrated_updates() {
     assert_eq!(updates[0].1, ValidationStatus::Valid);
 }
 
-/// Build a `StoreEntry(Create)` op as a `DhtOpHashed`, returning it + the entry hash.
+/// Build a `CreateEntry(Create)` op as a `DhtOpHashed`, returning it + the entry hash.
 fn make_store_entry_op(seed: u8) -> (DhtOpHashed, EntryHash) {
     use holochain_serialized_bytes::UnsafeBytes;
     use holochain_types::prelude::{AppEntryBytes, Entry};
@@ -2753,9 +2750,6 @@ mod publish_query {
     use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator, DnaHashFixturator};
     use holochain_types::fixt::SignatureFixturator;
     use holochain_types::prelude::*;
-    // Disambiguate op-pipeline names brought in by `holochain_types::prelude::*`;
-    // this module seeds `ChainOp`s built from a v2 `Create` action fixture.
-    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, WarrantOp};
     use holochain_zome_types::fixt::{
         ActionFixturator, AppEntryBytesFixturator, AppEntryDefFixturator, CreateAction,
     };
@@ -2829,7 +2823,7 @@ mod publish_query {
                 WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                     action_author: fixt!(AgentPubKey),
                     action: (fixt!(ActionHash), fixt!(Signature)),
-                    chain_op_type: ChainOpType::RegisterAddLink,
+                    chain_op_type: ChainOpType::CreateLink,
                     reason: "test warrant".into(),
                 }),
                 agent.clone(),
@@ -2838,7 +2832,7 @@ mod publish_query {
             ),
             fixt!(Signature),
         );
-        DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(WarrantOp(warrant))))
+        DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(WarrantOp::from(warrant))))
     }
 
     async fn num_to_publish(dht_store: &DhtStore, agent: &AgentPubKey) -> usize {
@@ -2926,7 +2920,7 @@ mod publish_query {
         )
         .await;
 
-        // A StoreEntry op for a private entry is never published.
+        // A CreateEntry op for a private entry is never published.
         assert_eq!(num_to_publish(&dht_store, &agent).await, 0);
         assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 0);
     }
@@ -2949,7 +2943,7 @@ mod publish_query {
         )
         .await;
 
-        // A StoreEntry op for a public entry is published.
+        // A CreateEntry op for a public entry is published.
         assert_eq!(num_to_publish(&dht_store, &agent).await, 1);
         assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 1);
     }
@@ -2972,7 +2966,7 @@ mod publish_query {
         )
         .await;
 
-        // A StoreRecord op for a private entry is published (the entry is hidden).
+        // A CreateRecord op for a private entry is published (the entry is hidden).
         assert_eq!(num_to_publish(&dht_store, &agent).await, 1);
         assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 1);
     }

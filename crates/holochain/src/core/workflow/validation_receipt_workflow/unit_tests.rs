@@ -381,13 +381,9 @@ async fn create_op_with_status(
     let mut create_action = fixt!(Action, CreateAction);
     let author = author.unwrap_or_else(|| fixt!(AgentPubKey));
     create_action.header.author = author.clone();
-    let v2_action = create_action;
-    let signed = holochain_types::dht_v2::SignedAction::new(v2_action, fixt!(Signature));
-    let op = holochain_types::dht_v2::DhtOpHashed::from_content_sync(
-        holochain_types::dht_v2::DhtOp::from(holochain_types::dht_v2::ChainOp::AgentActivity(
-            signed,
-        )),
-    );
+    let action = create_action;
+    let signed = SignedAction::new(action, fixt!(Signature));
+    let op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(signed)));
 
     let test_op_hash = op.as_hash().clone();
 

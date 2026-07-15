@@ -476,7 +476,7 @@ fixturator!(
     variants [ Dna(DnaHash) Agent(AgentPubKey) ];
 );
 
-use crate::dht_v2::{
+use crate::action::{
     ActionData, ActionHeader, AgentValidationPkgData, CloseChainData, CreateData, CreateLinkData,
     DeleteData, DeleteLinkData, DnaData, InitZomesCompleteData, OpenChainData, UpdateData,
 };

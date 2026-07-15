@@ -13,7 +13,7 @@ use holochain::{
     test_utils::retry_fn_until_timeout,
 };
 use holochain_timestamp::Timestamp;
-use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
+use holochain_types::op::{DhtOp, DhtOpHashed};
 use holochain_types::prelude::WarrantOp;
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::{ChainIntegrityWarrant, Warrant};
@@ -242,7 +242,7 @@ async fn author_of_invalid_warrant_is_blocked() {
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
             action_author: alice.agent_pubkey().clone(),
             action: (action.hashed.hash.clone(), action.signature.clone()),
-            chain_op_type: ChainOpType::StoreRecord,
+            chain_op_type: ChainOpType::CreateRecord,
             reason: "test warrant".into(),
         }),
         bob.agent_pubkey().clone(),
@@ -320,8 +320,9 @@ async fn author_of_invalid_warrant_is_blocked() {
 
 mod zero_arc {
     use super::*;
-    use hdk::prelude::{AgentActivity, BlockTargetId, RegisterAgentActivity};
+    use hdk::prelude::{AgentActivity as OpAgentActivity, BlockTargetId};
     use holochain::prelude::DisabledAppReason;
+    use holochain_zome_types::query::AgentActivity;
 
     // Alice creates an invalid op, Bob receives it and issues a warrant.
     // Carol is a zero arc node and makes a get_agent_activity request to Bob.
@@ -560,7 +561,7 @@ mod zero_arc {
         // first attempt might fail if Carol tries to contact the now-disabled Alice.
         retry_fn_until_timeout(
             || async {
-                let result: Result<Vec<RegisterAgentActivity>, _> = carol_conductor
+                let result: Result<Vec<OpAgentActivity>, _> = carol_conductor
                     .call_fallible(
                         &carol_cell.zome(SweetInlineZomes::COORDINATOR),
                         "must_get_agent_activity",

@@ -29,7 +29,7 @@ pub trait HdiT: Send + Sync {
     fn must_get_agent_activity(
         &self,
         must_get_agent_activity_input: MustGetAgentActivityInput,
-    ) -> ExternResult<Vec<RegisterAgentActivity>>;
+    ) -> ExternResult<Vec<AgentActivity>>;
     // Info
     fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
     fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
@@ -79,7 +79,7 @@ impl HdiT for ErrHdi {
     fn must_get_agent_activity(
         &self,
         _: MustGetAgentActivityInput,
-    ) -> ExternResult<Vec<RegisterAgentActivity>> {
+    ) -> ExternResult<Vec<AgentActivity>> {
         Self::err("must_get_agent_activity")
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
@@ -160,8 +160,8 @@ impl HdiT for HostHdi {
     fn must_get_agent_activity(
         &self,
         must_get_agent_activity_input: MustGetAgentActivityInput,
-    ) -> ExternResult<Vec<RegisterAgentActivity>> {
-        host_call::<MustGetAgentActivityInput, Vec<RegisterAgentActivity>>(
+    ) -> ExternResult<Vec<AgentActivity>> {
+        host_call::<MustGetAgentActivityInput, Vec<AgentActivity>>(
             __hc__must_get_agent_activity_1,
             must_get_agent_activity_input,
         )

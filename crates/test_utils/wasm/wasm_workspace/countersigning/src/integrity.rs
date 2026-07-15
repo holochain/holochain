@@ -24,7 +24,7 @@ pub enum EntryTypes {
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
-        Op::StoreRecord(StoreRecord {
+        Op::CreateRecord(CreateRecord {
             record:
                 Record {
                     signed_action,

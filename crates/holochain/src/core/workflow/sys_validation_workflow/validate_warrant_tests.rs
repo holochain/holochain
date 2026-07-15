@@ -17,8 +17,6 @@ use ::fixt::prelude::*;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
-use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
-use holochain_zome_types::dht_v2::Action;
 use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
 
 /// Test that a valid ChainFork warrant is accepted when both actions:
@@ -276,7 +274,7 @@ async fn validate_invalid_chain_op_warrant_accepted() {
     let action = test_case.create_signed_action().await;
     test_case.insert_warranted_validated_action(
         &action,
-        ChainOpType::RegisterAgentActivity,
+        ChainOpType::AgentActivity,
         ValidationStatus::Rejected,
     );
 
@@ -307,7 +305,7 @@ async fn validate_invalid_chain_op_warrant_rejected_oversized_reason() {
     let action = test_case.create_signed_action().await;
     test_case.insert_warranted_validated_action(
         &action,
-        ChainOpType::RegisterAgentActivity,
+        ChainOpType::AgentActivity,
         ValidationStatus::Rejected,
     );
 
@@ -347,7 +345,7 @@ async fn make_invalid_chain_op_warrant_truncates_so_it_validates() {
     let action = test_case.create_signed_action().await;
     test_case.insert_warranted_validated_action(
         &action,
-        ChainOpType::RegisterAgentActivity,
+        ChainOpType::AgentActivity,
         ValidationStatus::Rejected,
     );
 
@@ -568,12 +566,10 @@ impl ChainForkWarrantTestCase {
         action: &SignedActionHashed,
         reason: &str,
     ) -> DhtOpHashed {
-        let chain_op = holochain_types::dht_v2::ChainOp::AgentActivity(
-            holochain_zome_types::dht_v2::SignedAction::new(
-                action.action().clone(),
-                action.signature.clone(),
-            ),
-        );
+        let chain_op = ChainOp::AgentActivity(SignedAction::new(
+            action.action().clone(),
+            action.signature.clone(),
+        ));
         crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
             &self.keystore,
             self.warrant_author.clone(),
@@ -598,7 +594,7 @@ impl ChainForkWarrantTestCase {
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: action_author.clone(),
                 action: (action.as_hash().clone(), action.signature.clone()),
-                chain_op_type: ChainOpType::RegisterAgentActivity,
+                chain_op_type: ChainOpType::AgentActivity,
                 reason,
             }),
             self.warrant_author.clone(),
@@ -686,7 +682,7 @@ impl ChainForkWarrantTestCase {
         // `holochain_types::warrant::WarrantOp` this module builds through the
         // shared `SignedWarrant` to get one.
         let signed_warrant: holochain_zome_types::warrant::SignedWarrant = (*warrant_op).clone();
-        let op = holochain_types::dht_v2::DhtOp::from(signed_warrant);
+        let op = DhtOp::from(signed_warrant);
 
         validate_op(&op, &dna_hash, self.validation_dependencies.clone()).await
     }

@@ -64,7 +64,7 @@ async fn invalid_op_warrant_issuance_can_be_disabled() {
 
     // Bob must not have issued a warrant against Alice.
     // A warrant would have been created as part of app validating all of Alice's
-    // ops, so once consistency is reached, the authored DB can be checked
+    // ops, so once consistency is reached, the DHT store can be checked
     // for warrants.
     let warrants = conductors[1]
         .get_spaces()
@@ -98,7 +98,7 @@ async fn skip_self_validation_to_cause_warrant() {
         })
         .integrity_function("validate", move |_api, op: Op| {
             match op {
-                Op::StoreRecord(record) => {
+                Op::CreateRecord(record) => {
                     match record.record.action().entry_type() {
                         Some(EntryType::App(_)) => {
                             // Invalidates all app entries.

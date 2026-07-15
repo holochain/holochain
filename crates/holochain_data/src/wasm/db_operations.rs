@@ -418,7 +418,7 @@ mod tests {
         db.put_wasm(wasm_hashed).await.unwrap();
 
         // Create initial DNA with 3 integrity zomes and 2 coordinator zomes
-        let integrity_zomes = vec![
+        let original_integrity_zomes = vec![
             (
                 ZomeName::from("integrity1"),
                 IntegrityZomeDef::from_hash(wasm_hash.clone()),
@@ -433,7 +433,7 @@ mod tests {
             ),
         ];
 
-        let coordinator_zomes = vec![
+        let original_coordinator_zomes = vec![
             (
                 ZomeName::from("coordinator1"),
                 CoordinatorZomeDef::from_hash(wasm_hash.clone()),
@@ -444,33 +444,38 @@ mod tests {
             ),
         ];
 
-        let dna_def_v1 = DnaDef {
-            name: "test_update".to_string(),
+        let original_dna_def = DnaDef {
+            name: "test_update_original".to_string(),
             modifiers: DnaModifiers {
-                network_seed: "seed".to_string(),
+                network_seed: "seed_original".to_string(),
                 properties: SerializedBytes::default(),
             },
-            integrity_zomes,
-            coordinator_zomes,
+            integrity_zomes: original_integrity_zomes,
+            coordinator_zomes: original_coordinator_zomes,
             #[cfg(feature = "unstable-migration")]
             lineage: std::collections::HashSet::new(),
         };
 
-        let hash = dna_def_v1.to_hash();
-        let cell_id = test_cell_id(&hash);
-        db.put_dna_def(cell_id.agent_pubkey(), &dna_def_v1)
+        let original_hash = original_dna_def.to_hash();
+        let original_cell_id = test_cell_id(&original_hash);
+        db.put_dna_def(original_cell_id.agent_pubkey(), &original_dna_def)
             .await
             .unwrap();
 
         // Verify initial state
-        let retrieved_v1 = db.as_ref().get_dna_def(&cell_id).await.unwrap().unwrap();
-        assert_eq!(retrieved_v1.integrity_zomes.len(), 3);
-        assert_eq!(retrieved_v1.coordinator_zomes.len(), 2);
+        let original_retrieved = db
+            .as_ref()
+            .get_dna_def(&original_cell_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(original_retrieved.integrity_zomes.len(), 3);
+        assert_eq!(original_retrieved.coordinator_zomes.len(), 2);
 
         // Count zomes directly in the database
         let integrity_count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ?")
-                .bind(hash.get_raw_32())
+                .bind(original_hash.get_raw_32())
                 .fetch_one(db.pool())
                 .await
                 .unwrap();
@@ -478,59 +483,72 @@ mod tests {
 
         let coordinator_count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM CoordinatorZome WHERE dna_hash = ?")
-                .bind(hash.get_raw_32())
+                .bind(original_hash.get_raw_32())
                 .fetch_one(db.pool())
                 .await
                 .unwrap();
         assert_eq!(coordinator_count, 2);
 
         // Update DNA with fewer zomes (1 integrity, 1 coordinator)
-        let integrity_zomes_v2 = vec![(
+        let updated_integrity_zomes = vec![(
             ZomeName::from("integrity1"),
             IntegrityZomeDef::from_hash(wasm_hash.clone()),
         )];
 
-        let coordinator_zomes_v2 = vec![(
+        let updated_coordinator_zomes = vec![(
             ZomeName::from("coordinator1"),
             CoordinatorZomeDef::from_hash(wasm_hash.clone()),
         )];
 
-        let dna_def_v2 = DnaDef {
-            name: "test_update_v2".to_string(),
+        let updated_dna_def = DnaDef {
+            name: "test_update_updated".to_string(),
             modifiers: DnaModifiers {
-                network_seed: "seed_v2".to_string(),
+                network_seed: "seed_updated".to_string(),
                 properties: SerializedBytes::default(),
             },
-            integrity_zomes: integrity_zomes_v2,
-            coordinator_zomes: coordinator_zomes_v2,
+            integrity_zomes: updated_integrity_zomes,
+            coordinator_zomes: updated_coordinator_zomes,
             #[cfg(feature = "unstable-migration")]
             lineage: std::collections::HashSet::new(),
         };
 
         // Different hash since zomes changed
-        let hash_v2 = dna_def_v2.to_hash();
-        let cell_id_v2 = test_cell_id(&hash_v2);
-        assert_ne!(hash, hash_v2, "Hash should change when zomes change");
+        let updated_hash = updated_dna_def.to_hash();
+        let updated_cell_id = test_cell_id(&updated_hash);
+        assert_ne!(
+            original_hash, updated_hash,
+            "Hash should change when zomes change"
+        );
 
         // Update the DNA definition
-        db.put_dna_def(cell_id_v2.agent_pubkey(), &dna_def_v2)
+        db.put_dna_def(updated_cell_id.agent_pubkey(), &updated_dna_def)
             .await
             .unwrap();
 
         // Verify old DNA still has original zomes
-        let retrieved_v1 = db.as_ref().get_dna_def(&cell_id).await.unwrap().unwrap();
-        assert_eq!(retrieved_v1.integrity_zomes.len(), 3);
-        assert_eq!(retrieved_v1.coordinator_zomes.len(), 2);
+        let original_retrieved = db
+            .as_ref()
+            .get_dna_def(&original_cell_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(original_retrieved.integrity_zomes.len(), 3);
+        assert_eq!(original_retrieved.coordinator_zomes.len(), 2);
 
         // Verify new DNA has new zomes
-        let retrieved_v2 = db.as_ref().get_dna_def(&cell_id_v2).await.unwrap().unwrap();
-        assert_eq!(retrieved_v2.integrity_zomes.len(), 1);
-        assert_eq!(retrieved_v2.coordinator_zomes.len(), 1);
+        let updated_retrieved = db
+            .as_ref()
+            .get_dna_def(&updated_cell_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated_retrieved.integrity_zomes.len(), 1);
+        assert_eq!(updated_retrieved.coordinator_zomes.len(), 1);
 
         // Verify no orphaned zomes remain for the old DNA hash
         let integrity_count_after: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ?")
-                .bind(hash.get_raw_32())
+                .bind(original_hash.get_raw_32())
                 .fetch_one(db.pool())
                 .await
                 .unwrap();
@@ -541,7 +559,7 @@ mod tests {
 
         let coordinator_count_after: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM CoordinatorZome WHERE dna_hash = ?")
-                .bind(hash.get_raw_32())
+                .bind(original_hash.get_raw_32())
                 .fetch_one(db.pool())
                 .await
                 .unwrap();
@@ -553,7 +571,7 @@ mod tests {
         // Verify new DNA has correct counts
         let new_integrity_count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ?")
-                .bind(hash_v2.get_raw_32())
+                .bind(updated_hash.get_raw_32())
                 .fetch_one(db.pool())
                 .await
                 .unwrap();
@@ -564,7 +582,7 @@ mod tests {
 
         let new_coordinator_count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM CoordinatorZome WHERE dna_hash = ?")
-                .bind(hash_v2.get_raw_32())
+                .bind(updated_hash.get_raw_32())
                 .fetch_one(db.pool())
                 .await
                 .unwrap();

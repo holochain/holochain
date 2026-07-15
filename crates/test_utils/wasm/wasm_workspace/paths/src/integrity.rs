@@ -23,7 +23,7 @@ pub enum LinkTypes {
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreRecord(OpRecord::CreateLink {
+        FlatOp::CreateRecord(OpRecord::CreateLink {
             link_type: LinkTypes::AuthorPath,
             base_address,
             target_address,
@@ -54,7 +54,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 )))
             }
         }
-        FlatOp::StoreRecord(OpRecord::CreateLink {
+        FlatOp::CreateRecord(OpRecord::CreateLink {
             link_type: LinkTypes::AuthorBook,
             base_address,
             target_address,

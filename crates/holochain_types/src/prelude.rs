@@ -16,6 +16,7 @@ pub use crate::fixt::TimestampFixturator;
 pub use crate::fixt::*;
 pub use crate::link::*;
 pub use crate::network::*;
+pub use crate::op::*;
 pub use crate::record::*;
 pub use crate::signal::*;
 pub use crate::validation_receipt::*;

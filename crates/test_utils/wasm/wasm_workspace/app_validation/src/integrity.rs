@@ -21,7 +21,7 @@ pub enum LinkTypes {
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreRecord(store_record) => {
+        FlatOp::CreateRecord(store_record) => {
             match store_record {
                 OpRecord::CreateLink { target_address, .. } => {
                     let action_hash = target_address.into_action_hash().ok_or(wasm_error!(

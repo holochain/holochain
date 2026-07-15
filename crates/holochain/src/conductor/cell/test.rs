@@ -13,9 +13,6 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_state::prelude::*;
 use holochain_trace::test_run;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-    Action, ActionData, ActionHeader, DnaData,
-};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
@@ -89,7 +86,7 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let v2_action = Action {
+    let action = Action {
         header: ActionHeader {
             author: agent.clone(),
             timestamp: Timestamp::now(),
@@ -102,22 +99,19 @@ async fn test_cell_handle_publish() {
     };
     let shh = SignedActionHashed::sign(
         &keystore,
-        holo_hash::HoloHashed::from_content_sync(v2_action.clone()),
+        holo_hash::HoloHashed::from_content_sync(action.clone()),
     )
     .await
     .unwrap();
-    let v2_op = holochain_types::dht_v2::DhtOp::ChainOp(Box::new(
-        holochain_types::dht_v2::ChainOp::CreateRecord(
-            holochain_types::dht_v2::SignedAction::new(v2_action, shh.signature().clone()),
-            holochain_types::dht_v2::OpEntry::ActionOnly,
-        ),
-    ));
-    let op_hash =
-        holochain_types::dht_v2::DhtOpHashed::from_content_sync(v2_op.clone()).into_hash();
+    let op = DhtOp::ChainOp(Box::new(ChainOp::CreateRecord(
+        SignedAction::new(action, shh.signature().clone()),
+        OpEntry::ActionOnly,
+    )));
+    let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
     spaces
         .spaces
-        .handle_publish(&dna, vec![(v2_op, true)])
+        .handle_publish(&dna, vec![(op, true)])
         .await
         .unwrap();
 

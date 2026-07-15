@@ -40,7 +40,7 @@ use holochain_zome_types::prelude::{GetValidationReceiptsInput, ValidationReceip
 ///     let receipts = get_validation_receipts(GetValidationReceiptsInput::new(action_hash))?;
 ///     let count = receipts
 ///         .into_iter()
-///         .filter(|receipt_set| receipt_set.op_type == "RegisterAgentActivity")
+///         .filter(|receipt_set| receipt_set.op_type == "AgentActivity")
 ///         .flat_map(|receipt_set| receipt_set.receipts)
 ///         .count();
 ///     info!("Found {} receipts from agent activity authorities", count);

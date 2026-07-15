@@ -15,7 +15,6 @@ use holochain_keystore::crude_mock_keystore::*;
 use holochain_keystore::test_keystore;
 use holochain_types::{app::AppStatus, inline_zome::InlineZomeSet};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::dht_v2::Op;
 use matches::assert_matches;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
@@ -336,7 +335,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     let bad_zome =
         InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
             .function("integrity", "validate", |_api, op: Op| match op {
-                Op::StoreEntry(StoreEntry { action, .. })
+                Op::CreateEntry(CreateEntry { action, .. })
                     if action.hashed.content.app_entry_def().is_some() =>
                 {
                     Ok(ValidateResult::Invalid(

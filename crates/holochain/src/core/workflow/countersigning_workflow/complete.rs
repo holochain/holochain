@@ -6,8 +6,6 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
 use holochain_timestamp::Timestamp;
-use holochain_types::dht_v2::ChainOp;
-use holochain_zome_types::dht_v2::build_action_set;
 use holochain_zome_types::prelude::SignedAction;
 
 pub(crate) async fn inner_countersigning_session_complete(

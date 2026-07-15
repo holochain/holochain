@@ -151,7 +151,7 @@ fn must_get_valid_record(action_hash: ActionHash) -> ExternResult<Record> {
 }
 
 #[hdk_extern]
-fn get_agent_activity(input: GetAgentActivityInput) -> ExternResult<AgentActivity> {
+fn get_agent_activity(input: GetAgentActivityInput) -> ExternResult<holochain_zome_types::query::AgentActivity> {
     HDK.with(|h| h.borrow().get_agent_activity(input))
 }
 

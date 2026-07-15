@@ -2,12 +2,12 @@
 
 use crate::models::dht::{ActionRow, AgentActivityItem, AgentActivityRow, ValidatedActionRow};
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, EntryHash, HoloHashed};
-use holochain_integrity_types::dht_v2::{Action, ActionData, ActionHeader, RecordValidity};
+use holochain_integrity_types::action::{Action, ActionData, ActionHeader, RecordValidity};
 use holochain_integrity_types::entry::Entry;
 use holochain_integrity_types::entry_def::EntryVisibility;
 use holochain_integrity_types::record::SignedHashed;
 use holochain_integrity_types::signature::Signature;
-use holochain_zome_types::dht_v2::SignedActionHashed;
+use holochain_zome_types::action::SignedActionHashed;
 use holochain_zome_types::op::ChainOpType;
 use sqlx::{Executor, Sqlite};
 
@@ -160,7 +160,7 @@ where
 ///
 /// Acceptability is read from the `Action` row's own `record_validity` state,
 /// not by joining to an op row, so the result never depends on holding a
-/// particular op such as `RegisterAgentActivity`. `record_validity` is the
+/// particular op such as `AgentActivity`. `record_validity` is the
 /// action's aggregated integration status: a self-authored action is `Accepted`
 /// when the flush writes it, and a network-received action becomes `Accepted`
 /// once its ops integrate. Pending (limbo) and rejected actions are excluded, so
@@ -196,7 +196,7 @@ where
 }
 
 /// All actions authored by `author` that have an integrated
-/// `RegisterAgentActivity` op, ordered by chain sequence. When
+/// `AgentActivity` op, ordered by chain sequence. When
 /// `include_entries` is set, the public
 /// `Entry` blob is joined in (Full mode); otherwise the entry column is `NULL`.
 ///
@@ -236,13 +236,13 @@ where
     };
     let rows: Vec<AgentActivityRow> = sqlx::query_as(sql)
         .bind(author.get_raw_36())
-        .bind(i64::from(ChainOpType::RegisterAgentActivity))
+        .bind(i64::from(ChainOpType::AgentActivity))
         .fetch_all(executor)
         .await?;
     rows.into_iter().map(agent_activity_row_to_item).collect()
 }
 
-/// Bounded `RegisterAgentActivity` scan for `must_get_agent_activity`: integrated
+/// Bounded `AgentActivity` scan for `must_get_agent_activity`: integrated
 /// actions authored by `author` with `seq <= chain_top_seq` and (when
 /// `until_seq` is `Some`) `seq >= until_seq`, ordered by `seq DESC, hash DESC`.
 pub(crate) async fn get_filtered_agent_activity<'e, E>(
@@ -265,7 +265,7 @@ where
            AND (? IS NULL OR a.seq >= ?)
          ORDER BY a.seq DESC, a.hash DESC",
     )
-    .bind(i64::from(ChainOpType::RegisterAgentActivity))
+    .bind(i64::from(ChainOpType::AgentActivity))
     .bind(author.get_raw_36())
     .bind(chain_top_seq as i64)
     .bind(until_seq.map(|s| s as i64))
@@ -276,7 +276,7 @@ where
 }
 
 /// The chain sequence and authored timestamp of `action_hash`, if it is an
-/// integrated `RegisterAgentActivity` action authored by `author`.
+/// integrated `AgentActivity` action authored by `author`.
 pub(crate) async fn get_action_seq_and_timestamp<'e, E>(
     executor: E,
     author: &AgentPubKey,
@@ -293,7 +293,7 @@ where
     )
     .bind(action_hash.get_raw_36())
     .bind(author.get_raw_36())
-    .bind(i64::from(ChainOpType::RegisterAgentActivity))
+    .bind(i64::from(ChainOpType::AgentActivity))
     .fetch_optional(executor)
     .await?;
     Ok(row.map(|(seq, ts)| (seq as u32, holochain_timestamp::Timestamp::from_micros(ts))))
@@ -304,7 +304,7 @@ fn agent_activity_row_to_item(row: AgentActivityRow) -> sqlx::Result<AgentActivi
     let validation_status = RecordValidity::try_from(row.validation_status).map_err(|v| {
         sqlx::Error::Decode(Box::new(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            format!("invalid validation_status {v} on RegisterAgentActivity op"),
+            format!("invalid validation_status {v} on AgentActivity op"),
         )))
     })?;
     let entry = match row.entry_blob {
@@ -325,8 +325,8 @@ fn agent_activity_row_to_item(row: AgentActivityRow) -> sqlx::Result<AgentActivi
     })
 }
 
-/// Return the live `StoreEntry` create actions for `entry_hash`: valid,
-/// integrated `StoreEntry` ops on that basis whose action has no `DeletedRecord`,
+/// Return the live `CreateEntry` create actions for `entry_hash`: valid,
+/// integrated `CreateEntry` ops on that basis whose action has no `DeletedRecord`,
 /// and whose entry is visible to `author` (public, or private and authored by
 /// `author`). Ordered by integration time.
 pub(crate) async fn get_live_entry_creates<'e, E>(
@@ -350,7 +350,7 @@ where
            AND (a.private_entry = 0 OR a.private_entry IS NULL OR a.author = ?)",
     )
     .bind(entry_hash.get_raw_36())
-    .bind(i64::from(ChainOpType::StoreEntry))
+    .bind(i64::from(ChainOpType::CreateEntry))
     .bind(i64::from(RecordValidity::Accepted))
     .bind(author.map(|a| a.get_raw_36().to_vec()))
     .fetch_all(executor)
@@ -358,7 +358,7 @@ where
     rows.into_iter().map(row_to_signed_action_hashed).collect()
 }
 
-/// The entry's `StoreEntry` create actions at validation status
+/// The entry's `CreateEntry` create actions at validation status
 /// `validation_status` (integrated, visible to `author`). Unlike
 /// `get_live_entry_creates`, this does NOT exclude deleted creates.
 pub(crate) async fn get_create_actions_for_entry<'e, E>(
@@ -382,7 +382,7 @@ where
            AND (a.private_entry = 0 OR a.private_entry IS NULL OR a.author = ?)",
     )
     .bind(entry_hash.get_raw_36())
-    .bind(i64::from(ChainOpType::StoreEntry))
+    .bind(i64::from(ChainOpType::CreateEntry))
     .bind(i64::from(validation_status))
     .bind(author.map(|a| a.get_raw_36().to_vec()))
     .fetch_all(executor)
@@ -540,7 +540,7 @@ where
     rows.into_iter().map(row_to_signed_action_hashed).collect()
 }
 
-/// Decode a `ValidatedActionRow` to a v2 action + its validation status.
+/// Decode a `ValidatedActionRow` to an action + its validation status.
 fn validated_action_row_to_item(
     row: ValidatedActionRow,
 ) -> sqlx::Result<(SignedActionHashed, RecordValidity)> {
@@ -555,7 +555,7 @@ fn validated_action_row_to_item(
 }
 
 /// Authority-serving create-link actions for `base`: locally-validated
-/// (`locally_validated = 1`) `RegisterAddLink` ops only, each with its
+/// (`locally_validated = 1`) `CreateLink` ops only, each with its
 /// validation status. Cached links (`locally_validated = 0`) are excluded.
 pub(crate) async fn get_authority_link_creates<'e, E>(
     executor: E,
@@ -573,7 +573,7 @@ where
          JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
          WHERE l.base_hash = ? AND c.locally_validated = 1",
     )
-    .bind(i64::from(ChainOpType::RegisterAddLink))
+    .bind(i64::from(ChainOpType::CreateLink))
     .bind(base.get_raw_36())
     .fetch_all(executor)
     .await?;
@@ -581,7 +581,7 @@ where
 }
 
 /// Authority-serving delete-link actions targeting `base`'s links:
-/// locally-validated `RegisterRemoveLink` ops only, each with its validation
+/// locally-validated `DeleteLink` ops only, each with its validation
 /// status.
 pub(crate) async fn get_authority_delete_links<'e, E>(
     executor: E,
@@ -600,15 +600,15 @@ where
          WHERE c.locally_validated = 1
            AND d.create_link_hash IN (SELECT l.action_hash FROM Link l WHERE l.base_hash = ?)",
     )
-    .bind(i64::from(ChainOpType::RegisterRemoveLink))
+    .bind(i64::from(ChainOpType::DeleteLink))
     .bind(base.get_raw_36())
     .fetch_all(executor)
     .await?;
     rows.into_iter().map(validated_action_row_to_item).collect()
 }
 
-/// Authority-serving `StoreRecord` action for `action_hash`: present only if a
-/// locally-validated (`locally_validated = 1`) `StoreRecord` op exists for it,
+/// Authority-serving `CreateRecord` action for `action_hash`: present only if a
+/// locally-validated (`locally_validated = 1`) `CreateRecord` op exists for it,
 /// with its validation status.
 pub(crate) async fn get_authority_store_record<'e, E>(
     executor: E,
@@ -625,7 +625,7 @@ where
          JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
          WHERE a.hash = ? AND c.locally_validated = 1",
     )
-    .bind(i64::from(ChainOpType::StoreRecord))
+    .bind(i64::from(ChainOpType::CreateRecord))
     .bind(action_hash.get_raw_36())
     .fetch_optional(executor)
     .await?;
@@ -633,7 +633,7 @@ where
 }
 
 /// Authority-serving delete actions targeting record `record_action_hash`:
-/// locally-validated `RegisterDeletedBy` ops only, each with its validation status.
+/// locally-validated `DeleteRecord` ops only, each with its validation status.
 /// Cached ops (`locally_validated = 0`) are excluded.
 pub(crate) async fn get_authority_deletes_for_record<'e, E>(
     executor: E,
@@ -651,7 +651,7 @@ where
          JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
          WHERE d.deletes_action_hash = ? AND c.locally_validated = 1",
     )
-    .bind(i64::from(ChainOpType::RegisterDeletedBy))
+    .bind(i64::from(ChainOpType::DeleteRecord))
     .bind(record_action_hash.get_raw_36())
     .fetch_all(executor)
     .await?;
@@ -659,7 +659,7 @@ where
 }
 
 /// Authority-serving update actions targeting record `record_action_hash`:
-/// locally-validated `RegisterUpdatedRecord` ops only, each with its validation status.
+/// locally-validated `UpdateRecord` ops only, each with its validation status.
 /// Cached ops (`locally_validated = 0`) are excluded.
 pub(crate) async fn get_authority_updates_for_record<'e, E>(
     executor: E,
@@ -677,7 +677,7 @@ where
          JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
          WHERE u.original_action_hash = ? AND c.locally_validated = 1",
     )
-    .bind(i64::from(ChainOpType::RegisterUpdatedRecord))
+    .bind(i64::from(ChainOpType::UpdateRecord))
     .bind(record_action_hash.get_raw_36())
     .fetch_all(executor)
     .await?;
@@ -685,7 +685,7 @@ where
 }
 
 /// Authority-serving create actions for entry `entry_hash`: locally-validated
-/// `StoreEntry` ops only, each with its validation status.
+/// `CreateEntry` ops only, each with its validation status.
 /// Cached ops (`locally_validated = 0`) are excluded.
 pub(crate) async fn get_authority_entry_creates<'e, E>(
     executor: E,
@@ -703,14 +703,14 @@ where
          WHERE c.basis_hash = ? AND c.op_type = ? AND c.locally_validated = 1",
     )
     .bind(entry_hash.get_raw_36())
-    .bind(i64::from(ChainOpType::StoreEntry))
+    .bind(i64::from(ChainOpType::CreateEntry))
     .fetch_all(executor)
     .await?;
     rows.into_iter().map(validated_action_row_to_item).collect()
 }
 
 /// Authority-serving delete actions targeting entry `entry_hash`:
-/// locally-validated `RegisterDeletedEntryAction` ops only, each with its validation status.
+/// locally-validated `DeleteEntry` ops only, each with its validation status.
 /// Cached ops (`locally_validated = 0`) are excluded.
 pub(crate) async fn get_authority_deletes_for_entry<'e, E>(
     executor: E,
@@ -728,7 +728,7 @@ where
          JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
          WHERE d.deletes_entry_hash = ? AND c.locally_validated = 1",
     )
-    .bind(i64::from(ChainOpType::RegisterDeletedEntryAction))
+    .bind(i64::from(ChainOpType::DeleteEntry))
     .bind(entry_hash.get_raw_36())
     .fetch_all(executor)
     .await?;
@@ -736,7 +736,7 @@ where
 }
 
 /// Authority-serving update actions targeting entry `entry_hash`:
-/// locally-validated `RegisterUpdatedContent` ops only, each with its validation status.
+/// locally-validated `UpdateEntry` ops only, each with its validation status.
 /// Cached ops (`locally_validated = 0`) are excluded.
 pub(crate) async fn get_authority_updates_for_entry<'e, E>(
     executor: E,
@@ -754,7 +754,7 @@ where
          JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
          WHERE u.original_entry_hash = ? AND c.locally_validated = 1",
     )
-    .bind(i64::from(ChainOpType::RegisterUpdatedContent))
+    .bind(i64::from(ChainOpType::UpdateEntry))
     .bind(entry_hash.get_raw_36())
     .fetch_all(executor)
     .await?;

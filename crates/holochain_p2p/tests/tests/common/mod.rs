@@ -2,8 +2,8 @@ use ::fixt::fixt;
 use holo_hash::fixt::ActionHashFixturator;
 use holochain_p2p::event::*;
 use holochain_p2p::*;
-use holochain_types::dht_v2::ChainOp;
 use holochain_types::fixt::CreateLinkAction;
+use holochain_types::op::ChainOp;
 use holochain_types::prelude::*;
 use kitsune2_api::*;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
@@ -76,7 +76,7 @@ impl HcP2pHandler for Handler {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        _ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
+        _ops: Vec<(holochain_types::op::DhtOp, bool)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             self.calls.lock().unwrap().push("publish".into());

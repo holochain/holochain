@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** `wire_rows_to_v2_ops` is renamed to `wire_rows_to_ops` now that there is no legacy v1 op form to distinguish it from.
+- **BREAKING CHANGE** `build_chain_dht_op_v2` and `build_warrant_dht_op_v2` (in `holochain_p2p`) are renamed to `build_chain_dht_op` and `build_warrant_dht_op` now that there is no legacy v1 op-construction path to distinguish them from.
 - Disable `reqwest`'s default features, including `native-tls`, in `holochain_metrics`. We are using `rustls-tls` anyway and `native-tls` requires a non-vendored OpenSSL to be installed. \#5878
 - Implemented more graceful handling of invalid or missing `hc` subcommands. Originally the code panicked with an ambiguous "File or directory not found error". [\#5867](https://github.com/holochain/holochain/pull/5867)
 - **BREAKING CHANGE** Remove the legacy per-variant action types now that the v2 `Action` model (`ActionHeader` + `ActionData`) is canonical. The `holochain_integrity_types::action` per-variant structs (`Create`, `Update`, `Delete`, `Dna`, `CreateLink`, `DeleteLink`, `OpenChain`, `CloseChain`, `AgentValidationPkg`, `InitZomesComplete`), the `ActionBuilder`/`ActionBuilderCommon` builder, the `EntryCreationAction`/`NewEntryAction`/`NewEntryActionRef` wrapper enums, and the `rate_limit` module (`RateWeight`/`EntryRateWeight` and the action-weight machinery) are all removed. \#5860

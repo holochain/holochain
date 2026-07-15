@@ -8,7 +8,6 @@ use holochain_p2p::DynHolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
-use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::Op;
 use std::sync::Arc;
 
 /// An invocation of the validate callback function.
@@ -128,9 +127,6 @@ mod test {
     use crate::fixt::ValidateHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_types::prelude::*;
-    use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-        Op, RegisterAgentActivity,
-    };
     use holochain_zome_types::fixt::{ActionFixturator, CreateLinkAction};
     use rand::seq::SliceRandom;
 
@@ -191,7 +187,7 @@ mod test {
     async fn validate_invocation_zomes() {
         let validate_invocation = ValidateInvocation::new(
             ZomesToInvoke::All,
-            &Op::RegisterAgentActivity(RegisterAgentActivity {
+            &Op::AgentActivity(AgentActivity {
                 action: SignedActionHashed::new_unchecked(
                     fixt!(Action, CreateLinkAction),
                     fixt!(Signature),
@@ -208,7 +204,7 @@ mod test {
     async fn validate_invocation_fn_components() {
         let validate_invocation = ValidateInvocation::new(
             ZomesToInvoke::All,
-            &Op::RegisterAgentActivity(RegisterAgentActivity {
+            &Op::AgentActivity(AgentActivity {
                 action: SignedActionHashed::new_unchecked(
                     fixt!(Action, CreateLinkAction),
                     fixt!(Signature),
@@ -226,7 +222,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn validate_invocation_host_input() {
-        let op = Op::RegisterAgentActivity(RegisterAgentActivity {
+        let op = Op::AgentActivity(AgentActivity {
             action: SignedActionHashed::new_unchecked(
                 fixt!(Action, CreateLinkAction),
                 fixt!(Signature),
@@ -266,9 +262,6 @@ mod slow_tests {
     use holochain_types::inline_zome::InlineZomeSet;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
-        Op, RegisterAgentActivity, StoreRecord,
-    };
     use holochain_zome_types::fixt::{ActionFixturator, CreateAction, CreateLinkAction};
     use std::sync::Arc;
 
@@ -276,7 +269,7 @@ mod slow_tests {
     async fn test_validate_unimplemented() {
         let validate_invocation = ValidateInvocation::new(
             ZomesToInvoke::One(IntegrityZome::from(TestWasm::Foo).erase_type()),
-            &Op::RegisterAgentActivity(RegisterAgentActivity {
+            &Op::AgentActivity(AgentActivity {
                 action: SignedActionHashed::new_unchecked(
                     fixt!(Action, CreateLinkAction),
                     fixt!(Signature),
@@ -299,7 +292,7 @@ mod slow_tests {
     async fn test_validate_implemented_valid() {
         let validate_invocation = ValidateInvocation::new(
             ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateValid).erase_type()),
-            &Op::RegisterAgentActivity(RegisterAgentActivity {
+            &Op::AgentActivity(AgentActivity {
                 action: SignedActionHashed::new_unchecked(
                     fixt!(Action, CreateLinkAction),
                     fixt!(Signature),
@@ -365,7 +358,7 @@ mod slow_tests {
     async fn test_validate_implemented_invalid_params() {
         let validate_invocation = ValidateInvocation::new(
             ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalidParams).erase_type()),
-            &Op::RegisterAgentActivity(RegisterAgentActivity {
+            &Op::AgentActivity(AgentActivity {
                 action: SignedActionHashed::new_unchecked(
                     fixt!(Action, CreateLinkAction),
                     fixt!(Signature),
@@ -424,7 +417,7 @@ mod slow_tests {
         *action.entry_type_mut().unwrap() = EntryType::AgentPubKey;
         *action.entry_hash_mut().unwrap() = EntryHash::with_data_sync(&entry);
 
-        let op = Op::StoreRecord(StoreRecord {
+        let op = Op::CreateRecord(CreateRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(
                     HoloHashed::from_content_sync(action),

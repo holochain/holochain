@@ -5,7 +5,7 @@ use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
 use crate::models::dht::LimboChainOpRow;
 use holo_hash::DhtOpHash;
-use holochain_integrity_types::dht_v2::OpValidity;
+use holochain_integrity_types::action::OpValidity;
 use holochain_timestamp::Timestamp;
 
 impl DbWrite<Dht> {

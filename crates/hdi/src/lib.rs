@@ -85,8 +85,8 @@
 //! #   A,
 //! #   B,
 //! # }
-//! # let op = Op::RegisterCreateLink(
-//! # RegisterCreateLink {
+//! # let op = Op::CreateLink(
+//! # CreateLink {
 //! #     create_link: SignedHashed {
 //! #         hashed: holo_hash::HoloHashed {
 //! #             content: Action {
@@ -114,13 +114,13 @@
 //! # hdi::test_utils::set_zome_types(&[(0, 2)], &[(0, 2)]);
 //! # let result: Result<hdi::prelude::ValidateCallbackResult, Box<dyn std::error::Error>> =
 //! match op.flattened()? {
-//!     FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
+//!     FlatOp::CreateEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
 //!         EntryTypes::A(_) => Ok(ValidateCallbackResult::Valid),
 //!         EntryTypes::B(_) => Ok(ValidateCallbackResult::Invalid(
 //!             "No Bs allowed in this app".to_string(),
 //!         )),
 //!     },
-//!     FlatOp::RegisterLink(OpLink::CreateLink {
+//!     FlatOp::Link(OpLink::CreateLink {
 //!         base_address: _,
 //!         target_address: _,
 //!         tag: _,

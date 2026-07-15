@@ -9,11 +9,7 @@ pub use holo_hash::*;
 use holochain_keystore::AgentPubKeyExt;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-use holochain_types::dht_v2::{ChainOp, DhtOp, OpEntry};
 use holochain_types::prelude::*;
-use holochain_zome_types::dht_v2::{
-    build_action_set, ActionData, CreateData, DnaData, SignedAction, UpdateData,
-};
 use std::sync::Arc;
 
 mod error;
@@ -47,7 +43,7 @@ pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysVal
 
 /// Verify the signature for this warrant
 pub async fn verify_warrant_signature(
-    warrant_op: &holochain_types::dht_v2::WarrantOp,
+    warrant_op: &holochain_types::warrant::WarrantOp,
 ) -> SysValidationResult<()> {
     if warrant_op
         .author
@@ -425,16 +421,16 @@ pub trait DhtOpSender {
     /// Sends an op
     async fn send_op(&self, op: DhtOp) -> SysValidationResult<()>;
 
-    /// Send a StoreRecord DhtOp
+    /// Send a CreateRecord DhtOp
     async fn send_store_record(&self, record: Record) -> SysValidationResult<()>;
 
-    /// Send a StoreEntry DhtOp
+    /// Send a CreateEntry DhtOp
     async fn send_store_entry(&self, record: Record) -> SysValidationResult<()>;
 
-    /// Send a RegisterAddLink DhtOp
+    /// Send a CreateLink DhtOp
     async fn send_register_add_link(&self, record: Record) -> SysValidationResult<()>;
 
-    /// Send a RegisterAgentActivity DhtOp
+    /// Send a AgentActivity DhtOp
     async fn send_register_agent_activity(&self, record: Record) -> SysValidationResult<()>;
 }
 
@@ -508,7 +504,7 @@ fn record_entry_to_op_entry(entry: RecordEntry) -> OpEntry {
     }
 }
 
-/// Make a StoreRecord ChainOp from a Record.
+/// Make a CreateRecord ChainOp from a Record.
 /// Note that this can fail if the op is missing an
 /// Entry when it was supposed to have one.
 ///
@@ -528,7 +524,7 @@ fn make_store_record(record: Record) -> ChainOp {
     )
 }
 
-/// Make a StoreEntry ChainOp from a Record.
+/// Make a CreateEntry ChainOp from a Record.
 /// Note that this can fail if the op is missing an Entry or
 /// the action is the wrong type.
 ///
@@ -555,7 +551,7 @@ fn make_store_entry(record: Record) -> Option<ChainOp> {
     ))
 }
 
-/// Make a RegisterAddLink ChainOp from a Record.
+/// Make a CreateLink ChainOp from a Record.
 /// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them
@@ -576,7 +572,7 @@ fn make_register_add_link(record: Record) -> Option<ChainOp> {
     Some(ChainOp::CreateLink(SignedAction::new(action, signature)))
 }
 
-/// Make a RegisterAgentActivity ChainOp from a Record.
+/// Make a AgentActivity ChainOp from a Record.
 /// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them

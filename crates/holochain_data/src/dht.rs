@@ -39,14 +39,14 @@ mod tests {
         ActionHash, AgentPubKey, AnyDhtHash, AnyLinkableHash, DhtOpHash, DnaHash, EntryHash,
         HoloHashed,
     };
-    use holochain_integrity_types::dht_v2::{
+    use holochain_integrity_types::action::{
         Action, ActionData, ActionHeader, DnaData, InitZomesCompleteData, RecordValidity,
     };
     use holochain_integrity_types::entry::Entry;
     use holochain_integrity_types::record::SignedHashed;
     use holochain_integrity_types::signature::Signature;
     use holochain_timestamp::Timestamp;
-    use holochain_zome_types::dht_v2::SignedActionHashed;
+    use holochain_zome_types::action::SignedActionHashed;
     use std::sync::Arc;
 
     fn dht_db_id() -> Dht {
@@ -1889,7 +1889,7 @@ mod tests {
 
     #[tokio::test]
     async fn every_action_variant_roundtrips() {
-        use holochain_integrity_types::dht_v2::*;
+        use holochain_integrity_types::action::*;
 
         let entry_hash = EntryHash::from_raw_36(vec![9u8; 36]);
         let action_hash = ActionHash::from_raw_36(vec![10u8; 36]);
@@ -2356,7 +2356,7 @@ mod tests {
                 action_seq: seed as u32,
                 prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_sub(1); 36])),
             },
-            data: ActionData::Create(holochain_integrity_types::dht_v2::CreateData {
+            data: ActionData::Create(holochain_integrity_types::action::CreateData {
                 entry_type: holochain_integrity_types::EntryType::AgentPubKey,
                 entry_hash: entry_hash.clone(),
             }),
@@ -2407,8 +2407,8 @@ mod tests {
     async fn remove_countersigning_session_deletes_withheld_public_entry() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let entry_hash = EntryHash::from_raw_36(vec![0x77; 36]);
-        // Two withheld self-authored ops for one action (e.g. StoreRecord +
-        // StoreEntry) plus the public entry.
+        // Two withheld self-authored ops for one action (e.g. CreateRecord +
+        // CreateEntry) plus the public entry.
         let (action_hash, op_hashes) = seed_countersigning_record(
             &db,
             0x30,

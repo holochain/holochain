@@ -24,7 +24,7 @@ use holochain_conductor_api::conductor::{ConductorTuningParams, KeystoreConfig};
 use holochain_conductor_api::AppRequest;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppResponse};
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
-use holochain_types::dht_v2::DhtOp;
+use holochain_types::op::DhtOp;
 use holochain_types::test_utils::{fake_dna_zomes, write_fake_dna_file};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::{ReceiveMessage, WebsocketReceiver, WebsocketSender};

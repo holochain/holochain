@@ -1,10 +1,9 @@
-use crate::core::ribosome::Ribosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::Ribosome;
 use crate::core::ribosome::RibosomeError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::dht_v2::{ActionData, CreateData};
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -104,6 +103,7 @@ pub fn create<'a>(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
     use crate::fixt::*;
     use crate::sweettest::*;
     use crate::test_utils::RibosomeTestFixture;
@@ -117,7 +117,6 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasm_test_utils::TestWasmPair;
     use std::sync::Arc;
-    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     /// we can get an entry hash out of the fn directly
     #[tokio::test(flavor = "multi_thread")]
