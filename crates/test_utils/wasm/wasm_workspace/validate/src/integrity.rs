@@ -84,7 +84,7 @@ pub fn __num_link_types() -> u8 {
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
-        Op::StoreEntry(StoreEntry {
+        Op::CreateEntry(CreateEntry {
             action:
                 SignedHashed {
                     hashed:

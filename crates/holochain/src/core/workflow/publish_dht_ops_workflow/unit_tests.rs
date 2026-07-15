@@ -253,7 +253,7 @@ async fn ignores_data_by_other_authors() {
     assert!(rx.is_paused());
 }
 
-// Even though ops are created for actions with private entries, the StoreEntry
+// Even though ops are created for actions with private entries, the CreateEntry
 // op (which carries the entry) must not be published.
 #[tokio::test(flavor = "multi_thread")]
 async fn private_entries_are_not_published() {
@@ -306,8 +306,8 @@ async fn private_entries_are_not_published() {
             .unwrap();
     }
 
-    // RegisterAgentActivity and StoreRecord are expected to be published.
-    // StoreEntry contains the entry and is expected to not be published.
+    // AgentActivity and CreateRecord are expected to be published.
+    // CreateEntry contains the entry and is expected to not be published.
     let mut network = MockHolochainP2pDnaT::new();
     let agent2 = agent.clone();
     network
@@ -352,7 +352,7 @@ async fn verify_published_recently(dht_store: &DhtStore, op_hash: DhtOpHash) {
     );
 }
 
-/// Seed an integrated, self-authored `RegisterAgentActivity` op (with an empty
+/// Seed an integrated, self-authored `AgentActivity` op (with an empty
 /// publish row) and return its hash.
 async fn create_op(dht_store: &DhtStore, author: AgentPubKey) -> StateMutationResult<DhtOpHash> {
     let mut create_action = fixt!(Action, CreateAction);

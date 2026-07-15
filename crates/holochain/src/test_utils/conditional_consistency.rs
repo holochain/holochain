@@ -362,7 +362,7 @@ fn display_op(op: &DhtOp) -> String {
 /// (GET-cached copies excluded, rejected ops included). **Warrants are
 /// deliberately excluded** — they are not guaranteed to reach every node
 /// (zero-arc nodes, gossip timing), so requiring cross-node warrant
-/// consistency here would hang. **Private `StoreEntry` ops are also
+/// consistency here would hang. **Private `CreateEntry` ops are also
 /// excluded** — a private entry never leaves its author, so
 /// `request_published_ops` (via `ops_to_publish_for_wire`) already omits them
 /// from the published set; the integrated set must match, or the author node
@@ -382,7 +382,7 @@ async fn get_integrated_ops(dht_store: &DhtStoreRead) -> Vec<DhtOp> {
         .collect()
 }
 
-/// A `StoreEntry` op whose entry is `Hidden` references a private entry, which
+/// A `CreateEntry` op whose entry is `Hidden` references a private entry, which
 /// is withheld from all peers. Such an op only ever exists on its author
 /// (reconstructed from the dump without its entry blob), so it must not enter a
 /// cross-node consistency comparison. Mirrors the SQL-level filter applied by

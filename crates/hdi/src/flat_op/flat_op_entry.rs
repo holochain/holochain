@@ -2,7 +2,7 @@
 use super::*;
 use holochain_integrity_types::{CapClaimEntry, CapGrantEntry};
 
-/// Data specific to the [`Op::StoreEntry`](holochain_integrity_types::op::Op::StoreEntry)
+/// Data specific to the [`Op::CreateEntry`](holochain_integrity_types::op::Op::CreateEntry)
 /// operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpEntry<ET>
@@ -98,7 +98,7 @@ where
     },
 }
 
-/// Data specific to the [`Op::RegisterUpdate`](holochain_integrity_types::op::Op::RegisterUpdate)
+/// Data specific to the [`Op::Update`](holochain_integrity_types::op::Op::Update)
 /// operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpUpdate<ET>
@@ -157,7 +157,7 @@ where
     },
 }
 
-/// Data specific to the [`Op::RegisterDelete`](holochain_integrity_types::op::Op::RegisterDelete)
+/// Data specific to the [`Op::Delete`](holochain_integrity_types::op::Op::Delete)
 /// operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OpDelete {

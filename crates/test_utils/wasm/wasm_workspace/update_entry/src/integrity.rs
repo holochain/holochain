@@ -35,7 +35,7 @@ pub fn msg_private() -> EntryTypes {
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
-        Op::StoreEntry(StoreEntry { action, entry }) => match action.hashed.app_entry_def() {
+        Op::CreateEntry(CreateEntry { action, entry }) => match action.hashed.app_entry_def() {
             Some(AppEntryDef {
                 entry_index: entry_def_index,
                 zome_index,

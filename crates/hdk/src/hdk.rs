@@ -27,7 +27,7 @@ pub trait HdkT: HdiT {
     fn get_agent_activity(
         &self,
         get_agent_activity_input: GetAgentActivityInput,
-    ) -> ExternResult<AgentActivity>;
+    ) -> ExternResult<holochain_zome_types::query::AgentActivity>;
     fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>>;
     // Ed25519
     fn sign(&self, sign: Sign) -> ExternResult<Signature>;
@@ -116,7 +116,7 @@ mockall::mock! {
         fn get_agent_activity(
             &self,
             get_agent_activity_input: GetAgentActivityInput,
-        ) -> ExternResult<AgentActivity>;
+        ) -> ExternResult<holochain_zome_types::query::AgentActivity>;
         fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>>;
         // Ed25519
         fn sign(&self, sign: Sign) -> ExternResult<Signature>;
@@ -203,7 +203,7 @@ mockall::mock! {
         fn must_get_agent_activity(
             &self,
             must_get_agent_activity_input: MustGetAgentActivityInput,
-        ) -> ExternResult<Vec<RegisterAgentActivity>>;
+        ) -> ExternResult<Vec<AgentActivity>>;
         // Info
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
         fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
@@ -268,7 +268,7 @@ impl HdiT for ErrHdk {
     fn must_get_agent_activity(
         &self,
         _: MustGetAgentActivityInput,
-    ) -> ExternResult<Vec<RegisterAgentActivity>> {
+    ) -> ExternResult<Vec<AgentActivity>> {
         Self::err()
     }
 
@@ -308,7 +308,7 @@ impl HdiT for ErrHdk {
 
 /// Every call is an error for the ErrHdk.
 impl HdkT for ErrHdk {
-    fn get_agent_activity(&self, _: GetAgentActivityInput) -> ExternResult<AgentActivity> {
+    fn get_agent_activity(&self, _: GetAgentActivityInput) -> ExternResult<holochain_zome_types::query::AgentActivity> {
         Self::err()
     }
     fn query(&self, _: ChainQueryFilter) -> ExternResult<Vec<Record>> {
@@ -505,7 +505,7 @@ impl HdiT for HostHdk {
     fn must_get_agent_activity(
         &self,
         must_get_agent_activity_input: MustGetAgentActivityInput,
-    ) -> ExternResult<Vec<RegisterAgentActivity>> {
+    ) -> ExternResult<Vec<AgentActivity>> {
         HostHdi::new().must_get_agent_activity(must_get_agent_activity_input)
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
@@ -546,8 +546,8 @@ impl HdkT for HostHdk {
     fn get_agent_activity(
         &self,
         get_agent_activity_input: GetAgentActivityInput,
-    ) -> ExternResult<AgentActivity> {
-        host_call::<GetAgentActivityInput, AgentActivity>(
+    ) -> ExternResult<holochain_zome_types::query::AgentActivity> {
+        host_call::<GetAgentActivityInput, holochain_zome_types::query::AgentActivity>(
             __hc__get_agent_activity_1,
             get_agent_activity_input,
         )

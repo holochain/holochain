@@ -137,7 +137,7 @@ pub(crate) fn receive_incoming_countersigning_ops(
                 tracing::warn!(?op, "Incoming countersigning op is not a CounterSign entry");
             }
         } else {
-            tracing::warn!(?op, "Incoming countersigning op is not a StoreEntry op");
+            tracing::warn!(?op, "Incoming countersigning op is not a CreateEntry op");
         }
     }
 

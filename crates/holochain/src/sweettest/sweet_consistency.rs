@@ -69,7 +69,7 @@ struct DhtOpRow {
     when_integrated: i64,
 }
 
-/// A `StoreEntry` op whose entry is `Hidden` references a private entry. The
+/// A `CreateEntry` op whose entry is `Hidden` references a private entry. The
 /// entry is withheld from all peers, so this op only ever exists on the author
 /// (reconstructed from the dump without its entry blob). Such ops must not
 /// enter the cross-node consistency comparison.
@@ -87,8 +87,8 @@ fn is_author_local_private_store_entry(op: &DhtOp) -> bool {
 /// are not guaranteed to reach every node (zero-arc nodes, gossip timing), so
 /// requiring cross-node warrant consistency here would hang; warrant
 /// propagation is asserted separately by the warrant tests. **Private
-/// `StoreEntry` ops are also excluded** — a private entry never leaves its
-/// author, so its `StoreEntry` op only ever exists on the authoring node;
+/// `CreateEntry` ops are also excluded** — a private entry never leaves its
+/// author, so its `CreateEntry` op only ever exists on the authoring node;
 /// including it would put a hash in the comparison set that no peer can hold
 /// and consistency could never be reached. This mirrors the SQL-level filter
 /// on `ops_to_publish_for_wire`. Ops are reconstructed into `DhtOp`s so

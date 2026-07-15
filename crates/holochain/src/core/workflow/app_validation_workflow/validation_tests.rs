@@ -209,14 +209,14 @@ async fn app_validation_ops() {
             move |_api: BoxApi, op: Op| {
                 let agents = agents.lock();
                 let event = match op {
-                    Op::StoreRecord(StoreRecord { record }) => Event {
+                    Op::CreateRecord(CreateRecord { record }) => Event {
                         action: ActionLocation::new(record.action().clone(), &agents),
                         op_type: ChainOpType::CreateRecord,
                         called_zome: zome,
                         with_zome_index: None,
                         with_entry_def_index: None,
                     },
-                    Op::StoreEntry(StoreEntry { action, .. }) => {
+                    Op::CreateEntry(CreateEntry { action, .. }) => {
                         let (with_entry_def_index, with_zome_index) =
                             match action.hashed.content.app_entry_def().cloned() {
                                 Some(AppEntryDef {
@@ -234,7 +234,7 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterUpdate(RegisterUpdate { update, .. }) => {
+                    Op::Update(Update { update, .. }) => {
                         let (with_entry_def_index, with_zome_index) =
                             match update.hashed.content.entry_type() {
                                 Some(EntryType::App(AppEntryDef {
@@ -252,7 +252,7 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterDelete(RegisterDelete { delete, .. }) => {
+                    Op::Delete(Delete { delete, .. }) => {
                         // `Delete` action data never carries an entry type, so
                         // this is always `(None, None)`; kept as an explicit
                         // match (rather than a constant) to mirror the other
@@ -274,21 +274,21 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Event {
+                    Op::AgentActivity(AgentActivity { action, .. }) => Event {
                         action: ActionLocation::new(action.hashed.content.clone(), &agents),
                         op_type: ChainOpType::AgentActivity,
                         called_zome: zome,
                         with_zome_index: None,
                         with_entry_def_index: None,
                     },
-                    Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => Event {
+                    Op::CreateLink(CreateLink { create_link, .. }) => Event {
                         action: ActionLocation::new(create_link.hashed.content.clone(), &agents),
                         op_type: ChainOpType::CreateLink,
                         called_zome: zome,
                         with_zome_index: None,
                         with_entry_def_index: None,
                     },
-                    Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => Event {
+                    Op::DeleteLink(DeleteLink { delete_link, .. }) => Event {
                         action: ActionLocation::new(delete_link.hashed.content.clone(), &agents),
                         op_type: ChainOpType::DeleteLink,
                         called_zome: zome,

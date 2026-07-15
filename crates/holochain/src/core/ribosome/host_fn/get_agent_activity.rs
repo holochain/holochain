@@ -13,7 +13,7 @@ pub fn get_agent_activity(
     _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: GetAgentActivityInput,
-) -> Result<AgentActivity, RuntimeError> {
+) -> Result<holochain_zome_types::query::AgentActivity, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace: Permission::Allow,

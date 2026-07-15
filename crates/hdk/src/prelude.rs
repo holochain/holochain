@@ -79,7 +79,7 @@ pub use hdi::prelude::Anchor;
 pub use hdi::prelude::Component;
 pub use hdi::prelude::OpHelper;
 pub use hdi::prelude::Path;
-pub use hdi::prelude::RegisterAgentActivity;
+pub use hdi::prelude::AgentActivity;
 pub use hdi::prelude::ShardStrategy;
 pub use hdi::prelude::TypedPath;
 pub use hdk_derive;

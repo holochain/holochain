@@ -581,7 +581,7 @@ mod op_hash_tests {
         // DhtOp::to_hash agrees with ChainOp::to_hash.
         assert_eq!(dht_op.to_hash(), chain_op.to_hash());
 
-        // StoreRecord basis is the action hash.
+        // CreateRecord basis is the action hash.
         let action_hash = ActionHash::with_data_sync(sa.data());
         assert_eq!(dht_op.dht_basis(), AnyLinkableHash::from(action_hash));
         assert_eq!(dht_op.dht_basis(), chain_op.dht_basis());

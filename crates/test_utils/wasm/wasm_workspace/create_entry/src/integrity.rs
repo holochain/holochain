@@ -27,7 +27,7 @@ pub enum LinkTypes {
 
 #[cfg_attr(feature = "integrity", hdk_extern)]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
-    if let Op::StoreEntry(StoreEntry {
+    if let Op::CreateEntry(CreateEntry {
         action:
             SignedHashed {
                 hashed: HoloHashed {

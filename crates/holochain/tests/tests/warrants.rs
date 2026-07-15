@@ -320,7 +320,8 @@ async fn author_of_invalid_warrant_is_blocked() {
 
 mod zero_arc {
     use super::*;
-    use hdk::prelude::{AgentActivity, BlockTargetId, RegisterAgentActivity};
+    use hdk::prelude::{AgentActivity as OpAgentActivity, BlockTargetId};
+    use holochain_zome_types::query::AgentActivity;
     use holochain::prelude::DisabledAppReason;
 
     // Alice creates an invalid op, Bob receives it and issues a warrant.
@@ -560,7 +561,7 @@ mod zero_arc {
         // first attempt might fail if Carol tries to contact the now-disabled Alice.
         retry_fn_until_timeout(
             || async {
-                let result: Result<Vec<RegisterAgentActivity>, _> = carol_conductor
+                let result: Result<Vec<OpAgentActivity>, _> = carol_conductor
                     .call_fallible(
                         &carol_cell.zome(SweetInlineZomes::COORDINATOR),
                         "must_get_agent_activity",

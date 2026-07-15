@@ -216,8 +216,8 @@ async fn app_validation_workflow_inner(
     let mut warrant_ops_vec: Vec<DhtOpHashed> = vec![];
     let mut app_validation_outcomes: Vec<(DhtOpHash, AppOutcome)> = vec![];
     // Track action hashes already warranted in this batch to avoid creating duplicate
-    // warrants for the same action. Multiple op types (StoreRecord, StoreEntry,
-    // RegisterAgentActivity) can share the same action, and without this deduplication
+    // warrants for the same action. Multiple op types (CreateRecord, CreateEntry,
+    // AgentActivity) can share the same action, and without this deduplication
     // all of them would trigger a separate warrant when processed in the same run.
     let mut warranted_in_batch = std::collections::HashSet::<holo_hash::ActionHash>::new();
 
@@ -414,9 +414,9 @@ pub async fn record_to_op(
 ) -> AppValidationOutcome<(Op, DhtOpHash, Option<Entry>)> {
     // Hide private data where appropriate
     let (record, mut hidden_entry) = if matches!(op_type, ChainOpType::CreateEntry) {
-        // We don't want to hide private data for a StoreEntry, because when doing
+        // We don't want to hide private data for a CreateEntry, because when doing
         // inline validation as an author, we want to validate and integrate our own entry!
-        // Publishing and gossip rules state that a private StoreEntry will never be transmitted
+        // Publishing and gossip rules state that a private CreateEntry will never be transmitted
         // to another node.
         (record, None)
     } else {
@@ -438,7 +438,7 @@ pub async fn record_to_op(
     let op = match op_type {
         ChainOpType::CreateRecord => {
             let visibility = sah.hashed.content.entry_visibility().copied();
-            Op::StoreRecord(StoreRecord {
+            Op::CreateRecord(CreateRecord {
                 record: Record::new(sah, RecordEntry::new(visibility.as_ref(), entry)),
             })
         }
@@ -448,22 +448,22 @@ pub async fn record_to_op(
                     sah.hashed.content.clone(),
                 )))
             })?;
-            Op::StoreEntry(StoreEntry { action: sah, entry })
+            Op::CreateEntry(CreateEntry { action: sah, entry })
         }
-        ChainOpType::AgentActivity => Op::RegisterAgentActivity(RegisterAgentActivity {
+        ChainOpType::AgentActivity => Op::AgentActivity(AgentActivity {
             action: sah,
             cached_entry: entry,
         }),
         ChainOpType::UpdateEntry | ChainOpType::UpdateRecord => {
-            Op::RegisterUpdate(RegisterUpdate {
+            Op::Update(Update {
                 update: sah,
                 new_entry: entry,
             })
         }
         ChainOpType::DeleteRecord | ChainOpType::DeleteEntry => {
-            Op::RegisterDelete(RegisterDelete { delete: sah })
+            Op::Delete(Delete { delete: sah })
         }
-        ChainOpType::CreateLink => Op::RegisterCreateLink(RegisterCreateLink { create_link: sah }),
+        ChainOpType::CreateLink => Op::CreateLink(CreateLink { create_link: sah }),
         ChainOpType::DeleteLink => {
             let link_add_address = match &sah.hashed.content.data {
                 ActionData::DeleteLink(DeleteLinkData {
@@ -482,7 +482,7 @@ pub async fn record_to_op(
                 .await?
                 .map(|(sh, _)| sh.hashed.content)
                 .ok_or_else(|| Outcome::awaiting(&link_add_address))?;
-            Op::RegisterDeleteLink(RegisterDeleteLink {
+            Op::DeleteLink(DeleteLink {
                 delete_link: sah,
                 create_link,
             })
@@ -509,7 +509,7 @@ async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppVal
                 OpEntry::Present(entry) => Some(entry),
                 OpEntry::Hidden | OpEntry::ActionOnly => None,
             };
-            Op::StoreRecord(StoreRecord {
+            Op::CreateRecord(CreateRecord {
                 record: Record::new(sah, RecordEntry::new(visibility.as_ref(), entry)),
             })
         }
@@ -524,9 +524,9 @@ async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppVal
                         .into());
                     }
                 };
-            Op::StoreEntry(StoreEntry { action: sah, entry })
+            Op::CreateEntry(CreateEntry { action: sah, entry })
         }
-        ChainOp::AgentActivity(_) => Op::RegisterAgentActivity(RegisterAgentActivity {
+        ChainOp::AgentActivity(_) => Op::AgentActivity(AgentActivity {
             action: sah,
             cached_entry: None,
         }),
@@ -557,15 +557,15 @@ async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppVal
                 },
                 _ => None,
             };
-            Op::RegisterUpdate(RegisterUpdate {
+            Op::Update(Update {
                 update: sah,
                 new_entry,
             })
         }
         ChainOp::DeleteRecord(_) | ChainOp::DeleteEntry(_) => {
-            Op::RegisterDelete(RegisterDelete { delete: sah })
+            Op::Delete(Delete { delete: sah })
         }
-        ChainOp::CreateLink(_) => Op::RegisterCreateLink(RegisterCreateLink { create_link: sah }),
+        ChainOp::CreateLink(_) => Op::CreateLink(CreateLink { create_link: sah }),
         ChainOp::DeleteLink(_) => {
             let ActionData::DeleteLink(DeleteLinkData {
                 link_add_address, ..
@@ -583,7 +583,7 @@ async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppVal
                 .await?
                 .map(|(sh, _)| sh.hashed.content)
                 .ok_or_else(|| Outcome::awaiting(&link_add_address))?;
-            Op::RegisterDeleteLink(RegisterDeleteLink {
+            Op::DeleteLink(DeleteLink {
                 delete_link: sah,
                 create_link,
             })
@@ -718,8 +718,8 @@ async fn get_zomes_to_invoke(
     ribosome: &Ribosome,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     match op {
-        Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => Ok(ZomesToInvoke::AllIntegrity),
-        Op::StoreRecord(StoreRecord { record }) => {
+        Op::AgentActivity(AgentActivity { .. }) => Ok(ZomesToInvoke::AllIntegrity),
+        Op::CreateRecord(CreateRecord { record }) => {
             // For deletes there is no entry type to check, so we get the previous action.
             // In theory this can be yet another delete, in which case all
             // integrity zomes are returned for invocation.
@@ -756,7 +756,7 @@ async fn get_zomes_to_invoke(
                 _ => Ok(ZomesToInvoke::AllIntegrity),
             }
         }
-        Op::StoreEntry(StoreEntry { action, .. }) => match &action.hashed.content.data {
+        Op::CreateEntry(CreateEntry { action, .. }) => match &action.hashed.content.data {
             ActionData::Create(CreateData {
                 entry_type: EntryType::App(app_entry_def),
                 ..
@@ -767,19 +767,19 @@ async fn get_zomes_to_invoke(
             }) => get_integrity_zome_from_ribosome(&app_entry_def.zome_index, ribosome),
             _ => Ok(ZomesToInvoke::AllIntegrity),
         },
-        Op::RegisterUpdate(RegisterUpdate { update, .. }) => match &update.hashed.content.data {
+        Op::Update(Update { update, .. }) => match &update.hashed.content.data {
             ActionData::Update(UpdateData {
                 entry_type: EntryType::App(app_entry_def),
                 ..
             }) => get_integrity_zome_from_ribosome(&app_entry_def.zome_index, ribosome),
             _ => Ok(ZomesToInvoke::AllIntegrity),
         },
-        Op::RegisterDelete(RegisterDelete { delete }) => {
+        Op::Delete(Delete { delete }) => {
             let deletes_address = match &delete.hashed.content.data {
                 ActionData::Delete(DeleteData {
                     deletes_address, ..
                 }) => deletes_address,
-                // Not expected: `RegisterDelete`'s action data is always `Delete`.
+                // Not expected: `Delete`'s action data is always `Delete`.
                 _ => return Ok(ZomesToInvoke::AllIntegrity),
             };
             let deleted_action =
@@ -796,21 +796,21 @@ async fn get_zomes_to_invoke(
                 _ => Ok(ZomesToInvoke::AllIntegrity),
             }
         }
-        Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
+        Op::CreateLink(CreateLink { create_link }) => {
             match &create_link.hashed.content.data {
                 ActionData::CreateLink(CreateLinkData { zome_index, .. }) => {
                     get_integrity_zome_from_ribosome(zome_index, ribosome)
                 }
-                // Not expected: `RegisterCreateLink`'s action data is always `CreateLink`.
+                // Not expected: `CreateLink`'s action data is always `CreateLink`.
                 _ => Ok(ZomesToInvoke::AllIntegrity),
             }
         }
-        Op::RegisterDeleteLink(RegisterDeleteLink { create_link, .. }) => {
+        Op::DeleteLink(DeleteLink { create_link, .. }) => {
             match &create_link.data {
                 ActionData::CreateLink(CreateLinkData { zome_index, .. }) => {
                     get_integrity_zome_from_ribosome(zome_index, ribosome)
                 }
-                // Not expected: `RegisterDeleteLink::create_link` is always `CreateLink`.
+                // Not expected: `DeleteLink::create_link` is always `CreateLink`.
                 _ => Ok(ZomesToInvoke::AllIntegrity),
             }
         }

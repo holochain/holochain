@@ -17,7 +17,7 @@ pub enum MustGetAgentActivityResponse {
     /// The activity was found.
     Activity {
         /// The actions performed by the agent.
-        activity: Vec<RegisterAgentActivity>,
+        activity: Vec<AgentActivity>,
         /// Any warrants issued to the agent for this activity.
         warrants: Vec<WarrantOp>,
     },
@@ -54,7 +54,7 @@ pub enum MustGetAgentActivityResponse {
 impl MustGetAgentActivityResponse {
     /// Constructor
     #[cfg(feature = "test_utils")]
-    pub fn activity(activity: Vec<RegisterAgentActivity>) -> Self {
+    pub fn activity(activity: Vec<AgentActivity>) -> Self {
         Self::Activity {
             activity,
             warrants: vec![],

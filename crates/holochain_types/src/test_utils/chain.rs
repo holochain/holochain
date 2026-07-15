@@ -277,10 +277,10 @@ pub fn chain_item_to_action(i: &impl ChainItem) -> SignedActionHashed {
 /// Produce a sequence of AgentActivity ops from a Vec of ChainItems
 pub fn chain_to_ops(
     chain: Vec<impl ChainItem>,
-) -> Vec<holochain_zome_types::op::RegisterAgentActivity> {
+) -> Vec<holochain_zome_types::op::AgentActivity> {
     chain
         .into_iter()
-        .map(|i| holochain_zome_types::op::RegisterAgentActivity {
+        .map(|i| holochain_zome_types::op::AgentActivity {
             action: chain_item_to_action(&i),
             cached_entry: None,
         })

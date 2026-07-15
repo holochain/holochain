@@ -132,7 +132,7 @@ pub enum ValidationOutcome {
     PreflightResponseSignature(Box<PreflightResponse>),
     #[error(transparent)]
     PrevActionError(#[from] PrevActionError),
-    #[error("Private entry data should never be included in any op other than StoreEntry.")]
+    #[error("Private entry data should never be included in any op other than CreateEntry.")]
     PrivateEntryLeaked,
     #[error("The DNA does not belong in this space! Action has {0:?}, expected {1:?}")]
     WrongDna(DnaHash, DnaHash),

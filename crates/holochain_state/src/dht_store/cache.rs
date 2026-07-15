@@ -170,7 +170,7 @@ mod tests {
         ))
     }
 
-    /// Build a single-op `RenderedOps` for a `StoreRecord(Create)` chain op
+    /// Build a single-op `RenderedOps` for a `CreateRecord(Create)` chain op
     /// carrying a public entry.
     fn build_rendered_store_record(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
@@ -325,7 +325,7 @@ mod tests {
         }
     }
 
-    /// Build a `RegisterAgentActivity` chain op as `RenderedOps`.
+    /// Build a `AgentActivity` chain op as `RenderedOps`.
     fn build_rendered_activity(seed: u8) -> RenderedOps {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let sig = Signature::from([seed; 64]);

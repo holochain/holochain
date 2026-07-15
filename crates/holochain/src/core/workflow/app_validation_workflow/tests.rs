@@ -41,7 +41,7 @@ async fn main_workflow() {
 
     let zomes =
         SweetInlineZomes::new(vec![], 0).integrity_function("validate", move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+            if let Op::Delete(Delete { delete }) = op {
                 let deletes_address = match &delete.hashed.content.data {
                     ActionData::Delete(DeleteData {
                         deletes_address, ..
@@ -267,7 +267,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     let zomes = SweetInlineZomes::new(vec![entry_def.clone()], 0).integrity_function(
         "validate",
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+            if let Op::Delete(Delete { delete }) = op {
                 let deletes_address = match &delete.hashed.content.data {
                     ActionData::Delete(DeleteData {
                         deletes_address, ..
@@ -403,7 +403,7 @@ async fn validate_ops_in_sequence_must_get_action() {
     let zomes = SweetInlineZomes::new(vec![entry_def.clone()], 0).integrity_function(
         "validate",
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+            if let Op::Delete(Delete { delete }) = op {
                 let deletes_address = match &delete.hashed.content.data {
                     ActionData::Delete(DeleteData {
                         deletes_address, ..
@@ -602,7 +602,7 @@ async fn handle_error_in_op_validation() {
     let zomes = SweetInlineZomes::new(vec![entry_def], 0).integrity_function(
         "validate",
         move |_, op: Op| match op {
-            Op::RegisterAgentActivity(_) => Err(InlineZomeError::TestError("kaputt".to_string())),
+            Op::AgentActivity(_) => Err(InlineZomeError::TestError("kaputt".to_string())),
             _ => Ok(ValidateCallbackResult::Valid),
         },
     );
@@ -860,14 +860,14 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
 
     for op in validation_ops.lock().iter() {
         match op {
-            Op::StoreEntry(StoreEntry { action, entry: _ }) => {
-                // `StoreEntry`'s action data is always `Create` or `Update`, so
+            Op::CreateEntry(CreateEntry { action, entry: _ }) => {
+                // `CreateEntry`'s action data is always `Create` or `Update`, so
                 // it always has an entry type.
                 if *action.hashed.entry_type().unwrap().visibility() == EntryVisibility::Private {
                     num_store_entry_private += 1
                 }
             }
-            Op::StoreRecord(StoreRecord { record }) => {
+            Op::CreateRecord(CreateRecord { record }) => {
                 if record
                     .action()
                     .entry_type()
@@ -879,7 +879,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
                 let (privatized, _) = record.clone().privatized();
                 assert_eq!(record, &privatized);
             }
-            Op::RegisterAgentActivity(RegisterAgentActivity {
+            Op::AgentActivity(AgentActivity {
                 action,
                 cached_entry: _,
             }) => {
@@ -896,8 +896,8 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
         }
     }
 
-    // - Of the two private entries alice committed, only alice should validate these as a StoreEntry.
-    // - However, both Alice and Bob should validate and integrate the StoreRecord and RegisterAgentActivity,
+    // - Of the two private entries alice committed, only alice should validate these as a CreateEntry.
+    // - However, both Alice and Bob should validate and integrate the CreateRecord and AgentActivity,
     //     even though the entries are private.
     assert_eq!(
         (
@@ -1284,7 +1284,7 @@ async fn app_validation_produces_warrants() {
         1
     );
 
-    let activity: AgentActivity = conductors[2]
+    let activity: holochain_zome_types::query::AgentActivity = conductors[2]
         .call(
             &carol.zome(SweetInlineZomes::COORDINATOR),
             "get_agent_activity",
@@ -1337,7 +1337,7 @@ async fn skip_issuing_warrant_if_one_found() {
             })?)
         })
         .integrity_function("validate", move |_api, op: Op| {
-            if matches!(op, Op::RegisterAgentActivity(_)) && op.action_seq() > 3 {
+            if matches!(op, Op::AgentActivity(_)) && op.action_seq() > 3 {
                 Ok(ValidateCallbackResult::Invalid("nope".to_string()))
             } else {
                 Ok(ValidateCallbackResult::Valid)
@@ -1565,8 +1565,8 @@ async fn run_test(
         commit_invalid(&bob_cell_id, &conductors[1].raw_handle(), dna_file).await;
 
     // Integration should have 3 ops in it
-    // StoreEntry should be invalid.
-    // RegisterAgentActivity will be valid.
+    // CreateEntry should be invalid.
+    // AgentActivity will be valid.
     let expected_count = 3 + expected_count;
     let alice_store = conductors[0]
         .get_dht_store(alice_cell_id.dna_hash())
@@ -1758,7 +1758,7 @@ async fn run_test_entry_def_id(
         commit_invalid_post(&bob_cell_id, &conductors[1].raw_handle(), dna_file).await;
 
     // Integration should have 3 ops in it
-    // StoreEntry and StoreRecord should be invalid.
+    // CreateEntry and CreateRecord should be invalid.
     let expected_count = 3 + expected_count;
     let alice_store = conductors[0]
         .get_dht_store(alice_cell_id.dna_hash())

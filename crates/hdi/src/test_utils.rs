@@ -75,7 +75,7 @@ pub fn set_zome_types(entries: &[(u8, u8)], links: &[(u8, u8)]) {
         fn must_get_agent_activity(
             &self,
             must_get_agent_activity_input: MustGetAgentActivityInput,
-        ) -> ExternResult<Vec<RegisterAgentActivity>> {
+        ) -> ExternResult<Vec<AgentActivity>> {
             todo!()
         }
     }

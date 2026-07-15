@@ -18,7 +18,7 @@ pub fn must_get_agent_activity(
     _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: MustGetAgentActivityInput,
-) -> Result<Vec<RegisterAgentActivity>, RuntimeError> {
+) -> Result<Vec<AgentActivity>, RuntimeError> {
     tracing::debug!("begin must_get_agent_activity");
     let ret = match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
@@ -263,7 +263,7 @@ pub mod test {
 
         let filter = ChainFilter::until_hash(c.clone(), a.clone());
 
-        let r: Vec<RegisterAgentActivity> = conductor
+        let r: Vec<AgentActivity> = conductor
             .call(
                 &alice,
                 "call_must_get_agent_activity",

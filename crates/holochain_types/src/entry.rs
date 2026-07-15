@@ -58,7 +58,7 @@ impl WireEntryOps {
     /// Expand the served records into the request-relevant ops for caching.
     ///
     /// Each served action becomes the single op the get-entry request
-    /// represents (`StoreEntry` per create, `RegisterDeletedEntryAction` per
+    /// represents (`CreateEntry` per create, `RegisterDeletedEntryAction` per
     /// delete, `RegisterUpdatedContent` per update), tagged with the served
     /// validation status. Warrants are handled separately by the requester.
     pub fn render(self) -> DhtOpResult<RenderedOps> {

@@ -253,7 +253,7 @@ async fn purge_all_empties_every_table() {
     }
 }
 
-/// Build a `StoreRecord` chain op for a `Create` action carrying a public
+/// Build a `CreateRecord` chain op for a `Create` action carrying a public
 /// entry.  `seed` is used to make each call produce distinct keys /
 /// hashes (it drives the raw bytes of the author key and entry hash).
 fn build_test_store_record_op_hashed(seed: u8) -> (DhtOpHashed, bool) {
@@ -915,7 +915,7 @@ async fn validation_receipts_for_action_reconstructs_receipt() {
 
     let store = DhtStore::new_test(dht_id()).await.unwrap();
 
-    // Seed an integrated, self-authored StoreRecord op.
+    // Seed an integrated, self-authored CreateRecord op.
     let (op, _) = build_test_store_record_op_hashed(50);
     let op_hash = op.as_hash().clone();
     let action_hash = {
@@ -1267,7 +1267,7 @@ async fn reject_chain_op_rejects_limbo_op() {
     assert_eq!(row.app_validation_status, None);
 }
 
-/// Build a single-op `RenderedOps` for a `StoreRecord(Create)` using the
+/// Build a single-op `RenderedOps` for a `CreateRecord(Create)` using the
 /// same style as `cache.rs` tests.  Returns `(RenderedOps, action_hash)`.
 fn build_rendered_store_record_for_move(seed: u8) -> (RenderedOps, holo_hash::ActionHash) {
     use holo_hash::{ActionHash, EntryHash};
@@ -1632,7 +1632,7 @@ async fn get_live_record_returns_none_when_deleted() {
         .is_none());
 }
 
-/// Build a single-op `RenderedOps` for a `StoreEntry(Create)`.
+/// Build a single-op `RenderedOps` for a `CreateEntry(Create)`.
 /// Returns `(RenderedOps, action_hash, entry_hash)`.
 fn build_rendered_store_entry(
     seed: u8,
@@ -1744,7 +1744,7 @@ async fn get_live_entry_returns_none_when_create_deleted() {
         .is_none());
 }
 
-/// Build a single-op `RenderedOps` for a `StoreRecord(Create)` with a public
+/// Build a single-op `RenderedOps` for a `CreateRecord(Create)` with a public
 /// entry.  Returns `(RenderedOps, action_hash, entry_hash)`.
 fn build_rendered_store_record_ops(
     seed: u8,
@@ -2593,7 +2593,7 @@ async fn authority_updates_for_record_returns_integrated_updates() {
     assert_eq!(updates[0].1, ValidationStatus::Valid);
 }
 
-/// Build a `StoreEntry(Create)` op as a `DhtOpHashed`, returning it + the entry hash.
+/// Build a `CreateEntry(Create)` op as a `DhtOpHashed`, returning it + the entry hash.
 fn make_store_entry_op(seed: u8) -> (DhtOpHashed, EntryHash) {
     use holochain_serialized_bytes::UnsafeBytes;
     use holochain_types::prelude::{AppEntryBytes, Entry};
@@ -2920,7 +2920,7 @@ mod publish_query {
         )
         .await;
 
-        // A StoreEntry op for a private entry is never published.
+        // A CreateEntry op for a private entry is never published.
         assert_eq!(num_to_publish(&dht_store, &agent).await, 0);
         assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 0);
     }
@@ -2943,7 +2943,7 @@ mod publish_query {
         )
         .await;
 
-        // A StoreEntry op for a public entry is published.
+        // A CreateEntry op for a public entry is published.
         assert_eq!(num_to_publish(&dht_store, &agent).await, 1);
         assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 1);
     }
@@ -2966,7 +2966,7 @@ mod publish_query {
         )
         .await;
 
-        // A StoreRecord op for a private entry is published (the entry is hidden).
+        // A CreateRecord op for a private entry is published (the entry is hidden).
         assert_eq!(num_to_publish(&dht_store, &agent).await, 1);
         assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 1);
     }

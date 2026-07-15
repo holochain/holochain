@@ -9,7 +9,7 @@ use kitsune2_api::OpId;
 /// Request the published ops for the given agent from the DHT store.
 ///
 /// Returns the ops `author` has authored and shares with the DHT — that is,
-/// self-authored, locally-validated ops, with private `StoreEntry` ops
+/// self-authored, locally-validated ops, with private `CreateEntry` ops
 /// excluded so private entries never leak into the published set. Each op is
 /// returned as `(loc, op_id, op)`, where `loc` is the basis location and
 /// `op_id` the located K2 op id.

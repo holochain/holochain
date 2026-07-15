@@ -76,7 +76,7 @@ pub fn validate_create_link_by_must_get_agent_activity(
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::RegisterLink(OpLink::CreateLink {
+        FlatOp::Link(OpLink::CreateLink {
             base_address,
             target_address,
             link_type,
@@ -93,7 +93,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::StoreRecord(OpRecord::CreateLink {
+        FlatOp::CreateRecord(OpRecord::CreateLink {
             base_address,
             target_address,
             link_type,

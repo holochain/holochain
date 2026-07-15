@@ -261,7 +261,7 @@ async fn self_validation_get_missing() {
             let invoked_must_get_action = invoked_must_get_action.clone();
             let invoked_must_get_entry = invoked_must_get_entry.clone();
             move |api, op: Op| match op {
-                Op::StoreRecord(store_record) => {
+                Op::CreateRecord(store_record) => {
                     match store_record.record.action().entry_type() {
                         Some(EntryType::App(app_entry_def)) => {
                             if app_entry_def.entry_index.0 != 1 {

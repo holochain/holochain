@@ -36,7 +36,7 @@ impl WireRecordOps {
     /// Expand the served records into the request-relevant ops for caching.
     ///
     /// Each served action becomes the single op the get-record request
-    /// represents (`StoreRecord` for the record itself, `RegisterDeletedBy`
+    /// represents (`CreateRecord` for the record itself, `RegisterDeletedBy`
     /// per delete, `RegisterUpdatedRecord` per update), tagged with the served
     /// validation status. Warrants are handled separately by the requester.
     pub fn render(self) -> DhtOpResult<RenderedOps> {

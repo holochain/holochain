@@ -30,7 +30,7 @@ fn delete_via_input(delete_input: DeleteInput) -> ExternResult<ActionHash> {
 }
 
 #[hdk_extern]
-fn get_agent_activity(input: AgentPubKey) -> ExternResult<AgentActivity> {
+fn get_agent_activity(input: AgentPubKey) -> ExternResult<holochain_zome_types::query::AgentActivity> {
     let query = ChainQueryFilter::new().include_entries(true);
     let options = ActivityRequest::Full;
     hdk::prelude::get_agent_activity(input, query, options, GetOptions::default())

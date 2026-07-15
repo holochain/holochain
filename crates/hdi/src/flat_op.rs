@@ -22,18 +22,18 @@ where
     ET: UnitEnum,
 {
     /// Received by the action authority; see [`OpRecord`].
-    StoreRecord(OpRecord<ET, LT>),
+    CreateRecord(OpRecord<ET, LT>),
     /// Received by the entry authority; see [`OpEntry`].
-    StoreEntry(OpEntry<ET>),
+    CreateEntry(OpEntry<ET>),
     /// Received by the chain authority for every action; see [`OpActivity`].
-    RegisterAgentActivity(OpActivity<<ET as UnitEnum>::Unit, LT>),
+    AgentActivity(OpActivity<<ET as UnitEnum>::Unit, LT>),
     /// A link create or delete operation, grouped into [`OpLink`] to mirror the
     /// [`OpRecord`]/[`OpEntry`]/[`OpActivity`] sub-types.
-    RegisterLink(OpLink<LT>),
+    Link(OpLink<LT>),
     /// Received by the entry authority when an entry is updated; see [`OpUpdate`].
-    RegisterUpdate(OpUpdate<ET>),
+    Update(OpUpdate<ET>),
     /// Received by the entry authority when an entry is deleted; see [`OpDelete`].
-    RegisterDelete(OpDelete),
+    Delete(OpDelete),
 }
 
 /// The link operations of [`FlatOp`], grouped into a sub-type to mirror

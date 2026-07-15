@@ -25,7 +25,7 @@ use holochain_types::{
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::action::{ActionData, DeleteData, SignedAction};
-use holochain_zome_types::op::{Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete};
+use holochain_zome_types::op::{Op, AgentActivity, CreateLink, Delete};
 use holochain_zome_types::{
     chain::{ChainFilter, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
@@ -44,7 +44,7 @@ use std::{sync::Arc, time::Duration};
 async fn validation_callback_must_get_action() {
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+            if let Op::Delete(Delete { delete }) = op {
                 let deletes_address = match &delete.hashed.content.data {
                     ActionData::Delete(DeleteData {
                         deletes_address, ..
@@ -52,7 +52,7 @@ async fn validation_callback_must_get_action() {
                     // App validation only runs on ops that have passed sys
                     // validation, which rejects a delete op whose action is not
                     // a `Delete` (`malformed` in the sys validation workflow), so
-                    // a `RegisterDelete` op always carries `ActionData::Delete`.
+                    // a `Delete` op always carries `ActionData::Delete`.
                     _ => unreachable!(),
                 };
                 let result = api.must_get_action(MustGetActionInput(deletes_address.clone()));
@@ -92,7 +92,7 @@ async fn validation_callback_must_get_action() {
     }
     let delete_action_signed_hashed =
         SignedActionHashed::new_unchecked(delete_action, fixt!(Signature));
-    let delete_action_op = Op::RegisterDelete(RegisterDelete {
+    let delete_action_op = Op::Delete(Delete {
         delete: delete_action_signed_hashed.clone(),
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
@@ -138,7 +138,7 @@ async fn validation_callback_awaiting_deps_hashes() {
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+            if let Op::Delete(Delete { delete }) = op {
                 let deletes_address = match &delete.hashed.content.data {
                     ActionData::Delete(DeleteData {
                         deletes_address, ..
@@ -146,7 +146,7 @@ async fn validation_callback_awaiting_deps_hashes() {
                     // App validation only runs on ops that have passed sys
                     // validation, which rejects a delete op whose action is not
                     // a `Delete` (`malformed` in the sys validation workflow), so
-                    // a `RegisterDelete` op always carries `ActionData::Delete`.
+                    // a `Delete` op always carries `ActionData::Delete`.
                     _ => unreachable!(),
                 };
                 let result = api.must_get_action(MustGetActionInput(deletes_address.clone()));
@@ -187,7 +187,7 @@ async fn validation_callback_awaiting_deps_hashes() {
         d.deletes_address = create_action.to_hash();
     }
     let delete_action_signed_hashed = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
-    let delete_action_op = Op::RegisterDelete(RegisterDelete {
+    let delete_action_op = Op::Delete(Delete {
         delete: delete_action_signed_hashed.clone(),
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
@@ -246,7 +246,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+            if let Op::Delete(Delete { delete }) = op {
                 let deletes_address = match &delete.hashed.content.data {
                     ActionData::Delete(DeleteData {
                         deletes_address, ..
@@ -254,7 +254,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
                     // App validation only runs on ops that have passed sys
                     // validation, which rejects a delete op whose action is not
                     // a `Delete` (`malformed` in the sys validation workflow), so
-                    // a `RegisterDelete` op always carries `ActionData::Delete`.
+                    // a `Delete` op always carries `ActionData::Delete`.
                     _ => unreachable!(),
                 };
                 let author = delete.hashed.content.author().clone();
@@ -310,7 +310,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         SignedActionHashed::sign(&keystore, delete_action.clone().into_hashed())
             .await
             .unwrap();
-    let delete_action_op = Op::RegisterDelete(RegisterDelete {
+    let delete_action_op = Op::Delete(Delete {
         delete: SignedActionHashed::new_unchecked(delete_action, fixt!(Signature)),
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
@@ -332,11 +332,11 @@ async fn validation_callback_awaiting_deps_agent_activity() {
             assert_eq!(filter.get_until_hash(), Some(&expected_until_hash));
 
             Ok(vec![MustGetAgentActivityResponse::activity(vec![
-                RegisterAgentActivity {
+                AgentActivity {
                     action: create_action_signed_hashed.clone(),
                     cached_entry: None,
                 },
-                RegisterAgentActivity {
+                AgentActivity {
                     action: delete_action_signed_hashed.clone(),
                     cached_entry: None,
                 },
@@ -422,7 +422,7 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
     }
     let create_link_signed_hashed =
         SignedActionHashed::new_unchecked(create_link_action, fixt!(Signature));
-    let create_link_op = Op::RegisterCreateLink(RegisterCreateLink {
+    let create_link_op = Op::CreateLink(CreateLink {
         create_link: create_link_signed_hashed,
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &create_link_op).unwrap();

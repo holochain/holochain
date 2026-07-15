@@ -171,7 +171,7 @@ pub mod test {
             .call(&bob, "must_get_valid_record", action_hash.clone())
             .await;
 
-        // Reject the cached StoreRecord op.
+        // Reject the cached CreateRecord op.
         alice_host_fn_caller
             .dht_store
             .reject_chain_ops(vec![record_op_hash])

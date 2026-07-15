@@ -59,10 +59,13 @@ pub use crate::capability::CapAccess;
 pub use crate::action::SignedActionHashed;
 
 // Bring the validation `Op` and its variant structs into the prelude so
-// validators and inline zomes decode the `Op` the host encodes, and
-// `MustGetAgentActivityResponse` carries the `RegisterAgentActivity` payload
-// directly.
-pub use crate::op::{
-    Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
-    RegisterUpdate, StoreEntry, StoreRecord,
-};
+// validators and inline zomes decode the `Op` the host encodes. `AgentActivity`
+// (the `Op` variant struct, one action + optionally its cached entry) and
+// `query::AgentActivity` (the richer `get_agent_activity` response type) share
+// a name; both are glob re-exported (this block and `crate::query::*` below),
+// so an explicit re-export takes priority, resolving the ambiguity in favor of
+// the `Op` variant struct — the path the large majority of existing consumers
+// use (e.g. every per-action item built while scanning a chain). Consumers
+// that need the richer query-response type instead import
+// `crate::query::AgentActivity` explicitly.
+pub use crate::op::{Op, AgentActivity, CreateLink, Delete, DeleteLink, Update, CreateEntry, CreateRecord};

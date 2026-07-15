@@ -13,7 +13,7 @@
 //! - Check that updates can't switch the entry type
 //! - The link tag size is bounded
 //! - Check the AppEntryDef is valid for the zome and the EntryDefId and ZomeIndex are in range.
-//! - Check that StoreEntry never contains a private entry type
+//! - Check that CreateEntry never contains a private entry type
 //! - Test that a given sequence of actions constitutes a valid chain w.r.t. its backlinks
 //!
 // TODO Add tests for:
@@ -109,7 +109,7 @@ fn check_entry_hash_test() {
     );
 }
 
-/// Check that StoreEntry does not have a private entry type
+/// Check that CreateEntry does not have a private entry type
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_filters_private_entry() {
     let dna = fixt!(DnaHash);

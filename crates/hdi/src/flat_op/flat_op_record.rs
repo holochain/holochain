@@ -2,7 +2,7 @@
 use super::*;
 use holochain_integrity_types::MigrationTarget;
 
-/// Data specific to the [`Op::StoreRecord`](holochain_integrity_types::op::Op::StoreRecord)
+/// Data specific to the [`Op::CreateRecord`](holochain_integrity_types::op::Op::CreateRecord)
 /// operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpRecord<ET: UnitEnum, LT> {

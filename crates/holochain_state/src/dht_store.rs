@@ -1069,9 +1069,9 @@ fn entry_hash_from_chain_op_action(
 ///
 /// | `op_type` | Basis hash type |
 /// |-----------|-----------------|
-/// | 1 (StoreRecord)                 | `ActionHash`  |
-/// | 2 (StoreEntry)                  | `EntryHash`   |
-/// | 3 (RegisterAgentActivity)       | `AgentPubKey` |
+/// | 1 (CreateRecord)                 | `ActionHash`  |
+/// | 2 (CreateEntry)                  | `EntryHash`   |
+/// | 3 (AgentActivity)       | `AgentPubKey` |
 /// | 4 (RegisterUpdatedContent)      | `EntryHash`   |
 /// | 5 (RegisterUpdatedRecord)       | `ActionHash`  |
 /// | 6 (RegisterDeletedEntryAction)  | `EntryHash`   |
@@ -1085,11 +1085,11 @@ fn entry_hash_from_chain_op_action(
 /// `EntryHash` is used as the fallback for those rows.
 fn chain_op_basis_hash_from_row(op_type: i64, raw: Vec<u8>) -> holo_hash::AnyLinkableHash {
     match op_type {
-        // StoreRecord, RegisterUpdatedRecord, RegisterDeletedBy → ActionHash basis
+        // CreateRecord, RegisterUpdatedRecord, RegisterDeletedBy → ActionHash basis
         1 | 5 | 7 => holo_hash::ActionHash::from_raw_36(raw).into(),
-        // RegisterAgentActivity → AgentPubKey basis
+        // AgentActivity → AgentPubKey basis
         3 => holo_hash::AgentPubKey::from_raw_36(raw).into(),
-        // StoreEntry, RegisterUpdatedContent, RegisterDeletedEntryAction,
+        // CreateEntry, RegisterUpdatedContent, RegisterDeletedEntryAction,
         // RegisterAddLink, RegisterRemoveLink → EntryHash basis (or Agent as Entry)
         _ => holo_hash::EntryHash::from_raw_36(raw).into(),
     }
@@ -1263,8 +1263,8 @@ impl DhtStore<DbWrite<Dht>> {
     /// `ChainOpPublish` row, WITHOUT inserting the parent `Action`.
     ///
     /// A committed record produces several ops that share one action — a
-    /// `Create`, for instance, yields `StoreRecord`, `RegisterAgentActivity`,
-    /// and `StoreEntry` ops — all written integrated by the source-chain flush.
+    /// `Create`, for instance, yields `CreateRecord`, `AgentActivity`,
+    /// and `CreateEntry` ops — all written integrated by the source-chain flush.
     /// Use this after
     /// [`test_insert_authored_chain_op`](DhtStore::test_insert_authored_chain_op),
     /// which inserts the action once, to add the sibling op types for the same

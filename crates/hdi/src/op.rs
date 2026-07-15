@@ -18,7 +18,7 @@ pub trait OpHelper {
 
 use crate::flat_op;
 
-/// All possible variants that a [`RegisterAgentActivity`] with an
+/// All possible variants that a [`AgentActivity`] with an
 /// action that has an [`EntryType`] can produce.
 #[derive(Debug)]
 pub(crate) enum ActivityEntry<Unit> {
@@ -39,7 +39,7 @@ impl OpHelper for Op {
         WasmError: From<<LT as LinkTypesHelper>::Error>,
     {
         match self {
-            Op::StoreRecord(StoreRecord { record }) => {
+            Op::CreateRecord(CreateRecord { record }) => {
                 let a = record.action();
                 let r = match &a.data {
                     ActionData::Dna(d) => flat_op::OpRecord::Dna {
@@ -144,9 +144,9 @@ impl OpHelper for Op {
                         action: a.clone(),
                     },
                 };
-                Ok(flat_op::FlatOp::StoreRecord(r))
+                Ok(flat_op::FlatOp::CreateRecord(r))
             }
-            Op::StoreEntry(StoreEntry { action, entry }) => {
+            Op::CreateEntry(CreateEntry { action, entry }) => {
                 let a = &action.hashed.content;
                 let r = match &a.data {
                     ActionData::Create(d) => match &d.entry_type {
@@ -199,20 +199,20 @@ impl OpHelper for Op {
                     },
                     other => {
                         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                            "StoreEntry op carried a non-entry-creation action: {:?}",
+                            "CreateEntry op carried a non-entry-creation action: {:?}",
                             other.action_type()
                         ))))
                     }
                 };
-                Ok(flat_op::FlatOp::StoreEntry(r))
+                Ok(flat_op::FlatOp::CreateEntry(r))
             }
-            Op::RegisterUpdate(RegisterUpdate { update, new_entry }) => {
+            Op::Update(Update { update, new_entry }) => {
                 let a = &update.hashed.content;
                 let d = match &a.data {
                     ActionData::Update(d) => d,
                     other => {
                         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                            "RegisterUpdate op carried a non-Update action: {:?}",
+                            "Update op carried a non-Update action: {:?}",
                             other.action_type()
                         ))))
                     }
@@ -249,9 +249,9 @@ impl OpHelper for Op {
                         action: a.clone(),
                     },
                 };
-                Ok(flat_op::FlatOp::RegisterUpdate(r))
+                Ok(flat_op::FlatOp::Update(r))
             }
-            Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
+            Op::AgentActivity(AgentActivity { action, .. }) => {
                 let a = &action.hashed.content;
                 let r = match &a.data {
                     ActionData::Dna(d) => flat_op::OpActivity::Dna {
@@ -350,21 +350,21 @@ impl OpHelper for Op {
                         action: a.clone(),
                     },
                 };
-                Ok(flat_op::FlatOp::RegisterAgentActivity(r))
+                Ok(flat_op::FlatOp::AgentActivity(r))
             }
-            Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
+            Op::CreateLink(CreateLink { create_link }) => {
                 let a = &create_link.hashed.content;
                 let d = match &a.data {
                     ActionData::CreateLink(d) => d,
                     other => {
                         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                            "RegisterCreateLink op carried a non-CreateLink action: {:?}",
+                            "CreateLink op carried a non-CreateLink action: {:?}",
                             other.action_type()
                         ))))
                     }
                 };
                 let link_type = in_scope_link_type(d.zome_index, d.link_type)?;
-                Ok(flat_op::FlatOp::RegisterLink(flat_op::OpLink::CreateLink {
+                Ok(flat_op::FlatOp::Link(flat_op::OpLink::CreateLink {
                     base_address: d.base_address.clone(),
                     target_address: d.target_address.clone(),
                     tag: d.tag.clone(),
@@ -372,7 +372,7 @@ impl OpHelper for Op {
                     action: a.clone(),
                 }))
             }
-            Op::RegisterDeleteLink(RegisterDeleteLink {
+            Op::DeleteLink(DeleteLink {
                 delete_link,
                 create_link,
             }) => {
@@ -381,7 +381,7 @@ impl OpHelper for Op {
                     ActionData::DeleteLink(_) => {}
                     other => {
                         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                            "RegisterDeleteLink op carried a non-DeleteLink action: {:?}",
+                            "DeleteLink op carried a non-DeleteLink action: {:?}",
                             other.action_type()
                         ))))
                     }
@@ -390,13 +390,13 @@ impl OpHelper for Op {
                     ActionData::CreateLink(d) => d,
                     other => {
                         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                            "RegisterDeleteLink referenced a non-CreateLink original action: {:?}",
+                            "DeleteLink referenced a non-CreateLink original action: {:?}",
                             other.action_type()
                         ))))
                     }
                 };
                 let link_type = in_scope_link_type(d.zome_index, d.link_type)?;
-                Ok(flat_op::FlatOp::RegisterLink(flat_op::OpLink::DeleteLink {
+                Ok(flat_op::FlatOp::Link(flat_op::OpLink::DeleteLink {
                     original_action: create_link.clone(),
                     base_address: d.base_address.clone(),
                     target_address: d.target_address.clone(),
@@ -405,16 +405,16 @@ impl OpHelper for Op {
                     action: delete_action.clone(),
                 }))
             }
-            Op::RegisterDelete(RegisterDelete { delete }) => {
+            Op::Delete(Delete { delete }) => {
                 let action = &delete.hashed.content;
                 match &action.data {
                     ActionData::Delete(_) => {
-                        Ok(flat_op::FlatOp::RegisterDelete(flat_op::OpDelete {
+                        Ok(flat_op::FlatOp::Delete(flat_op::OpDelete {
                             action: action.clone(),
                         }))
                     }
                     other => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "RegisterDelete op carried a non-Delete action: {:?}",
+                        "Delete op carried a non-Delete action: {:?}",
                         other.action_type()
                     )))),
                 }
@@ -444,7 +444,7 @@ fn cap_grant_entry(entry: &Entry) -> Result<CapGrantEntry, WasmError> {
 }
 
 /// Produces the user-defined entry type enum. Even if the entry is private, this will succeed.
-/// To be used only in the context of a StoreEntry authority.
+/// To be used only in the context of a CreateEntry authority.
 pub(crate) fn get_app_entry_type_for_store_entry_authority<ET>(
     entry_def: &AppEntryDef,
     entry: &Entry,
@@ -466,7 +466,7 @@ where
 }
 
 /// Produces the user-defined entry type enum or the unit enum if entry is not present.
-/// To be used only in the context of a StoreRecord or AgentActivity authority.
+/// To be used only in the context of a CreateRecord or AgentActivity authority.
 /// If the entry's availability does not match the defined visibility, an error will result.
 pub(crate) fn get_app_entry_type_for_record_authority<ET>(
     entry_def: &AppEntryDef,
@@ -505,7 +505,7 @@ where
     }
 }
 
-/// Maps [`RegisterAgentActivity`] ops to their
+/// Maps [`AgentActivity`] ops to their
 /// entries. The entry type will be [`None`] if
 /// the zome id is not a dependency of this zome.
 pub(crate) fn activity_entry<ET>(
@@ -668,11 +668,11 @@ mod tests {
         types();
         let signed = signed_from_data(create_app_data());
         let record = Record::new(signed, RecordEntry::Present(e(A {})));
-        let op = Op::StoreRecord(StoreRecord { record });
+        let op = Op::CreateRecord(CreateRecord { record });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
         assert!(matches!(
             flat,
-            FlatOp::StoreRecord(OpRecord::CreateEntry {
+            FlatOp::CreateRecord(OpRecord::CreateEntry {
                 app_entry: EntryTypes::A(A {}),
                 ..
             })
@@ -687,11 +687,11 @@ mod tests {
             entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
         }));
         let record = Record::new(signed, RecordEntry::NA);
-        let op = Op::StoreRecord(StoreRecord { record });
+        let op = Op::CreateRecord(CreateRecord { record });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
         assert!(matches!(
             flat,
-            FlatOp::StoreRecord(OpRecord::CreateAgent { .. })
+            FlatOp::CreateRecord(OpRecord::CreateAgent { .. })
         ));
     }
 
@@ -702,9 +702,9 @@ mod tests {
             dna_hash: DnaHash::from_raw_36(vec![4u8; 36]),
         }));
         let record = Record::new(signed, RecordEntry::NA);
-        let op = Op::StoreRecord(StoreRecord { record });
+        let op = Op::CreateRecord(CreateRecord { record });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
-        assert!(matches!(flat, FlatOp::StoreRecord(OpRecord::Dna { .. })));
+        assert!(matches!(flat, FlatOp::CreateRecord(OpRecord::Dna { .. })));
     }
 
     #[test]
@@ -718,11 +718,11 @@ mod tests {
             tag: LinkTag(vec![]),
         }));
         let record = Record::new(signed, RecordEntry::NA);
-        let op = Op::StoreRecord(StoreRecord { record });
+        let op = Op::CreateRecord(CreateRecord { record });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
         assert!(matches!(
             flat,
-            FlatOp::StoreRecord(OpRecord::CreateLink {
+            FlatOp::CreateRecord(OpRecord::CreateLink {
                 link_type: LinkTypes::A,
                 ..
             })
@@ -733,14 +733,14 @@ mod tests {
     fn store_entry_create_app_flattens_to_create_entry() {
         types();
         let signed = signed_from_data(create_app_data());
-        let op = Op::StoreEntry(StoreEntry {
+        let op = Op::CreateEntry(CreateEntry {
             action: signed,
             entry: e(A {}),
         });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
         assert!(matches!(
             flat,
-            FlatOp::StoreEntry(OpEntry::CreateEntry {
+            FlatOp::CreateEntry(OpEntry::CreateEntry {
                 app_entry: EntryTypes::A(A {}),
                 ..
             })
@@ -751,14 +751,14 @@ mod tests {
     fn register_agent_activity_create_app_flattens_with_unit_type() {
         types();
         let signed = signed_from_data(create_app_data());
-        let op = Op::RegisterAgentActivity(RegisterAgentActivity {
+        let op = Op::AgentActivity(AgentActivity {
             action: signed,
             cached_entry: None,
         });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
         assert!(matches!(
             flat,
-            FlatOp::RegisterAgentActivity(OpActivity::CreateEntry {
+            FlatOp::AgentActivity(OpActivity::CreateEntry {
                 app_entry_type: Some(UnitEntryTypes::A),
                 ..
             })
@@ -772,8 +772,8 @@ mod tests {
             deletes_address: ActionHash::from_raw_36(vec![7u8; 36]),
             deletes_entry_address: EntryHash::from_raw_36(vec![8u8; 36]),
         }));
-        let op = Op::RegisterDelete(RegisterDelete { delete: signed });
+        let op = Op::Delete(Delete { delete: signed });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
-        assert!(matches!(flat, FlatOp::RegisterDelete(_)));
+        assert!(matches!(flat, FlatOp::Delete(_)));
     }
 }

@@ -156,7 +156,7 @@ impl HcP2pHandler for StubHost {
     }
 }
 
-/// Build a `StoreRecord` op, as it travels on the gossip wire.
+/// Build a `CreateRecord` op, as it travels on the gossip wire.
 fn test_dht_op(authored_timestamp: Timestamp) -> holochain_types::op::DhtOp {
     use holochain_types::op::OpEntry;
     use holochain_zome_types::action::SignedAction;

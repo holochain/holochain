@@ -160,7 +160,7 @@ where
 ///
 /// Acceptability is read from the `Action` row's own `record_validity` state,
 /// not by joining to an op row, so the result never depends on holding a
-/// particular op such as `RegisterAgentActivity`. `record_validity` is the
+/// particular op such as `AgentActivity`. `record_validity` is the
 /// action's aggregated integration status: a self-authored action is `Accepted`
 /// when the flush writes it, and a network-received action becomes `Accepted`
 /// once its ops integrate. Pending (limbo) and rejected actions are excluded, so
@@ -196,7 +196,7 @@ where
 }
 
 /// All actions authored by `author` that have an integrated
-/// `RegisterAgentActivity` op, ordered by chain sequence. When
+/// `AgentActivity` op, ordered by chain sequence. When
 /// `include_entries` is set, the public
 /// `Entry` blob is joined in (Full mode); otherwise the entry column is `NULL`.
 ///
@@ -242,7 +242,7 @@ where
     rows.into_iter().map(agent_activity_row_to_item).collect()
 }
 
-/// Bounded `RegisterAgentActivity` scan for `must_get_agent_activity`: integrated
+/// Bounded `AgentActivity` scan for `must_get_agent_activity`: integrated
 /// actions authored by `author` with `seq <= chain_top_seq` and (when
 /// `until_seq` is `Some`) `seq >= until_seq`, ordered by `seq DESC, hash DESC`.
 pub(crate) async fn get_filtered_agent_activity<'e, E>(
@@ -276,7 +276,7 @@ where
 }
 
 /// The chain sequence and authored timestamp of `action_hash`, if it is an
-/// integrated `RegisterAgentActivity` action authored by `author`.
+/// integrated `AgentActivity` action authored by `author`.
 pub(crate) async fn get_action_seq_and_timestamp<'e, E>(
     executor: E,
     author: &AgentPubKey,
@@ -304,7 +304,7 @@ fn agent_activity_row_to_item(row: AgentActivityRow) -> sqlx::Result<AgentActivi
     let validation_status = RecordValidity::try_from(row.validation_status).map_err(|v| {
         sqlx::Error::Decode(Box::new(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            format!("invalid validation_status {v} on RegisterAgentActivity op"),
+            format!("invalid validation_status {v} on AgentActivity op"),
         )))
     })?;
     let entry = match row.entry_blob {
@@ -325,8 +325,8 @@ fn agent_activity_row_to_item(row: AgentActivityRow) -> sqlx::Result<AgentActivi
     })
 }
 
-/// Return the live `StoreEntry` create actions for `entry_hash`: valid,
-/// integrated `StoreEntry` ops on that basis whose action has no `DeletedRecord`,
+/// Return the live `CreateEntry` create actions for `entry_hash`: valid,
+/// integrated `CreateEntry` ops on that basis whose action has no `DeletedRecord`,
 /// and whose entry is visible to `author` (public, or private and authored by
 /// `author`). Ordered by integration time.
 pub(crate) async fn get_live_entry_creates<'e, E>(
@@ -358,7 +358,7 @@ where
     rows.into_iter().map(row_to_signed_action_hashed).collect()
 }
 
-/// The entry's `StoreEntry` create actions at validation status
+/// The entry's `CreateEntry` create actions at validation status
 /// `validation_status` (integrated, visible to `author`). Unlike
 /// `get_live_entry_creates`, this does NOT exclude deleted creates.
 pub(crate) async fn get_create_actions_for_entry<'e, E>(
@@ -607,8 +607,8 @@ where
     rows.into_iter().map(validated_action_row_to_item).collect()
 }
 
-/// Authority-serving `StoreRecord` action for `action_hash`: present only if a
-/// locally-validated (`locally_validated = 1`) `StoreRecord` op exists for it,
+/// Authority-serving `CreateRecord` action for `action_hash`: present only if a
+/// locally-validated (`locally_validated = 1`) `CreateRecord` op exists for it,
 /// with its validation status.
 pub(crate) async fn get_authority_store_record<'e, E>(
     executor: E,
@@ -685,7 +685,7 @@ where
 }
 
 /// Authority-serving create actions for entry `entry_hash`: locally-validated
-/// `StoreEntry` ops only, each with its validation status.
+/// `CreateEntry` ops only, each with its validation status.
 /// Cached ops (`locally_validated = 0`) are excluded.
 pub(crate) async fn get_authority_entry_creates<'e, E>(
     executor: E,

@@ -3,7 +3,7 @@ use super::*;
 use holochain_integrity_types::MigrationTarget;
 
 /// Data specific to the
-/// [`Op::RegisterAgentActivity`](holochain_integrity_types::op::Op::RegisterAgentActivity)
+/// [`Op::AgentActivity`](holochain_integrity_types::op::Op::AgentActivity)
 /// operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpActivity<UnitType, LT> {

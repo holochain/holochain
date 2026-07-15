@@ -259,7 +259,7 @@ fn simple_validation_zome() -> InlineZomeSet {
         })
         .integrity_function("validate", |_api, data: Op| {
             let s = match data {
-                Op::StoreEntry(StoreEntry {
+                Op::CreateEntry(CreateEntry {
                     entry: Entry::App(bytes),
                     ..
                 }) => AppString::try_from(bytes.into_sb()).unwrap(),

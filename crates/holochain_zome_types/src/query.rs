@@ -201,7 +201,7 @@ pub enum ChainStatus {
     Forked(ChainFork),
     /// The chain is not forked, but is invalid from the given action sequence
     /// and action hash forward, by virtue of this authority finding a
-    /// [`RegisterAgentActivity`] DHT operation for that action to be
+    /// [`AgentActivity`] DHT operation for that action to be
     /// invalid. There may be other types of operations for the chain's
     /// actions which other authorities have found to be invalid; this
     /// information is not reflected here but is instead found in the

@@ -1945,7 +1945,7 @@ impl TestHarness {
 
         let signed = SignedAction::new(action, signature.clone());
 
-        // Build the `StoreEntry`/`CreateEntry` op for the DhtStore writes below.
+        // Build the `CreateEntry`/`CreateEntry` op for the DhtStore writes below.
         // It carries the real action signature: the store record is
         // reconstructed from this op and the completion path verifies the
         // record's signature, so a fixt signature would be rejected.
@@ -1974,7 +1974,7 @@ impl TestHarness {
             .await
             .unwrap();
 
-        // The real flush emits a `RegisterAgentActivity` op for every action.
+        // The real flush emits a `AgentActivity` op for every action.
         // The chain-head lookup (used by `current_countersigning_session` and
         // `read_chain_head_hash`) scopes to the integrated agent-activity op, so
         // mirror it here — withheld like the session's other ops — otherwise the

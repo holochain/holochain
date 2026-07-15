@@ -22,7 +22,7 @@ pub enum LinkTypes {
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         // This is a pretty pointless example as everything is valid.
-        FlatOp::RegisterLink(OpLink::CreateLink {
+        FlatOp::Link(OpLink::CreateLink {
             base_address,
             target_address,
             ..
@@ -44,7 +44,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 _ => ValidateCallbackResult::Invalid("base never validates".to_string()),
             })
         }
-        FlatOp::RegisterLink(OpLink::DeleteLink { base_address, .. }) => {
+        FlatOp::Link(OpLink::DeleteLink { base_address, .. }) => {
             let base: MaybeLinkable =
                 must_get_entry(base_address.into_entry_hash().expect("must be entry hash"))?
                     .try_into()?;

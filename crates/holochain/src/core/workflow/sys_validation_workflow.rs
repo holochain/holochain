@@ -393,8 +393,8 @@ async fn sys_validation_workflow_inner(
     {
         let mut warrants = vec![];
         // Track action hashes already warranted in this batch to avoid creating duplicate
-        // warrants for the same action. Multiple op types (StoreRecord, StoreEntry,
-        // RegisterAgentActivity) can share the same action, and without this deduplication
+        // warrants for the same action. Multiple op types (CreateRecord, CreateEntry,
+        // AgentActivity) can share the same action, and without this deduplication
         // all of them would trigger a separate warrant when processed in the same run.
         let mut warranted_in_batch = std::collections::HashSet::new();
         for (op_hash, chain_op, reason) in

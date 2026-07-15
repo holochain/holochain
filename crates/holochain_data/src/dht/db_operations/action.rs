@@ -57,7 +57,7 @@ impl DbRead<Dht> {
         action::chain_head_for_author(&mut *conn, author).await
     }
 
-    /// Integrated `RegisterAgentActivity` actions for `author`, ordered by
+    /// Integrated `AgentActivity` actions for `author`, ordered by
     /// chain sequence. `include_entries` joins the public entry (Full mode).
     pub async fn get_agent_activity(
         &self,
@@ -68,7 +68,7 @@ impl DbRead<Dht> {
         action::get_agent_activity(&mut *conn, &author, include_entries).await
     }
 
-    /// Bounded `RegisterAgentActivity` scan: `author`'s integrated actions with
+    /// Bounded `AgentActivity` scan: `author`'s integrated actions with
     /// `seq <= chain_top_seq` and (optionally) `seq >= until_seq`, ordered by
     /// `seq DESC, hash DESC`.
     pub async fn get_filtered_agent_activity(
@@ -82,7 +82,7 @@ impl DbRead<Dht> {
     }
 
     /// The chain sequence and authored timestamp of `action_hash`, if it is an
-    /// integrated `RegisterAgentActivity` action authored by `author`.
+    /// integrated `AgentActivity` action authored by `author`.
     pub async fn get_action_seq_and_timestamp(
         &self,
         author: AgentPubKey,
@@ -103,7 +103,7 @@ impl DbRead<Dht> {
         action::get_actions_by_prev_hash(&mut *conn, prev_hash, exclude_hash).await
     }
 
-    /// The entry's `StoreEntry` create actions at `validation_status`.
+    /// The entry's `CreateEntry` create actions at `validation_status`.
     pub async fn get_create_actions_for_entry(
         &self,
         entry_hash: &EntryHash,
@@ -133,7 +133,7 @@ impl DbRead<Dht> {
         action::get_update_actions_for_entry(&mut *conn, entry_hash).await
     }
 
-    /// Live `StoreEntry` create actions for `entry_hash` (valid, integrated,
+    /// Live `CreateEntry` create actions for `entry_hash` (valid, integrated,
     /// not deleted, visible to `author`), ordered by integration time.
     pub async fn get_live_entry_creates(
         &self,
@@ -209,7 +209,7 @@ impl DbRead<Dht> {
         action::get_authority_delete_links(&mut *conn, base).await
     }
 
-    /// Authority-serving `StoreRecord` action for `action_hash` (locally-validated
+    /// Authority-serving `CreateRecord` action for `action_hash` (locally-validated
     /// only), with its validation status.
     pub async fn get_authority_store_record(
         &self,

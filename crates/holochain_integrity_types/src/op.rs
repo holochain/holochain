@@ -57,94 +57,94 @@ pub enum UnitEnumEither<E: UnitEnum> {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum Op {
     /// Stores a [`Record`] (validated by the action authority).
-    StoreRecord(StoreRecord),
+    CreateRecord(CreateRecord),
     /// Stores an [`Entry`] (validated by the entry authority). The action's
     /// [`ActionData`] is `Create` or `Update`.
-    StoreEntry(StoreEntry),
+    CreateEntry(CreateEntry),
     /// Registers an update against an entry. The action's data is `Update`.
-    RegisterUpdate(RegisterUpdate),
+    Update(Update),
     /// Registers a delete against an entry. The action's data is `Delete`.
-    RegisterDelete(RegisterDelete),
+    Delete(Delete),
     /// Registers an action on an agent's source chain (validated by the chain
     /// authority); produced for every action.
-    RegisterAgentActivity(RegisterAgentActivity),
+    AgentActivity(AgentActivity),
     /// Registers a link. The action's data is `CreateLink`.
-    RegisterCreateLink(RegisterCreateLink),
+    CreateLink(CreateLink),
     /// Registers a link deletion. The action's data is `DeleteLink`.
-    RegisterDeleteLink(RegisterDeleteLink),
+    DeleteLink(DeleteLink),
 }
 
-/// See [`Op::StoreRecord`].
+/// See [`Op::CreateRecord`].
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct StoreRecord {
+pub struct CreateRecord {
     /// The record being stored.
     pub record: Record,
 }
 
-/// See [`Op::StoreEntry`].
+/// See [`Op::CreateEntry`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-pub struct StoreEntry {
+pub struct CreateEntry {
     /// The signed action whose data is `Create` or `Update`.
     pub action: SignedHashed<Action>,
     /// The entry being stored.
     pub entry: Entry,
 }
 
-/// See [`Op::RegisterUpdate`].
+/// See [`Op::Update`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-pub struct RegisterUpdate {
+pub struct Update {
     /// The signed `Update` action.
     pub update: SignedHashed<Action>,
     /// The new entry, absent when the entry is private.
     pub new_entry: Option<Entry>,
 }
 
-/// See [`Op::RegisterDelete`].
+/// See [`Op::Delete`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-pub struct RegisterDelete {
+pub struct Delete {
     /// The signed `Delete` action.
     pub delete: SignedHashed<Action>,
 }
 
-/// See [`Op::RegisterAgentActivity`].
+/// See [`Op::AgentActivity`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-pub struct RegisterAgentActivity {
+pub struct AgentActivity {
     /// The signed action being registered.
     pub action: SignedHashed<Action>,
     /// Optionally cached entry for agent-activity authorities.
     pub cached_entry: Option<Entry>,
 }
 
-/// See [`Op::RegisterCreateLink`].
+/// See [`Op::CreateLink`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-pub struct RegisterCreateLink {
+pub struct CreateLink {
     /// The signed `CreateLink` action.
     pub create_link: SignedHashed<Action>,
 }
 
-/// See [`Op::RegisterDeleteLink`].
+/// See [`Op::DeleteLink`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-pub struct RegisterDeleteLink {
+pub struct DeleteLink {
     /// The signed `DeleteLink` action.
     pub delete_link: SignedHashed<Action>,
     /// The original `CreateLink` action content being deleted.
     pub create_link: Action,
 }
 
-impl StoreEntry {
+impl CreateEntry {
     /// Construct, validating that the action's data creates an entry.
     pub fn new(action: SignedHashed<Action>, entry: Entry) -> Result<Self, WrongActionError> {
         match &action.hashed.content.data {
             ActionData::Create(_) | ActionData::Update(_) => Ok(Self { action, entry }),
             other => Err(WrongActionError(format!(
-                "StoreEntry requires Create or Update action data, got {:?}",
+                "CreateEntry requires Create or Update action data, got {:?}",
                 other.action_type()
             ))),
         }
     }
 }
 
-impl RegisterUpdate {
+impl Update {
     /// Construct, validating that the action's data is an `Update`.
     pub fn new(
         update: SignedHashed<Action>,
@@ -153,40 +153,40 @@ impl RegisterUpdate {
         match &update.hashed.content.data {
             ActionData::Update(_) => Ok(Self { update, new_entry }),
             other => Err(WrongActionError(format!(
-                "RegisterUpdate requires Update action data, got {:?}",
+                "Update requires Update action data, got {:?}",
                 other.action_type()
             ))),
         }
     }
 }
 
-impl RegisterDelete {
+impl Delete {
     /// Construct, validating that the action's data is a `Delete`.
     pub fn new(delete: SignedHashed<Action>) -> Result<Self, WrongActionError> {
         match &delete.hashed.content.data {
             ActionData::Delete(_) => Ok(Self { delete }),
             other => Err(WrongActionError(format!(
-                "RegisterDelete requires Delete action data, got {:?}",
+                "Delete requires Delete action data, got {:?}",
                 other.action_type()
             ))),
         }
     }
 }
 
-impl RegisterCreateLink {
+impl CreateLink {
     /// Construct, validating that the action's data is a `CreateLink`.
     pub fn new(create_link: SignedHashed<Action>) -> Result<Self, WrongActionError> {
         match &create_link.hashed.content.data {
             ActionData::CreateLink(_) => Ok(Self { create_link }),
             other => Err(WrongActionError(format!(
-                "RegisterCreateLink requires CreateLink action data, got {:?}",
+                "CreateLink requires CreateLink action data, got {:?}",
                 other.action_type()
             ))),
         }
     }
 }
 
-impl RegisterDeleteLink {
+impl DeleteLink {
     /// Construct, validating the delete action is a `DeleteLink`, the referenced
     /// original action is a `CreateLink`, and the two share a base address.
     ///
@@ -205,7 +205,7 @@ impl RegisterDeleteLink {
             (ActionData::DeleteLink(dl), ActionData::CreateLink(cl)) => {
                 if dl.base_address != cl.base_address {
                     return Err(WrongActionError(
-                        "RegisterDeleteLink requires the DeleteLink and CreateLink to share a base address".into(),
+                        "DeleteLink requires the DeleteLink and CreateLink to share a base address".into(),
                     ));
                 }
                 #[cfg(feature = "hashing")]
@@ -216,7 +216,7 @@ impl RegisterDeleteLink {
                         ActionHashed::from_content_sync(create_link.clone()).into_hash();
                     if create_link_hash != dl.link_add_address {
                         return Err(WrongActionError(format!(
-                            "RegisterDeleteLink requires the CreateLink action referenced by link_add_address ({}), got a CreateLink action hashing to {}",
+                            "DeleteLink requires the CreateLink action referenced by link_add_address ({}), got a CreateLink action hashing to {}",
                             dl.link_add_address, create_link_hash
                         )));
                     }
@@ -227,7 +227,7 @@ impl RegisterDeleteLink {
                 })
             }
             (dl, cl) => Err(WrongActionError(format!(
-                "RegisterDeleteLink requires DeleteLink and CreateLink action data, got {:?} and {:?}",
+                "DeleteLink requires DeleteLink and CreateLink action data, got {:?} and {:?}",
                 dl.action_type(),
                 cl.action_type()
             ))),
@@ -239,13 +239,13 @@ impl Op {
     /// The signed action backing this op.
     fn signed_action(&self) -> &SignedHashed<Action> {
         match self {
-            Op::StoreRecord(StoreRecord { record }) => &record.signed_action,
-            Op::StoreEntry(StoreEntry { action, .. }) => action,
-            Op::RegisterUpdate(RegisterUpdate { update, .. }) => update,
-            Op::RegisterDelete(RegisterDelete { delete }) => delete,
-            Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => action,
-            Op::RegisterCreateLink(RegisterCreateLink { create_link }) => create_link,
-            Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => delete_link,
+            Op::CreateRecord(CreateRecord { record }) => &record.signed_action,
+            Op::CreateEntry(CreateEntry { action, .. }) => action,
+            Op::Update(Update { update, .. }) => update,
+            Op::Delete(Delete { delete }) => delete,
+            Op::AgentActivity(AgentActivity { action, .. }) => action,
+            Op::CreateLink(CreateLink { create_link }) => create_link,
+            Op::DeleteLink(DeleteLink { delete_link, .. }) => delete_link,
         }
     }
 
@@ -346,7 +346,7 @@ mod tests {
     #[test]
     fn store_entry_accepts_create_and_update() {
         let entry = crate::Entry::Agent(AgentPubKey::from_raw_36(vec![1u8; 36]));
-        assert!(StoreEntry::new(signed_action(create_data()), entry.clone()).is_ok());
+        assert!(CreateEntry::new(signed_action(create_data()), entry.clone()).is_ok());
 
         let update = ActionData::Update(crate::action::UpdateData {
             original_action_address: ActionHash::from_raw_36(vec![10u8; 36]),
@@ -354,19 +354,19 @@ mod tests {
             entry_type: EntryType::AgentPubKey,
             entry_hash: EntryHash::from_raw_36(vec![12u8; 36]),
         });
-        assert!(StoreEntry::new(signed_action(update), entry).is_ok());
+        assert!(CreateEntry::new(signed_action(update), entry).is_ok());
     }
 
     #[test]
     fn store_entry_rejects_non_entry_action() {
         let entry = crate::Entry::Agent(AgentPubKey::from_raw_36(vec![1u8; 36]));
-        assert!(StoreEntry::new(signed_action(delete_data()), entry).is_err());
+        assert!(CreateEntry::new(signed_action(delete_data()), entry).is_err());
     }
 
     #[test]
     fn register_delete_rejects_non_delete() {
-        assert!(RegisterDelete::new(signed_action(create_data())).is_err());
-        assert!(RegisterDelete::new(signed_action(delete_data())).is_ok());
+        assert!(Delete::new(signed_action(create_data())).is_err());
+        assert!(Delete::new(signed_action(delete_data())).is_ok());
     }
 
     fn create_link_action(base: u8, target: u8) -> Action {
@@ -395,14 +395,14 @@ mod tests {
             base_address: EntryHash::from_raw_36(vec![6u8; 36]).into(),
             link_add_address: create_link_hash,
         });
-        assert!(RegisterDeleteLink::new(signed_action(delete_link_data), create_link).is_ok());
+        assert!(DeleteLink::new(signed_action(delete_link_data), create_link).is_ok());
     }
 
     #[test]
     fn register_delete_link_rejects_mismatched_base_address() {
         // create_link's base differs from delete_link_data()'s base.
         let create_link = create_link_action(9, 8);
-        assert!(RegisterDeleteLink::new(signed_action(delete_link_data()), create_link).is_err());
+        assert!(DeleteLink::new(signed_action(delete_link_data()), create_link).is_err());
     }
 
     #[test]
@@ -421,14 +421,14 @@ mod tests {
                 _ => unreachable!(),
             }
         );
-        assert!(RegisterDeleteLink::new(signed_action(delete_link_data()), create_link).is_err());
+        assert!(DeleteLink::new(signed_action(delete_link_data()), create_link).is_err());
     }
 
     #[test]
     fn op_accessors_read_header_and_data() {
         let sah = signed_action(create_data());
         let expected_hash = sah.as_hash().clone();
-        let op = Op::RegisterAgentActivity(RegisterAgentActivity {
+        let op = Op::AgentActivity(AgentActivity {
             action: sah,
             cached_entry: None,
         });
@@ -453,7 +453,7 @@ mod tests {
 
     #[test]
     fn op_entry_data_none_for_delete() {
-        let op = Op::RegisterDelete(RegisterDelete::new(signed_action(delete_data())).unwrap());
+        let op = Op::Delete(Delete::new(signed_action(delete_data())).unwrap());
         assert!(op.entry_data().is_none());
     }
 
@@ -461,8 +461,8 @@ mod tests {
     fn op_serde_roundtrip() {
         let entry = crate::Entry::Agent(AgentPubKey::from_raw_36(vec![1u8; 36]));
         let store_entry =
-            Op::StoreEntry(StoreEntry::new(signed_action(create_data()), entry).unwrap());
-        let store_record = Op::StoreRecord(StoreRecord {
+            Op::CreateEntry(CreateEntry::new(signed_action(create_data()), entry).unwrap());
+        let store_record = Op::CreateRecord(CreateRecord {
             record: Record::new(signed_action(create_data()), crate::record::RecordEntry::NA),
         });
         for op in [store_entry, store_record] {
@@ -477,7 +477,7 @@ mod tests {
         let sah = signed_action(create_data());
         let expected_hash = sah.as_hash().clone();
         let record = Record::new(sah, crate::record::RecordEntry::NA);
-        let op = Op::StoreRecord(StoreRecord { record });
+        let op = Op::CreateRecord(CreateRecord { record });
         assert_eq!(op.action_hash(), &expected_hash);
         assert_eq!(op.action_seq(), 1);
     }
@@ -490,7 +490,7 @@ mod tests {
             entry_type: EntryType::AgentPubKey,
             entry_hash: EntryHash::from_raw_36(vec![12u8; 36]),
         });
-        let op = Op::RegisterUpdate(RegisterUpdate::new(signed_action(update), None).unwrap());
+        let op = Op::Update(Update::new(signed_action(update), None).unwrap());
         let (entry_hash, entry_type) = op.entry_data().expect("update has entry data");
         assert_eq!(entry_hash, &EntryHash::from_raw_36(vec![12u8; 36]));
         assert_eq!(entry_type, &EntryType::AgentPubKey);

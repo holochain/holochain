@@ -17,8 +17,8 @@ use holochain_zome_types::fixt::{
     EntryFixturator, SignatureFixturator, UpdateAction,
 };
 use holochain_zome_types::op::{
-    Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
-    RegisterUpdate, StoreEntry, StoreRecord,
+    Op, AgentActivity, CreateLink, Delete, DeleteLink,
+    Update, CreateEntry, CreateRecord,
 };
 use holochain_zome_types::record::{Record, RecordEntry, SignedActionHashed};
 use holochain_zome_types::timestamp::Timestamp;
@@ -48,7 +48,7 @@ async fn register_agent_activity() {
 
     let action = fixt!(Action);
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let op = Op::RegisterAgentActivity(RegisterAgentActivity {
+    let op = Op::AgentActivity(AgentActivity {
         action: action.clone(),
         cached_entry: None,
     });
@@ -93,7 +93,7 @@ async fn store_entry_create_app_entry() {
     action.header.prev_action = Some(fixt!(ActionHash));
     action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let op = Op::StoreEntry(StoreEntry {
+    let op = Op::CreateEntry(CreateEntry {
         action: action.clone(),
         entry,
     });
@@ -132,7 +132,7 @@ async fn store_entry_create_non_app_entry() {
     action.header.prev_action = Some(fixt!(ActionHash));
     action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let op = Op::StoreEntry(StoreEntry {
+    let op = Op::CreateEntry(CreateEntry {
         action: action.clone(),
         entry,
     });
@@ -181,7 +181,7 @@ async fn store_entry_update_app_entry() {
     action.header.prev_action = Some(fixt!(ActionHash));
     action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let op = Op::StoreEntry(StoreEntry {
+    let op = Op::CreateEntry(CreateEntry {
         action: action.clone(),
         entry,
     });
@@ -224,7 +224,7 @@ async fn store_entry_update_non_app_entry() {
     action.header.prev_action = Some(fixt!(ActionHash));
     action.header.timestamp = Timestamp::now();
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let op = Op::StoreEntry(StoreEntry {
+    let op = Op::CreateEntry(CreateEntry {
         action: action.clone(),
         entry,
     });
@@ -273,7 +273,7 @@ async fn store_record_create_app_entry() {
         action.clone(),
         RecordEntry::new(action.hashed.content.entry_visibility(), None),
     );
-    let op = Op::StoreRecord(StoreRecord { record });
+    let op = Op::CreateRecord(CreateRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
@@ -309,7 +309,7 @@ async fn store_record_create_non_app_entry() {
         action.clone(),
         RecordEntry::new(action.hashed.content.entry_visibility(), None),
     );
-    let op = Op::StoreRecord(StoreRecord { record });
+    let op = Op::CreateRecord(CreateRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
@@ -354,7 +354,7 @@ async fn store_record_create_wrong_entry() {
         action.clone(),
         RecordEntry::new(action.hashed.content.entry_visibility(), None),
     );
-    let op = Op::StoreRecord(StoreRecord { record });
+    let op = Op::CreateRecord(CreateRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
@@ -393,7 +393,7 @@ async fn store_record_create_link() {
         action.clone(),
         RecordEntry::new(action.hashed.content.entry_visibility(), None),
     );
-    let op = Op::StoreRecord(StoreRecord { record });
+    let op = Op::CreateRecord(CreateRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
@@ -448,7 +448,7 @@ async fn store_record_update_app_entry() {
         action.clone(),
         RecordEntry::new(action.hashed.content.entry_visibility(), None),
     );
-    let op = Op::StoreRecord(StoreRecord { record });
+    let op = Op::CreateRecord(CreateRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
@@ -490,7 +490,7 @@ async fn store_record_update_non_app_entry() {
         action.clone(),
         RecordEntry::new(action.hashed.content.entry_visibility(), None),
     );
-    let op = Op::StoreRecord(StoreRecord { record });
+    let op = Op::CreateRecord(CreateRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
@@ -560,7 +560,7 @@ async fn store_record_update_of_update_app_entry() {
         action.clone(),
         RecordEntry::new(action.hashed.content.entry_visibility(), None),
     );
-    let op = Op::StoreRecord(StoreRecord { record });
+    let op = Op::CreateRecord(CreateRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
@@ -609,7 +609,7 @@ async fn store_record_delete_without_entry() {
         action.clone(),
         RecordEntry::new(action.hashed.content.entry_visibility(), None),
     );
-    let op = Op::StoreRecord(StoreRecord { record });
+    let op = Op::CreateRecord(CreateRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
@@ -656,7 +656,7 @@ async fn store_record_delete_non_app_entry() {
         action.clone(),
         RecordEntry::new(action.hashed.content.entry_visibility(), None),
     );
-    let op = Op::StoreRecord(StoreRecord { record });
+    let op = Op::CreateRecord(CreateRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
@@ -705,7 +705,7 @@ async fn store_record_delete_link() {
         action.clone(),
         RecordEntry::new(action.hashed.content.entry_visibility(), None),
     );
-    let op = Op::StoreRecord(StoreRecord { record });
+    let op = Op::CreateRecord(CreateRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
@@ -758,7 +758,7 @@ async fn register_update_app_entry() {
     update.header.prev_action = Some(fixt!(ActionHash));
     update.header.timestamp = Timestamp::now();
     let update = SignedActionHashed::new_unchecked(update, fixt!(Signature));
-    let op = Op::RegisterUpdate(RegisterUpdate {
+    let op = Op::Update(Update {
         update: update.clone(),
         new_entry: Some(entry),
     });
@@ -798,7 +798,7 @@ async fn register_update_non_app_entry() {
     update.header.prev_action = Some(fixt!(ActionHash));
     update.header.timestamp = Timestamp::now();
     let update = SignedActionHashed::new_unchecked(update, fixt!(Signature));
-    let op = Op::RegisterUpdate(RegisterUpdate {
+    let op = Op::Update(Update {
         update: update.clone(),
         new_entry: Some(entry),
     });
@@ -846,7 +846,7 @@ async fn register_delete_create_app_entry() {
     delete.header.prev_action = Some(fixt!(ActionHash));
     delete.header.timestamp = Timestamp::now();
     let delete = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
-    let op = Op::RegisterDelete(RegisterDelete {
+    let op = Op::Delete(Delete {
         delete: delete.clone(),
     });
 
@@ -894,7 +894,7 @@ async fn register_delete_create_non_app_entry() {
     delete.header.prev_action = Some(fixt!(ActionHash));
     delete.header.timestamp = Timestamp::now();
     let delete = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
-    let op = Op::RegisterDelete(RegisterDelete {
+    let op = Op::Delete(Delete {
         delete: delete.clone(),
     });
 
@@ -948,7 +948,7 @@ async fn register_delete_update_app_entry() {
     delete.header.prev_action = Some(fixt!(ActionHash));
     delete.header.timestamp = Timestamp::now();
     let delete = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
-    let op = Op::RegisterDelete(RegisterDelete {
+    let op = Op::Delete(Delete {
         delete: delete.clone(),
     });
 
@@ -996,7 +996,7 @@ async fn register_delete_update_non_app_entry() {
     delete.header.prev_action = Some(fixt!(ActionHash));
     delete.header.timestamp = Timestamp::now();
     let delete = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
-    let op = Op::RegisterDelete(RegisterDelete {
+    let op = Op::Delete(Delete {
         delete: delete.clone(),
     });
 
@@ -1039,7 +1039,7 @@ async fn register_create_link() {
         d.zome_index = zome_index;
     }
     let create_link = SignedActionHashed::new_unchecked(create_link, fixt!(Signature));
-    let op = Op::RegisterCreateLink(RegisterCreateLink {
+    let op = Op::CreateLink(CreateLink {
         create_link: create_link.clone(),
     });
 
@@ -1076,7 +1076,7 @@ async fn register_delete_link() {
     }
     let delete_link = fixt!(Action, DeleteLinkAction);
     let delete_link = SignedActionHashed::new_unchecked(delete_link, fixt!(Signature));
-    let op = Op::RegisterDeleteLink(RegisterDeleteLink {
+    let op = Op::DeleteLink(DeleteLink {
         create_link,
         delete_link,
     });

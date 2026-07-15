@@ -17,7 +17,7 @@ use holochain_data::DbRead;
 use holochain_types::op::DhtOpHashed;
 use holochain_types::prelude::{
     ActionHashedContainer, AgentActivityResponse, ChainItems, ChainItemsSource,
-    MustGetAgentActivityResponse, RegisterAgentActivity, ScheduledFn, Timestamp,
+    MustGetAgentActivityResponse, AgentActivity, ScheduledFn, Timestamp,
 };
 use holochain_types::warrant::WarrantOp;
 use holochain_zome_types::chain::{ChainFilter, LimitConditions};
@@ -265,7 +265,7 @@ impl DhtStore<DbRead<Dht>> {
     /// `min_publish_interval` bounds how recently an op may have been published
     /// and still be skipped: the cutoff is `now - min_publish_interval`, and an
     /// op qualifies when it has never been published or was last published at
-    /// or before the cutoff. Private `StoreEntry` ops are never returned — the
+    /// or before the cutoff. Private `CreateEntry` ops are never returned — the
     /// query is the guard that keeps private entries off the network.
     ///
     /// The basis is reconstructed as an [`ExternalHash`]: the publish path
@@ -616,7 +616,7 @@ impl DhtStore<DbRead<Dht>> {
     }
 
     /// The live `Record` for an entry: among the entry's valid, integrated,
-    /// undeleted `StoreEntry` creates (visible to `author`), prefer the one
+    /// undeleted `CreateEntry` creates (visible to `author`), prefer the one
     /// authored by `author`, else the first by integration order. Returns
     /// `None` if there are no live creates. `author = Some` includes that
     /// agent's private entry.
@@ -848,7 +848,7 @@ impl DhtStore<DbRead<Dht>> {
     /// in-memory scratch for create candidates and delete tombstones.
     ///
     /// Live creates are the union of:
-    /// - the store's validated, integrated, undeleted `StoreEntry` creates
+    /// - the store's validated, integrated, undeleted `CreateEntry` creates
     ///   (from [`get_live_entry_creates`](holochain_data::DbRead::get_live_entry_creates)), and
     /// - scratch `Create`/`Update` actions whose `entry_hash() == entry_hash`
     ///   and that are not targeted by a scratch `Delete`.
@@ -930,9 +930,9 @@ impl DhtStore<DbRead<Dht>> {
     }
 
     /// Assemble the [`RecordDetails`](holochain_zome_types::metadata::RecordDetails) for `hash`: the record, its validation
-    /// status (from its integrated `StoreRecord` op), the deletes targeting it,
+    /// status (from its integrated `CreateRecord` op), the deletes targeting it,
     /// and the updates of it. Returns `None` if there is no integrated
-    /// `StoreRecord` op for `hash`. `author = Some` allows that agent's private
+    /// `CreateRecord` op for `hash`. `author = Some` allows that agent's private
     /// entry.
     pub async fn get_record_details(
         &self,
@@ -954,7 +954,7 @@ impl DhtStore<DbRead<Dht>> {
             }
             Err(v) => {
                 return Err(crate::query::StateQueryError::Other(format!(
-                    "invalid validation_status {v} on StoreRecord op for {hash:?}"
+                    "invalid validation_status {v} on CreateRecord op for {hash:?}"
                 )))
             }
         };
@@ -976,13 +976,13 @@ impl DhtStore<DbRead<Dht>> {
     ///
     /// # Contract
     ///
-    /// Validation status is derived from the integrated `StoreRecord` op when one
+    /// Validation status is derived from the integrated `CreateRecord` op when one
     /// exists. A scratch-only record (authored locally but not yet committed and
     /// published) has no such op; it is returned with `Valid` status, since the
     /// author's own uncommitted record is valid from their perspective. This
     /// lets host functions resolve a just-authored record mid-call — e.g. an
     /// `update` reading the `create` it depends on within one zome call. An action
-    /// reachable only via a non-record op (no `StoreRecord`, not in the scratch)
+    /// reachable only via a non-record op (no `CreateRecord`, not in the scratch)
     /// still returns `None`.
     ///
     /// Deletes and updates are the **union** of:
@@ -1008,10 +1008,10 @@ impl DhtStore<DbRead<Dht>> {
             return Ok(None);
         };
 
-        // Validation status comes from the integrated StoreRecord op when one
+        // Validation status comes from the integrated CreateRecord op when one
         // exists. A scratch-only record (authored locally, not yet committed)
         // has no such op and is Valid from the author's perspective. A store
-        // action reachable only via a non-record op (no StoreRecord op, not in
+        // action reachable only via a non-record op (no CreateRecord op, not in
         // the scratch) has no record details.
         let ops = self.db().get_chain_ops_for_action(hash.clone()).await?;
         let store_op = ops
@@ -1023,7 +1023,7 @@ impl DhtStore<DbRead<Dht>> {
                 Ok(RecordValidity::Rejected) => ValidationStatus::Rejected,
                 Err(v) => {
                     return Err(crate::query::StateQueryError::Other(format!(
-                        "invalid validation_status {v} on StoreRecord op for {hash:?}"
+                        "invalid validation_status {v} on CreateRecord op for {hash:?}"
                     )))
                 }
             },
@@ -1395,7 +1395,7 @@ impl DhtStore<DbRead<Dht>> {
         Ok(store_details)
     }
 
-    /// Agent activity for `author`: the integrated `RegisterAgentActivity`
+    /// Agent activity for `author`: the integrated `AgentActivity`
     /// actions classified into valid/rejected, with chain status, highest
     /// observed, and warrants. Store-only (no scratch).
     ///
@@ -1509,7 +1509,7 @@ impl DhtStore<DbRead<Dht>> {
         // Collect scratch activity + warrants in one lock.
         let (scratch_valid, scratch_warrant_ops) = scratch.apply_and_then(
             |s| -> StateQueryResult<(
-                Vec<RegisterAgentActivity>,
+                Vec<AgentActivity>,
                 Vec<holochain_types::warrant::WarrantOp>,
             )> {
                 let activity = agent_activity_from_scratch(s, author, None, None);
@@ -1539,7 +1539,7 @@ impl DhtStore<DbRead<Dht>> {
             let mut rejected = Vec::new();
             for item in items {
                 match item.validation_status {
-                    RecordValidity::Accepted => store_valid_activity.push(RegisterAgentActivity {
+                    RecordValidity::Accepted => store_valid_activity.push(AgentActivity {
                         action: item.action,
                         cached_entry: None,
                     }),
@@ -1571,7 +1571,7 @@ impl DhtStore<DbRead<Dht>> {
             let mut rejected_hashed = Vec::new();
             for item in items {
                 match item.validation_status {
-                    RecordValidity::Accepted => store_valid_activity.push(RegisterAgentActivity {
+                    RecordValidity::Accepted => store_valid_activity.push(AgentActivity {
                         action: item.action,
                         cached_entry: None,
                     }),
@@ -1597,7 +1597,7 @@ impl DhtStore<DbRead<Dht>> {
     }
 
     /// Store-only `must_get_agent_activity`: resolve `filter.chain_top`, scan the
-    /// bounded `RegisterAgentActivity` range, exclude forked actions, apply the
+    /// bounded `AgentActivity` range, exclude forked actions, apply the
     /// timestamp/take filters, and decide completeness.
     /// No scratch, no network, no cross-source merge (the requester layers those
     /// on).
@@ -1653,12 +1653,12 @@ impl DhtStore<DbRead<Dht>> {
         }
 
         // Scan the bounded range (already ordered seq DESC, hash DESC).
-        let mut activity: Vec<RegisterAgentActivity> = self
+        let mut activity: Vec<AgentActivity> = self
             .db()
             .get_filtered_agent_activity(author.clone(), chain_top_seq, resolved_until_seq)
             .await?
             .into_iter()
-            .map(|action| RegisterAgentActivity {
+            .map(|action| AgentActivity {
                 action,
                 cached_entry: None,
             })
@@ -1710,7 +1710,7 @@ impl DhtStore<DbRead<Dht>> {
     }
 
     /// Store-and-scratch `must_get_agent_activity`: resolve `filter.chain_top`,
-    /// scan the bounded `RegisterAgentActivity` range from both the store and the
+    /// scan the bounded `AgentActivity` range from both the store and the
     /// in-memory scratch, merge, exclude forked actions, apply timestamp/take
     /// filters, and decide completeness.
     ///
@@ -1799,19 +1799,19 @@ impl DhtStore<DbRead<Dht>> {
         }
 
         // Scan the store bounded range.
-        let store_activity: Vec<RegisterAgentActivity> = self
+        let store_activity: Vec<AgentActivity> = self
             .db()
             .get_filtered_agent_activity(author.clone(), chain_top_seq, resolved_until_seq)
             .await?
             .into_iter()
-            .map(|action| RegisterAgentActivity {
+            .map(|action| AgentActivity {
                 action,
                 cached_entry: None,
             })
             .collect();
 
         // Scan the scratch bounded range.
-        let scratch_activity: Vec<RegisterAgentActivity> = scratch.apply_and_then(|s| {
+        let scratch_activity: Vec<AgentActivity> = scratch.apply_and_then(|s| {
             Ok::<_, crate::query::StateQueryError>(agent_activity_from_scratch(
                 s,
                 author,
@@ -1987,7 +1987,7 @@ impl DhtStore<DbRead<Dht>> {
             .collect())
     }
 
-    /// Authority-serving `StoreRecord` action for `action_hash` (locally-validated
+    /// Authority-serving `CreateRecord` action for `action_hash` (locally-validated
     /// only), paired with its validation status.
     pub async fn get_authority_store_record(
         &self,
@@ -2768,7 +2768,7 @@ fn agent_activity_from_scratch(
     // `action_seq <= seq` for the `must_get` chain-top window.
     chain_top_seq: Option<u32>,
     until_seq: Option<u32>,
-) -> Vec<RegisterAgentActivity> {
+) -> Vec<AgentActivity> {
     s.actions()
         .filter(|sah| {
             let action = sah.action();
@@ -2788,7 +2788,7 @@ fn agent_activity_from_scratch(
             }
             true
         })
-        .map(|sah| RegisterAgentActivity {
+        .map(|sah| AgentActivity {
             action: sah.clone(),
             // Entries are not cached in scratch activity (mirrors cascade TODO).
             cached_entry: None,
@@ -2831,11 +2831,11 @@ fn warrants_for_agent_from_scratch(
         .collect()
 }
 
-/// Flatten, sort and deduplicate `RegisterAgentActivity` lists.
+/// Flatten, sort and deduplicate `AgentActivity` lists.
 ///
 /// Sort key: `(Reverse(seq), Reverse(hash))` — newest action first, then by
 /// hash descending for stability.
-fn merge_agent_activity(lists: Vec<Vec<RegisterAgentActivity>>) -> Vec<RegisterAgentActivity> {
+fn merge_agent_activity(lists: Vec<Vec<AgentActivity>>) -> Vec<AgentActivity> {
     use std::cmp::Reverse;
     let total: usize = lists.iter().map(|l| l.len()).sum();
     let mut merged = Vec::with_capacity(total);
@@ -2948,11 +2948,11 @@ fn chain_op_from_joined_row(
         ChainOpType::CreateEntry => {
             if entry_type.is_none() {
                 return Err(crate::query::StateQueryError::Other(
-                    "StoreEntry action is not a Create/Update".into(),
+                    "CreateEntry action is not a Create/Update".into(),
                 ));
             }
             let entry = decoded_entry.clone().ok_or_else(|| {
-                crate::query::StateQueryError::Other("Entry for StoreEntry not found".into())
+                crate::query::StateQueryError::Other("Entry for CreateEntry not found".into())
             })?;
             ChainOp::CreateEntry(signed_action, OpEntry::Present(entry))
         }
@@ -3156,7 +3156,7 @@ enum MustGetAgentActivityCompleteness {
 /// Remove forked actions by walking the chain backwards from `chain_top`.
 /// Input must already be sorted by action seq descending.
 fn exclude_forked_activity(
-    activity: &mut Vec<RegisterAgentActivity>,
+    activity: &mut Vec<AgentActivity>,
     chain_top: &holo_hash::ActionHash,
 ) {
     if activity.is_empty() {
@@ -3169,7 +3169,7 @@ fn exclude_forked_activity(
 /// Walk the chain from `chain_top` backwards (via `prev_action`), collecting the
 /// reachable action hashes. Input must already be sorted by action seq descending.
 fn collect_canonical_chain_hashes(
-    activity: &[RegisterAgentActivity],
+    activity: &[AgentActivity],
     chain_top: &holo_hash::ActionHash,
 ) -> HashSet<holo_hash::ActionHash> {
     let index_by_hash: HashMap<holo_hash::ActionHash, usize> = activity
@@ -3206,7 +3206,7 @@ fn collect_canonical_chain_hashes(
 /// Apply the `until_timestamp` filter. Returns `true` when the kept set has a
 /// deterministic lower-bound witness (an action with timestamp < `until_timestamp`).
 fn apply_timestamp_filter(
-    activity: &mut Vec<RegisterAgentActivity>,
+    activity: &mut Vec<AgentActivity>,
     until_timestamp: Option<holochain_types::prelude::Timestamp>,
 ) -> bool {
     match until_timestamp {
@@ -3224,7 +3224,7 @@ fn apply_timestamp_filter(
 
 /// Decide whether `activity` is a complete response for `filter`.
 fn check_agent_activity_completeness(
-    activity: &[RegisterAgentActivity],
+    activity: &[AgentActivity],
     filter: &ChainFilter,
     canonical_chain_precedes_until_timestamp: bool,
 ) -> MustGetAgentActivityCompleteness {
@@ -3476,7 +3476,7 @@ mod tests {
         };
         let action_hash = ActionHash::with_data_sync(&action);
 
-        // Recording the StoreRecord op with the entry present lands the entry in
+        // Recording the CreateRecord op with the entry present lands the entry in
         // the public `Entry` table — the leak surface.
         let signed_action = SignedAction::new(action, Signature::from([7u8; 64]));
         let chain_op = ChainOp::CreateRecord(signed_action, OpEntry::Present(entry.clone()));
@@ -3629,7 +3629,7 @@ mod tests {
         let head_hash = ActionHash::with_data_sync(&head_action);
 
         // Insert the head as a committed self-authored op: an integrated
-        // `RegisterAgentActivity` op (so it is the chain head) plus the
+        // `AgentActivity` op (so it is the chain head) plus the
         // `CounterSign` entry in the store. This is the shape a real
         // source-chain flush produces.
         insert_integrated_head(&store, head_action, &cs_entry_hash, &cs_entry, None).await;
@@ -4653,7 +4653,7 @@ mod tests {
         }
     }
 
-    /// Build a linked chain of `len` `RegisterAgentActivity` ops for `author`
+    /// Build a linked chain of `len` `AgentActivity` ops for `author`
     /// (seq 0..len, each `prev_action` = the previous action's hash). Returns the
     /// ops and the action hashes (index = seq).
     fn make_activity_chain(author: &AgentPubKey, len: u32) -> (Vec<DhtOpHashed>, Vec<ActionHash>) {
@@ -5254,7 +5254,7 @@ mod tests {
             .await
             .unwrap();
 
-        // Build a StoreEntry op that carries a public entry.
+        // Build a CreateEntry op that carries a public entry.
         let seed = 93u8;
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let entry_bytes = holochain_serialized_bytes::SerializedBytes::from(
@@ -5403,7 +5403,7 @@ mod tests {
             .await
             .unwrap();
 
-        // `make_chain_op` records a RegisterAgentActivity op: the Create action
+        // `make_chain_op` records a AgentActivity op: the Create action
         // (referencing entry `seed+100`) lands in the store, but the entry does not.
         let seed = 94u8;
         let op = make_chain_op(seed, false);
@@ -5462,7 +5462,7 @@ mod tests {
         Entry::App(AppEntryBytes(bytes))
     }
 
-    /// Build and integrate a `StoreEntry` op so that `entry_hash` has a live
+    /// Build and integrate a `CreateEntry` op so that `entry_hash` has a live
     /// store create. Returns the action hash of the `Create` action.
     async fn integrate_store_entry_op(
         store: &crate::dht_store::DhtStore<DbWrite<Dht>>,
@@ -5557,7 +5557,7 @@ mod tests {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let entry = make_entry(seed);
 
-        // First insert a RegisterAgentActivity op so the action is in the store.
+        // First insert a AgentActivity op so the action is in the store.
         let act_op = make_chain_op(seed, false);
         let action = match act_op.0.as_content() {
             DhtOp::ChainOp(c) => c.signed_action().data().clone(),
@@ -5566,7 +5566,7 @@ mod tests {
         let action_hash = holo_hash::ActionHash::with_data_sync(&action);
         store.record_incoming_ops(vec![act_op]).await.unwrap();
 
-        // Integrate a StoreEntry op so the record is fully live in the store.
+        // Integrate a CreateEntry op so the record is fully live in the store.
         integrate_store_entry_op(&store, seed, &author, entry_hash.clone(), entry).await;
 
         // Store-only live-record sees it.
@@ -5730,7 +5730,7 @@ mod tests {
         let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
         let entry = make_entry(seed);
 
-        // Integrate a StoreEntry op so the create is live in the store.
+        // Integrate a CreateEntry op so the create is live in the store.
         let store_action_hash =
             integrate_store_entry_op(&store, seed, &author, entry_hash.clone(), entry).await;
 
@@ -5809,7 +5809,7 @@ mod tests {
 
     // ---- get_record_details_with_scratch / get_entry_details_with_scratch tests ----
 
-    /// Build and integrate a `StoreRecord` op so that `action_hash` has a live
+    /// Build and integrate a `CreateRecord` op so that `action_hash` has a live
     /// store record. Returns the action hash. The action has no entry (uses `Dna`).
     async fn integrate_store_record_op(
         store: &crate::dht_store::DhtStore<DbWrite<Dht>>,
@@ -5870,11 +5870,11 @@ mod tests {
         let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
         let entry = make_entry(seed);
 
-        // Integrate a StoreRecord so the record exists in the store.
+        // Integrate a CreateRecord so the record exists in the store.
         let action_hash =
             integrate_store_record_op(&store, seed, &author, entry_hash.clone(), entry).await;
 
-        // Also integrate a StoreEntry op so the entry is live (for the record retrieval).
+        // Also integrate a CreateEntry op so the entry is live (for the record retrieval).
         let entry2 = make_entry(seed);
         integrate_store_entry_op(
             &store,
@@ -5970,9 +5970,9 @@ mod tests {
         );
     }
 
-    /// A scratch-only action (no integrated `StoreRecord` op) returns `None`.
+    /// A scratch-only action (no integrated `CreateRecord` op) returns `None`.
     /// A scratch-only record (the author's own, not yet committed) has no
-    /// integrated StoreRecord op, but is still returned with `Valid` status so
+    /// integrated CreateRecord op, but is still returned with `Valid` status so
     /// host functions can resolve a just-authored record mid-call.
     #[tokio::test]
     async fn get_record_details_with_scratch_returns_valid_for_scratch_only_record() {
@@ -6018,7 +6018,7 @@ mod tests {
         let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
         let entry = make_entry(seed);
 
-        // Integrate a StoreRecord and a StoreEntry.
+        // Integrate a CreateRecord and a CreateEntry.
         let action_hash =
             integrate_store_record_op(&store, seed, &author, entry_hash.clone(), entry.clone())
                 .await;
@@ -6061,7 +6061,7 @@ mod tests {
         let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
         let entry = make_entry(seed);
 
-        // Integrate a StoreEntry op that is then deleted (by a store delete) so
+        // Integrate a CreateEntry op that is then deleted (by a store delete) so
         // the entry is Dead in the store.
         let store_action_hash =
             integrate_store_entry_op(&store, seed, &author, entry_hash.clone(), entry.clone())
@@ -6154,7 +6154,7 @@ mod tests {
         let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
         let entry = make_entry(seed);
 
-        // Integrate a live StoreEntry op.
+        // Integrate a live CreateEntry op.
         let store_action_hash =
             integrate_store_entry_op(&store, seed, &author, entry_hash.clone(), entry.clone())
                 .await;
@@ -6256,7 +6256,7 @@ mod tests {
         let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
         let entry = make_entry(seed);
 
-        // Integrate a live StoreEntry op.
+        // Integrate a live CreateEntry op.
         let store_action_hash =
             integrate_store_entry_op(&store, seed, &author, entry_hash.clone(), entry.clone())
                 .await;

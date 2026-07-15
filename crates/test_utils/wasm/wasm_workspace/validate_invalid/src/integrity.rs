@@ -3,7 +3,7 @@ use hdi::prelude::*;
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
-        Op::StoreEntry(StoreEntry { 
+        Op::CreateEntry(CreateEntry { 
             entry: Entry::Agent(_),
             ..
          }) => Ok(ValidateCallbackResult::Valid),

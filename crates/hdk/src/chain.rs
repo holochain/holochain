@@ -31,7 +31,7 @@ pub fn get_agent_activity(
     query: ChainQueryFilter,
     request: ActivityRequest,
     options: GetOptions,
-) -> ExternResult<AgentActivity> {
+) -> ExternResult<holochain_zome_types::query::AgentActivity> {
     HDK.with(|h| {
         h.borrow()
             .get_agent_activity(GetAgentActivityInput::new(agent, query, request, options))

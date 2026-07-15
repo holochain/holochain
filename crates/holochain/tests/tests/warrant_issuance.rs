@@ -98,7 +98,7 @@ async fn skip_self_validation_to_cause_warrant() {
         })
         .integrity_function("validate", move |_api, op: Op| {
             match op {
-                Op::StoreRecord(record) => {
+                Op::CreateRecord(record) => {
                     match record.record.action().entry_type() {
                         Some(EntryType::App(_)) => {
                             // Invalidates all app entries.

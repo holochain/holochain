@@ -77,7 +77,7 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
             let receipt_sets_complete = receipt_sets.iter().all(|r| r.receipts_complete);
             let agent_activity_receipt_set = match receipt_sets
                 .into_iter()
-                .find(|r| r.op_type == "RegisterAgentActivity")
+                .find(|r| r.op_type == "AgentActivity")
             {
                 None => 0,
                 Some(r) => r.receipts.len(),

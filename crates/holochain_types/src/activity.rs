@@ -4,7 +4,12 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::action::ActionHashed;
+// Explicit: disambiguates from the `Op` variant struct `AgentActivity` that
+// `holochain_zome_types`'s own prelude glob brings in by default for this
+// name; this file specifically needs the richer `get_agent_activity`
+// query-response type.
 use holochain_zome_types::prelude::*;
+use holochain_zome_types::query::AgentActivity;
 
 /// An agents chain records returned from a agent_activity_query
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]

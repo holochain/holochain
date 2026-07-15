@@ -912,7 +912,7 @@ where
     }
 
     /// If there is a countersigning session get the
-    /// StoreEntry op to send to the entry authorities.
+    /// CreateEntry op to send to the entry authorities.
     pub fn countersigning_op(&self) -> SourceChainResult<Option<ChainOp>> {
         let r = self.scratch.apply(|scratch| {
             scratch
