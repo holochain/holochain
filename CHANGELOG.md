@@ -14,6 +14,86 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260715.141229
+
+## [hcterm-0.7.0-rc.0](crates/hcterm/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_cli-0.7.0-rc.0](crates/holochain_cli/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_cli\_bundle-0.7.0-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_cli\_client-0.7.0-rc.0](crates/holochain_cli_client/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_cli\_sandbox-0.7.0-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_client-0.9.0-rc.0](crates/holochain_client/CHANGELOG.md#0.9.0-rc.0)
+
+## [holochain-0.7.0-rc.0](crates/holochain/CHANGELOG.md#0.7.0-rc.0)
+
+- **BREAKING CHANGE**: Removed the `transport-iroh` feature flag from `holochain`, `holochain_p2p`, `holochain_cascade`, `holochain_client`, `hc`, `hc_client`, and `hc_sandbox`. The iroh (QUIC) transport is the only network backend and is now compiled in unconditionally rather than gated behind an (on-by-default) optional feature. Downstream crates that built with `default-features = false` and explicitly listed `transport-iroh` must drop it, as the feature no longer exists.
+- Made the workspace crates’ feature flags build independently and removed unused dependencies across the workspace, trimming the dependency tree.
+- **BREAKING CHANGE** `wire_rows_to_v2_ops` is renamed to `wire_rows_to_ops` now that there is no legacy v1 op form to distinguish it from.
+- **BREAKING CHANGE** `build_chain_dht_op_v2` and `build_warrant_dht_op_v2` (in `holochain_p2p`) are renamed to `build_chain_dht_op` and `build_warrant_dht_op` now that there is no legacy v1 op-construction path to distinguish them from.
+- Disable `reqwest`’s default features, including `native-tls`, in `holochain_metrics`. We are using `rustls-tls` anyway and `native-tls` requires a non-vendored OpenSSL to be installed. \#5878
+- Implemented more graceful handling of invalid or missing `hc` subcommands. Originally the code panicked with an ambiguous “File or directory not found error”. [\#5867](https://github.com/holochain/holochain/pull/5867)
+- **BREAKING CHANGE** Remove the legacy per-variant action types now that the v2 `Action` model (`ActionHeader` + `ActionData`) is canonical. The `holochain_integrity_types::action` per-variant structs (`Create`, `Update`, `Delete`, `Dna`, `CreateLink`, `DeleteLink`, `OpenChain`, `CloseChain`, `AgentValidationPkg`, `InitZomesComplete`), the `ActionBuilder`/`ActionBuilderCommon` builder, the `EntryCreationAction`/`NewEntryAction`/`NewEntryActionRef` wrapper enums, and the `rate_limit` module (`RateWeight`/`EntryRateWeight` and the action-weight machinery) are all removed. \#5860
+- Holochain gains a new `encryption` feature to control whether its databases are encrypted or not. This replaces the previous `sqlite-encrypted` feature which no longer has any effect.
+- **BREAKING CHANGE** Remove the `holochain_sqlite` crate now that persistence has moved to `holochain_data`.
+- **BREAKING CHANGE** Databases created by Holochain have been renamed now that the legacy databases are no longer in use.
+- **BREAKING CHANGE**: `DnaStorageInfo` (returned by the `StorageInfo` admin call) drops its `authored_data_size`/`authored_data_size_on_disk` and `cache_data_size`/`cache_data_size_on_disk` fields. An agent’s source-chain data now lives in the per-DNA DHT database and is counted in `dht_data_size`/`dht_data_size_on_disk`; the separate cache figure is removed. \#5844
+
+## [holochain\_cascade-0.7.0-rc.0](crates/holochain_cascade/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_conductor\_config-0.7.0-rc.0](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_metrics-0.7.0-rc.0](crates/holochain_metrics/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_test\_wasm\_common-0.7.0-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_wasm\_test\_utils-0.7.0-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_websocket-0.7.0-rc.0](crates/holochain_websocket/CHANGELOG.md#0.7.0-rc.0)
+
+## [hdk-0.7.0-rc.0](crates/hdk/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_p2p-0.7.0-rc.0](crates/holochain_p2p/CHANGELOG.md#0.7.0-rc.0)
+
+## [hdi-0.8.0-rc.0](crates/hdi/CHANGELOG.md#0.8.0-rc.0)
+
+## [holochain\_state-0.7.0-rc.0](crates/holochain_state/CHANGELOG.md#0.7.0-rc.0)
+
+## [hdk\_derive-0.7.0-rc.0](crates/hdk_derive/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_data-0.7.0-rc.0](crates/holochain_data/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_conductor\_api-0.7.0-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_state\_types-0.7.0-rc.0](crates/holochain_state_types/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_types-0.7.0-rc.0](crates/holochain_types/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_keystore-0.7.0-rc.0](crates/holochain_keystore/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_trace-0.7.0-rc.0](crates/holochain_trace/CHANGELOG.md#0.7.0-rc.0)
+
+## [mr\_bundle-0.7.0-rc.0](crates/mr_bundle/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_zome\_types-0.7.0-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_integrity\_types-0.7.0-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_nonce-0.7.0-rc.0](crates/holochain_nonce/CHANGELOG.md#0.7.0-rc.0)
+
+## [holo\_hash-0.7.0-rc.0](crates/holo_hash/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_secure\_primitive-0.7.0-rc.0](crates/holochain_secure_primitive/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_timestamp-0.7.0-rc.0](crates/holochain_timestamp/CHANGELOG.md#0.7.0-rc.0)
+
+## [fixt-0.7.0-rc.0](crates/fixt/CHANGELOG.md#0.7.0-rc.0)
+
+## [holochain\_util-0.7.0-rc.0](crates/holochain_util/CHANGELOG.md#0.7.0-rc.0)
+
 # 20260701.171007
 
 ## [hcterm-0.7.0-dev.32](crates/hcterm/CHANGELOG.md#0.7.0-dev.32)
