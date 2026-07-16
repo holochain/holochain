@@ -60,7 +60,7 @@ impl AppWebsocket {
     /// use std::net::Ipv4Addr;
     /// use holochain_client::{AdminWebsocket, AppWebsocket, ClientAgentSigner};
     ///
-    /// let mut admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, 30_000)).await.unwrap();
+    /// let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, 30_000), None).await.unwrap();
     ///
     /// let app_id = "test-app".to_string();
     /// let issued = admin_ws.issue_app_auth_token(app_id.clone().into()).await.unwrap();
@@ -96,7 +96,7 @@ impl AppWebsocket {
     /// use std::time::Duration;
     /// use holochain_client::{AdminWebsocket, AppWebsocket, AllowedOrigins, WebsocketConfig, ClientAgentSigner};
     ///
-    /// let mut admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, 30_000)).await.unwrap();
+    /// let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, 30_000), None).await.unwrap();
     ///
     /// let app_id = "test-app".to_string();
     /// let issued = admin_ws.issue_app_auth_token(app_id.clone().into()).await.unwrap();
@@ -141,7 +141,8 @@ impl AppWebsocket {
     ///     ConnectRequest, ClientAgentSigner, AgentSigner, DynAgentSigner
     /// };
     ///
-    /// let mut admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, 30_000)).await.unwrap();
+    ///
+    /// let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, 30_000), None).await.unwrap();
     ///
     /// let app_id = "test-app".to_string();
     /// let issued = admin_ws.issue_app_auth_token(app_id.clone().into()).await.unwrap();
@@ -157,7 +158,9 @@ impl AppWebsocket {
     ///     SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 30_001),
     /// ];
     /// for addr in connect_to {
-    ///     match AppWebsocket::connect_with_request_and_config(request, client_config.clone(), issued.token.clone(), signer.clone(), None).await {
+    ///     let request = ConnectRequest::from(addr.clone());
+    ///
+    ///     match AppWebsocket::connect_with_request_and_config(request, client_config.clone(), issued.token.clone(), signer.clone()).await {
     ///         Ok(admin_ws) => {
     ///             println!("Connected to {:?}", addr);
     ///             break;
