@@ -1,6 +1,6 @@
 [package]
 name = "holochain_data"
-version = "0.7.0-rc.0"
+version = "0.7.0-rc.1"
 description = "Database abstraction layer for Holochain using sqlx"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -22,14 +22,14 @@ sodoken = "0.1.0"
 tokio = { version = "1.27", features = ["full"] }
 libsqlite3-sys = "0.35"
 opentelemetry = "0.31"
-holo_hash = { version = "^0.7.0-rc.0", path = "../holo_hash" }
-holochain_types = { version = "^0.7.0-rc.0", path = "../holochain_types" }
-holochain_integrity_types = { version = "^0.7.0-rc.0", path = "../holochain_integrity_types" }
-holochain_zome_types = { version = "^0.7.0-rc.0", path = "../holochain_zome_types" }
-holochain_conductor_api = { version = "^0.7.0-rc.0", path = "../holochain_conductor_api" }
+holo_hash = { version = "^0.7.0-rc.1", path = "../holo_hash" }
+holochain_types = { version = "^0.7.0-rc.1", path = "../holochain_types" }
+holochain_integrity_types = { version = "^0.7.0-rc.1", path = "../holochain_integrity_types" }
+holochain_zome_types = { version = "^0.7.0-rc.1", path = "../holochain_zome_types" }
+holochain_conductor_api = { version = "^0.7.0-rc.1", path = "../holochain_conductor_api" }
 holochain_serialized_bytes = "=0.0.57"
-holochain_nonce = { version = "^0.7.0-rc.0", path = "../holochain_nonce" }
-holochain_timestamp = { version = "^0.7.0-rc.0", path = "../timestamp" }
+holochain_nonce = { version = "^0.7.0-rc.1", path = "../holochain_nonce" }
+holochain_timestamp = { version = "^0.7.0-rc.1", path = "../timestamp" }
 serde_json = "1.0"
 indexmap = { version = "2.6.0", features = ["serde"] }
 bytes = "1"
