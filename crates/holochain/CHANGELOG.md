@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.7.0-rc.1
+
 ## 0.7.0-rc.0
 
 - **BREAKING CHANGE**: Removed the `transport-iroh` feature flag from `holochain`, `holochain_p2p`, `holochain_cascade`, `holochain_client`, `hc`, `hc_client`, and `hc_sandbox`. The iroh (QUIC) transport is the only network backend and is now compiled in unconditionally rather than gated behind an (on-by-default) optional feature. Downstream crates that built with `default-features = false` and explicitly listed `transport-iroh` must drop it, as the feature no longer exists.
