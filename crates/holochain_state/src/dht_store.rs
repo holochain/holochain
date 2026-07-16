@@ -1418,7 +1418,9 @@ impl DhtStore<DbWrite<Dht>> {
 
 pub(crate) mod action_indexes;
 mod cache;
+pub(crate) mod op_production;
 mod reads;
+mod restore;
 mod sync_reads;
 
 #[cfg(test)]
