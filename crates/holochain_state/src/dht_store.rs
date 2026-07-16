@@ -1421,6 +1421,7 @@ impl DhtStore<DbWrite<Dht>> {
 pub(crate) mod action_indexes;
 mod cache;
 mod reads;
+mod restore;
 mod sync_reads;
 
 #[cfg(test)]
