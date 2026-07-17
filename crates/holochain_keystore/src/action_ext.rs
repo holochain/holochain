@@ -91,8 +91,8 @@ mod test {
         }
     }
 
-    #[tokio::test]
-    async fn test_signed_action_roundtrip() {
+    #[test]
+    fn signed_action_round_trip() {
         let signature = Signature([9u8; 64]);
         let action = sample_action();
         let signed_action = SignedAction::new(action.clone(), signature.clone());

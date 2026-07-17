@@ -65,7 +65,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_try_stream_of_results() {
+    async fn check_try_stream_of_results() {
         let iter: Vec<futures::future::Ready<Result<i32, String>>> = vec![];
         let stream = futures::stream::iter(iter);
         assert_eq!(Ok(vec![]), try_stream_of_results(stream).await);
