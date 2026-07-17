@@ -1,7 +1,7 @@
 use super::error::WorkflowResult;
 use crate::core::queue_consumer::WorkComplete;
 use futures::{stream, StreamExt};
-use holochain_keystore::MetaLairClient;
+use holochain_keystore::{MetaLairClient, ValidationReceiptExt};
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;

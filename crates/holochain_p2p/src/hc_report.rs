@@ -54,6 +54,7 @@ mod config {
 }
 
 pub use config::*;
+use holochain_keystore::ReportEntryFetchedOpsExt;
 
 /// Holochain report module. See module level docs for details.
 pub struct HcReportFactory {

@@ -110,7 +110,7 @@ use futures::StreamExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
-use holochain_keystore::MetaLairClient;
+use holochain_keystore::{AgentPubKeyExt, MetaLairClient, WarrantOpExt};
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;

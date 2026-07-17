@@ -1,8 +1,8 @@
 use crate::peer_meta::PeerMetaInfo;
 use crate::{AppAuthenticationToken, ExternalApiWireError};
 use holo_hash::AgentPubKey;
-use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
+use holochain_keystore::{AgentPubKeyExt, LairResult};
 use holochain_types::prelude::*;
 use indexmap::IndexMap;
 use kitsune2_api::Url;

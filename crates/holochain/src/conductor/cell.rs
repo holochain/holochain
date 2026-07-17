@@ -30,6 +30,7 @@ use error::CellError;
 use futures::future::FutureExt;
 use holo_hash::*;
 use holochain_cascade::authority;
+use holochain_keystore::AgentPubKeyExt;
 use holochain_nonce::fresh_nonce;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pError, HolochainP2pResult};

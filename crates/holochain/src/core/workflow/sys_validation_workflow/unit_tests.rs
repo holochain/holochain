@@ -13,6 +13,7 @@ use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holochain_keystore::MetaLairClient;
+use holochain_keystore::{SignedActionHashedExt, WarrantOpExt};
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::StateMutationResult;
 use holochain_timestamp::Timestamp;
@@ -20,7 +21,6 @@ use holochain_types::op::ChainOp;
 use holochain_types::op::DhtOp;
 use holochain_types::op::DhtOpHashed;
 use holochain_types::op::OpEntry;
-use holochain_types::record::SignedActionHashedExt;
 use holochain_types::record::WireRecordOps;
 use holochain_types::wire_ops::WireOps;
 use holochain_zome_types::fixt::{

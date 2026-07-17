@@ -12,6 +12,7 @@ use holochain::{
     },
     test_utils::retry_fn_until_timeout,
 };
+use holochain_keystore::WarrantOpExt;
 use holochain_timestamp::Timestamp;
 use holochain_types::op::{DhtOp, DhtOpHashed};
 use holochain_types::prelude::WarrantOp;

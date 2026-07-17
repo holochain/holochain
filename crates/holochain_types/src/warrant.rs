@@ -1,7 +1,6 @@
 //! Defines the Warrant variant of DhtOp
 
 use holo_hash::{hash_type, HashableContent, HashableContentBytes};
-use holochain_keystore::{AgentPubKeyExt, LairResult, MetaLairClient};
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
 use holochain_zome_types::prelude::{SignedWarrant, Warrant, WarrantProof};
@@ -27,12 +26,6 @@ impl WarrantOp {
         match self.proof {
             WarrantProof::ChainIntegrity(_) => WarrantOpType::ChainIntegrityWarrant,
         }
-    }
-
-    /// Sign the warrant for use as an Op
-    pub async fn sign(keystore: &MetaLairClient, warrant: Warrant) -> LairResult<Self> {
-        let signature = warrant.author.sign(keystore, warrant.clone()).await?;
-        Ok(Self::from(SignedWarrant::new(warrant, signature)))
     }
 
     /// Accessor for the timestamp of the warrant

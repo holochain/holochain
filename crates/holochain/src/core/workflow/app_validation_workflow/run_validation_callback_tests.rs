@@ -14,12 +14,12 @@ use hdk::prelude::EntryFixturator;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::{ActionHash, AgentPubKey, HashableContentExtSync};
 use holochain_keystore::MetaLairClient;
+use holochain_keystore::SignedActionHashedExt;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
     op::{ChainOp, DhtOp, DhtOpHashed},
-    prelude::SignedActionHashedExt,
     record::WireRecordOps,
     wire_ops::{RenderedOp, RenderedOps, WireOps},
 };

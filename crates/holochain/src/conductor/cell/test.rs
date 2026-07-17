@@ -8,6 +8,7 @@ use crate::sweettest::SweetConductorConfig;
 use crate::test_utils::fake_valid_dna_file;
 use holo_hash::HasHash;
 use holochain_conductor_api::conductor::paths::DataRootPath;
+use holochain_keystore::SignedActionHashedExt;
 use holochain_p2p::actor::MockHcP2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::prelude::*;

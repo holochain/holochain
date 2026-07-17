@@ -51,6 +51,18 @@ pub use meta_lair_client::*;
 mod agent_pubkey_ext;
 pub use agent_pubkey_ext::*;
 
+mod action_ext;
+pub use action_ext::*;
+
+mod validation_receipt_ext;
+pub use validation_receipt_ext::*;
+
+mod report_ext;
+pub use report_ext::*;
+
+mod warrant_ext;
+pub use warrant_ext::*;
+
 pub mod lair_keystore;
 
 pub mod paths;

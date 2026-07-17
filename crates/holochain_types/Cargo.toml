@@ -12,9 +12,7 @@ edition = "2021"
 # reminder - do not use workspace deps
 [dependencies]
 anyhow = "1.0"
-async-trait = "0.1"
 backtrace = "0.3.27"
-base64 = "0.22"
 derive_builder = "0.20"
 derive_more = { version = "2.0", features = ["constructor", "into_iterator"] }
 futures = "0.3"
@@ -22,7 +20,6 @@ holo_hash = { version = "^0.7.0-rc.1", path = "../holo_hash", features = [
   "encoding",
   "schema",
 ] }
-holochain_keystore = { version = "^0.7.0-rc.1", path = "../holochain_keystore" }
 holochain_nonce = { version = "^0.7.0-rc.1", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.57"
 holochain_trace = { version = "^0.7.0-rc.1", path = "../holochain_trace" }
@@ -82,7 +79,6 @@ fixturators = ["dep:fixt", "holochain_zome_types/fixturators"]
 test_utils = [
   "fixturators",
   "fuzzing",
-  "holochain_keystore/test_utils",
   "holochain_zome_types/test_utils",
 ]
 
