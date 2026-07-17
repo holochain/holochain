@@ -61,7 +61,7 @@ impl AdminWebsocket {
     /// use std::net::Ipv4Addr;
     /// use holochain_client::AdminWebsocket;
     ///
-    /// let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, 30_000), String::from("my_cli_app")).await.unwrap();
+    /// let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, 30_000), Some(String::from("my_cli_app"))).await.unwrap();
     /// # }
     /// ```
     ///
