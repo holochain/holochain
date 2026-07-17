@@ -92,8 +92,8 @@ url2 = "0.0.6"
 uuid = { version = "1.8", features = ["serde", "v4"] }
 opentelemetry = "0.31"
 indexmap = { version = "2.6.0", features = ["serde"] }
-wasmer = { version = "7.1.0", default-features = false }
-wasmer-middlewares = { version = "7.1.0", optional = true, default-features = false }
+wasmer = { version = "=7.1.0", default-features = false }
+wasmer-middlewares = { version = "=7.1.0", optional = true, default-features = false }
 
 # Dependencies for test_utils / other optional deps
 fixt = { version = "^0.7.0-rc.1", path = "../fixt", optional = true }
