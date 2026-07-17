@@ -2,7 +2,7 @@
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
 use super::{conductor::RwShare, error::ConductorResult};
-use crate::conductor::{error::ConductorError, state::ConductorState};
+use crate::conductor::error::ConductorError;
 use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
 use crate::core::{
     queue_consumer::QueueConsumerMap,
@@ -16,6 +16,7 @@ use crate::core::{
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::paths::DatabasesRootPath;
 use holochain_conductor_api::conductor::ConductorConfig;
+use holochain_conductor_api::state::ConductorState;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::DynHcP2p;
 use holochain_state::data::{DbKey, DbSyncLevel};
@@ -256,7 +257,7 @@ impl Spaces {
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
         timed!([1, 10, 1000], "get_state", {
             match self.conductor_store.as_read().load_state().await? {
-                Some(snapshot) => crate::conductor::state_persistence::snapshot_to_state(snapshot),
+                Some(state) => Ok(state),
                 // Initialize by running an identity update — writes the default
                 // state atomically on first access.
                 None => self.update_state(Ok).await,
@@ -299,17 +300,10 @@ impl Spaces {
         timed!([1, 10, 1000], "update_state_prime", {
             self.conductor_store
                 .update_state(
-                    move |snapshot| -> ConductorResult<_> {
-                        let state = match snapshot {
-                            Some(snapshot) => {
-                                crate::conductor::state_persistence::snapshot_to_state(snapshot)?
-                            }
-                            None => ConductorState::default(),
-                        };
+                    move |state| -> ConductorResult<_> {
+                        let state = state.unwrap_or_default();
                         let (new_state, output) = f(state)?;
-                        let new_snapshot =
-                            crate::conductor::state_persistence::state_to_snapshot(&new_state)?;
-                        Ok((new_snapshot, (new_state, output)))
+                        Ok((new_state.clone(), (new_state, output)))
                     },
                     app_id,
                     init_properties,

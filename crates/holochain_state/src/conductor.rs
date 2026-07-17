@@ -7,39 +7,41 @@
 //! storage representation of this data.
 
 use holo_hash::AgentPubKey;
+use holochain_conductor_api::signal_subscription::SignalSubscription;
+use holochain_conductor_api::state::{
+    AppInterfaceConfig, AppInterfaceId, ConductorState, ConductorStateTag,
+};
 use holochain_data::conductor::{AppInterfaceModel, Block, BlockTargetId, Nonce256Bits};
 use holochain_data::kind::Conductor;
 use holochain_data::{TxRead, TxWrite};
 use holochain_types::prelude::{
-    AppStatus, InitProperties, InitPropertiesMap, InstalledAppCommon, Timestamp,
+    AppStatus, InitProperties, InitPropertiesMap, InstalledApp, InstalledAppCommon, InstalledAppId,
+    InstalledAppMap, Timestamp,
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::mutations::StateMutationResult;
 use crate::prelude::StateMutationError;
-use crate::query::StateQueryResult;
+use crate::query::{StateQueryError, StateQueryResult};
 pub use holochain_data::conductor::{WitnessNonceResult, WITNESSABLE_EXPIRY_DURATION};
 
 /// A single signal subscription row: `(app_id, filters_blob)`.
 pub type SignalSubscriptionRow = (String, Vec<u8>);
 
-/// An app interface and its associated signal subscriptions.
-pub type AppInterfaceEntry = (AppInterfaceModel, Vec<SignalSubscriptionRow>);
+/// An app interface row and its associated signal subscription rows.
+type AppInterfaceRows = (AppInterfaceModel, Vec<SignalSubscriptionRow>);
 
-/// A point-in-time view of the persisted conductor state.
-///
-/// Used as the read/write unit for atomic state updates via
-/// [`ConductorStore::update_state`]. Producing or consuming this type
-/// does not touch the database on its own.
+/// The raw persisted rows backing a [`ConductorState`], read or written
+/// within a single transaction.
 #[derive(Clone, Debug, Default)]
-pub struct ConductorStateSnapshot {
+struct StateRows {
     /// The conductor's self-assigned tag.
-    pub tag: String,
+    tag: String,
     /// All installed apps and their statuses, keyed by app id.
-    pub installed_apps: Vec<(String, InstalledAppCommon, AppStatus)>,
+    installed_apps: Vec<(String, InstalledAppCommon, AppStatus)>,
     /// All app interfaces paired with their signal subscriptions.
-    pub app_interfaces: Vec<AppInterfaceEntry>,
+    app_interfaces: Vec<AppInterfaceRows>,
 }
 
 /// A wrapper around the conductor database.
@@ -121,14 +123,14 @@ impl ConductorStore<holochain_data::DbRead<Conductor>> {
     ///
     /// Returns `None` if the conductor tag has not yet been set
     /// (the conductor has no persisted state). Otherwise returns a
-    /// [`ConductorStateSnapshot`] read within a single transaction so
-    /// the tag, apps, interfaces, and subscriptions are all consistent
-    /// with each other.
-    pub async fn load_state(&self) -> StateQueryResult<Option<ConductorStateSnapshot>> {
+    /// [`ConductorState`] read within a single transaction so the tag,
+    /// apps, interfaces, and subscriptions are all consistent with each
+    /// other.
+    pub async fn load_state(&self) -> StateQueryResult<Option<ConductorState>> {
         let mut tx = self.db.begin().await?;
-        let snapshot = load_snapshot_in_tx(&mut tx).await?;
+        let rows = load_rows_in_tx(&mut tx).await?;
         tx.close().await?;
-        Ok(snapshot)
+        rows.map(state_from_rows).transpose()
     }
 
     /// Check if a nonce has already been seen.
@@ -170,13 +172,13 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
     /// `init_properties` rows for `app_id` in the same transaction.
     /// When `init_properties` is empty the `app_id` is not used.
     ///
-    /// Loads the current snapshot (if any), applies `f`, and saves the
+    /// Loads the current state (if any), applies `f`, and saves the
     /// result, all within a single database transaction. An internal
     /// mutex serializes concurrent callers so read-modify-write cycles
     /// cannot interleave and silently drop updates.
     ///
     /// The closure receives `None` when the conductor has no persisted
-    /// state yet (the tag is unset); it must produce a new snapshot to
+    /// state yet (the tag is unset); it must produce a new state to
     /// persist.
     pub async fn update_state<F, O, E>(
         &self,
@@ -185,16 +187,20 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
         init_properties: &InitPropertiesMap,
     ) -> Result<O, E>
     where
-        F: FnOnce(Option<ConductorStateSnapshot>) -> Result<(ConductorStateSnapshot, O), E>,
+        F: FnOnce(Option<ConductorState>) -> Result<(ConductorState, O), E>,
         E: From<StateMutationError>,
     {
         let _guard = self.update_lock.lock().await;
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
-        let current = load_snapshot_in_tx(tx.as_mut())
+        let current = load_rows_in_tx(tx.as_mut())
             .await
+            .map_err(StateMutationError::from)?
+            .map(state_from_rows)
+            .transpose()
             .map_err(StateMutationError::from)?;
-        let (new_snapshot, output) = f(current)?;
-        save_snapshot_in_tx(&mut tx, &new_snapshot)
+        let (new_state, output) = f(current)?;
+        let new_rows = state_to_rows(&new_state)?;
+        save_rows_in_tx(&mut tx, &new_rows)
             .await
             .map_err(StateMutationError::from)?;
         for (role_name, properties) in init_properties {
@@ -281,12 +287,114 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
 }
 
 // ============================================================================
-// Snapshot load/save helpers (used by atomic read/write paths)
+// Row load/save and conversion helpers (used by atomic read/write paths)
 // ============================================================================
 
-async fn load_snapshot_in_tx(
-    tx: &mut TxRead<Conductor>,
-) -> sqlx::Result<Option<ConductorStateSnapshot>> {
+/// Build a [`ConductorState`] from its persisted rows.
+fn state_from_rows(rows: StateRows) -> StateQueryResult<ConductorState> {
+    let tag = ConductorStateTag(Arc::from(rows.tag.as_str()));
+
+    let mut installed_apps = InstalledAppMap::new();
+    for (app_id, app_common, status) in rows.installed_apps {
+        let mut installed_app = InstalledApp::new_fresh(app_common);
+        installed_app.status = status;
+        installed_apps.insert(InstalledAppId::from(app_id), installed_app);
+    }
+
+    let mut app_interfaces = HashMap::new();
+    for (model, subs_data) in rows.app_interfaces {
+        let driver = model.to_driver().map_err(StateQueryError::Other)?;
+
+        let mut signal_subscriptions = HashMap::new();
+        for (app_id, filters_blob) in subs_data {
+            let subscription: SignalSubscription =
+                serde_json::from_slice(&filters_blob).map_err(|e| {
+                    StateQueryError::Other(format!(
+                        "Failed to deserialize signal subscription: {e}"
+                    ))
+                })?;
+            signal_subscriptions.insert(InstalledAppId::from(app_id), subscription);
+        }
+
+        let config = AppInterfaceConfig {
+            signal_subscriptions,
+            installed_app_id: model.installed_app_id.clone(),
+            driver,
+        };
+
+        let interface_id = if model.port == 0 {
+            if model.id.is_empty() {
+                return Err(StateQueryError::Other(
+                    "Port 0 interface missing ID".to_string(),
+                ));
+            }
+            AppInterfaceId::from_parts(0, Some(model.id.clone()))
+        } else {
+            let port = u16::try_from(model.port).map_err(|err| {
+                StateQueryError::Other(format!(
+                    "Invalid port number {port}: {err}",
+                    port = model.port
+                ))
+            })?;
+            AppInterfaceId::new(port)
+        };
+        app_interfaces.insert(interface_id, config);
+    }
+
+    Ok(ConductorState::from_parts(
+        tag,
+        installed_apps,
+        app_interfaces,
+    ))
+}
+
+/// Build the persisted rows for a [`ConductorState`].
+fn state_to_rows(state: &ConductorState) -> Result<StateRows, StateMutationError> {
+    let tag = state.tag().0.as_ref().to_string();
+
+    let installed_apps = state
+        .installed_apps()
+        .iter()
+        .map(|(app_id, installed_app)| {
+            (
+                app_id.to_string(),
+                installed_app.as_ref().clone(),
+                installed_app.status.clone(),
+            )
+        })
+        .collect();
+
+    let mut app_interfaces = Vec::with_capacity(state.app_interfaces.len());
+    for (interface_id, config) in &state.app_interfaces {
+        let mut model = AppInterfaceModel::from_driver(
+            &config.driver,
+            config.installed_app_id.as_ref().map(|id| id.to_string()),
+        )
+        .map_err(StateMutationError::Other)?;
+
+        let mut subscriptions = Vec::with_capacity(config.signal_subscriptions.len());
+        for (app_id, subscription) in &config.signal_subscriptions {
+            let filters_blob = serde_json::to_vec(subscription).map_err(|e| {
+                StateMutationError::Other(format!("Failed to serialize signal subscription: {e}"))
+            })?;
+            subscriptions.push((app_id.to_string(), filters_blob));
+        }
+
+        // Keep the port/id on the model in sync with the interface_id.
+        model.port = interface_id.port() as i64;
+        model.id = interface_id.id().as_deref().unwrap_or("").to_string();
+
+        app_interfaces.push((model, subscriptions));
+    }
+
+    Ok(StateRows {
+        tag,
+        installed_apps,
+        app_interfaces,
+    })
+}
+
+async fn load_rows_in_tx(tx: &mut TxRead<Conductor>) -> sqlx::Result<Option<StateRows>> {
     let tag = match tx.get_conductor_tag().await? {
         Some(tag) => tag,
         None => return Ok(None),
@@ -301,27 +409,24 @@ async fn load_snapshot_in_tx(
         app_interfaces.push((model, subs));
     }
 
-    Ok(Some(ConductorStateSnapshot {
+    Ok(Some(StateRows {
         tag,
         installed_apps,
         app_interfaces,
     }))
 }
 
-async fn save_snapshot_in_tx(
-    tx: &mut TxWrite<Conductor>,
-    snapshot: &ConductorStateSnapshot,
-) -> sqlx::Result<()> {
-    tx.set_conductor_tag(&snapshot.tag).await?;
+async fn save_rows_in_tx(tx: &mut TxWrite<Conductor>, rows: &StateRows) -> sqlx::Result<()> {
+    tx.set_conductor_tag(&rows.tag).await?;
 
-    // Upsert apps from the new snapshot.
-    let mut new_app_ids: HashSet<&str> = HashSet::with_capacity(snapshot.installed_apps.len());
-    for (app_id, common, status) in &snapshot.installed_apps {
+    // Upsert apps from the new state.
+    let mut new_app_ids: HashSet<&str> = HashSet::with_capacity(rows.installed_apps.len());
+    for (app_id, common, status) in &rows.installed_apps {
         tx.put_installed_app(app_id, common, status).await?;
         new_app_ids.insert(app_id.as_str());
     }
 
-    // Delete apps that are no longer in the snapshot.
+    // Delete apps that are no longer in the state.
     let existing_apps = tx.as_mut().get_all_installed_apps().await?;
     let stale_app_ids: Vec<String> = existing_apps
         .into_iter()
@@ -334,8 +439,8 @@ async fn save_snapshot_in_tx(
 
     // Upsert interfaces and replace their subscriptions.
     let mut new_interface_keys: HashSet<(i64, String)> =
-        HashSet::with_capacity(snapshot.app_interfaces.len());
-    for (model, subscriptions) in &snapshot.app_interfaces {
+        HashSet::with_capacity(rows.app_interfaces.len());
+    for (model, subscriptions) in &rows.app_interfaces {
         tx.put_app_interface(model.port, &model.id, model).await?;
         tx.delete_signal_subscriptions(model.port, &model.id)
             .await?;
@@ -346,7 +451,7 @@ async fn save_snapshot_in_tx(
         new_interface_keys.insert((model.port, model.id.clone()));
     }
 
-    // Delete interfaces that are no longer in the snapshot.
+    // Delete interfaces that are no longer in the state.
     let existing_interfaces = tx.as_mut().get_all_app_interfaces().await?;
     let stale_interfaces: Vec<(i64, String)> = existing_interfaces
         .into_iter()
@@ -366,9 +471,9 @@ async fn save_snapshot_in_tx(
 mod tests {
     use super::*;
     use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
-    use holochain_types::prelude::{
-        AppManifest, AppManifestV0, AppRoleAssignment, AppStatus, DisabledAppReason, RoleName,
-    };
+    use holochain_types::app::DisabledAppReason;
+    use holochain_types::prelude::{AppManifest, AppManifestV0, AppRoleAssignment, RoleName};
+    use holochain_types::websocket::AllowedOrigins;
 
     fn test_init_props(bytes: Vec<u8>) -> InitProperties {
         InitProperties(SerializedBytes::from(UnsafeBytes::from(bytes)))
@@ -392,6 +497,65 @@ mod tests {
         .unwrap()
     }
 
+    fn state_with_tag(tag: &str) -> ConductorState {
+        ConductorState::from_parts(
+            ConductorStateTag(Arc::from(tag)),
+            InstalledAppMap::new(),
+            HashMap::new(),
+        )
+    }
+
+    fn websocket_interfaces(ports: &[u16]) -> HashMap<AppInterfaceId, AppInterfaceConfig> {
+        ports
+            .iter()
+            .map(|&port| {
+                (
+                    AppInterfaceId::new(port),
+                    AppInterfaceConfig::websocket(port, None, AllowedOrigins::Any, None),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn state_from_rows_rejects_ports_outside_u16_range() {
+        let invalid_ports = [-1, i64::from(u16::MAX) + 1];
+
+        for port in invalid_ports {
+            let config = AppInterfaceConfig::websocket(1, None, AllowedOrigins::Any, None);
+            let mut model = AppInterfaceModel::from_driver(&config.driver, None).unwrap();
+            model.port = port;
+            let rows = StateRows {
+                tag: "test".to_string(),
+                app_interfaces: vec![(model, Vec::new())],
+                ..Default::default()
+            };
+
+            assert!(
+                matches!(
+                    state_from_rows(rows),
+                    Err(StateQueryError::Other(error))
+                        if error.contains(&format!("Invalid port number {port}"))
+                ),
+                "port {port} should be rejected"
+            );
+        }
+    }
+
+    async fn roundtrip(
+        store: &ConductorStore,
+        state: ConductorState,
+    ) -> StateMutationResult<ConductorState> {
+        store
+            .update_state(
+                |_| -> StateMutationResult<_> { Ok((state, ())) },
+                "",
+                &InitPropertiesMap::new(),
+            )
+            .await?;
+        Ok(store.as_read().load_state().await?.unwrap())
+    }
+
     #[tokio::test]
     async fn load_state_returns_none_when_unset() {
         let store = ConductorStore::new_test().await.unwrap();
@@ -401,30 +565,11 @@ mod tests {
     #[tokio::test]
     async fn update_state_initializes_and_roundtrips() {
         let store = ConductorStore::new_test().await.unwrap();
-
-        // Initialize with a tag
-        store
-            .update_state(
-                |snap| -> StateMutationResult<_> {
-                    assert!(snap.is_none());
-                    Ok((
-                        ConductorStateSnapshot {
-                            tag: "conductor-A".to_string(),
-                            installed_apps: vec![],
-                            app_interfaces: vec![],
-                        },
-                        (),
-                    ))
-                },
-                "",
-                &InitPropertiesMap::new(),
-            )
+        let loaded = roundtrip(&store, state_with_tag("conductor-A"))
             .await
             .unwrap();
-
-        let loaded = store.as_read().load_state().await.unwrap().unwrap();
-        assert_eq!(loaded.tag, "conductor-A");
-        assert!(loaded.installed_apps.is_empty());
+        assert_eq!(loaded.tag().0.as_ref(), "conductor-A");
+        assert!(loaded.installed_apps().is_empty());
         assert!(loaded.app_interfaces.is_empty());
     }
 
@@ -432,59 +577,26 @@ mod tests {
     async fn update_state_deletes_stale_interfaces() {
         let store = ConductorStore::new_test().await.unwrap();
 
-        let iface = |port: i64| AppInterfaceModel {
-            port,
-            id: String::new(),
-            driver_type: "websocket".to_string(),
-            websocket_port: Some(port),
-            danger_bind_addr: None,
-            allowed_origins_blob: None,
-            installed_app_id: None,
-        };
+        let two = ConductorState::from_parts(
+            ConductorStateTag(Arc::from("t")),
+            InstalledAppMap::new(),
+            websocket_interfaces(&[12345, 12346]),
+        );
+        let loaded = roundtrip(&store, two).await.unwrap();
+        assert_eq!(loaded.app_interfaces.len(), 2);
 
-        // Save two interfaces.
-        store
-            .update_state(
-                |_| -> StateMutationResult<_> {
-                    Ok((
-                        ConductorStateSnapshot {
-                            tag: "t".to_string(),
-                            installed_apps: vec![],
-                            app_interfaces: vec![(iface(1111), vec![]), (iface(2222), vec![])],
-                        },
-                        (),
-                    ))
-                },
-                "",
-                &InitPropertiesMap::new(),
-            )
-            .await
-            .unwrap();
-
-        // Replace with just one interface.
-        store
-            .update_state(
-                |snap| -> StateMutationResult<_> {
-                    let snap = snap.unwrap();
-                    assert_eq!(snap.app_interfaces.len(), 2);
-                    Ok((
-                        ConductorStateSnapshot {
-                            tag: snap.tag,
-                            installed_apps: snap.installed_apps,
-                            app_interfaces: vec![(iface(1111), vec![])],
-                        },
-                        (),
-                    ))
-                },
-                "",
-                &InitPropertiesMap::new(),
-            )
-            .await
-            .unwrap();
-
-        let loaded = store.as_read().load_state().await.unwrap().unwrap();
+        let one = ConductorState::from_parts(
+            ConductorStateTag(Arc::from("t")),
+            InstalledAppMap::new(),
+            websocket_interfaces(&[12345]),
+        );
+        let loaded = roundtrip(&store, one).await.unwrap();
         assert_eq!(loaded.app_interfaces.len(), 1);
-        assert_eq!(loaded.app_interfaces[0].0.port, 1111);
+        assert!(loaded
+            .app_interfaces
+            .contains_key(&AppInterfaceId::new(12345)));
+        let iface = loaded.app_interfaces.values().next().unwrap();
+        assert_eq!(iface.driver.port(), 12345);
     }
 
     #[tokio::test]
@@ -492,23 +604,7 @@ mod tests {
         let store = ConductorStore::new_test().await.unwrap();
 
         // Seed a known state.
-        store
-            .update_state(
-                |_| -> StateMutationResult<_> {
-                    Ok((
-                        ConductorStateSnapshot {
-                            tag: "seed".to_string(),
-                            installed_apps: vec![],
-                            app_interfaces: vec![],
-                        },
-                        (),
-                    ))
-                },
-                "",
-                &InitPropertiesMap::new(),
-            )
-            .await
-            .unwrap();
+        roundtrip(&store, state_with_tag("seed")).await.unwrap();
 
         // Closure returns an error — tx must roll back.
         #[derive(Debug)]
@@ -520,7 +616,7 @@ mod tests {
         }
         let result: Result<(), Boom> = store
             .update_state(
-                |_| -> Result<(ConductorStateSnapshot, ()), Boom> { Err(Boom) },
+                |_| -> Result<(ConductorState, ()), Boom> { Err(Boom) },
                 "",
                 &InitPropertiesMap::new(),
             )
@@ -529,39 +625,35 @@ mod tests {
 
         // Seeded state still intact.
         let loaded = store.as_read().load_state().await.unwrap().unwrap();
-        assert_eq!(loaded.tag, "seed");
+        assert_eq!(loaded.tag().0.as_ref(), "seed");
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn concurrent_update_state_does_not_lose_writes() {
-        // Each task appends a unique interface to the snapshot. Without
-        // serialization, concurrent tasks would load the same snapshot in
+        // Each task appends a unique interface to the state. Without
+        // serialization, concurrent tasks would load the same state in
         // parallel and the last writer would clobber the others.
         let store = ConductorStore::new_test().await.unwrap();
 
-        let ports: Vec<i64> = (0..16).collect();
+        let ports: Vec<u16> = (1000..1016).collect();
         let mut joins = Vec::new();
         for port in ports.clone() {
             let store = store.clone();
             joins.push(tokio::spawn(async move {
                 store
                     .update_state(
-                        move |snap| -> StateMutationResult<_> {
-                            let mut snap = snap.unwrap_or_default();
-                            if snap.tag.is_empty() {
-                                snap.tag = "t".to_string();
-                            }
-                            let model = AppInterfaceModel {
-                                port,
-                                id: String::new(),
-                                driver_type: "websocket".to_string(),
-                                websocket_port: Some(port),
-                                danger_bind_addr: None,
-                                allowed_origins_blob: None,
-                                installed_app_id: None,
-                            };
-                            snap.app_interfaces.push((model, vec![]));
-                            Ok((snap, ()))
+                        move |state| -> StateMutationResult<_> {
+                            let mut state = state.unwrap_or_default();
+                            state.app_interfaces.insert(
+                                AppInterfaceId::new(port),
+                                AppInterfaceConfig::websocket(
+                                    port,
+                                    None,
+                                    AllowedOrigins::Any,
+                                    None,
+                                ),
+                            );
+                            Ok((state, ()))
                         },
                         "",
                         &InitPropertiesMap::new(),
@@ -576,11 +668,7 @@ mod tests {
         }
 
         let loaded = store.as_read().load_state().await.unwrap().unwrap();
-        let mut loaded_ports: Vec<i64> = loaded
-            .app_interfaces
-            .into_iter()
-            .map(|(m, _)| m.port)
-            .collect();
+        let mut loaded_ports: Vec<u16> = loaded.app_interfaces.keys().map(|id| id.port()).collect();
         loaded_ports.sort();
         let mut expected = ports;
         expected.sort();
@@ -595,22 +683,20 @@ mod tests {
         let role = "my-role";
         let props: InitPropertiesMap = [(role.to_string(), test_init_props(vec![1, 2, 3]))].into();
 
+        let mut apps = InstalledAppMap::new();
+        apps.insert(
+            app_id.to_string(),
+            InstalledApp::new(
+                make_test_app(app_id),
+                AppStatus::Disabled(DisabledAppReason::NeverStarted),
+            ),
+        );
+        let state =
+            ConductorState::from_parts(ConductorStateTag(Arc::from("t")), apps, HashMap::new());
+
         store
             .update_state(
-                move |_| -> StateMutationResult<_> {
-                    Ok((
-                        ConductorStateSnapshot {
-                            tag: "t".to_string(),
-                            installed_apps: vec![(
-                                app_id.to_string(),
-                                make_test_app(app_id),
-                                AppStatus::Disabled(DisabledAppReason::NeverStarted),
-                            )],
-                            app_interfaces: vec![],
-                        },
-                        (),
-                    ))
-                },
+                move |_| -> StateMutationResult<_> { Ok((state, ())) },
                 app_id,
                 &props,
             )
@@ -642,42 +728,17 @@ mod tests {
         let store = ConductorStore::new_test().await.unwrap();
 
         // Seed an initial state.
-        store
-            .update_state(
-                |_| -> StateMutationResult<_> {
-                    Ok((
-                        ConductorStateSnapshot {
-                            tag: "initial".to_string(),
-                            installed_apps: vec![],
-                            app_interfaces: vec![],
-                        },
-                        (),
-                    ))
-                },
-                "",
-                &InitPropertiesMap::new(),
-            )
-            .await
-            .unwrap();
+        roundtrip(&store, state_with_tag("initial")).await.unwrap();
 
         // Attempt a state change that also tries to write init_properties for an
-        // app that will not exist after the snapshot is saved. The FK violation
+        // app that will not exist after the state is saved. The FK violation
         // must roll back the entire transaction, including the state change.
         let props: InitPropertiesMap =
             [("role".to_string(), test_init_props(vec![4, 5, 6]))].into();
 
         let result: StateMutationResult<()> = store
             .update_state(
-                |_| -> StateMutationResult<_> {
-                    Ok((
-                        ConductorStateSnapshot {
-                            tag: "changed".to_string(),
-                            installed_apps: vec![],
-                            app_interfaces: vec![],
-                        },
-                        (),
-                    ))
-                },
+                |_| -> StateMutationResult<_> { Ok((state_with_tag("changed"), ())) },
                 "nonexistent-app",
                 &props,
             )
@@ -687,7 +748,8 @@ mod tests {
 
         let loaded = store.as_read().load_state().await.unwrap().unwrap();
         assert_eq!(
-            loaded.tag, "initial",
+            loaded.tag().0.as_ref(),
+            "initial",
             "state change should have been rolled back"
         );
     }
@@ -697,23 +759,7 @@ mod tests {
         let store = ConductorStore::new_test().await.unwrap();
         assert_eq!(store.as_read().get_conductor_tag().await.unwrap(), None);
 
-        store
-            .update_state(
-                |_| -> StateMutationResult<_> {
-                    Ok((
-                        ConductorStateSnapshot {
-                            tag: "hello".to_string(),
-                            installed_apps: vec![],
-                            app_interfaces: vec![],
-                        },
-                        (),
-                    ))
-                },
-                "",
-                &InitPropertiesMap::new(),
-            )
-            .await
-            .unwrap();
+        roundtrip(&store, state_with_tag("hello")).await.unwrap();
 
         assert_eq!(
             store.as_read().get_conductor_tag().await.unwrap(),

@@ -1,10 +1,8 @@
 //! Structs which allow the Conductor's state to be persisted across
 //! startups and shutdowns
 
-use super::error::{ConductorError, ConductorResult};
-use holochain_conductor_api::config::InterfaceDriver;
-use holochain_conductor_api::signal_subscription::SignalSubscription;
-use holochain_p2p::NetworkCompatParams;
+use crate::config::InterfaceDriver;
+use crate::signal_subscription::SignalSubscription;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use serde::Deserialize;
@@ -12,10 +10,26 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
+use thiserror::Error;
+
+/// Result type for operations on [`ConductorState`].
+pub type ConductorStateResult<T> = Result<T, ConductorStateError>;
+
+/// Errors produced when reading or modifying a [`ConductorState`].
+#[derive(Error, Debug)]
+pub enum ConductorStateError {
+    /// The referenced app is not installed in this conductor state.
+    #[error("Tried to access an app that was not installed: {0}")]
+    AppNotInstalled(InstalledAppId),
+
+    /// An app with this id is already installed in this conductor state.
+    #[error("Tried to install an app using an already-used InstalledAppId: {0}")]
+    AppAlreadyInstalled(InstalledAppId),
+}
 
 /// Unique conductor tag / identifier.
 #[derive(Clone, Deserialize, Serialize, Debug, SerializedBytes)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(any(test, feature = "test-utils"), derive(PartialEq))]
 #[serde(transparent)]
 pub struct ConductorStateTag(pub Arc<str>);
 
@@ -32,7 +46,7 @@ impl Default for ConductorStateTag {
 /// via string IDs.
 #[serde_with::serde_as]
 #[derive(Clone, Deserialize, Serialize, Default, Debug, SerializedBytes)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(any(test, feature = "test-utils"), derive(PartialEq))]
 pub struct ConductorState {
     /// Unique conductor tag / identifier.
     #[serde(default)]
@@ -44,7 +58,7 @@ pub struct ConductorState {
     /// List of interfaces any UI can use to access zome functions.
     #[serde_as(as = "Vec<(_, _)>")]
     #[serde(default)]
-    pub(crate) app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
+    pub app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
 }
 
 /// A unique identifier used to refer to an App Interface internally.
@@ -74,8 +88,8 @@ impl AppInterfaceId {
         Self { port, id }
     }
 
-    /// Create an AppInterfaceId from its parts
-    pub(crate) fn from_parts(port: u16, id: Option<String>) -> Self {
+    /// Creates an [`AppInterfaceId`] from its parts.
+    pub fn from_parts(port: u16, id: Option<String>) -> Self {
         Self { port, id }
     }
 
@@ -85,7 +99,7 @@ impl AppInterfaceId {
     }
 
     /// Get the unique ID (if port is 0)
-    pub(crate) fn id(&self) -> &Option<String> {
+    pub fn id(&self) -> &Option<String> {
         &self.id
     }
 }
@@ -96,8 +110,8 @@ impl ConductorState {
         &self.tag
     }
 
-    /// Create a ConductorState from its components
-    pub(crate) fn from_parts(
+    /// Creates a [`ConductorState`] from its components.
+    pub fn from_parts(
         tag: ConductorStateTag,
         installed_apps: InstalledAppMap,
         app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
@@ -110,7 +124,7 @@ impl ConductorState {
     }
 
     /// Set the tag for this conductor
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn set_tag(&mut self, tag: ConductorStateTag) {
         self.tag = tag;
     }
@@ -150,31 +164,31 @@ impl ConductorState {
     }
 
     /// Getter for a single app. Returns error if app missing.
-    pub fn get_app(&self, id: &InstalledAppId) -> ConductorResult<&InstalledApp> {
+    pub fn get_app(&self, id: &InstalledAppId) -> ConductorStateResult<&InstalledApp> {
         self.installed_apps
             .get(id)
-            .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))
+            .ok_or_else(|| ConductorStateError::AppNotInstalled(id.clone()))
     }
 
     /// Getter for a mutable reference to a single app. Returns error if app missing.
-    pub fn get_app_mut(&mut self, id: &InstalledAppId) -> ConductorResult<&mut InstalledApp> {
+    pub fn get_app_mut(&mut self, id: &InstalledAppId) -> ConductorStateResult<&mut InstalledApp> {
         self.installed_apps
             .get_mut(id)
-            .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))
+            .ok_or_else(|| ConductorStateError::AppNotInstalled(id.clone()))
     }
 
     /// Getter for a single app. Returns error if app missing.
-    pub fn remove_app(&mut self, id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+    pub fn remove_app(&mut self, id: &InstalledAppId) -> ConductorStateResult<InstalledApp> {
         self.installed_apps
             .swap_remove(id)
-            .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))
+            .ok_or_else(|| ConductorStateError::AppNotInstalled(id.clone()))
     }
 
     /// Add an app in the Disabled state. Returns an error if an app is already
     /// present at the given ID.
-    pub fn add_app(&mut self, app: InstalledAppCommon) -> ConductorResult<InstalledApp> {
+    pub fn add_app(&mut self, app: InstalledAppCommon) -> ConductorStateResult<InstalledApp> {
         if self.installed_apps.contains_key(app.id()) {
-            return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
+            return Err(ConductorStateError::AppAlreadyInstalled(app.id().clone()));
         }
         let app = InstalledApp::new(app, AppStatus::Disabled(DisabledAppReason::NeverStarted));
         self.installed_apps.insert(app.id().clone(), app.clone());
@@ -186,9 +200,9 @@ impl ConductorState {
     pub fn add_app_awaiting_memproofs(
         &mut self,
         app: InstalledAppCommon,
-    ) -> ConductorResult<InstalledApp> {
+    ) -> ConductorStateResult<InstalledApp> {
         if self.installed_apps.contains_key(app.id()) {
-            return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
+            return Err(ConductorStateError::AppAlreadyInstalled(app.id().clone()));
         }
         let app = InstalledApp::new(app, AppStatus::AwaitingMemproofs);
         self.installed_apps.insert(app.id().clone(), app.clone());
@@ -209,9 +223,9 @@ impl ConductorState {
     pub fn add_app_awaiting_restore(
         &mut self,
         app: InstalledAppCommon,
-    ) -> ConductorResult<InstalledApp> {
+    ) -> ConductorStateResult<InstalledApp> {
         if self.installed_apps.contains_key(app.id()) {
-            return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
+            return Err(ConductorStateError::AppAlreadyInstalled(app.id().clone()));
         }
         let app = InstalledApp::new(app, AppStatus::AwaitingRestore);
         self.installed_apps.insert(app.id().clone(), app.clone());
@@ -230,14 +244,6 @@ impl ConductorState {
             .find(|app| app.all_cells().any(|id| id == *cell_id))
     }
 
-    /// Get network compability params
-    /// (but this can't actually be on the Conductor since it must be retrieved before
-    /// conductor initialization)
-    pub fn get_network_compat(&self) -> NetworkCompatParams {
-        tracing::warn!("Using default NetworkCompatParams");
-        Default::default()
-    }
-
     /// Find all installed apps that have a role which depends on a cell in this app
     /// via `AppRoleAssignment::Dependency`.
     ///
@@ -247,7 +253,7 @@ impl ConductorState {
         &self,
         id: &InstalledAppId,
         protected_only: bool,
-    ) -> ConductorResult<Vec<InstalledAppId>> {
+    ) -> ConductorStateResult<Vec<InstalledAppId>> {
         let app = self.get_app(id)?;
         let cell_ids: HashSet<_> = app.all_cells().collect();
         Ok(self
@@ -276,7 +282,7 @@ impl ConductorState {
 ///
 /// The cells (referenced by ID) that are to be made available via that interface should be listed.
 #[derive(Clone, Deserialize, Serialize, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(any(test, feature = "test-utils"), derive(PartialEq))]
 pub struct AppInterfaceConfig {
     /// The signal subscription settings for each App
     pub signal_subscriptions: HashMap<InstalledAppId, SignalSubscription>,
@@ -314,13 +320,12 @@ impl AppInterfaceConfig {
 mod tests {
     use super::ConductorState;
     use ::fixt::fixt;
-    use hdk::prelude::CellId;
     use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
-    use holochain_timestamp::Timestamp;
     use holochain_types::app::{
         AppManifestV0Builder, AppRoleAssignment, AppRolePrimary, AppStatus, DisabledAppReason,
         InstalledApp, InstalledAppCommon,
     };
+    use holochain_types::prelude::{CellId, Timestamp};
 
     #[test]
     fn app_status() {
