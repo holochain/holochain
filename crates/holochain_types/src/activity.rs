@@ -31,6 +31,21 @@ pub struct AgentActivityResponse {
 }
 
 impl AgentActivityResponse {
+    /// Whether this response carries no information about the agent's chain.
+    ///
+    /// An empty response means the authority holds nothing for the agent:
+    /// no valid or rejected activity, an [`ChainStatus::Empty`] status, no
+    /// highest observed action and no warrants. Callers that aggregate
+    /// responses from several authorities use this to tell "I hold
+    /// nothing" answers apart from answers that contribute data.
+    pub fn is_empty(&self) -> bool {
+        self.valid_activity.is_empty()
+            && self.rejected_activity.is_empty()
+            && matches!(self.status, ChainStatus::Empty)
+            && self.highest_observed.is_none()
+            && self.warrants.is_empty()
+    }
+
     /// Convert an empty response to a different type.
     pub fn from_empty(other: AgentActivityResponse) -> Self {
         let convert_activity = |items: &ChainItems| match items {
@@ -94,6 +109,18 @@ pub enum ChainItems {
     NotRequested,
 }
 
+impl ChainItems {
+    /// Whether these items carry no activity, either because none was
+    /// requested or because the requested list came back empty.
+    pub fn is_empty(&self) -> bool {
+        match self {
+            ChainItems::Full(records) => records.is_empty(),
+            ChainItems::Hashes(hashes) => hashes.is_empty(),
+            ChainItems::NotRequested => true,
+        }
+    }
+}
+
 impl From<AgentActivityResponse> for AgentActivity {
     fn from(a: AgentActivityResponse) -> Self {
         let valid_activity = match a.valid_activity {
@@ -154,6 +181,53 @@ impl ChainItemsSource for Vec<(u32, ActionHash)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn empty_response_detection() {
+        // An authority holding nothing for the agent: with activity
+        // requested the payload is an empty `Hashes` list, not
+        // `NotRequested`. Both shapes carry no information and must be
+        // treated as empty.
+        let empty = AgentActivityResponse {
+            agent: AgentPubKey::from_raw_32(vec![2; 32]),
+            valid_activity: ChainItems::Hashes(vec![]),
+            rejected_activity: ChainItems::Hashes(vec![]),
+            status: ChainStatus::Empty,
+            highest_observed: None,
+            warrants: vec![],
+        };
+        assert!(empty.is_empty());
+        assert!(AgentActivityResponse {
+            valid_activity: ChainItems::NotRequested,
+            rejected_activity: ChainItems::NotRequested,
+            ..empty.clone()
+        }
+        .is_empty());
+
+        // Any piece of information makes the response non-empty.
+        let head = ChainHead {
+            action_seq: 5,
+            hash: ActionHash::from_raw_32(vec![1; 32]),
+        };
+        assert!(!AgentActivityResponse {
+            valid_activity: ChainItems::Hashes(vec![(0, ActionHash::from_raw_32(vec![3; 32]))]),
+            ..empty.clone()
+        }
+        .is_empty());
+        assert!(!AgentActivityResponse {
+            status: ChainStatus::Valid(head.clone()),
+            ..empty.clone()
+        }
+        .is_empty());
+        assert!(!AgentActivityResponse {
+            highest_observed: Some(HighestObserved {
+                action_seq: head.action_seq,
+                hash: vec![head.hash],
+            }),
+            ..empty.clone()
+        }
+        .is_empty());
+    }
 
     #[test]
     fn status_only_preserves_status() {

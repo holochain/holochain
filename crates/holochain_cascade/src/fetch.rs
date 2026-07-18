@@ -253,6 +253,32 @@ impl CascadeImpl {
         Ok(results)
     }
 
+    /// Get agent activity from multiple authorities, returning each
+    /// peer's response independently, paired with the responding peer.
+    ///
+    /// Unlike [`fetch_agent_activity`](Self::fetch_agent_activity), a
+    /// missing network is a hard error and `NoPeersForLocation` is not
+    /// swallowed: the caller must be able to distinguish "no answer"
+    /// from "empty answer".
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
+    pub(crate) async fn fetch_agent_activity_multi(
+        &self,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: GetActivityMultiOptions,
+    ) -> CascadeResult<Vec<(AgentPubKey, AgentActivityResponse)>> {
+        let network = self
+            .network
+            .as_ref()
+            .ok_or(CascadeError::NetworkNotInitialized)?;
+
+        network
+            .get_agent_activity_multi(agent, query, options)
+            .await
+            .inspect_err(|_| self.record_fetch_error("agent_activity_multi"))
+            .map_err(Into::into)
+    }
+
     /// Fetch hash bounded agent activity from the network.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub(crate) async fn fetch_must_get_agent_activity(

@@ -36,7 +36,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holochain_p2p::actor::GetLinksRequestOptions;
-use holochain_p2p::actor::{GetActivityOptions, NetworkRequestOptions};
+use holochain_p2p::actor::{GetActivityMultiOptions, GetActivityOptions, NetworkRequestOptions};
 use holochain_p2p::{DynHolochainP2pDna, HolochainP2pError};
 use holochain_state::dht_store::DhtStore;
 use holochain_state::host_fn_workspace::HostFnStores;
@@ -807,6 +807,29 @@ impl CascadeImpl {
         Ok(r)
     }
 
+    /// Get agent activity from multiple authorities, returning each
+    /// peer's response independently, paired with the responding peer.
+    ///
+    /// This is a network-only call: responses are not merged, not
+    /// overlaid with local state, and not written to any store, leaving
+    /// callers free to apply their own cross-peer agreement rules. Fails
+    /// with [`CascadeError::NetworkNotInitialized`] when the cascade has
+    /// no network, and with an insufficient-responses error when fewer
+    /// than `options.required_responses` peers answer with data in time.
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self, agent, query, options))
+    )]
+    pub async fn get_agent_activity_multi(
+        &self,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: GetActivityMultiOptions,
+    ) -> CascadeResult<Vec<(AgentPubKey, AgentActivityResponse)>> {
+        let _guard = self.time_cascade();
+        self.fetch_agent_activity_multi(agent, query, options).await
+    }
+
     /// Looks through a [ChainItems] object and fills in any missing entry data.
     ///
     /// For any [RecordEntry::NotStored] entries, this function will attempt to fetch the entry data
@@ -1011,3 +1034,7 @@ impl Cascade for CascadeImpl {
 /// scratch-only content through the requester-read methods.
 #[cfg(all(test, feature = "test_utils"))]
 mod dht_store_scratch_overlay_tests;
+
+/// Tests for the `get_agent_activity_multi` network passthrough.
+#[cfg(all(test, feature = "test_utils"))]
+mod agent_activity_multi_tests;

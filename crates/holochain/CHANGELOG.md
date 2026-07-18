@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.7.0-rc.0
 
+- Added a new `get_agent_activity_multi` p2p call (`HcP2p`, `HolochainP2pDnaT`, and a `CascadeImpl` passthrough): a multi-peer fan-out that returns each authority's `AgentActivityResponse` independently, paired with the responding peer, for use by source-chain restore. Fails with the new `HolochainP2pError::Timeout` when fewer than `min_responses` responses arrive within the timeout. The existing `get_agent_activity` behaviour is unchanged. \#5799
 - **BREAKING CHANGE**: Removed the `transport-iroh` feature flag from `holochain`, `holochain_p2p`, `holochain_cascade`, `holochain_client`, `hc`, `hc_client`, and `hc_sandbox`. The iroh (QUIC) transport is the only network backend and is now compiled in unconditionally rather than gated behind an (on-by-default) optional feature. Downstream crates that built with `default-features = false` and explicitly listed `transport-iroh` must drop it, as the feature no longer exists.
 - Made the workspace crates’ feature flags build independently and removed unused dependencies across the workspace, trimming the dependency tree.
 - **BREAKING CHANGE** `wire_rows_to_v2_ops` is renamed to `wire_rows_to_ops` now that there is no legacy v1 op form to distinguish it from.
