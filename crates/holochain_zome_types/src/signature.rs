@@ -1,7 +1,9 @@
 //! Signature for authenticity of data
-use crate::prelude::*;
+
+use crate::prelude::Bytes;
 use holo_hash::AgentPubKey;
-pub use holochain_integrity_types::signature::*;
+use holochain_integrity_types::signature::Signature;
+use holochain_serialized_bytes::prelude::*;
 
 /// Input structure for creating a signature.
 #[derive(Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Clone)]
@@ -11,6 +13,7 @@ pub struct Sign {
     pub key: holo_hash::AgentPubKey,
 
     /// The data that should be signed.
+    // TODO double check
     pub data: Bytes,
 }
 

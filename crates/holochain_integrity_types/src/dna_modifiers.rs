@@ -1,6 +1,6 @@
 //! # DNA Properties Support types
 
-use crate::prelude::*;
+use crate::info::NetworkSeed;
 use holochain_serialized_bytes::prelude::*;
 
 /// Modifiers of this DNA - the network seed, properties and origin time - as

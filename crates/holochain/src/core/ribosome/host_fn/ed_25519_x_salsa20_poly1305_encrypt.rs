@@ -82,7 +82,7 @@ pub mod wasm_test {
             .await;
 
         let decrypt_input =
-            holochain_zome_types::x_salsa20_poly1305::Ed25519XSalsa20Poly1305Decrypt::new(
+            Ed25519XSalsa20Poly1305Decrypt::new(
                 bob_pubkey.clone(),
                 alice_pubkey.clone(),
                 encrypt_output.clone(),

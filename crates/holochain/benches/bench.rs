@@ -40,7 +40,7 @@ static CELL_ID: Lazy<Mutex<holochain_zome_types::cell::CellId>> = Lazy::new(|| {
     )
 });
 
-static CAP: Lazy<Mutex<holochain_zome_types::capability::CapSecret>> =
+static CAP: Lazy<Mutex<CapSecret>> =
     Lazy::new(|| Mutex::new(CapSecretFixturator::new(Unpredictable).next().unwrap()));
 
 static AGENT_KEY: Lazy<Mutex<AgentPubKey>> =

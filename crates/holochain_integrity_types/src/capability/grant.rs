@@ -2,8 +2,7 @@ use super::CapSecret;
 use crate::zome::FunctionName;
 use crate::zome::ZomeName;
 use holo_hash::*;
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashSet};
 
 /// Represents a _potentially_ valid access grant to a zome call.
@@ -49,8 +48,6 @@ pub struct ZomeCallCapGrant {
     pub access: CapAccess,
     /// Set of functions to which this capability grants ZomeCall access
     pub functions: GrantedFunctions,
-    // @todo the payloads to curry to the functions
-    // pub curry_payloads: CurryPayloads,
 }
 
 /// The outbound DTO of a ZomeCall capability grant info request.

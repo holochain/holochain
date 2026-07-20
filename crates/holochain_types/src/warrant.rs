@@ -1,7 +1,10 @@
 //! Defines the Warrant variant of DhtOp
 
+use holo_hash::{hash_type, HashableContent, HashableContentBytes};
 use holochain_keystore::{AgentPubKeyExt, LairResult, MetaLairClient};
-use holochain_zome_types::prelude::*;
+use holochain_serialized_bytes::prelude::*;
+use holochain_timestamp::Timestamp;
+use holochain_zome_types::prelude::{SignedWarrant, Warrant, WarrantProof};
 
 /// A Warrant DhtOp
 #[derive(

@@ -10,17 +10,17 @@ use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator, EntryHashFixt
 use holo_hash::HashableContentExtSync;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
+use holochain_timestamp::Timestamp;
 use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
-use holochain_zome_types::action::{ActionData, AppEntryDef, EntryType, SignedAction, ZomeIndex};
 use holochain_zome_types::fixt::{
     ActionFixturator, CreateAction, CreateLinkAction, DeleteAction, DeleteLinkAction,
     EntryFixturator, SignatureFixturator, UpdateAction,
 };
-use holochain_zome_types::op::{
-    AgentActivity, CreateEntry, CreateLink, CreateRecord, Delete, DeleteLink, Op, Update,
+use holochain_zome_types::prelude::{
+    ActionData, AgentActivity, AppEntryDef, CreateEntry, CreateLink, CreateRecord, Delete,
+    DeleteLink, EntryType, Op, Record, RecordEntry, SignedAction, SignedActionHashed, Update,
+    ZomeIndex,
 };
-use holochain_zome_types::record::{Record, RecordEntry, SignedActionHashed};
-use holochain_zome_types::timestamp::Timestamp;
 use matches::assert_matches;
 use std::sync::Arc;
 

@@ -279,12 +279,9 @@ mod tests {
     use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::fixt::ActionFixturator;
-    use holochain_zome_types::{
-        action::{ChainTopOrdering, SignedAction},
-        entry::{AppEntryBytes, AppEntryDefLocation, CreateInput, EntryDefLocation},
-        entry_def::{EntryDef, EntryVisibility},
-        zome::inline_zome::InlineIntegrityZome,
-        Entry,
+    use holochain_zome_types::prelude::{
+        AppEntryBytes, AppEntryDefLocation, ChainTopOrdering, CreateInput, Entry, EntryDef,
+        EntryDefLocation, EntryVisibility, InlineIntegrityZome, SignedAction,
     };
     use serde::{Deserialize, Serialize};
 

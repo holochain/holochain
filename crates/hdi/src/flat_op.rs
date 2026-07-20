@@ -4,7 +4,7 @@
 
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
 use holochain_integrity_types::action::Action;
-use holochain_integrity_types::{LinkTag, MembraneProof, UnitEnum};
+use holochain_integrity_types::prelude::{LinkTag, MembraneProof, UnitEnum};
 
 mod flat_op_activity;
 mod flat_op_entry;

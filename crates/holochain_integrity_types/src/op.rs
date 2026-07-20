@@ -2,8 +2,8 @@
 
 use crate::action::conversions::WrongActionError;
 use crate::action::{Action, ActionData, ActionType, EntryType};
+use crate::entry::Entry;
 use crate::record::{Record, SignedHashed};
-use crate::Entry;
 use holo_hash::{ActionHash, AgentPubKey, EntryHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
@@ -303,7 +303,6 @@ mod tests {
     };
     use crate::record::SignedHashed;
     use crate::signature::Signature;
-    use crate::EntryType;
     use holo_hash::{ActionHash, AgentPubKey, EntryHash, HasHash, HoloHashed};
 
     fn signed_action(data: ActionData) -> SignedHashed<Action> {
@@ -346,7 +345,7 @@ mod tests {
 
     #[test]
     fn store_entry_accepts_create_and_update() {
-        let entry = crate::Entry::Agent(AgentPubKey::from_raw_36(vec![1u8; 36]));
+        let entry = Entry::Agent(AgentPubKey::from_raw_36(vec![1u8; 36]));
         assert!(CreateEntry::new(signed_action(create_data()), entry.clone()).is_ok());
 
         let update = ActionData::Update(crate::action::UpdateData {
@@ -360,7 +359,7 @@ mod tests {
 
     #[test]
     fn store_entry_rejects_non_entry_action() {
-        let entry = crate::Entry::Agent(AgentPubKey::from_raw_36(vec![1u8; 36]));
+        let entry = Entry::Agent(AgentPubKey::from_raw_36(vec![1u8; 36]));
         assert!(CreateEntry::new(signed_action(delete_data()), entry).is_err());
     }
 
@@ -460,7 +459,7 @@ mod tests {
 
     #[test]
     fn op_serde_roundtrip() {
-        let entry = crate::Entry::Agent(AgentPubKey::from_raw_36(vec![1u8; 36]));
+        let entry = Entry::Agent(AgentPubKey::from_raw_36(vec![1u8; 36]));
         let store_entry =
             Op::CreateEntry(CreateEntry::new(signed_action(create_data()), entry).unwrap());
         let store_record = Op::CreateRecord(CreateRecord {

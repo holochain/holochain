@@ -420,7 +420,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn must_get_agent_activity(
         &self,
         author: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
+        filter: ChainFilter,
         options: NetworkRequestOptions,
         zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {

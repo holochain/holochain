@@ -85,7 +85,7 @@ pub enum WireMessage {
         msg_id: u64,
         to_agent: AgentPubKey,
         agent: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
+        filter: ChainFilter,
     },
     MustGetAgentActivityRes {
         msg_id: u64,
@@ -278,7 +278,7 @@ impl WireMessage {
     pub fn must_get_agent_activity_req(
         to_agent: AgentPubKey,
         agent: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
+        filter: ChainFilter,
     ) -> (u64, WireMessage) {
         let msg_id = next_msg_id();
         (

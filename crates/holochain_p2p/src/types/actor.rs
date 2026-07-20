@@ -356,7 +356,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
         &self,
         dna_hash: DnaHash,
         author: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
+        filter: ChainFilter,
         options: NetworkRequestOptions,
         zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<MustGetAgentActivityResponse>>>;

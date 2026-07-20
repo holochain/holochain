@@ -46,7 +46,7 @@ mod tests {
     use holochain_integrity_types::record::SignedHashed;
     use holochain_integrity_types::signature::Signature;
     use holochain_timestamp::Timestamp;
-    use holochain_zome_types::action::SignedActionHashed;
+    use holochain_zome_types::prelude::SignedActionHashed;
     use std::sync::Arc;
 
     fn dht_db_id() -> Dht {
@@ -1897,7 +1897,7 @@ mod tests {
             vec![11u8; 36],
             holo_hash::hash_type::AnyLinkable::Entry,
         );
-        let entry_type = holochain_integrity_types::EntryType::AgentPubKey;
+        let entry_type = EntryType::AgentPubKey;
 
         let cases: Vec<(u8, ActionData)> = vec![
             (
@@ -2356,8 +2356,8 @@ mod tests {
                 action_seq: seed as u32,
                 prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_sub(1); 36])),
             },
-            data: ActionData::Create(holochain_integrity_types::action::CreateData {
-                entry_type: holochain_integrity_types::EntryType::AgentPubKey,
+            data: ActionData::Create(holochain_integrity_types::prelude::CreateData {
+                entry_type: holochain_integrity_types::prelude::EntryType::AgentPubKey,
                 entry_hash: entry_hash.clone(),
             }),
         };

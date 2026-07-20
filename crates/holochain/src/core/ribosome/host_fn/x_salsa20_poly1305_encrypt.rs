@@ -85,7 +85,7 @@ pub mod wasm_test {
 
         // encrypt some data with that shared key (identified by key_ref)
         let data = XSalsa20Poly1305Data::from(vec![1, 2, 3, 4]);
-        let enc_input = holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt::new(
+        let enc_input = holochain_zome_types::prelude::XSalsa20Poly1305Encrypt::new(
             key_ref.clone(),
             data.clone(),
         );
@@ -94,7 +94,7 @@ pub mod wasm_test {
             .await;
 
         // export the shared key to send to conductor2
-        let exp_input = holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretExport::new(
+        let exp_input = holochain_zome_types::prelude::XSalsa20Poly1305SharedSecretExport::new(
             alice1_x25519, // sender
             alice2_x25519, // recipient
             key_ref.clone(),
@@ -104,7 +104,7 @@ pub mod wasm_test {
             .await;
 
         // ingest the shared key on conductor2
-        let ing_input = holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretIngest::new(
+        let ing_input = holochain_zome_types::prelude::XSalsa20Poly1305SharedSecretIngest::new(
             alice2_x25519, // recipient
             alice1_x25519, // sender
             secret_exp,
@@ -116,7 +116,7 @@ pub mod wasm_test {
         assert_eq!(key_ref, key_ref2);
 
         // now decrypt the message on conductor2
-        let dec_input = holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Decrypt::new(
+        let dec_input = holochain_zome_types::prelude::XSalsa20Poly1305Decrypt::new(
             key_ref,
             cipher.clone(),
         );
@@ -137,7 +137,7 @@ pub mod wasm_test {
             .await;
 
         // try decrypting with key_ref_bad
-        let dec_input_bad = holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Decrypt::new(
+        let dec_input_bad = holochain_zome_types::prelude::XSalsa20Poly1305Decrypt::new(
             key_ref_bad,
             cipher,
         );

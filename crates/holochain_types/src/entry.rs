@@ -8,9 +8,11 @@
 use crate::error::DhtOpResult;
 use crate::wire_ops::RenderedOp;
 use crate::wire_ops::RenderedOps;
-use holochain_zome_types::op::ChainOpType;
-use holochain_zome_types::prelude::*;
-use holochain_zome_types::warrant::SignedWarrant;
+use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::prelude::{
+    ChainOpType, Entry, EntryHashed, EntryType, HasValidationStatus, Judged, RecordEntry,
+    SignedAction, SignedWarrant,
+};
 
 /// Convenience function for when you have a RecordEntry but need
 /// a Option EntryHashed

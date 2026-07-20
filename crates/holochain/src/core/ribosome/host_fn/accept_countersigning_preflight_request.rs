@@ -73,7 +73,7 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holochain_nonce::fresh_nonce;
     use holochain_state::source_chain::SourceChainError;
-    use holochain_zome_types::query::AgentActivity;
+    use holochain_zome_types::query::AgentActivityStatus;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallParams;
     use matches::assert_matches;
@@ -156,7 +156,7 @@ pub mod wasm_test {
         let _: ActionHash = conductors[1].call(&alice, "create_a_thing", ()).await;
         let _: ActionHash = conductors[1].call(&bob, "create_a_thing", ()).await;
 
-        let alice_agent_activity_alice_observed_before: AgentActivity = conductors[1]
+        let alice_agent_activity_alice_observed_before: AgentActivityStatus = conductors[1]
             .call(
                 &alice,
                 "get_agent_activity",
@@ -168,7 +168,7 @@ pub mod wasm_test {
                 },
             )
             .await;
-        let alice_agent_activity_bob_observed_before: AgentActivity = conductors[1]
+        let alice_agent_activity_bob_observed_before: AgentActivityStatus = conductors[1]
             .call(
                 &bob,
                 "get_agent_activity",
@@ -180,7 +180,7 @@ pub mod wasm_test {
                 },
             )
             .await;
-        let bob_agent_activity_alice_observed_before: AgentActivity = conductors[1]
+        let bob_agent_activity_alice_observed_before: AgentActivityStatus = conductors[1]
             .call(
                 &alice,
                 "get_agent_activity",
@@ -192,7 +192,7 @@ pub mod wasm_test {
                 },
             )
             .await;
-        let bob_agent_activity_bob_observed_before: AgentActivity = conductors[1]
+        let bob_agent_activity_bob_observed_before: AgentActivityStatus = conductors[1]
             .call(
                 &bob,
                 "get_agent_activity",
@@ -337,7 +337,7 @@ pub mod wasm_test {
         );
 
         // At this point Alice's session entry is a liability so can't exist.
-        let alice_agent_activity_alice_observed_after: AgentActivity = conductors[1]
+        let alice_agent_activity_alice_observed_after: AgentActivityStatus = conductors[1]
             .call(
                 &alice,
                 "get_agent_activity",
@@ -349,7 +349,7 @@ pub mod wasm_test {
                 },
             )
             .await;
-        let alice_agent_activity_bob_observed_after: AgentActivity = conductors[1]
+        let alice_agent_activity_bob_observed_after: AgentActivityStatus = conductors[1]
             .call(
                 &bob,
                 "get_agent_activity",
@@ -361,7 +361,7 @@ pub mod wasm_test {
                 },
             )
             .await;
-        let bob_agent_activity_alice_observed_after: AgentActivity = conductors[1]
+        let bob_agent_activity_alice_observed_after: AgentActivityStatus = conductors[1]
             .call(
                 &alice,
                 "get_agent_activity",
@@ -373,7 +373,7 @@ pub mod wasm_test {
                 },
             )
             .await;
-        let bob_agent_activity_bob_observed_after: AgentActivity = conductors[1]
+        let bob_agent_activity_bob_observed_after: AgentActivityStatus = conductors[1]
             .call(
                 &bob,
                 "get_agent_activity",
@@ -695,7 +695,7 @@ pub mod wasm_test {
         expect_chain_locked(thing_fail_create_alice);
 
         // The countersigned entry does NOT appear in alice's activity yet.
-        let alice_activity_pre: AgentActivity = conductors[1]
+        let alice_activity_pre: AgentActivityStatus = conductors[1]
             .call(
                 &alice,
                 "get_agent_activity",
@@ -770,7 +770,7 @@ pub mod wasm_test {
             .call(&bob, "must_get_valid_record", countersigned_action_hash_bob)
             .await;
 
-        let alice_activity: AgentActivity = conductors[1]
+        let alice_activity: AgentActivityStatus = conductors[1]
             .call(
                 &alice,
                 "get_agent_activity",
@@ -793,7 +793,7 @@ pub mod wasm_test {
             countersigned_action_alice.as_hash(),
         );
 
-        let bob_activity: AgentActivity = conductors[1]
+        let bob_activity: AgentActivityStatus = conductors[1]
             .call(
                 &bob,
                 "get_agent_activity",
@@ -973,7 +973,7 @@ pub mod wasm_test {
         expect_chain_locked(thing_fail_create_alice);
 
         // The countersigned entry does NOT appear in alice's activity yet.
-        let alice_activity_pre: AgentActivity = conductor
+        let alice_activity_pre: AgentActivityStatus = conductor
             .call(
                 &alice,
                 "get_agent_activity",
@@ -1048,7 +1048,7 @@ pub mod wasm_test {
             .call(&bob, "must_get_valid_record", countersigned_action_hash_bob)
             .await;
 
-        let alice_activity: AgentActivity = conductor
+        let alice_activity: AgentActivityStatus = conductor
             .call(
                 &alice,
                 "get_agent_activity",
@@ -1069,7 +1069,7 @@ pub mod wasm_test {
             countersigned_action_alice.as_hash(),
         );
 
-        let bob_activity: AgentActivity = conductor
+        let bob_activity: AgentActivityStatus = conductor
             .call(
                 &bob,
                 "get_agent_activity",
@@ -1124,7 +1124,7 @@ pub mod wasm_test {
 
         if force_init {
             // Run any arbitrary zome call for bob to force him to run init
-            let _: AgentActivity = conductor
+            let _: AgentActivityStatus = conductor
                 .call(
                     &bob,
                     "get_agent_activity",
@@ -1191,7 +1191,7 @@ pub mod wasm_test {
             .await;
 
         // The countersigned entry does NOT appear in alice's activity yet.
-        let alice_activity_pre: AgentActivity = conductor
+        let alice_activity_pre: AgentActivityStatus = conductor
             .call(
                 &alice,
                 "get_agent_activity",
@@ -1204,7 +1204,7 @@ pub mod wasm_test {
             )
             .await;
         // Nor bob's.
-        let bob_activity_pre: AgentActivity = conductor
+        let bob_activity_pre: AgentActivityStatus = conductor
             .call(
                 &alice,
                 "get_agent_activity",
@@ -1229,7 +1229,7 @@ pub mod wasm_test {
         await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
         // Now the action appears in alice's activty.
-        let alice_activity: AgentActivity = conductor
+        let alice_activity: AgentActivityStatus = conductor
             .call(
                 &alice,
                 "get_agent_activity",
@@ -1242,7 +1242,7 @@ pub mod wasm_test {
             )
             .await;
         // And bob's.
-        let bob_activity: AgentActivity = conductor
+        let bob_activity: AgentActivityStatus = conductor
             .call(
                 &alice,
                 "get_agent_activity",
@@ -1302,7 +1302,7 @@ pub mod wasm_test {
                 .unwrap();
 
             // The countersigned entry does NOT appear in alice's activity yet.
-            let alice_activity_pre: AgentActivity = bob_conductor
+            let alice_activity_pre: AgentActivityStatus = bob_conductor
                 .call(
                     &bob,
                     "get_agent_activity",
@@ -1315,7 +1315,7 @@ pub mod wasm_test {
                 )
                 .await;
             // Nor bob's.
-            let bob_activity_pre: AgentActivity = alice_conductor
+            let bob_activity_pre: AgentActivityStatus = alice_conductor
                 .call(
                     &alice,
                     "get_agent_activity",
@@ -1398,7 +1398,7 @@ pub mod wasm_test {
                 .unwrap();
 
             // Now the action appears in alice's activty.
-            let alice_activity: AgentActivity = bob_conductor
+            let alice_activity: AgentActivityStatus = bob_conductor
                 .call(
                     &bob,
                     "get_agent_activity",
@@ -1412,7 +1412,7 @@ pub mod wasm_test {
                 .await;
 
             // And bob's.
-            let bob_activity: AgentActivity = alice_conductor
+            let bob_activity: AgentActivityStatus = alice_conductor
                 .call(
                     &alice,
                     "get_agent_activity",
@@ -1499,7 +1499,7 @@ pub mod wasm_test {
                 .await;
 
             // The countersigned entry does NOT appear in alice's activity yet.
-            let alice_activity_pre: AgentActivity = bob_conductor
+            let alice_activity_pre: AgentActivityStatus = bob_conductor
                 .call(
                     &bob,
                     "get_agent_activity",
@@ -1512,7 +1512,7 @@ pub mod wasm_test {
                 )
                 .await;
             // Nor bob's.
-            let bob_activity_pre: AgentActivity = alice_conductor
+            let bob_activity_pre: AgentActivityStatus = alice_conductor
                 .call(
                     &alice,
                     "get_agent_activity",
@@ -1536,7 +1536,7 @@ pub mod wasm_test {
 
             // Now the action DOES NOT appear in alice's activty, due to the
             // partition blocking the enzyme push.
-            let alice_activity: AgentActivity = bob_conductor
+            let alice_activity: AgentActivityStatus = bob_conductor
                 .call(
                     &bob,
                     "get_agent_activity",
@@ -1549,7 +1549,7 @@ pub mod wasm_test {
                 )
                 .await;
             // Same for bob's.
-            let bob_activity: AgentActivity = alice_conductor
+            let bob_activity: AgentActivityStatus = alice_conductor
                 .call(
                     &alice,
                     "get_agent_activity",

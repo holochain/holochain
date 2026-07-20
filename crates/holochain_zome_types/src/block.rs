@@ -1,10 +1,10 @@
 // Temporarily allowing deprecation because of [`BlockTarget::NodeDna`] and [`BlockTarget::Node`].
 #![allow(deprecated)]
 
-use crate::prelude::*;
+use crate::cell::CellId;
 use holo_hash::DhtOpHash;
-use holochain_integrity_types::Timestamp;
-use holochain_timestamp::InclusiveTimestampInterval;
+use holochain_serialized_bytes::prelude::*;
+use holochain_timestamp::{InclusiveTimestampInterval, Timestamp};
 
 /// Reason why we might want to block a cell.
 #[derive(Clone, serde::Serialize, serde::Deserialize, Debug, Eq, PartialEq)]

@@ -1,8 +1,8 @@
-use crate::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-pub use holochain_integrity_types::info::*;
+use holochain_integrity_types::prelude::{CapGrant, FunctionName};
 use holochain_serialized_bytes::prelude::*;
+use holochain_timestamp::Timestamp;
 
 /// The struct containing all information about the executing agent's identity.
 #[allow(missing_docs)]

@@ -1,6 +1,6 @@
 use crate::entry_def::EntryVisibility;
+use crate::genesis::MembraneProof;
 use crate::link::{LinkTag, LinkType};
-use crate::MembraneProof;
 use holo_hash::{
     ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash, HashableContent,
     HashableContentBytes, HoloHashed,
@@ -323,10 +323,10 @@ impl core::fmt::Display for ActionType {
     }
 }
 
-/// Capability-grant access mode.
+/// Capability-grant access type.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(i64)]
-pub enum CapAccess {
+pub enum CapAccessType {
     /// No restrictions; any caller may invoke the granted function.
     Unrestricted = 0,
     /// Caller must present a matching secret token.
@@ -335,23 +335,23 @@ pub enum CapAccess {
     Assigned = 2,
 }
 
-/// Maps [`CapAccess`] onto the `CapGrant.cap_access` INTEGER column
+/// Maps [`CapAccessType`] onto the `CapGrant.cap_access` INTEGER column
 /// (`0..=2`). All three variants are valid, including `0`.
-impl From<CapAccess> for i64 {
-    fn from(a: CapAccess) -> Self {
+impl From<CapAccessType> for i64 {
+    fn from(a: CapAccessType) -> Self {
         a as i64
     }
 }
 
 /// Inverse of [`From<CapAccess> for i64`]. Returns `Err(v)` for any value
 /// outside `0..=2`.
-impl TryFrom<i64> for CapAccess {
+impl TryFrom<i64> for CapAccessType {
     type Error = i64;
     fn try_from(v: i64) -> Result<Self, Self::Error> {
         match v {
-            0 => Ok(CapAccess::Unrestricted),
-            1 => Ok(CapAccess::Transferable),
-            2 => Ok(CapAccess::Assigned),
+            0 => Ok(CapAccessType::Unrestricted),
+            1 => Ok(CapAccessType::Transferable),
+            2 => Ok(CapAccessType::Assigned),
             other => Err(other),
         }
     }
@@ -759,15 +759,15 @@ mod tests {
     #[test]
     fn cap_access_i64_roundtrip() {
         for v in [
-            CapAccess::Unrestricted,
-            CapAccess::Transferable,
-            CapAccess::Assigned,
+            CapAccessType::Unrestricted,
+            CapAccessType::Transferable,
+            CapAccessType::Assigned,
         ] {
             let n: i64 = v.into();
-            assert_eq!(CapAccess::try_from(n).unwrap(), v);
+            assert_eq!(CapAccessType::try_from(n).unwrap(), v);
         }
-        assert!(CapAccess::try_from(-1).is_err());
-        assert!(CapAccess::try_from(3).is_err());
+        assert!(CapAccessType::try_from(-1).is_err());
+        assert!(CapAccessType::try_from(3).is_err());
     }
 
     #[test]

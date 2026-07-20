@@ -77,7 +77,7 @@ pub mod slow_tests {
     use crate::sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
     use holo_hash::ActionHash;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::record::Record;
+    use holochain_zome_types::prelude::Record;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn get_action_entry_local_only() {

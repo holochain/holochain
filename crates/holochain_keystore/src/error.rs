@@ -1,6 +1,6 @@
 use crate::*;
 use holochain_secure_primitive::SecurePrimitiveError;
-use holochain_zome_types::signature::Signature;
+use holochain_zome_types::prelude::Signature;
 
 /// Keystore Error Type.
 #[derive(Debug, thiserror::Error)]

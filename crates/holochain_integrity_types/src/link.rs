@@ -1,4 +1,4 @@
-use crate::ZomeIndex;
+use crate::action::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(

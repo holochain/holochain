@@ -1,9 +1,9 @@
 //! Defines a Record, the basic unit of Holochain data.
 
 use crate::action::Action;
+use crate::entry::Entry;
 use crate::entry_def::EntryVisibility;
 use crate::signature::Signature;
-use crate::Entry;
 use holo_hash::ActionHash;
 use holo_hash::HasHash;
 use holo_hash::HashableContent;
@@ -351,10 +351,10 @@ impl crate::action::ActionHashedContainer for Record {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::action::{Action, ActionData, ActionHeader, CreateData};
+    use crate::action::{Action, ActionData, ActionHeader, CreateData, EntryType};
+    use crate::entry::AppEntryBytes;
     use crate::record::{RecordEntry, SignedHashed};
     use crate::signature::Signature;
-    use crate::{Entry, EntryType};
     use holo_hash::{ActionHash, AgentPubKey, EntryHash, HoloHashed};
 
     fn sample_signed_action_with_entry_type(entry_type: EntryType) -> SignedHashed<Action> {
@@ -430,7 +430,7 @@ mod tests {
 
     #[test]
     fn record_privatized_hides_a_present_private_entry() {
-        let entry = Entry::App(crate::AppEntryBytes(SerializedBytes::default()));
+        let entry = Entry::App(AppEntryBytes(SerializedBytes::default()));
         let sah = sample_signed_action_with_entry_type(EntryType::CapClaim);
         let record = Record::new(sah, RecordEntry::Present(entry.clone()));
 

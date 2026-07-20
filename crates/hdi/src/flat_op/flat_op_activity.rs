@@ -1,6 +1,6 @@
 //! The `OpActivity` type; see the description in the [`crate::flat_op`] parent module.
 use super::*;
-use holochain_integrity_types::MigrationTarget;
+use holochain_integrity_types::prelude::MigrationTarget;
 
 /// Data specific to the
 /// [`Op::AgentActivity`](holochain_integrity_types::op::Op::AgentActivity)

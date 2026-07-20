@@ -9,7 +9,7 @@ use {
         SerializedBytes, ValidateCallbackResult,
     },
     holochain::prelude::InlineZomeSet,
-    holochain_zome_types::Entry,
+    holochain_zome_types::prelude::Entry,
     serde::{Deserialize, Serialize},
     std::time::Duration,
 };

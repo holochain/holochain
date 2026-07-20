@@ -1,6 +1,5 @@
 //! Countersigned entries involve preflights between many agents to build a session that is part of the entry.
 
-use crate::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
@@ -23,8 +22,10 @@ pub const MIN_COUNTERSIGNING_AGENTS: usize = 2;
 /// 8 seems like a reasonable limit of agents to countersign.
 pub const MAX_COUNTERSIGNING_AGENTS: usize = 8;
 
-pub use error::CounterSigningError;
 mod error;
+use crate::action::EntryType;
+use crate::signature::Signature;
+pub use error::CounterSigningError;
 
 /// Every countersigning session must complete a full set of actions between the start and end times to be valid.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
@@ -563,17 +564,10 @@ impl CounterSigningSessionData {
 
 #[cfg(test)]
 mod test {
-    use super::CounterSigningError;
-    use super::CounterSigningSessionTimes;
-    use super::PreflightRequest;
     use super::SESSION_ACTION_TIME_OFFSET;
-    use crate::CounterSigningSessionData;
-    use crate::Role;
-    use crate::Signature;
-    use crate::{
-        ActionBase, AppEntryDef, CounterSigningAgentState, CreateBase, EntryType, EntryVisibility,
-        PreflightBytes,
-    };
+    use super::*;
+    use crate::action::AppEntryDef;
+    use crate::entry_def::EntryVisibility;
     use fixt::*;
     use holo_hash::fixt::ActionHashFixturator;
     use holo_hash::fixt::AgentPubKeyFixturator;

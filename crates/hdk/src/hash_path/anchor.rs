@@ -4,7 +4,7 @@ use hdi::hash_path::{
     anchor::{Anchor, ROOT},
     path::{Component, Path},
 };
-use holochain_zome_types::entry::GetStrategy;
+use holochain_zome_types::prelude::GetStrategy;
 
 /// Extension trait for [`Anchor`] to convert directly to [`TypedPath`] preserving strategy.
 pub trait AnchorExt {

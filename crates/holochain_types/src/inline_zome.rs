@@ -1,4 +1,5 @@
 //! Extra types that help with inline zomes that are not needed in the wasm.
+use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;

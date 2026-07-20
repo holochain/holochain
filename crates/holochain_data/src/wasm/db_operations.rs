@@ -97,13 +97,12 @@ mod tests {
     use holo_hash::{
         blake2b_256, HasHash, HashableContentExtAsync, HashableContentExtSync, InlineHash,
     };
-    use holochain_integrity_types::{zome::ZomeName, EntryDefId, EntryVisibility};
+    use holochain_integrity_types::prelude::{EntryDefId, EntryVisibility, ZomeName};
     use holochain_serialized_bytes::SerializedBytes;
     use holochain_types::prelude::{
         AgentPubKey, CoordinatorZomeDef, DnaHash, DnaModifiers, DnaWasm, IntegrityZomeDef,
     };
-    use holochain_zome_types::prelude::InlineZomeDef;
-    use holochain_zome_types::zome::ZomeDef;
+    use holochain_zome_types::prelude::{InlineZomeDef, ZomeDef};
 
     use super::*;
 

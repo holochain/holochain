@@ -22,9 +22,10 @@ use holochain_serialized_bytes::prelude::{decode, encode};
 use holochain_state::dht_store::{K2ChainOpForWireRow, K2WarrantForWireRow};
 use holochain_state::DhtStore;
 use holochain_types::op::{ChainOp, DhtOp, OpEntry};
-use holochain_zome_types::action::{Action, ActionData, ActionHeader, SignedAction};
-use holochain_zome_types::op::ChainOpType;
-use holochain_zome_types::warrant::{SignedWarrant, Warrant, WarrantProof};
+use holochain_zome_types::prelude::{
+    Action, ActionData, ActionHeader, ChainOpType, SignedAction, SignedWarrant, Warrant,
+    WarrantProof,
+};
 use kitsune2_api::*;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
@@ -511,9 +512,9 @@ pub fn build_warrant_dht_op(row: K2WarrantForWireRow) -> Result<DhtOp, String> {
     Ok(DhtOp::WarrantOp(Box::new(signed.into())))
 }
 
-fn decode_signature(bytes: &[u8]) -> Result<holochain_zome_types::signature::Signature, String> {
+fn decode_signature(bytes: &[u8]) -> Result<holochain_zome_types::prelude::Signature, String> {
     let arr: [u8; 64] = bytes
         .try_into()
         .map_err(|_| format!("signature length {} is not 64 bytes", bytes.len()))?;
-    Ok(holochain_zome_types::signature::Signature::from(arr))
+    Ok(holochain_zome_types::prelude::Signature::from(arr))
 }

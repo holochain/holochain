@@ -425,7 +425,7 @@ fn hash_path_component() {
 #[test]
 #[cfg(test)]
 fn hash_path_typed_path_with_strategy() {
-    use holochain_integrity_types::{LinkType, ZomeIndex};
+    use holochain_integrity_types::prelude::{LinkType, ZomeIndex};
 
     // Test TypedPath creation with default strategy
     let path = Path::from("test.path");

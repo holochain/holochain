@@ -83,7 +83,7 @@ fn create_priv_msg(_: ()) -> ExternResult<ActionHash> {
 #[hdk_extern]
 fn get_activity(
     input: holochain_test_wasm_common::AgentActivitySearch,
-) -> ExternResult<holochain_zome_types::query::AgentActivity> {
+) -> ExternResult<holochain_zome_types::prelude::AgentActivityStatus> {
     get_agent_activity(input.agent, input.query, input.request, GetOptions::default())
 }
 

@@ -1,4 +1,4 @@
-use crate::Role;
+use crate::countersigning::Role;
 
 /// Errors related to the secure primitive macro.
 #[derive(Debug, PartialEq, Eq)]
@@ -27,7 +27,7 @@ pub enum CounterSigningError {
     /// There cannot be duplicates in the agents list.
     AgentsDupes(Vec<holo_hash::AgentPubKey>),
     /// The session times must validate.
-    CounterSigningSessionTimes(crate::CounterSigningSessionTimes),
+    CounterSigningSessionTimes(crate::countersigning::CounterSigningSessionTimes),
 }
 
 impl std::error::Error for CounterSigningError {}

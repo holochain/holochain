@@ -2,11 +2,8 @@
 
 use holo_hash::{AgentPubKey, EntryHash};
 use holochain_timestamp::Timestamp;
-use holochain_zome_types::{
-    cell::CellId,
-    prelude::PreflightRequest,
-    record::{SignedAction, SignedActionHashed},
-};
+use holochain_zome_types::prelude::SignedAction;
+use holochain_zome_types::{cell::CellId, prelude::PreflightRequest, prelude::SignedActionHashed};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

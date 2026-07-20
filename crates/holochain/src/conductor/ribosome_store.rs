@@ -2,7 +2,7 @@
 
 use crate::core::ribosome::Ribosome;
 use holochain_types::{prelude::*, share::RwShare};
-use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::prelude::EntryDef;
 use std::collections::{HashMap, HashSet};
 
 /// A store for ribosomes and entry definitions.

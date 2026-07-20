@@ -37,7 +37,7 @@ pub struct IntegratedOpSummary {
     /// Authored timestamp of the underlying action or warrant.
     pub authored_timestamp: Timestamp,
     /// Terminal validation status for this op.
-    pub validation_status: holochain_zome_types::action::OpValidity,
+    pub validation_status: OpValidity,
     /// When the op was received (used for the integration-delay metric).
     pub when_received: Timestamp,
     /// Combined validation attempts captured before promotion.
@@ -130,6 +130,7 @@ pub use holochain_data::models::dht::{
     K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow,
     SliceHashIndexedRow,
 };
+use holochain_zome_types::prelude::{Action, ActionData, OpValidity, SignedActionHashed};
 
 /// Per-DNA store for the DHT database.
 ///
@@ -550,7 +551,7 @@ impl DhtStore<DbWrite<Dht>> {
                 DhtOp::ChainOp(chain_op) => {
                     let signed_action = chain_op.signed_action();
                     let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.data());
-                    let sah = holochain_zome_types::action::SignedActionHashed::with_presigned(
+                    let sah = SignedActionHashed::with_presigned(
                         holo_hash::HoloHashed::with_pre_hashed(
                             signed_action.data().clone(),
                             action_hash.clone(),
@@ -837,8 +838,8 @@ impl DhtStore<DbWrite<Dht>> {
                 .map_err(StateMutationError::from)?;
             if promoted_ok {
                 let validation_status = match row.sys_validation_status {
-                    Some(2) => holochain_zome_types::action::OpValidity::Rejected,
-                    _ => holochain_zome_types::action::OpValidity::Accepted,
+                    Some(2) => OpValidity::Rejected,
+                    _ => OpValidity::Accepted,
                 };
                 // Warrant basis = warrantee (AgentPubKey hash).
                 let warrantee = holo_hash::AgentPubKey::from_raw_36(row.warrantee.clone());
@@ -928,7 +929,7 @@ impl DhtStore<DbWrite<Dht>> {
     /// row matches (the op is still in limbo), marks both sys and app validation
     /// status as Rejected on `LimboChainOp`.
     pub async fn reject_chain_ops(&self, op_hashes: Vec<DhtOpHash>) -> StateMutationResult<()> {
-        use holochain_zome_types::action::OpValidity;
+        use OpValidity;
 
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
         for hash in op_hashes {
@@ -1048,10 +1049,8 @@ where
 /// Returns an error if the action does not reference an entry hash, which
 /// would indicate a programmer error (calling this for an `OpEntry::ActionOnly`
 /// variant).
-fn entry_hash_from_chain_op_action(
-    action: &holochain_zome_types::action::Action,
-) -> StateMutationResult<holo_hash::EntryHash> {
-    use holochain_zome_types::action::ActionData;
+fn entry_hash_from_chain_op_action(action: &Action) -> StateMutationResult<holo_hash::EntryHash> {
+    use ActionData;
     match &action.data {
         ActionData::Create(d) => Ok(d.entry_hash.clone()),
         ActionData::Update(d) => Ok(d.entry_hash.clone()),
@@ -1095,7 +1094,7 @@ fn chain_op_basis_hash_from_row(op_type: i64, raw: Vec<u8>) -> holo_hash::AnyLin
     }
 }
 
-/// Compute the terminal [`OpValidity`](holochain_zome_types::action::OpValidity)
+/// Compute the terminal [`OpValidity`](OpValidity)
 /// for a limbo chain op row.
 ///
 /// The schema's ready-for-integration predicate accepts a row when:
@@ -1105,8 +1104,8 @@ fn chain_op_basis_hash_from_row(op_type: i64, raw: Vec<u8>) -> holo_hash::AnyLin
 /// Any rejection maps to `Rejected`; otherwise `Accepted`.
 fn compute_chain_op_validation_status(
     row: &holochain_data::models::dht::LimboChainOpRow,
-) -> holochain_zome_types::action::OpValidity {
-    use holochain_zome_types::action::OpValidity as RecordValidity;
+) -> OpValidity {
+    use OpValidity as RecordValidity;
     if row.sys_validation_status == Some(2) {
         return RecordValidity::Rejected;
     }
@@ -1202,7 +1201,7 @@ impl DhtStore<DbWrite<Dht>> {
         withhold_publish: Option<bool>,
     ) -> StateMutationResult<()> {
         use holochain_data::dht::InsertChainOp;
-        use holochain_zome_types::action::RecordValidity;
+        use holochain_zome_types::prelude::RecordValidity;
 
         let op_hash = op.as_hash().clone();
         let serialized_size = holochain_serialized_bytes::encode(op.as_content())
@@ -1215,7 +1214,7 @@ impl DhtStore<DbWrite<Dht>> {
 
         let signed_action = chain_op.signed_action();
         let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.data());
-        let sah = holochain_zome_types::action::SignedActionHashed::with_presigned(
+        let sah = SignedActionHashed::with_presigned(
             holo_hash::HoloHashed::with_pre_hashed(
                 signed_action.data().clone(),
                 action_hash.clone(),
@@ -1275,7 +1274,7 @@ impl DhtStore<DbWrite<Dht>> {
         withhold_publish: Option<bool>,
     ) -> StateMutationResult<()> {
         use holochain_data::dht::InsertChainOp;
-        use holochain_zome_types::action::RecordValidity;
+        use holochain_zome_types::prelude::RecordValidity;
 
         let op_hash = op.as_hash().clone();
         let serialized_size = holochain_serialized_bytes::encode(op.as_content())

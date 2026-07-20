@@ -15,6 +15,7 @@ use holo_hash::HasHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::StateMutationResult;
+use holochain_timestamp::Timestamp;
 use holochain_types::op::ChainOp;
 use holochain_types::op::DhtOp;
 use holochain_types::op::DhtOpHashed;
@@ -22,24 +23,18 @@ use holochain_types::op::OpEntry;
 use holochain_types::record::SignedActionHashedExt;
 use holochain_types::record::WireRecordOps;
 use holochain_types::wire_ops::WireOps;
-use holochain_zome_types::action::Action;
-use holochain_zome_types::action::ActionData;
-use holochain_zome_types::action::AppEntryDef;
-use holochain_zome_types::action::EntryType;
-use holochain_zome_types::action::SignedAction;
-use holochain_zome_types::dna_def::{DnaDef, DnaDefHashed};
-use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::fixt::{
     ActionFixturator, AgentValidationPkgAction, CreateAction, DnaAction,
 };
-use holochain_zome_types::judged::Judged;
-use holochain_zome_types::record::SignedActionHashed;
-use holochain_zome_types::timestamp::Timestamp;
+use holochain_zome_types::prelude::{
+    Action, ActionData, AppEntryDef, DnaDef, DnaDefHashed, Entry, EntryType, EntryVisibility,
+    Judged, SignedAction, SignedActionHashed,
+};
 use std::collections::HashSet;
 use std::sync::Arc;
 use {
     hdk::prelude::AppEntryBytesFixturator, holo_hash::HashableContentExtSync,
-    holochain_serialized_bytes::SerializedBytes, holochain_zome_types::Entry,
+    holochain_serialized_bytes::SerializedBytes,
 };
 
 #[tokio::test(flavor = "multi_thread")]
@@ -802,9 +797,9 @@ impl TestCase {
         let signature = chain_op.signed_action().signature().clone();
         let op_type = chain_op.op_type();
         let entry = match chain_op.op_entry() {
-            Some(OpEntry::Present(e)) => Some(
-                holochain_zome_types::entry::EntryHashed::from_content_sync(e.clone()),
-            ),
+            Some(OpEntry::Present(e)) => {
+                Some(holochain_zome_types::prelude::EntryHashed::from_content_sync(e.clone()))
+            }
             _ => None,
         };
 

@@ -20,7 +20,7 @@ use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::IncompleteCommitReason;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
-use holochain_zome_types::record::Record;
+use holochain_zome_types::prelude::Record;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 

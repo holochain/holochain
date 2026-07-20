@@ -4,9 +4,14 @@ use crate::prelude::*;
 use ::fixt::prelude::*;
 use ::fixt::*;
 use holo_hash::fixt::*;
+use holochain_integrity_types::prelude::{
+    ActionData, ActionHeader, AgentValidationPkgData, CloseChainData, CreateData, CreateLinkData,
+    DeleteData, DeleteLinkData, DnaData, InitZomesCompleteData, OpenChainData, UpdateData,
+};
 use holochain_serialized_bytes::prelude::SerializedBytes;
 use rand::Rng;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::convert::TryFrom;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -366,7 +371,6 @@ fixturator!(
         )
     };
 );
-use std::convert::TryFrom;
 
 fixturator!(
     AppEntryBytes;
@@ -387,13 +391,6 @@ fixturator!(
             .next()
             .unwrap()
         ).unwrap();
-);
-
-fixturator!(
-    CrdtType;
-    curve Empty CrdtType;
-    curve Unpredictable CrdtType;
-    curve Predictable CrdtType;
 );
 
 fixturator!(
@@ -475,11 +472,6 @@ fixturator!(
     MigrationTarget;
     variants [ Dna(DnaHash) Agent(AgentPubKey) ];
 );
-
-use crate::action::{
-    ActionData, ActionHeader, AgentValidationPkgData, CloseChainData, CreateData, CreateLinkData,
-    DeleteData, DeleteLinkData, DnaData, InitZomesCompleteData, OpenChainData, UpdateData,
-};
 
 // Build an [`Action`] directly from a common [`ActionHeader`] plus a
 // per-variant [`ActionData`]. The variant is chosen by the fixturator index so

@@ -1284,7 +1284,7 @@ async fn app_validation_produces_warrants() {
         1
     );
 
-    let activity: holochain_zome_types::query::AgentActivity = conductors[2]
+    let activity: holochain_zome_types::query::AgentActivityStatus = conductors[2]
         .call(
             &carol.zome(SweetInlineZomes::COORDINATOR),
             "get_agent_activity",
@@ -1413,7 +1413,7 @@ async fn skip_issuing_warrant_if_one_found() {
         .unwrap();
 
     // Now Carol should be able to get Alice's activity, including the warrant, from Bob.
-    let _activity: holochain_zome_types::query::AgentActivity = conductors[2]
+    let _activity: holochain_zome_types::query::AgentActivityStatus = conductors[2]
         .call(
             &carol.zome(SweetInlineZomes::COORDINATOR),
             "get_agent_activity",

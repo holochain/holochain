@@ -1,7 +1,7 @@
 use holo_hash::ActionHash;
 use holochain::sweettest::{await_consistency_s, SweetConductorBatch, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::query::AgentActivity;
+use holochain_zome_types::query::AgentActivityStatus;
 use holochain_zome_types::query::ChainStatus;
 use matches::assert_matches;
 
@@ -46,7 +46,7 @@ async fn get_agent_activity() {
         .await
         .unwrap();
 
-    let agent_activity: AgentActivity = conductor_batch[1]
+    let agent_activity: AgentActivityStatus = conductor_batch[1]
         .call(
             &bob_cell.zome(TestWasm::Crd.coordinator_zome_name()),
             "get_agent_activity",

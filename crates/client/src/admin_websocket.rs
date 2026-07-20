@@ -16,9 +16,9 @@ use holochain_types::{
     },
 };
 use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketSender};
-use holochain_zome_types::{
-    capability::GrantedFunctions,
-    prelude::{DnaDef, GrantZomeCallCapabilityPayload},
+use holochain_zome_types::prelude::{
+    CapAccess, DnaDef, GrantZomeCallCapabilityPayload, GrantedFunctions, ZomeCallCapGrant,
+    CAP_SECRET_BYTES,
 };
 use kitsune2_api::Url;
 use serde::{Deserialize, Serialize};
@@ -558,7 +558,6 @@ impl AdminWebsocket {
         &self,
         request: AuthorizeSigningCredentialsPayload,
     ) -> ConductorApiResult<crate::signing::client_signing::SigningCredentials> {
-        use holochain_zome_types::capability::{ZomeCallCapGrant, CAP_SECRET_BYTES};
         use rand::{rngs::OsRng, RngCore};
         use std::collections::BTreeSet;
 
@@ -574,7 +573,7 @@ impl AdminWebsocket {
             cell_id: request.cell_id,
             cap_grant: ZomeCallCapGrant {
                 tag: "zome-call-signing-key".to_string(),
-                access: holochain_zome_types::capability::CapAccess::Assigned {
+                access: CapAccess::Assigned {
                     secret: cap_secret.into(),
                     assignees: BTreeSet::from([signing_agent_key.clone()]),
                 },

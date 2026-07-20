@@ -1,7 +1,7 @@
 //! # Source Chain Filtering
 //! Types for filtering the source chain.
 
-use crate::MigrationTarget;
+use crate::action::MigrationTarget;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;

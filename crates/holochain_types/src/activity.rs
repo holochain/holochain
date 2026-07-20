@@ -1,15 +1,11 @@
 //! Types for agents chain activity
 
-use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
+use holo_hash::{ActionHash, HasHash};
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::action::ActionHashed;
-// Explicit: disambiguates from the `Op` variant struct `AgentActivity` that
-// `holochain_zome_types`'s own prelude glob brings in by default for this
-// name; this file specifically needs the richer `get_agent_activity`
-// query-response type.
-use holochain_zome_types::prelude::*;
-use holochain_zome_types::query::AgentActivity;
+use holochain_zome_types::prelude::{
+    ActionHashed, AgentActivityStatus, ChainStatus, HighestObserved, Record, SignedWarrant,
+};
 
 /// An agents chain records returned from a agent_activity_query
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -121,7 +117,7 @@ impl ChainItems {
     }
 }
 
-impl From<AgentActivityResponse> for AgentActivity {
+impl From<AgentActivityResponse> for AgentActivityStatus {
     fn from(a: AgentActivityResponse) -> Self {
         let valid_activity = match a.valid_activity {
             ChainItems::Full(records) => records
@@ -149,7 +145,7 @@ impl From<AgentActivityResponse> for AgentActivity {
     }
 }
 
-/// A helper trait to allow [Record]s, [SignedActionHashed]s, and [ActionHashed]s to be converted into [ChainItems]
+/// A helper trait to allow [`Record`]s, [`SignedActionHashed`](holochain_zome_types::prelude::SignedActionHashed)s, and [`ActionHashed`]s to be converted into [`ChainItems`]
 /// without needing to know which source type is being operated on.
 pub trait ChainItemsSource {
     /// Convert a source type into a [ChainItems] value.
@@ -181,6 +177,7 @@ impl ChainItemsSource for Vec<(u32, ActionHash)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use holochain_zome_types::prelude::ChainHead;
 
     #[test]
     fn empty_response_detection() {

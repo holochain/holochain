@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use holochain_integrity_types::LinkTypeFilter;
+use holochain_integrity_types::prelude::LinkTypeFilter;
 use holochain_wasmer_guest::WasmError;
 use std::collections::HashMap;
 

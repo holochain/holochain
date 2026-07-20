@@ -1,11 +1,6 @@
 //! For more details see [`holochain_integrity_types::op`].
 
-use crate::prelude::{Deserialize, Serialize};
-
-#[doc(no_inline)]
-pub use holochain_integrity_types::op;
-#[doc(inline)]
-pub use holochain_integrity_types::op::*;
+use serde::{Deserialize, Serialize};
 
 /// This enum is used to encode just the enum variant of ChainOp
 #[allow(missing_docs)]

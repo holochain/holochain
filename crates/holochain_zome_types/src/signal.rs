@@ -1,7 +1,8 @@
 //! App-defined signals
 
-use crate::prelude::*;
 use holo_hash::AgentPubKey;
+use holochain_integrity_types::prelude::ExternIO;
+use holochain_serialized_bytes::prelude::*;
 
 /// A signal emitted by an app via `emit_signal`
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

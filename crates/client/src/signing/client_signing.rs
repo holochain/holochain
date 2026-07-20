@@ -2,9 +2,7 @@ use super::{AgentSigner, DynAgentSigner};
 use async_trait::async_trait;
 use ed25519_dalek::Signer;
 use holo_hash::AgentPubKey;
-use holochain_zome_types::{
-    capability::CapSecret, cell::CellId, dependencies::holochain_integrity_types::Signature,
-};
+use holochain_zome_types::prelude::{CapSecret, CellId, Signature};
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 

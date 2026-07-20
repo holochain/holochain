@@ -9,7 +9,7 @@ use holochain::sweettest::SweetInlineZomes;
 use holochain::sweettest::{await_consistency, SweetConductor, SweetDnaFile};
 use holochain::sweettest::{SweetConductorBatch, SweetLocalRendezvous};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
-use holochain_zome_types::record::Record;
+use holochain_zome_types::prelude::Record;
 
 /// Test that conductors with arcs clamped to zero do not gossip.
 #[tokio::test(flavor = "multi_thread")]

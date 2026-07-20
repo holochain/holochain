@@ -124,7 +124,7 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         author: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
+        filter: ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
         Box::pin(async {
             self.cell_by_parts(&dna_hash, &to_agent)

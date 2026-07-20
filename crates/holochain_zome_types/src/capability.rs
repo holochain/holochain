@@ -24,12 +24,14 @@
 //! information needed to refer to the capability as well as the secret needed
 //! to send to the Grantor.
 
-use crate::prelude::*;
+use crate::cell::CellId;
+use holo_hash::ActionHash;
+use holochain_integrity_types::prelude::{DesensitizedZomeCallCapGrant, ZomeCallCapGrant};
+use holochain_timestamp::Timestamp;
 use serde::{Deserialize, Serialize};
 
 mod grant;
 pub use grant::*;
-pub use holochain_integrity_types::capability::*;
 
 /// Parameters for granting a zome call capability.
 #[derive(Debug, Deserialize, Serialize)]

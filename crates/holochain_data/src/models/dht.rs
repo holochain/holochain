@@ -7,9 +7,8 @@
 //! [`holochain_integrity_types::action`] and
 //! [`holochain_zome_types::action`]).
 
-use holochain_integrity_types::action::RecordValidity;
-use holochain_integrity_types::entry::Entry;
-use holochain_zome_types::action::SignedActionHashed;
+use holochain_integrity_types::prelude::{Entry, RecordValidity};
+use holochain_zome_types::prelude::SignedActionHashed;
 
 /// Row from the `Action` table.
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
@@ -102,7 +101,7 @@ pub struct PrivateEntryRow {
 pub struct CapGrantRow {
     /// Hash of the `CapGrant` action (primary key).
     pub action_hash: Vec<u8>,
-    /// Encoded [`CapAccess`](holochain_integrity_types::action::CapAccess).
+    /// Encoded [`CapAccess`](holochain_integrity_types::action::CapAccessType).
     pub cap_access: i64,
     /// Optional human-readable tag.
     pub tag: Option<String>,

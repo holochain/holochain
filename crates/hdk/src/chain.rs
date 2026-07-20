@@ -14,15 +14,15 @@ pub use hdi::chain::*;
 ///
 /// If retrieving chain items along with the current state using
 /// [`ActivityRequest::Full`], the chain items in
-/// [`holochain_zome_types::query::AgentActivity::valid_activity`] and [`holochain_zome_types::query::AgentActivity::rejected_activity`]
+/// [`holochain_zome_types::query::AgentActivityStatus::valid_activity`] and [`holochain_zome_types::query::AgentActivityStatus::rejected_activity`]
 /// can be filtered with [`ChainQueryFilter`] like a local chain query. This
 /// filtering happens at the source before it sends the data to the receiver.
 ///
 /// Parameters:
 ///
 /// * `agent`: The agent to retrieve the status of.
-/// * `query`: An optional filter for the resulting [`holochain_zome_types::query::AgentActivity::valid_activity`]
-///   and [`holochain_zome_types::query::AgentActivity::rejected_activity`] values. This is only used when
+/// * `query`: An optional filter for the resulting [`holochain_zome_types::query::AgentActivityStatus::valid_activity`]
+///   and [`holochain_zome_types::query::AgentActivityStatus::rejected_activity`] values. This is only used when
 ///   the `request` argument is [`ActivityRequest::Full`].
 /// * `request`: The type of data to retrieve -- a summary of current state, or
 ///   the summary plus hashes of chain actions matching the filter.
@@ -31,7 +31,7 @@ pub fn get_agent_activity(
     query: ChainQueryFilter,
     request: ActivityRequest,
     options: GetOptions,
-) -> ExternResult<holochain_zome_types::query::AgentActivity> {
+) -> ExternResult<holochain_zome_types::query::AgentActivityStatus> {
     HDK.with(|h| {
         h.borrow()
             .get_agent_activity(GetAgentActivityInput::new(agent, query, request, options))

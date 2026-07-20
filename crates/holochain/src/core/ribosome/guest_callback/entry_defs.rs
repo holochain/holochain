@@ -187,7 +187,7 @@ mod slow_tests {
     use crate::test_utils::RibosomeTestFixture;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    pub use holochain_zome_types::entry_def::EntryVisibility;
+    pub use holochain_zome_types::prelude::EntryVisibility;
     use std::collections::BTreeMap;
 
     #[tokio::test(flavor = "multi_thread")]

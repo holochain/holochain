@@ -6,23 +6,14 @@
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
 use crate::action::ChainTopOrdering;
-use holochain_integrity_types::EntryDefIndex;
-use holochain_integrity_types::EntryType;
-use holochain_integrity_types::EntryVisibility;
-use holochain_integrity_types::ScopedEntryDefIndex;
-use holochain_integrity_types::ZomeIndex;
+use holochain_integrity_types::prelude::{
+    Entry, EntryDefIndex, EntryType, EntryVisibility, GetStrategy, ScopedEntryDefIndex, ZomeIndex,
+};
 use holochain_serialized_bytes::prelude::*;
-
-// Re-export GetStrategy from holochain_integrity_types for backward compatibility
-pub use holochain_integrity_types::get_strategy::GetStrategy;
 
 /// Maximum number of remote agents that can be queried in parallel.
 /// This limit prevents abuse and excessive network load.
 pub const MAX_REMOTE_AGENT_COUNT: u8 = 5;
-
-mod app_entry_bytes;
-pub use app_entry_bytes::*;
-pub use holochain_integrity_types::entry::*;
 
 /// Either an [`EntryDefIndex`] or one of:
 /// - [EntryType::CapGrant]
@@ -36,10 +27,10 @@ pub enum EntryDefLocation {
     /// App defined entries always have a unique [`u8`] index
     /// within the Dna.
     App(AppEntryDefLocation),
-    /// [`CapClaim`](holochain_integrity_types::EntryDefId::CapClaim) is committed to and
+    /// [`CapClaim`](holochain_integrity_types::prelude::EntryDefId::CapClaim) is committed to and
     /// validated by all integrity zomes in the dna.
     CapClaim,
-    /// [`CapGrant`](holochain_integrity_types::EntryDefId::CapGrant) is committed to and
+    /// [`CapGrant`](holochain_integrity_types::prelude::EntryDefId::CapGrant) is committed to and
     /// validated by all integrity zomes in the dna.
     CapGrant,
 }
@@ -182,7 +173,7 @@ pub struct CreateInput {
     /// The visibility of this entry.
     pub entry_visibility: EntryVisibility,
     /// Entry body.
-    pub entry: crate::entry::Entry,
+    pub entry: Entry,
     /// ChainTopBehaviour for the write.
     pub chain_top_ordering: ChainTopOrdering,
 }
@@ -214,8 +205,8 @@ impl CreateInput {
     }
 }
 
-impl AsRef<crate::Entry> for CreateInput {
-    fn as_ref(&self) -> &crate::Entry {
+impl AsRef<Entry> for CreateInput {
+    fn as_ref(&self) -> &Entry {
         &self.entry
     }
 }

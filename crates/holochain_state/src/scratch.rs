@@ -3,13 +3,11 @@ use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holochain_keystore::KeystoreError;
+use holochain_zome_types::prelude::{Record, SignedActionHashed};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 use thiserror::Error;
-
-use holochain_zome_types::record::Record;
-use holochain_zome_types::record::SignedActionHashed;
 
 /// The "scratch" is an in-memory space to stage Actions to be committed at the
 /// end of the CallZome workflow.

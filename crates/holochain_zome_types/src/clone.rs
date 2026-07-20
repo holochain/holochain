@@ -3,7 +3,7 @@
 use crate::cell::{CellId, CloneId};
 use derive_more::Display;
 use holo_hash::DnaHash;
-use holochain_integrity_types::DnaModifiers;
+use holochain_integrity_types::prelude::{DnaModifiers, MembraneProof};
 
 /// The arguments to create a clone of an existing cell.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -14,9 +14,10 @@ pub struct CreateCloneCellInput {
     /// At least one of the modifiers must be set to obtain a distinct hash for
     /// the clone cell's DNA.
     #[cfg(feature = "properties")]
-    pub modifiers: holochain_integrity_types::DnaModifiersOpt<crate::properties::YamlProperties>,
+    pub modifiers:
+        holochain_integrity_types::prelude::DnaModifiersOpt<crate::properties::YamlProperties>,
     /// Optionally set a proof of membership for the clone cell
-    pub membrane_proof: Option<holochain_integrity_types::MembraneProof>,
+    pub membrane_proof: Option<MembraneProof>,
     /// Optionally a name for the DNA clone
     pub name: Option<String>,
 }

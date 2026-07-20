@@ -2,12 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use holo_hash::AgentPubKey;
 use holochain_conductor_api::ZomeCallParamsSigned;
-use holochain_zome_types::{
-    capability::CapSecret,
-    cell::CellId,
-    dependencies::holochain_integrity_types::Signature,
-    zome_io::{ExternIO, ZomeCallParams},
-};
+use holochain_zome_types::prelude::{CapSecret, CellId, ExternIO, Signature, ZomeCallParams};
 use std::sync::Arc;
 
 pub(crate) mod client_signing;
