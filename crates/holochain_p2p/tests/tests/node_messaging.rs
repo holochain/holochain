@@ -250,7 +250,7 @@ impl HcP2pHandler for EchoingActivityHandler {
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
         _author: AgentPubKey,
-        _filter: holochain_zome_types::chain::ChainFilter,
+        _filter: holochain_zome_types::prelude::ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
         Box::pin(std::future::pending())
     }
