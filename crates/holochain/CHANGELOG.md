@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: `holochain_zome_types::query::AgentActivity`, the response type of `hdk::chain::get_agent_activity`, is renamed to `AgentActivityStatus`. This resolves a name collision with the unrelated `AgentActivity` `Op` variant struct.
+- **BREAKING CHANGE**: `holochain_integrity_types::action::CapAccess` (the `CapGrant.cap_access` column discriminant) is renamed to `CapAccessType`. This resolves a name collision with `holochain_integrity_types::capability::CapAccess`, the data-carrying grant-access type used by `ZomeCallCapGrant`, which keeps the `CapAccess` name. \#5882
+- Remove the unused `holochain_zome_types::crdt::CrdtType` placeholder type.
+- **BREAKING CHANGE**: `holochain_integrity_types` no longer re-exports its prelude (or `Entry`) at the crate root, and `holochain_zome_types` drops its own crate-root `Action`/`Entry` re-exports. In `holochain_zome_types`, modules that only re-exported `holochain_integrity_types` types (`chain`, `countersigning`, `crdt`, `genesis`, `record`, `trace`) are removed, and modules that previously re-exported their `holochain_integrity_types` counterpart wholesale (`action`, `capability`, `entry`, `entry_def`, `link`, `op`, `warrant`, `x_salsa20_poly1305`, `zome_io`, and others) no longer do so. Code that imported shared types via a module-qualified `holochain_zome_types::<module>::...` or bare `holochain_integrity_types::...` path should import from `holochain_zome_types::prelude` / `holochain_integrity_types::prelude` (or the type's owning module) instead. `hdi`/`hdk` zome code that only uses `hdi::prelude`/`hdk::prelude` is unaffected.
+
 ## 0.7.0-rc.2
 
 ## 0.7.0-rc.1
