@@ -25,11 +25,12 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::CreateRecord(OpRecord::CreateLink {
             link_type: LinkTypes::AuthorPath,
-            base_address,
-            target_address,
-            tag,
+            action,
             ..
         }) => {
+            let base_address = action.data.base_address.clone();
+            let target_address = action.data.target_address.clone();
+            let tag = action.data.tag.clone();
             let tag_bytes = SerializedBytes::from(UnsafeBytes::from(tag.clone().into_inner()));
 
             if base_address.clone().into_entry_hash().is_none() {
@@ -56,11 +57,12 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         }
         FlatOp::CreateRecord(OpRecord::CreateLink {
             link_type: LinkTypes::AuthorBook,
-            base_address,
-            target_address,
-            tag,
+            action,
             ..
         }) => {
+            let base_address = action.data.base_address.clone();
+            let target_address = action.data.target_address.clone();
+            let tag = action.data.tag.clone();
             if TryInto::<String>::try_into(tag.clone()).is_err() {
                 Ok(ValidateCallbackResult::Invalid(format!(
                     "Link's tag of '{tag:?}' was not a valid string",

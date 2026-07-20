@@ -76,40 +76,40 @@ pub fn validate_create_link_by_must_get_agent_activity(
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::Link(OpLink::CreateLink {
-            base_address,
-            target_address,
-            link_type,
-            ..
-        }) => match link_type {
-            LinkTypes::LinkValidationCallsMustGetValidRecord => {
-                validate_create_link_by_must_get_valid_record(base_address)
+        FlatOp::Link(link @ OpLink::CreateLink { link_type, .. }) => {
+            let base_address = link.base_address().clone();
+            let target_address = link.target_address().clone();
+            match link_type {
+                LinkTypes::LinkValidationCallsMustGetValidRecord => {
+                    validate_create_link_by_must_get_valid_record(base_address)
+                }
+                LinkTypes::LinkValidationCallsMustGetActionThenEntry => {
+                    validate_create_link_by_must_get_action_then_entry(base_address)
+                }
+                LinkTypes::LinkValidationCallsMustGetAgentActivity => {
+                    validate_create_link_by_must_get_agent_activity(base_address, target_address)
+                }
+                _ => Ok(ValidateCallbackResult::Valid),
             }
-            LinkTypes::LinkValidationCallsMustGetActionThenEntry => {
-                validate_create_link_by_must_get_action_then_entry(base_address)
-            }
-            LinkTypes::LinkValidationCallsMustGetAgentActivity => {
-                validate_create_link_by_must_get_agent_activity(base_address, target_address)
-            }
-            _ => Ok(ValidateCallbackResult::Valid),
-        },
+        }
         FlatOp::CreateRecord(OpRecord::CreateLink {
-            base_address,
-            target_address,
-            link_type,
-            ..
-        }) => match link_type {
-            LinkTypes::LinkValidationCallsMustGetValidRecord => {
-                validate_create_link_by_must_get_valid_record(base_address)
+            action, link_type, ..
+        }) => {
+            let base_address = action.data.base_address.clone();
+            let target_address = action.data.target_address.clone();
+            match link_type {
+                LinkTypes::LinkValidationCallsMustGetValidRecord => {
+                    validate_create_link_by_must_get_valid_record(base_address)
+                }
+                LinkTypes::LinkValidationCallsMustGetActionThenEntry => {
+                    validate_create_link_by_must_get_action_then_entry(base_address)
+                }
+                LinkTypes::LinkValidationCallsMustGetAgentActivity => {
+                    validate_create_link_by_must_get_agent_activity(base_address, target_address)
+                }
+                _ => Ok(ValidateCallbackResult::Valid),
             }
-            LinkTypes::LinkValidationCallsMustGetActionThenEntry => {
-                validate_create_link_by_must_get_action_then_entry(base_address)
-            }
-            LinkTypes::LinkValidationCallsMustGetAgentActivity => {
-                validate_create_link_by_must_get_agent_activity(base_address, target_address)
-            }
-            _ => Ok(ValidateCallbackResult::Valid),
-        },
+        }
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }

@@ -22,11 +22,9 @@ pub enum LinkTypes {
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         // This is a pretty pointless example as everything is valid.
-        FlatOp::Link(OpLink::CreateLink {
-            base_address,
-            target_address,
-            ..
-        }) => {
+        FlatOp::Link(link @ OpLink::CreateLink { .. }) => {
+            let base_address = link.base_address().clone();
+            let target_address = link.target_address().clone();
             let base: MaybeLinkable =
                 must_get_entry(base_address.into_entry_hash().expect("must be entry hash"))?
                     .try_into()?;
@@ -44,7 +42,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 _ => ValidateCallbackResult::Invalid("base never validates".to_string()),
             })
         }
-        FlatOp::Link(OpLink::DeleteLink { base_address, .. }) => {
+        FlatOp::Link(link @ OpLink::DeleteLink { .. }) => {
+            let base_address = link.base_address().clone();
             let base: MaybeLinkable =
                 must_get_entry(base_address.into_entry_hash().expect("must be entry hash"))?
                     .try_into()?;

@@ -121,9 +121,6 @@
 //!         )),
 //!     },
 //!     FlatOp::Link(OpLink::CreateLink {
-//!         base_address: _,
-//!         target_address: _,
-//!         tag: _,
 //!         link_type,
 //!         action: _,
 //!     }) => match link_type {
