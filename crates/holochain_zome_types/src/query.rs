@@ -3,8 +3,8 @@
 use crate::prelude::*;
 use holo_hash::EntryHash;
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
-use holochain_integrity_types::{LinkTag, LinkTypeFilter};
-pub use holochain_serialized_bytes::prelude::*;
+use holochain_integrity_types::prelude::{LinkTag, LinkTypeFilter};
+use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_common::WasmError;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -101,14 +101,14 @@ pub struct LinkQuery {
 /// An agent's status and chain records returned from a `hdk::chain::get_agent_activity`
 /// query.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct AgentActivity {
+pub struct AgentActivityStatus {
     /// Actions on this chain seen as valid by this authority, matching the
     /// filters passed to the query, as a vector of
     /// `(action_sequence, action_hash)` tuples.
     ///
     /// **Note**: This may include actions seen as _invalid_ by authorities
     /// who have validated _other_ DHT operations for the actions. Check the
-    /// [`AgentActivity::warrants`] field for warrants against any of these
+    /// [`AgentActivityStatus::warrants`] field for warrants against any of these
     /// actions for a full picture of their validity.
     pub valid_activity: Vec<(u32, ActionHash)>,
     /// Actions on this chain seen as invalid by this authority, matching the
@@ -119,7 +119,7 @@ pub struct AgentActivity {
     /// chain head, last valid action, and any forks, irrespective of
     /// what chain actions match the filters. **Note**: warrants received from
     /// other sources are not reflected in this status; check the value of the
-    /// [`AgentActivity::warrants`] field.
+    /// [`AgentActivityStatus::warrants`] field.
     pub status: ChainStatus,
     /// The highest chain action that has been observed by this authority,
     /// irrespective of the filters. This includes actions that have been
@@ -136,7 +136,7 @@ pub struct AgentActivity {
 /// When calling `hdk::chain::get_agent_activity`, specify whether to get either a
 /// summary of the chain's status, or a summary plus the hashes of the chain
 /// actions that match the given [`ChainQueryFilter`]. See the notes on
-/// [`AgentActivity`] about the perspective-dependent nature of the agent's
+/// [`AgentActivityStatus`] about the perspective-dependent nature of the agent's
 /// status and valid/rejected activity.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub enum ActivityRequest {
@@ -151,17 +151,17 @@ pub enum ActivityRequest {
 
 /// The highest action sequence for an agent's chain that has been
 /// _observed_, but not necessarily validated and integrated, by this
-/// authority. This struct is seen in the [`AgentActivity`] response from
+/// authority. This struct is seen in the [`AgentActivityStatus`] response from
 /// the `hdk::chain::get_agent_activity` query. It also includes the hash(es) of
 /// the action(s) at this action sequence.
 ///
 /// Because it may come from an unintegrated DHT operation, a given hash
 /// shouldn't be used as a dependency when constructing another action that
 /// depends on its validity. Instead, check that the hash exists in
-/// [`AgentActivity::valid_activity`] and does not exist in
-/// [`AgentActivity::warrants`]; this will tell you that the action has been
+/// [`AgentActivityStatus::valid_activity`] and does not exist in
+/// [`AgentActivityStatus::warrants`]; this will tell you that the action has been
 /// integrated and presumably found valid by all validators. It's also
-/// recommended to check that [`AgentActivity::status`] is [`ChainStatus::Valid`].
+/// recommended to check that [`AgentActivityStatus::status`] is [`ChainStatus::Valid`].
 #[derive(Clone, Debug, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]
 pub struct HighestObserved {
     /// The highest sequence number observed.
@@ -186,7 +186,7 @@ pub enum ChainStatus {
     /// highest integrated action is at the given action sequence and action
     /// hash. This does not indicate that the chain is valid from the
     /// perspective of _all_ authorities; check the contents of
-    /// [`AgentActivity::warrants`] for notices of invalidity found by
+    /// [`AgentActivityStatus::warrants`] for notices of invalidity found by
     /// other authorities.
     Valid(ChainHead),
     /// The chain is forked at the given action sequence by at least two
@@ -195,17 +195,17 @@ pub enum ChainStatus {
     ///
     /// The chain may also have invalid records in addition to being forked;
     /// in this case, `Forked` is still used. To check for invalid records,
-    /// look at the value of [`AgentActivity::warrants`] and/or call
+    /// look at the value of [`AgentActivityStatus::warrants`] and/or call
     /// `hdk::chain::get_agent_activity` with [`ActivityRequest::Full`] and look
-    /// at the values in [`AgentActivity::rejected_activity`].
+    /// at the values in [`AgentActivityStatus::rejected_activity`].
     Forked(ChainFork),
     /// The chain is not forked, but is invalid from the given action sequence
     /// and action hash forward, by virtue of this authority finding a
-    /// [`AgentActivity`] DHT operation for that action to be
+    /// [`AgentActivityStatus`] DHT operation for that action to be
     /// invalid. There may be other types of operations for the chain's
     /// actions which other authorities have found to be invalid; this
     /// information is not reflected here but is instead found in the
-    /// [`AgentActivity::warrants`] field.
+    /// [`AgentActivityStatus::warrants`] field.
     Invalid(ChainHead),
     /// The chain is valid (as for [`ChainStatus::Valid`]) and additionally its
     /// head is a `CloseChain` action, meaning the author has closed their
@@ -482,13 +482,12 @@ impl LinkQuery {
 #[cfg(feature = "fixturators")]
 mod tests {
     use super::ChainQueryFilter;
-    use crate::action::EntryType;
     use crate::fixt::{AppEntryDefFixturator, CreateAction, CreateLinkAction, UpdateAction};
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::EntryHashFixturator;
     use holo_hash::HasHash;
-    use holochain_integrity_types::action::ActionHashed;
+    use holochain_integrity_types::prelude::{ActionHashed, EntryType};
 
     /// Create hashed actions with various properties. The `Action`s are built
     /// directly (header + `ActionData`), seeded from the per-variant

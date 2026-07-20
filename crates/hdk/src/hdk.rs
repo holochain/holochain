@@ -27,7 +27,7 @@ pub trait HdkT: HdiT {
     fn get_agent_activity(
         &self,
         get_agent_activity_input: GetAgentActivityInput,
-    ) -> ExternResult<holochain_zome_types::query::AgentActivity>;
+    ) -> ExternResult<holochain_zome_types::query::AgentActivityStatus>;
     fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>>;
     // Ed25519
     fn sign(&self, sign: Sign) -> ExternResult<Signature>;
@@ -116,7 +116,7 @@ mockall::mock! {
         fn get_agent_activity(
             &self,
             get_agent_activity_input: GetAgentActivityInput,
-        ) -> ExternResult<holochain_zome_types::query::AgentActivity>;
+        ) -> ExternResult<holochain_zome_types::prelude::AgentActivityStatus>;
         fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>>;
         // Ed25519
         fn sign(&self, sign: Sign) -> ExternResult<Signature>;
@@ -312,7 +312,7 @@ impl HdkT for ErrHdk {
     fn get_agent_activity(
         &self,
         _: GetAgentActivityInput,
-    ) -> ExternResult<holochain_zome_types::query::AgentActivity> {
+    ) -> ExternResult<holochain_zome_types::query::AgentActivityStatus> {
         Self::err()
     }
     fn query(&self, _: ChainQueryFilter) -> ExternResult<Vec<Record>> {
@@ -550,8 +550,8 @@ impl HdkT for HostHdk {
     fn get_agent_activity(
         &self,
         get_agent_activity_input: GetAgentActivityInput,
-    ) -> ExternResult<holochain_zome_types::query::AgentActivity> {
-        host_call::<GetAgentActivityInput, holochain_zome_types::query::AgentActivity>(
+    ) -> ExternResult<holochain_zome_types::query::AgentActivityStatus> {
+        host_call::<GetAgentActivityInput, holochain_zome_types::query::AgentActivityStatus>(
             __hc__get_agent_activity_1,
             get_agent_activity_input,
         )

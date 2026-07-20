@@ -4,9 +4,7 @@ use crate::prelude::*;
 use holochain_keystore::KeystoreError;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
-use holochain_zome_types::action::CloseChainData;
-use holochain_zome_types::entry::EntryHashed;
-use holochain_zome_types::warrant::SignedWarrant;
+use holochain_zome_types::prelude::{CloseChainData, EntryHashed, SignedWarrant};
 
 /// The record-serving response to a get-record request.
 ///
@@ -170,7 +168,7 @@ mod tests {
     use super::SignedActionHashedExt;
     use crate::prelude::*;
     use holo_hash::{AgentPubKey, DnaHash, HasHash, HoloHashed};
-    use holochain_zome_types::action::{ActionHeader, DnaData};
+    use holochain_zome_types::prelude::{ActionHeader, DnaData};
 
     fn sample_action() -> Action {
         Action {

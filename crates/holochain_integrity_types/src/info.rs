@@ -1,11 +1,9 @@
 //! Information about the current zome and dna.
-use crate::action::ZomeIndex;
-use crate::zome::ZomeName;
-use crate::DnaModifiers;
-use crate::EntryDefIndex;
-use crate::EntryDefs;
-use crate::FunctionName;
-use crate::LinkType;
+use crate::action::{EntryDefIndex, ZomeIndex};
+use crate::dna_modifiers::DnaModifiers;
+use crate::entry_def::EntryDefs;
+use crate::link::LinkType;
+use crate::zome::{FunctionName, ZomeName};
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 

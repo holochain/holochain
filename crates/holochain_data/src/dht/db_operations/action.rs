@@ -5,8 +5,8 @@ use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
 use crate::models::dht::AgentActivityItem;
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, EntryHash};
-use holochain_integrity_types::action::RecordValidity;
-use holochain_zome_types::action::SignedActionHashed;
+use holochain_integrity_types::prelude::RecordValidity;
+use holochain_zome_types::prelude::SignedActionHashed;
 
 impl DbWrite<Dht> {
     /// Insert an `Action` row, storing its signature and pre-computed hash.

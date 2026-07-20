@@ -2,9 +2,7 @@ use crate::AgentSigner;
 use anyhow::Result;
 use async_trait::async_trait;
 use holo_hash::AgentPubKey;
-use holochain_zome_types::{
-    capability::CapSecret, cell::CellId, dependencies::holochain_integrity_types::Signature,
-};
+use holochain_zome_types::prelude::{CapSecret, CellId, Signature};
 use lair_keystore_api::LairClient;
 use parking_lot::RwLock;
 use std::collections::HashMap;

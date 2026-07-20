@@ -604,8 +604,7 @@ mod test {
     use holochain_keystore::AgentPubKeyExt;
     use holochain_timestamp::Timestamp;
     use holochain_types::prelude::PreflightRequest;
-    use holochain_zome_types::countersigning::PreflightResponse;
-    use holochain_zome_types::prelude::CreateBase;
+    use holochain_zome_types::prelude::{CreateBase, PreflightResponse};
     use matches::assert_matches;
     use std::time::Duration;
 

@@ -3,8 +3,8 @@
 use crate::op::ChainOpType;
 use crate::signature::Signed;
 use holo_hash::*;
-use holochain_integrity_types::Signature;
-pub use holochain_serialized_bytes::prelude::*;
+use holochain_integrity_types::prelude::Signature;
+use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
 
 /// A Warrant is an authored, timestamped proof of wrongdoing by another agent.

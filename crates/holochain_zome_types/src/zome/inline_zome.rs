@@ -6,14 +6,19 @@
 
 // TODO: move entire module to `holochain_types`
 
-use crate::prelude::*;
-pub use error::*;
+use crate::zome_io::HostFnApiT;
+use holo_hash::{blake2b_256, InlineHash};
+use holochain_integrity_types::prelude::{
+    EntryDef, EntryDefsCallbackResult, ExternIO, FunctionName,
+};
+use holochain_serialized_bytes::prelude::*;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
 mod error;
+pub use error::*;
 
 pub type BoxApi = Box<dyn HostFnApiT>;
 
@@ -254,7 +259,7 @@ impl std::hash::Hash for DynInlineZome {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::GetOptions;
+    use crate::prelude::{GetInput, GetOptions};
     use ::fixt::fixt;
     use holo_hash::fixt::ActionHashFixturator;
     use holo_hash::AnyDhtHash;

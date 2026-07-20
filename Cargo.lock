@@ -3077,6 +3077,7 @@ dependencies = [
  "holochain",
  "holochain_conductor_api",
  "holochain_nonce",
+ "holochain_serialized_bytes",
  "holochain_types",
  "holochain_wasm_test_utils",
  "holochain_websocket",

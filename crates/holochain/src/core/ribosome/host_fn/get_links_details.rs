@@ -80,9 +80,7 @@ pub mod slow_tests {
     use crate::test_utils::RibosomeTestFixture;
     use holo_hash::ActionHash;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::action::ActionData;
-    use holochain_zome_types::link::LinkDetails;
-    use holochain_zome_types::record::SignedActionHashed;
+    use holochain_zome_types::prelude::{ActionData, LinkDetails, SignedActionHashed};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {

@@ -136,8 +136,7 @@ mod tests {
     use holochain_trace;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
-    use holochain_zome_types::action::ActionData;
-    use holochain_zome_types::Action;
+    use holochain_zome_types::prelude::{Action, ActionData};
     use matches::assert_matches;
 
     #[tokio::test(flavor = "multi_thread")]

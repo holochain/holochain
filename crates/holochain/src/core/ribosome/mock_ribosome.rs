@@ -2,11 +2,9 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult;
 use crate::core::ribosome::{CallContext, Invocation, MockRibosomeImplT, Ribosome};
 use hdk::prelude::{DnaModifiers, ValidateCallbackResult};
-use holochain_zome_types::dna_def::{DnaDefBuilder, DnaDefHashed};
-use holochain_zome_types::info::NetworkSeed;
-use holochain_zome_types::init::InitCallbackResult;
-use holochain_zome_types::prelude::FunctionName;
-use holochain_zome_types::zome_io::ExternIO;
+use holochain_zome_types::prelude::{
+    DnaDefBuilder, DnaDefHashed, ExternIO, FunctionName, InitCallbackResult, NetworkSeed,
+};
 use mockall::predicate::{always, eq};
 use std::sync::Arc;
 

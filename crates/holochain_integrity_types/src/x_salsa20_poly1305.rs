@@ -1,10 +1,13 @@
-use crate::prelude::*;
+use encrypted_data::XSalsa20Poly1305EncryptedData;
+use holo_hash::AgentPubKey;
+use holochain_serialized_bytes::prelude::*;
+use x25519::X25519PubKey;
+
 pub mod data;
 pub mod encrypted_data;
 pub mod key_ref;
 pub mod nonce;
 pub mod x25519;
-use holochain_serialized_bytes::prelude::*;
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct XSalsa20Poly1305Decrypt {

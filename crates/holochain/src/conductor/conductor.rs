@@ -2301,7 +2301,7 @@ mod scheduler_impls {
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
     use holochain_conductor_api::{CellInfo, JsonDump};
-    use holochain_zome_types::Entry;
+    use holochain_zome_types::prelude::Entry;
     use kitsune2_api::{SpaceId, TransportStats};
     use std::sync::atomic::Ordering;
 

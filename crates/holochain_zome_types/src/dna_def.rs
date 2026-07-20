@@ -6,7 +6,8 @@ use crate::zome::ZomeError;
 #[cfg(feature = "full-dna-def")]
 use holo_hash::*;
 #[cfg(feature = "full-dna-def")]
-use holochain_integrity_types::DnaModifiersBuilder;
+use holochain_integrity_types::prelude::DnaModifiersBuilder;
+use holochain_serialized_bytes::prelude::*;
 #[cfg(feature = "unstable-migration")]
 use std::collections::HashSet;
 
@@ -342,9 +343,7 @@ impl HashableContent for DnaDef {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
-    use holochain_serialized_bytes::prelude::*;
 
     #[test]
     fn test_update_modifiers() {

@@ -1,16 +1,15 @@
-use crate::countersigning::{ActionBase, CounterSigningError, CounterSigningSessionData};
 use crate::signature::Signed;
 use crate::timestamp::Timestamp;
-use conversions::WrongActionError;
 use holo_hash::{ActionHash, AgentPubKey, EntryHash};
-use holochain_integrity_types::record::SignedHashed;
+use holochain_integrity_types::prelude::{
+    Action, ActionBase, ActionData, ActionHeader, CounterSigningAgents, CounterSigningError,
+    CounterSigningSessionData, CreateData, UpdateData, WrongActionError,
+};
 use holochain_serialized_bytes::prelude::*;
 use thiserror::Error;
 
-pub use holochain_integrity_types::action::*;
-
-/// The canonical action content type: a common header plus per-variant data.
-pub use holochain_integrity_types::action::{Action, ActionData};
+/// An [`Action`] with its [`Signature`](holochain_integrity_types::signature::Signature) (no hash).
+pub type SignedAction = Signed<Action>;
 
 #[derive(Error, Debug)]
 pub enum ActionError {
@@ -141,7 +140,7 @@ pub fn build_action_set(
 ) -> Result<Vec<Action>, CounterSigningError> {
     let mut actions = vec![];
     let mut build_actions =
-        |countersigning_agents: &crate::countersigning::CounterSigningAgents| -> Result<(), CounterSigningError> {
+        |countersigning_agents: &CounterSigningAgents| -> Result<(), CounterSigningError> {
             for (agent, _role) in countersigning_agents.iter() {
                 actions.push(from_countersigning_data(
                     entry_hash.clone(),
@@ -155,9 +154,3 @@ pub fn build_action_set(
     build_actions(&session_data.preflight_request().optional_signing_agents)?;
     Ok(actions)
 }
-
-/// An [`Action`] with its [`crate::signature::Signature`] (no hash).
-pub type SignedAction = Signed<Action>;
-
-/// An [`Action`] that is both hashed and signed.
-pub type SignedActionHashed = SignedHashed<Action>;

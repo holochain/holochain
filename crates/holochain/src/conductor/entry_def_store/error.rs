@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 use crate::core::ribosome::error::RibosomeError;
-use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::prelude::ZomeName;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

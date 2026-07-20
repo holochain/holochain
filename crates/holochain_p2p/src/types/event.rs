@@ -2,7 +2,7 @@
 //! Module containing incoming events from HolochainP2p.
 
 use crate::*;
-use holochain_zome_types::signature::Signature;
+use holochain_zome_types::prelude::Signature;
 
 /// GetLinks options help control how the get is processed at various levels.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -132,7 +132,7 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         author: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
+        filter: ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>>;
 
     /// A remote node has sent us a validation receipt.

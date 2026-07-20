@@ -9,10 +9,6 @@ use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
 use crate::countersigning::CounterSigningSessionData;
-use crate::AppEntryDef;
-use crate::EntryDefIndex;
-use crate::EntryType;
-use crate::ZomeIndex;
 use holo_hash::hash_type;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -22,8 +18,10 @@ use holo_hash::HashableContentBytes;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
-mod error;
 pub use app_entry_bytes::*;
+
+mod error;
+use crate::action::{AppEntryDef, EntryDefIndex, EntryType, ZomeIndex};
 pub use error::*;
 
 /// Entries larger than this number of bytes cannot be created

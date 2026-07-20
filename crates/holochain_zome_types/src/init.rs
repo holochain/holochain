@@ -5,7 +5,7 @@
 //! Init fail: <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/init_fail/src/lib.rs>
 
 use crate::call::CallbackResult;
-use holochain_integrity_types::UnresolvedDependencies;
+use holochain_integrity_types::prelude::UnresolvedDependencies;
 use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_common::{WasmError, WasmErrorInner};
 

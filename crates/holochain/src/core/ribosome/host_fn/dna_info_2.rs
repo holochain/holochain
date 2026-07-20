@@ -4,7 +4,7 @@ use crate::core::ribosome::RibosomeError;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::info::DnaInfoV2;
+use holochain_zome_types::prelude::DnaInfoV2;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -43,6 +43,7 @@ pub fn dna_info_2(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
+    use holochain_serialized_bytes::SerializedBytes;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetZome;

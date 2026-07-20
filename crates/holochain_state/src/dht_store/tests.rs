@@ -3,16 +3,11 @@ use holo_hash::{ActionHash, AnyLinkableHash, DnaHash, EntryHash};
 use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use holochain_types::prelude::Signature;
 use holochain_types::wire_ops::{RenderedOp, RenderedOps};
-// This test module seeds the op-cache/limbo pipeline directly with
-// `ChainOp`/`DhtOp`, building actions (header + `ActionData`) directly.
-use holochain_zome_types::action::{
-    Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
-    SignedAction, UpdateData,
+use holochain_zome_types::prelude::{
+    Action, ActionData, ActionHeader, AppEntryDef, ChainOpType, CreateData, CreateLinkData,
+    DeleteData, DeleteLinkData, EntryType, EntryVisibility, SignedAction, UpdateData,
+    ValidationStatus,
 };
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::op::ChainOpType;
-use holochain_zome_types::prelude::{AppEntryDef, EntryType};
-use holochain_zome_types::validate::ValidationStatus;
 use std::sync::Arc;
 
 fn dht_id() -> Dht {
@@ -565,7 +560,7 @@ async fn integrate_ready_ops_promotes_ready_chain_op() {
     assert_eq!(row.when_integrated, 999);
     assert_eq!(
         row.validation_status,
-        i64::from(holochain_zome_types::action::RecordValidity::Accepted)
+        i64::from(holochain_zome_types::prelude::RecordValidity::Accepted)
     );
 }
 
@@ -1161,7 +1156,7 @@ async fn op_validation_status_reads_decided_limbo_op() {
 
 #[tokio::test]
 async fn reject_chain_op_rejects_integrated_op() {
-    use holochain_zome_types::action::RecordValidity;
+    use holochain_zome_types::prelude::RecordValidity;
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let op = build_test_store_record_op_hashed(100);
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
@@ -1206,7 +1201,7 @@ async fn reject_chain_op_rejects_integrated_op() {
 
 #[tokio::test]
 async fn reject_chain_op_no_op_for_locally_validated_integrated_op() {
-    use holochain_zome_types::action::RecordValidity;
+    use holochain_zome_types::prelude::RecordValidity;
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let op = build_test_store_record_op_hashed(102);
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
@@ -1522,10 +1517,7 @@ async fn record_locally_validated_warrants_inserts_warrant() {
         .find(|s| s.op_hash == *warrant_op.as_hash())
         .expect("warrant not integrated");
     assert_eq!(summary.warrantee.as_ref(), Some(&expected_warrantee));
-    assert_eq!(
-        summary.validation_status,
-        holochain_zome_types::action::OpValidity::Accepted
-    );
+    assert_eq!(summary.validation_status, OpValidity::Accepted);
 
     let row = store
         .db()
@@ -2016,7 +2008,7 @@ fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHa
             target_address: target,
             zome_index: 0.into(),
             link_type: 0.into(),
-            tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
+            tag: holochain_zome_types::prelude::LinkTag(vec![1, 2, 3]),
         }),
     };
     let rendered =
@@ -2142,7 +2134,7 @@ fn make_create_link_op(base: &AnyLinkableHash, seed: u8) -> DhtOpHashed {
             ),
             zome_index: 0.into(),
             link_type: 0.into(),
-            tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
+            tag: holochain_zome_types::prelude::LinkTag(vec![1, 2, 3]),
         }),
     };
     DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::CreateLink(
@@ -2276,7 +2268,7 @@ fn build_cached_create_link(base: &holo_hash::AnyLinkableHash, seed: u8) -> Rend
             ),
             zome_index: 0.into(),
             link_type: 0.into(),
-            tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
+            tag: holochain_zome_types::prelude::LinkTag(vec![1, 2, 3]),
         }),
     };
     let rendered = RenderedOp::new(
@@ -2431,7 +2423,7 @@ async fn integrate_upgrades_cached_op_to_locally_validated() {
             ),
             zome_index: 0.into(),
             link_type: 0.into(),
-            tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
+            tag: holochain_zome_types::prelude::LinkTag(vec![1, 2, 3]),
         }),
     };
     let sig = Signature::from([6u8; 64]);

@@ -9,7 +9,6 @@
 #![deny(missing_docs)]
 // We have a lot of usages of type aliases to `&String`, which clippy objects to.
 #![allow(clippy::ptr_arg)]
-#![allow(non_local_definitions)]
 
 pub mod access;
 pub mod activity;
@@ -44,5 +43,3 @@ pub mod network;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 pub mod websocket;
-
-pub use holochain_zome_types::entry::EntryHashed;

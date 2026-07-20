@@ -165,10 +165,7 @@ fn create_entry_op_rejects_private_entry() {
         0.into(),
         EntryVisibility::Private,
     ));
-    let sa = SignedAction::new(
-        private_create,
-        holochain_zome_types::signature::Signature::from([0u8; 64]),
-    );
+    let sa = SignedAction::new(private_create, Signature::from([0u8; 64]));
 
     for withheld in [OpEntry::Hidden, OpEntry::ActionOnly] {
         assert_matches!(

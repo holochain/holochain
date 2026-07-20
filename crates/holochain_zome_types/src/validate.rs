@@ -1,5 +1,4 @@
 use crate::prelude::*;
-pub use holochain_integrity_types::validate::*;
 use holochain_wasmer_common::*;
 
 /// The validation status for an op or record

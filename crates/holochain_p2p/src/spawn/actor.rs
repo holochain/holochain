@@ -170,7 +170,7 @@ impl event::HcP2pHandler for WrapEvtSender {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         agent: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
+        filter: ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
         timing_trace!(
             true,
@@ -3263,7 +3263,7 @@ mod tests {
             _dna_hash: DnaHash,
             _to_agent: AgentPubKey,
             _author: AgentPubKey,
-            _filter: holochain_zome_types::chain::ChainFilter,
+            _filter: ChainFilter,
         ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
             // Increment counter
             let mut count = self.handle_must_get_agent_activity_count.lock().unwrap();

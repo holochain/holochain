@@ -54,7 +54,4 @@ macro_rules! impl_try_from_random {
     };
 }
 
-impl_try_from_random!(
-    CapSecret,
-    holochain_zome_types::capability::CAP_SECRET_BYTES
-);
+impl_try_from_random!(CapSecret, holochain_zome_types::prelude::CAP_SECRET_BYTES);

@@ -4,7 +4,7 @@ use crate::dna::wasm::DnaWasm;
 use crate::prelude::*;
 use crate::record::SignedActionHashedExt;
 use holochain_keystore::MetaLairClient;
-use holochain_zome_types::action::{
+use holochain_zome_types::prelude::{
     ActionHeader, AgentValidationPkgData, CreateData, DnaData, InitZomesCompleteData, UpdateData,
 };
 pub use holochain_zome_types::test_utils::*;

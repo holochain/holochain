@@ -3,8 +3,8 @@
 //! These models represent WASM bytecode, DNA definitions, zomes, and entry definitions.
 use holo_hash::hash_type::Zome;
 use holo_hash::{DnaHash, InlineHash, WasmHash, ZomeHash};
-use holochain_integrity_types::{
-    zome::ZomeName, AppEntryName, DnaModifiers, EntryDef, EntryDefId, EntryVisibility,
+use holochain_integrity_types::prelude::{
+    AppEntryName, DnaModifiers, EntryDef, EntryDefId, EntryVisibility, ZomeName,
 };
 use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
 use holochain_types::prelude::CellId;

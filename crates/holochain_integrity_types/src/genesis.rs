@@ -5,7 +5,7 @@
 //! joining to ensure that they can catch any problems they can before being
 //! subject to the scrutiny of their peers and facing possible rejection.
 
-use crate::DnaInfoV1;
+use crate::info::DnaInfoV1;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 

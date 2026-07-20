@@ -15,11 +15,9 @@ use holochain::{
 use holochain_timestamp::Timestamp;
 use holochain_types::op::{DhtOp, DhtOpHashed};
 use holochain_types::prelude::WarrantOp;
-use holochain_zome_types::op::ChainOpType;
-use holochain_zome_types::prelude::{ChainIntegrityWarrant, Warrant};
-use holochain_zome_types::record::SignedActionHashed;
-use holochain_zome_types::warrant::WarrantProof;
-use holochain_zome_types::Entry;
+use holochain_zome_types::prelude::{
+    ChainIntegrityWarrant, ChainOpType, Entry, SignedActionHashed, Warrant, WarrantProof,
+};
 use serde::{Deserialize, Serialize};
 
 // Alice creates an invalid op and publishes it to Bob. Bob issues a warrant and
@@ -318,7 +316,7 @@ mod zero_arc {
     use super::*;
     use hdk::prelude::{AgentActivity as OpAgentActivity, BlockTargetId};
     use holochain::prelude::DisabledAppReason;
-    use holochain_zome_types::query::AgentActivity;
+    use holochain_zome_types::query::AgentActivityStatus;
 
     // Alice creates an invalid op, Bob receives it and issues a warrant.
     // Carol is a zero arc node and makes a get_agent_activity request to Bob.
@@ -373,7 +371,7 @@ mod zero_arc {
         // and Carol might contact Alice first before finding Bob.
         retry_fn_until_timeout(
             || async {
-                let alice_activity: Result<AgentActivity, _> = carol_conductor
+                let alice_activity: Result<AgentActivityStatus, _> = carol_conductor
                     .call_fallible(
                         &carol_cell.zome(SweetInlineZomes::COORDINATOR),
                         "get_agent_activity",
@@ -456,7 +454,7 @@ mod zero_arc {
         // and Carol might contact Alice first before finding Bob.
         retry_fn_until_timeout(
             || async {
-                let result: Result<AgentActivity, _> = carol_conductor
+                let result: Result<AgentActivityStatus, _> = carol_conductor
                     .call_fallible(
                         &carol_cell.zome(SweetInlineZomes::COORDINATOR),
                         "get_agent_activity",

@@ -1,6 +1,6 @@
 //! The `OpRecord` type; see the description in the [`crate::flat_op`] parent module.
 use super::*;
-use holochain_integrity_types::MigrationTarget;
+use holochain_integrity_types::prelude::MigrationTarget;
 
 /// Data specific to the [`Op::CreateRecord`](holochain_integrity_types::op::Op::CreateRecord)
 /// operation.

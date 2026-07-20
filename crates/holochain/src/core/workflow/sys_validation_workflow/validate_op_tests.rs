@@ -13,10 +13,6 @@ use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
-// This module builds op-pipeline types (`ChainOp`/`DhtOp`) directly and feeds
-// them to `validate_op`. The `fixt!(Action, <Variant>Action)` fixturators yield
-// `Action` values (an `ActionHeader` + `ActionData` envelope) that are
-// authored, hashed, and signed.
 use holochain_zome_types::fixt::{
     ActionFixturator, AgentValidationPkgAction, CloseChainAction, CreateAction, CreateLinkAction,
     DeleteAction, DeleteLinkAction, DnaAction, InitZomesCompleteAction, UpdateAction,
@@ -669,7 +665,7 @@ async fn validate_valid_store_record_with_no_entry() {
     *create_action.entry_type_mut().unwrap() = EntryType::CapClaim;
     let op = ChainOp::CreateRecord(
         signed(create_action, fixt!(Signature)),
-        to_op_entry(holochain_zome_types::record::RecordEntry::NotStored),
+        to_op_entry(RecordEntry::NotStored),
     )
     .into();
 
@@ -713,9 +709,7 @@ async fn validate_store_record_leaks_entry() {
     });
     let op = ChainOp::CreateRecord(
         signed(create_action, fixt!(Signature)),
-        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
-            Entry::App(fixt!(AppEntryBytes)),
-        )),
+        to_op_entry(RecordEntry::Present(Entry::App(fixt!(AppEntryBytes)))),
     )
     .into();
 
@@ -756,9 +750,7 @@ async fn validate_store_record_with_entry_having_wrong_entry_type() {
     *create_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
     let op = ChainOp::CreateRecord(
         signed(create_action, fixt!(Signature)),
-        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
-            app_entry,
-        )),
+        to_op_entry(RecordEntry::Present(app_entry)),
     )
     .into();
 
@@ -814,9 +806,7 @@ async fn validate_store_record_with_entry_having_wrong_entry_hash() {
 
     let op = ChainOp::CreateRecord(
         signed(create_action, fixt!(Signature)),
-        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
-            mismatched_entry,
-        )),
+        to_op_entry(RecordEntry::Present(mismatched_entry)),
     )
     .into();
 
@@ -878,9 +868,7 @@ async fn validate_store_record_with_large_entry() {
     *create_action.entry_hash_mut().unwrap() = entry_hash.as_hash().clone();
     let op = ChainOp::CreateRecord(
         signed(create_action, fixt!(Signature)),
-        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
-            app_entry,
-        )),
+        to_op_entry(RecordEntry::Present(app_entry)),
     )
     .into();
 
@@ -952,9 +940,7 @@ async fn validate_valid_store_record_update() {
     }
     let op = ChainOp::CreateRecord(
         signed(update_action, fixt!(Signature)),
-        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
-            app_entry,
-        )),
+        to_op_entry(RecordEntry::Present(app_entry)),
     )
     .into();
 
@@ -1014,9 +1000,7 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
     }
     let op = ChainOp::CreateRecord(
         signed(update_action, fixt!(Signature)),
-        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
-            app_entry,
-        )),
+        to_op_entry(RecordEntry::Present(app_entry)),
     )
     .into();
 
@@ -1097,9 +1081,7 @@ async fn validate_store_record_update_changes_entry_type() {
     }
     let op = ChainOp::CreateRecord(
         signed(update_action.clone(), fixt!(Signature)),
-        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
-            app_entry,
-        )),
+        to_op_entry(RecordEntry::Present(app_entry)),
     )
     .into();
 

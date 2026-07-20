@@ -21,17 +21,11 @@ pub mod bytes;
 pub mod call;
 pub mod capability;
 pub mod cell;
-#[allow(missing_docs)]
-pub mod chain;
 pub mod clone;
-pub mod countersigning;
-#[allow(missing_docs)]
-pub mod crdt;
 pub mod dna_def;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
-pub mod genesis;
 #[allow(missing_docs)]
 pub mod info;
 #[allow(missing_docs)]
@@ -45,14 +39,12 @@ pub mod prelude;
 #[cfg(feature = "properties")]
 pub mod properties;
 pub mod query;
-pub mod record;
 pub mod request;
 /// Schedule functions to run outside a direct zome call.
 pub mod schedule;
 pub mod signal;
 pub mod signature;
 pub use holochain_timestamp as timestamp;
-pub mod trace;
 #[allow(missing_docs)]
 pub mod validate;
 pub mod warrant;
@@ -69,12 +61,3 @@ pub mod fixt;
 
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
-
-pub use action::Action;
-pub use entry::Entry;
-
-/// Re-exported dependencies
-pub mod dependencies {
-    pub use ::holochain_integrity_types;
-    pub use ::subtle;
-}

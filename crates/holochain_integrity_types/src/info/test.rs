@@ -1,5 +1,5 @@
 use super::*;
-use crate::UnitEnum;
+use crate::op::UnitEnum;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum LinkTypes {

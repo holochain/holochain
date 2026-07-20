@@ -7,8 +7,7 @@ use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holochain_keystore::KeystoreError;
 use holochain_types::prelude::*;
-use holochain_zome_types::countersigning::CounterSigningError;
-use holochain_zome_types::countersigning::CounterSigningSessionData;
+use holochain_zome_types::prelude::{CounterSigningError, CounterSigningSessionData};
 use std::convert::TryFrom;
 use thiserror::Error;
 

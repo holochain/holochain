@@ -568,7 +568,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
         author: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
+        filter: ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
         Box::pin(async {
             let store = self.space.dht_store.as_read();

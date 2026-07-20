@@ -7,7 +7,6 @@ use holo_hash::{
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::*;
-use holochain_zome_types::Entry;
 
 /// How an entry is represented inside a `ChainOp`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
@@ -472,9 +471,9 @@ mod op_hash_tests {
     use super::*;
     use holo_hash::{ActionHash, AgentPubKey, EntryHash};
     use holochain_timestamp::Timestamp;
-    use holochain_zome_types::prelude::{AppEntryDef, EntryType, EntryVisibility};
-    use holochain_zome_types::signature::Signature;
-    use holochain_zome_types::Entry;
+    use holochain_zome_types::prelude::{
+        AppEntryDef, Entry, EntryType, EntryVisibility, Signature,
+    };
 
     fn create_action() -> Action {
         Action {
@@ -622,10 +621,10 @@ mod produce_ops_tests {
     use super::*;
     use holo_hash::{ActionHash, AgentPubKey, EntryHash, HoloHashed};
     use holochain_timestamp::Timestamp;
-    use holochain_zome_types::prelude::{AppEntryDef, EntryType, EntryVisibility};
-    use holochain_zome_types::record::{Record, RecordEntry, SignedHashed};
-    use holochain_zome_types::signature::Signature;
-    use holochain_zome_types::Entry;
+    use holochain_zome_types::prelude::{
+        AppEntryDef, Entry, EntryType, EntryVisibility, Record, RecordEntry, Signature,
+        SignedHashed,
+    };
 
     fn create_action() -> Action {
         Action {

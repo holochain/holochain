@@ -8,14 +8,12 @@ use holochain_types::access::Permission;
 use holochain_types::prelude::CellId;
 use holochain_types::prelude::ExternIO;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::prelude::Timestamp;
-use holochain_zome_types::signal::RemoteSignal;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome_io::ZomeCallParams;
+use holochain_zome_types::prelude::{RemoteSignal, FunctionName, ZomeCallParams};
 use std::sync::Arc;
 use tracing::Instrument;
 use wasmer::RuntimeError;
 use holo_hash::HasHash;
+use holochain_timestamp::Timestamp;
 
 #[cfg_attr(
     feature = "instrument",

@@ -24,16 +24,13 @@ use holochain_types::{
     wire_ops::{RenderedOp, RenderedOps, WireOps},
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::action::{ActionData, DeleteData, SignedAction};
-use holochain_zome_types::op::{AgentActivity, CreateLink, Delete, Op};
-use holochain_zome_types::{
-    chain::{ChainFilter, MustGetAgentActivityInput},
-    dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
-    entry::MustGetActionInput,
-    fixt::{ActionFixturator, CreateAction, CreateLinkAction, DeleteAction, SignatureFixturator},
-    judged::Judged,
-    record::SignedActionHashed,
-    validate::ValidationStatus,
+use holochain_zome_types::fixt::{
+    ActionFixturator, CreateAction, CreateLinkAction, DeleteAction, SignatureFixturator,
+};
+use holochain_zome_types::prelude::{
+    ActionData, AgentActivity, ChainFilter, CreateLink, Delete, DeleteData, Judged,
+    MustGetActionInput, MustGetAgentActivityInput, Op, SignedAction, SignedActionHashed,
+    UnresolvedDependencies, ValidateCallbackResult, ValidationStatus,
 };
 use matches::assert_matches;
 use std::{sync::Arc, time::Duration};

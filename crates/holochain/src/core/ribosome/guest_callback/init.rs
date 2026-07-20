@@ -238,6 +238,7 @@ mod slow_tests {
     use ::fixt::prelude::*;
     use assert2::{assert, let_assert};
     use holo_hash::ActionHash;
+    use holochain_serialized_bytes::SerializedBytes;
     use holochain_types::app::DisableCloneCellPayload;
     use holochain_types::inline_zome::InlineZomeSet;
     use holochain_types::prelude::CreateCloneCellPayload;

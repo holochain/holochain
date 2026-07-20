@@ -3,9 +3,7 @@
 #![allow(missing_docs)]
 
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_zome_types::action::conversions::WrongActionError;
-use holochain_zome_types::action::{Action, ActionType};
-use holochain_zome_types::op::ChainOpType;
+use holochain_zome_types::prelude::{Action, ActionType, ChainOpType, WrongActionError};
 use thiserror::Error;
 
 #[derive(Debug, Error)]

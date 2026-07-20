@@ -5,6 +5,9 @@
 //! through limbo (`LimboWarrantOp`) so the local conductor can validate them
 //! regardless of arc coverage.
 
+use super::action_indexes::insert_action_indexes;
+use super::DhtStore;
+use crate::mutations::{StateMutationError, StateMutationResult};
 use holo_hash::HasHash;
 use holochain_data::dht::{InsertChainOp, InsertLimboWarrant};
 use holochain_data::kind::Dht;
@@ -12,11 +15,7 @@ use holochain_data::DbWrite;
 use holochain_types::prelude::Timestamp;
 use holochain_types::warrant::WarrantOp;
 use holochain_types::wire_ops::RenderedOps;
-use holochain_zome_types::action::RecordValidity;
-
-use super::action_indexes::insert_action_indexes;
-use super::DhtStore;
-use crate::mutations::{StateMutationError, StateMutationResult};
+use holochain_zome_types::prelude::RecordValidity;
 
 impl DhtStore<DbWrite<Dht>> {
     /// Insert a batch of chain ops into the DHT store cache.
@@ -127,15 +126,10 @@ mod tests {
     use holochain_types::prelude::{AppEntryBytes, Entry, EntryHashed, Signature};
     use holochain_types::warrant::WarrantOp;
     use holochain_types::wire_ops::{RenderedOp, RenderedOps};
-    use holochain_zome_types::action::{
-        Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
-        UpdateData,
-    };
-    use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::op::ChainOpType;
-    use holochain_zome_types::prelude::EntryType;
     use holochain_zome_types::prelude::{
-        AppEntryDef, ChainIntegrityWarrant, SignedWarrant, Warrant, WarrantProof,
+        Action, ActionData, ActionHeader, AppEntryDef, ChainIntegrityWarrant, ChainOpType,
+        CreateData, CreateLinkData, DeleteData, DeleteLinkData, EntryType, EntryVisibility,
+        LinkTag, SignedWarrant, UpdateData, Warrant, WarrantProof,
     };
     use std::sync::Arc;
 
@@ -224,7 +218,7 @@ mod tests {
                 target_address: target,
                 zome_index: 0.into(),
                 link_type: 0.into(),
-                tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
+                tag: LinkTag(vec![1, 2, 3]),
             }),
         );
 

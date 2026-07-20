@@ -613,9 +613,9 @@ mod tests {
     use crate::test_utils::set_zome_types;
     use crate::test_utils::short_hand::{e, public_app_entry_def};
     use holo_hash::{ActionHash, AgentPubKey, DnaHash, EntryHash};
-    use holochain_integrity_types::record::{RecordEntry, SignedHashed};
-    use holochain_integrity_types::signature::Signature;
-    use holochain_integrity_types::{EntryType, LinkTag, LinkType, ZomeIndex};
+    use holochain_integrity_types::prelude::{
+        EntryType, LinkTag, LinkType, RecordEntry, Signature, SignedHashed, ZomeIndex,
+    };
 
     #[hdk_entry_helper]
     #[derive(Clone, PartialEq, Eq)]

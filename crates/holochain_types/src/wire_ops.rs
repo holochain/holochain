@@ -4,8 +4,10 @@
 use crate::error::{DhtOpError, DhtOpResult};
 use crate::op::HashedChainOp;
 use crate::warrant::WarrantOp;
-use holochain_zome_types::op::ChainOpType;
-use holochain_zome_types::prelude::*;
+use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::prelude::{
+    Action, ChainOpType, EntryHashed, Signature, SignedActionHashed, ValidationStatus,
+};
 
 /// Condensed version of ops for sending across the wire.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
@@ -73,16 +75,13 @@ impl RenderedOp {
     /// The entry (if any) is carried separately on the parent [`RenderedOps`],
     /// so it is not attached here.
     pub fn new(
-        action: holochain_zome_types::action::Action,
+        action: Action,
         signature: Signature,
         validation_status: Option<ValidationStatus>,
         op_type: ChainOpType,
     ) -> DhtOpResult<Self> {
         let action_hashed = holo_hash::HoloHashed::from_content_sync(action);
-        let signed_action = holochain_zome_types::action::SignedActionHashed::with_presigned(
-            action_hashed,
-            signature,
-        );
+        let signed_action = SignedActionHashed::with_presigned(action_hashed, signature);
         let op = HashedChainOp::from_signed_action(signed_action, op_type, None)
             .ok_or(DhtOpError::OpTypeActionMismatch(op_type))?;
         Ok(Self {

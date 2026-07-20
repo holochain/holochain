@@ -10,7 +10,8 @@
 //! and the validation status is the status of the DhtOp which that authority
 //! holds".
 
-use crate::prelude::*;
+use crate::validate::ValidationStatus;
+use holochain_serialized_bytes::prelude::*;
 
 /// Data with an optional validation status.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

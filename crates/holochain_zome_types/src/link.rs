@@ -1,7 +1,9 @@
-use crate::prelude::*;
+use crate::action::ChainTopOrdering;
+use crate::entry::GetOptions;
+use crate::query::LinkQuery;
 use holo_hash::{ActionHash, AgentPubKey};
-pub use holochain_integrity_types::link::*;
-use holochain_integrity_types::ZomeIndex;
+use holochain_integrity_types::link::LinkTypeFilter;
+use holochain_integrity_types::prelude::{LinkTag, LinkType, SignedActionHashed, ZomeIndex};
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
 
@@ -20,9 +22,9 @@ use holochain_timestamp::Timestamp;
 pub struct Link {
     /// The author of this link
     pub author: holo_hash::AgentPubKey,
-    /// The [AnyLinkableHash] being linked from
+    /// The [`AnyLinkableHash`](holo_hash::AnyLinkableHash) being linked from
     pub base: holo_hash::AnyLinkableHash,
-    /// The [AnyLinkableHash] being linked to
+    /// The [`AnyLinkableHash`](holo_hash::AnyLinkableHash) being linked to
     pub target: holo_hash::AnyLinkableHash,
     /// When the link was added
     pub timestamp: Timestamp,

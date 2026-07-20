@@ -1,6 +1,6 @@
 //! The `OpEntry` / `OpUpdate` / `OpDelete` types; see the description in the [`crate::flat_op`] parent module.
 use super::*;
-use holochain_integrity_types::{CapClaimEntry, CapGrantEntry};
+use holochain_integrity_types::prelude::{CapClaimEntry, CapGrantEntry};
 
 /// Data specific to the [`Op::CreateEntry`](holochain_integrity_types::op::Op::CreateEntry)
 /// operation.

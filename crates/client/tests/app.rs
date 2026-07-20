@@ -14,7 +14,7 @@ use holochain_types::{
     websocket::AllowedOrigins,
 };
 use holochain_websocket::ConnectRequest;
-use holochain_zome_types::dependencies::holochain_integrity_types::ExternIO;
+use holochain_zome_types::prelude::ExternIO;
 use kitsune2_api::{AgentInfoSigned, Url};
 use kitsune2_core::Ed25519Verifier;
 use serde::{Deserialize, Serialize};

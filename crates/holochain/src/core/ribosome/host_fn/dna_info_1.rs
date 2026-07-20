@@ -4,7 +4,7 @@ use crate::core::ribosome::RibosomeError;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::info::DnaInfoV1;
+use holochain_zome_types::prelude::DnaInfoV1;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -48,6 +48,7 @@ pub mod test {
     use crate::sweettest::SweetZome;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
+    use holochain_serialized_bytes::SerializedBytes;
 
     async fn test_conductor(properties: SerializedBytes) -> (SweetConductor, SweetZome) {
         let (dna_file, _, _) = SweetDnaFile::from_test_wasms(

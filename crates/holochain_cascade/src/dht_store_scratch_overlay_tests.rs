@@ -2,7 +2,7 @@ use super::*;
 use ::fixt::fixt;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::HoloHashed;
-use holochain_zome_types::action::{
+use holochain_zome_types::prelude::{
     Action, ActionData, ActionHeader, ChainTopOrdering, CreateData, CreateLinkData, DeleteData,
     DeleteLinkData, DnaData, SignedActionHashed,
 };
@@ -62,9 +62,7 @@ async fn dht_get_action_reflects_scratch_action() {
 /// `Create` action + entry returns that record without a network request.
 #[tokio::test]
 async fn dht_get_entry_reflects_scratch_create() {
-    use holochain_zome_types::action::EntryType;
-    use holochain_zome_types::entry::Entry;
-    use holochain_zome_types::prelude::EntryHashed;
+    use holochain_zome_types::prelude::{Entry, EntryHashed, EntryType};
 
     let store = empty_store().await;
 
@@ -117,22 +115,20 @@ async fn dht_get_entry_reflects_scratch_create() {
 /// The entry is included in the op so `retrieve_record` can locate it in
 /// the database when assembling `RecordDetails`.
 async fn integrate_store_record(
-    store: &holochain_state::dht_store::DhtStore,
+    store: &DhtStore,
     seed: u8,
     author: &AgentPubKey,
     entry_hash: holo_hash::EntryHash,
-    entry: holochain_zome_types::entry::Entry,
+    entry: Entry,
 ) -> ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
     use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
-    use holochain_zome_types::action::{AppEntryDef, SignedAction};
-    use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::prelude::Signature;
+    use holochain_zome_types::prelude::{AppEntryDef, EntryVisibility, Signature, SignedAction};
 
     let action = Action {
         header: ActionHeader {
             author: author.clone(),
-            timestamp: holochain_zome_types::prelude::Timestamp::from_micros(seed as i64 * 1000),
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
             action_seq: 1,
             prev_action: Some(holo_hash::ActionHash::from_raw_36(vec![
                 seed.wrapping_add(
@@ -142,7 +138,7 @@ async fn integrate_store_record(
             ])),
         },
         data: ActionData::Create(CreateData {
-            entry_type: holochain_zome_types::action::EntryType::App(AppEntryDef::new(
+            entry_type: EntryType::App(AppEntryDef::new(
                 0.into(),
                 0.into(),
                 EntryVisibility::Public,
@@ -175,22 +171,20 @@ async fn integrate_store_record(
 
 /// Helper: integrate a `CreateEntry` op for a `Create` action.
 async fn integrate_store_entry(
-    store: &holochain_state::dht_store::DhtStore,
+    store: &DhtStore,
     seed: u8,
     author: &AgentPubKey,
     entry_hash: holo_hash::EntryHash,
-    entry: holochain_zome_types::entry::Entry,
+    entry: Entry,
 ) -> ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
     use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
-    use holochain_zome_types::action::{AppEntryDef, SignedAction};
-    use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::prelude::Signature;
+    use holochain_zome_types::prelude::{AppEntryDef, EntryVisibility, Signature, SignedAction};
 
     let action = Action {
         header: ActionHeader {
             author: author.clone(),
-            timestamp: holochain_zome_types::prelude::Timestamp::from_micros(seed as i64 * 1000),
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
             action_seq: 1,
             prev_action: Some(holo_hash::ActionHash::from_raw_36(vec![
                 seed.wrapping_add(
@@ -200,7 +194,7 @@ async fn integrate_store_entry(
             ])),
         },
         data: ActionData::Create(CreateData {
-            entry_type: holochain_zome_types::action::EntryType::App(AppEntryDef::new(
+            entry_type: EntryType::App(AppEntryDef::new(
                 0.into(),
                 0.into(),
                 EntryVisibility::Public,
@@ -236,8 +230,6 @@ async fn integrate_store_entry(
 /// `RecordDetails` that includes the scratch delete.
 #[tokio::test]
 async fn get_record_details_reflects_scratch_delete() {
-    use holochain_zome_types::entry::Entry;
-
     let store = empty_store().await;
 
     let seed = 42u8;
@@ -305,7 +297,6 @@ async fn get_record_details_reflects_scratch_delete() {
 /// the scratch delete appears and `entry_dht_status` is `Dead`.
 #[tokio::test]
 async fn get_entry_details_reflects_scratch_delete() {
-    use holochain_zome_types::entry::Entry;
     use holochain_zome_types::metadata::EntryDhtStatus;
 
     let store = empty_store().await;
@@ -386,13 +377,12 @@ async fn integrate_link_op(
 ) -> holo_hash::ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
     use holochain_types::op::{ChainOp, DhtOp, DhtOpHashed};
-    use holochain_zome_types::action::SignedAction;
-    use holochain_zome_types::link::LinkTag;
+    use holochain_zome_types::prelude::SignedAction;
 
     let action = Action {
         header: ActionHeader {
             author: AgentPubKey::from_raw_36(vec![seed; 36]),
-            timestamp: holochain_zome_types::prelude::Timestamp::from_micros(seed as i64 * 1000),
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
             action_seq: 2,
             prev_action: Some(holo_hash::ActionHash::from_raw_36(vec![
                 seed.wrapping_add(
@@ -441,8 +431,6 @@ fn make_scratch_create_link(
     tag_bytes: Vec<u8>,
     seed: u8,
 ) -> SignedActionHashed {
-    use holochain_zome_types::link::LinkTag;
-
     let action = Action {
         header: ActionHeader {
             author: AgentPubKey::from_raw_36(vec![seed; 36]),
@@ -733,9 +721,6 @@ fn make_activity_create(
     prev: &holo_hash::ActionHash,
     seed: u8,
 ) -> Action {
-    use holochain_zome_types::action::AppEntryDef;
-    use holochain_zome_types::entry_def::EntryVisibility;
-
     Action {
         header: ActionHeader {
             author: author.clone(),
@@ -746,7 +731,7 @@ fn make_activity_create(
             prev_action: Some(prev.clone()),
         },
         data: ActionData::Create(CreateData {
-            entry_type: holochain_zome_types::action::EntryType::App(AppEntryDef::new(
+            entry_type: EntryType::App(AppEntryDef::new(
                 0.into(),
                 0.into(),
                 EntryVisibility::Public,

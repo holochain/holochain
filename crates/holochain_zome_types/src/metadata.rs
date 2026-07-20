@@ -1,8 +1,6 @@
 //! Metadata types for use in wasm
-use crate::record::Record;
-use crate::record::SignedActionHashed;
 use crate::validate::ValidationStatus;
-use crate::Entry;
+use holochain_integrity_types::prelude::{Entry, Record, SignedActionHashed};
 use holochain_serialized_bytes::prelude::*;
 
 /// Return type for get_details calls.
@@ -26,9 +24,9 @@ pub struct RecordDetails {
     pub record: Record,
     /// The validation status of this record.
     pub validation_status: ValidationStatus,
-    /// Any [`Delete`](crate::action::ActionData::Delete) on this record.
+    /// Any [`Delete`](holochain_integrity_types::prelude::ActionData::Delete) on this record.
     pub deletes: Vec<SignedActionHashed>,
-    /// Any [`Update`](crate::action::ActionData::Update) on this record.
+    /// Any [`Update`](holochain_integrity_types::prelude::ActionData::Update) on this record.
     pub updates: Vec<SignedActionHashed>,
 }
 
@@ -39,8 +37,8 @@ pub struct EntryDetails {
     pub entry: Entry,
     /// ## Create relationships.
     /// These are the actions that created this entry.
-    /// They can be either a [`Create`](crate::action::ActionData::Create) or an
-    /// [`Update`](crate::action::ActionData::Update) action
+    /// They can be either a [`Create`](holochain_integrity_types::prelude::ActionData::Create) or an
+    /// [`Update`](holochain_integrity_types::prelude::ActionData::Update) action
     /// where the `entry_hash` field is the hash of
     /// the above entry.
     ///
@@ -63,7 +61,7 @@ pub struct EntryDetails {
     /// This is just the relationship and you will need call get
     /// if you want to get the new Entry (the entry on the `entry_hash` field).
     ///
-    /// You **cannot** make a [Record] from these actions
+    /// You **cannot** make a [`Record`] from these actions
     /// and the above entry.
     pub updates: Vec<SignedActionHashed>,
     /// The status of this entry currently
@@ -71,11 +69,11 @@ pub struct EntryDetails {
     pub entry_dht_status: EntryDhtStatus,
 }
 
-/// The status of an [Entry] in the Dht
+/// The status of an [`Entry`] in the Dht
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EntryDhtStatus {
-    /// This [Entry] has active actions
+    /// This [`Entry`] has active actions
     Live,
-    /// This [Entry] has no actions that have not been deleted
+    /// This [`Entry`] has no actions that have not been deleted
     Dead,
 }

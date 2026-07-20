@@ -177,7 +177,7 @@ pub mod wasm_test {
         let round_twice: Vec<Option<Record>> = conductor.call(&alice, "get_entry_twice", ()).await;
 
         let bytes: Vec<u8> = match round.clone().and_then(|el| el.entry().as_option().cloned()) {
-            Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {
+            Some(Entry::App(entry_bytes)) => {
                 entry_bytes.bytes().to_vec()
             }
             other => panic!("unexpected output: {other:?}"),

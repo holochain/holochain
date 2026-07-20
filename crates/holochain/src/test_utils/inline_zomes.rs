@@ -2,6 +2,7 @@
 
 use crate::sweettest::SweetInlineZomes;
 use holo_hash::*;
+use holochain_serialized_bytes::prelude::*;
 use holochain_types::inline_zome::InlineEntryTypes;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_zome_types::prelude::*;

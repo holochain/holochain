@@ -1,8 +1,11 @@
 use crate as zt;
-use crate::prelude::*;
-use holo_hash::AgentPubKey;
-pub use holochain_integrity_types::zome_io::*;
+use crate::cell::CellId;
+use holo_hash::{sha2_512, AgentPubKey};
+use holochain_integrity_types::capability::CapSecret;
+use holochain_integrity_types::prelude::{ExternIO, FunctionName, Signature, ZomeName};
 use holochain_nonce::Nonce256Bits;
+use holochain_serialized_bytes::prelude::*;
+use holochain_timestamp::Timestamp;
 
 /// All wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way.
@@ -38,17 +41,17 @@ wasm_io_types! {
 
     // Attempt to accept a preflight request.
     #[cfg(feature = "unstable-countersigning")]
-    fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
+    fn accept_countersigning_preflight_request(zt::prelude::PreflightRequest) -> zt::prelude::PreflightRequestAcceptance;
 
     // Info about the calling agent.
-    fn agent_info (()) -> zt::info::AgentInfo;
+    fn agent_info (()) -> zt::prelude::AgentInfo;
 
     // Info about the current DNA.
-    fn dna_info_1 (()) -> zt::info::DnaInfoV1;
-    fn dna_info_2 (()) -> zt::info::DnaInfoV2;
+    fn dna_info_1 (()) -> zt::prelude::DnaInfoV1;
+    fn dna_info_2 (()) -> zt::prelude::DnaInfoV2;
 
     // @todo
-    fn call_info (()) -> zt::info::CallInfo;
+    fn call_info (()) -> zt::prelude::CallInfo;
 
     fn call (Vec<zt::call::Call>) -> Vec<zt::prelude::ZomeCallResponse>;
 
@@ -67,11 +70,11 @@ wasm_io_types! {
     // Create a link between two entries.
     fn create_link (zt::link::CreateLinkInput) -> holo_hash::ActionHash;
 
-    fn create_x25519_keypair(()) -> zt::x_salsa20_poly1305::x25519::X25519PubKey;
+    fn create_x25519_keypair(()) -> zt::prelude::X25519PubKey;
 
     // The debug host import takes a TraceMsg to output wherever the host wants to display it.
     // TraceMsg includes line numbers. so the wasm tells the host about it's own code structure.
-    fn trace (zt::trace::TraceMsg) -> ();
+    fn trace (zt::prelude::TraceMsg) -> ();
 
     // Action hash of the CreateLink record.
     fn delete_link (zt::link::DeleteLinkInput) -> holo_hash::ActionHash;
@@ -81,43 +84,43 @@ wasm_io_types! {
 
     // Action hash of the newly committed record.
     // Emit a Signal::App to subscribers on the interface
-    fn emit_signal (zt::signal::AppSignal) -> ();
+    fn emit_signal (zt::prelude::AppSignal) -> ();
 
-    fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
+    fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::prelude::AgentActivityStatus;
 
-    fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
+    fn get_details (Vec<zt::prelude::GetInput>) -> Vec<Option<zt::prelude::Details>>;
 
-    fn get_links_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
+    fn get_links_details (Vec<zt::prelude::GetLinksInput>) -> Vec<zt::prelude::LinkDetails>;
 
     // Get links by entry hash from the cascade.
-    fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<Vec<zt::link::Link>>;
+    fn get_links (Vec<zt::prelude::GetLinksInput>) -> Vec<Vec<zt::prelude::Link>>;
 
-    fn count_links(zt::query::LinkQuery) -> usize;
+    fn count_links(zt::prelude::LinkQuery) -> usize;
 
     // Attempt to get a live entry from the cascade.
-    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::record::Record>>;
+    fn get (Vec<zt::prelude::GetInput>) -> Vec<Option<zt::prelude::Record>>;
 
     // Retreive a record from the DHT or short circuit.
-    fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> zt::record::Record;
+    fn must_get_valid_record (zt::prelude::MustGetValidRecordInput) -> zt::prelude::Record;
 
     // Retreive a entry from the DHT or short circuit.
-    fn must_get_entry (zt::entry::MustGetEntryInput) -> zt::entry::EntryHashed;
+    fn must_get_entry (zt::prelude::MustGetEntryInput) -> zt::prelude::EntryHashed;
 
     // Retrieve an action from the DHT or short circuit.
-    fn must_get_action (zt::entry::MustGetActionInput) -> zt::prelude::SignedActionHashed;
+    fn must_get_action (zt::prelude::MustGetActionInput) -> zt::prelude::SignedActionHashed;
 
     // The guest decodes `AgentActivity`; keep in sync with the
     // matching entry in the ribosome's `HostFnApi` (`host_fn.rs`).
-    fn must_get_agent_activity (zt::chain::MustGetAgentActivityInput) -> Vec<zt::op::AgentActivity>;
+    fn must_get_agent_activity (zt::prelude::MustGetAgentActivityInput) -> Vec<zt::prelude::AgentActivity>;
 
     // Query the source chain for data.
-    fn query (zt::query::ChainQueryFilter) -> Vec<crate::prelude::Record>;
+    fn query (zt::prelude::ChainQueryFilter) -> Vec<crate::prelude::Record>;
 
     // the length of random bytes to create
     fn random_bytes (u32) -> zt::bytes::Bytes;
 
     // Remotely signal many agents without waiting for responses
-    fn send_remote_signal (zt::signal::RemoteSignal) -> ();
+    fn send_remote_signal (zt::prelude::RemoteSignal) -> ();
 
     // Schedule a schedulable function if it is not already.
     fn schedule (String) -> ();
@@ -128,78 +131,78 @@ wasm_io_types! {
 
     // Attempt to have the keystore sign some data
     // The pubkey in the input needs to be found in the keystore for this to work
-    fn sign (zt::signature::Sign) -> zt::signature::Signature;
+    fn sign (zt::prelude::Sign) -> zt::prelude::Signature;
 
-    fn sign_ephemeral (zt::signature::SignEphemeral) -> zt::signature::EphemeralSignatures;
+    fn sign_ephemeral (zt::prelude::SignEphemeral) -> zt::prelude::EphemeralSignatures;
 
     // Current system time, in the opinion of the host, as a `Timestamp`.
     fn sys_time (()) -> zt::timestamp::Timestamp;
 
     // Same as  but also takes the ActionHash of the updated record.
-    fn update (zt::entry::UpdateInput) -> holo_hash::ActionHash;
+    fn update (zt::prelude::UpdateInput) -> holo_hash::ActionHash;
 
-    fn verify_signature (zt::signature::VerifySignature) -> bool;
+    fn verify_signature (zt::prelude::VerifySignature) -> bool;
 
     fn x_salsa20_poly1305_shared_secret_create_random(
-        Option<zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef>
-    ) -> zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef;
+        Option<zt::prelude::XSalsa20Poly1305KeyRef>
+    ) -> zt::prelude::XSalsa20Poly1305KeyRef;
 
     fn x_salsa20_poly1305_shared_secret_export(
-        zt::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretExport
-    ) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+        zt::prelude::XSalsa20Poly1305SharedSecretExport
+    ) -> zt::prelude::XSalsa20Poly1305EncryptedData;
 
     fn x_salsa20_poly1305_shared_secret_ingest(
-        zt::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretIngest
-    ) -> zt::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef;
+        zt::prelude::XSalsa20Poly1305SharedSecretIngest
+    ) -> zt::prelude::XSalsa20Poly1305KeyRef;
 
     fn x_salsa20_poly1305_encrypt(
-        zt::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
-    ) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+        zt::prelude::XSalsa20Poly1305Encrypt
+    ) -> zt::prelude::XSalsa20Poly1305EncryptedData;
 
     fn x_salsa20_poly1305_decrypt(
-        zt::x_salsa20_poly1305::XSalsa20Poly1305Decrypt
-    ) -> Option<zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+        zt::prelude::XSalsa20Poly1305Decrypt
+    ) -> Option<zt::prelude::XSalsa20Poly1305Data>;
 
     // Sender, Recipient, Data.
-    fn x_25519_x_salsa20_poly1305_encrypt(zt::x_salsa20_poly1305::X25519XSalsa20Poly1305Encrypt) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+    fn x_25519_x_salsa20_poly1305_encrypt(zt::prelude::X25519XSalsa20Poly1305Encrypt) -> zt::prelude::XSalsa20Poly1305EncryptedData;
 
     // Recipient, Sender, Encrypted data.
-    fn x_25519_x_salsa20_poly1305_decrypt(zt::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+    fn x_25519_x_salsa20_poly1305_decrypt(zt::prelude::X25519XSalsa20Poly1305Decrypt) -> Option<zt::prelude::XSalsa20Poly1305Data>;
 
     // Sender, Recipient, Data.
-    fn ed_25519_x_salsa20_poly1305_encrypt(zt::x_salsa20_poly1305::Ed25519XSalsa20Poly1305Encrypt) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+    fn ed_25519_x_salsa20_poly1305_encrypt(zt::prelude::Ed25519XSalsa20Poly1305Encrypt) -> zt::prelude::XSalsa20Poly1305EncryptedData;
 
     // Recipient, Sender, Encrypted data.
-    fn ed_25519_x_salsa20_poly1305_decrypt(zt::x_salsa20_poly1305::Ed25519XSalsa20Poly1305Decrypt) -> zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data;
+    fn ed_25519_x_salsa20_poly1305_decrypt(zt::prelude::Ed25519XSalsa20Poly1305Decrypt) -> zt::prelude::XSalsa20Poly1305Data;
 
     // The zome and agent info are constants specific to the current zome and chain.
     // All the information is provided by core so there is no input value.
     // These are constant for the lifetime of a zome call.
-    fn zome_info (()) -> zt::info::ZomeInfo;
+    fn zome_info (()) -> zt::prelude::ZomeInfo;
 
     // Create a clone of an existing cell.
-    fn create_clone_cell(zt::clone::CreateCloneCellInput) -> zt::clone::ClonedCell;
+    fn create_clone_cell(zt::prelude::CreateCloneCellInput) -> zt::prelude::ClonedCell;
 
     // Disable a clone cell.
-    fn disable_clone_cell(zt::clone::DisableCloneCellInput) -> ();
+    fn disable_clone_cell(zt::prelude::DisableCloneCellInput) -> ();
 
     // Enable a clone cell.
-    fn enable_clone_cell(zt::clone::EnableCloneCellInput) -> zt::clone::ClonedCell;
+    fn enable_clone_cell(zt::prelude::EnableCloneCellInput) -> zt::prelude::ClonedCell;
 
     // Delete a clone cell.
-    fn delete_clone_cell(zt::clone::DeleteCloneCellInput) -> ();
+    fn delete_clone_cell(zt::prelude::DeleteCloneCellInput) -> ();
 
     // Close your source chain, indicating that you are migrating to a new DNA
-    fn close_chain(zt::chain::CloseChainInput) -> holo_hash::ActionHash;
+    fn close_chain(zt::prelude::CloseChainInput) -> holo_hash::ActionHash;
 
     // Open your chain, pointing to the previous DNA
-    fn open_chain(zt::chain::OpenChainInput) -> holo_hash::ActionHash;
+    fn open_chain(zt::prelude::OpenChainInput) -> holo_hash::ActionHash;
 
     // Read the init properties supplied for this cell's role at install time.
-    fn get_init_properties(()) -> Option<zt::init::InitProperties>;
+    fn get_init_properties(()) -> Option<zt::prelude::InitProperties>;
 
     // Get validation receipts for an action
-    fn get_validation_receipts(zt::validate::GetValidationReceiptsInput) -> Vec<zt::validate::ValidationReceiptSet>;
+    fn get_validation_receipts(zt::prelude::GetValidationReceiptsInput) -> Vec<zt::prelude::ValidationReceiptSet>;
 }
 
 /// Anything that can go wrong while calling a HostFnApi method

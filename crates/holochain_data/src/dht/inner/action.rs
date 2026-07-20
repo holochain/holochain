@@ -2,13 +2,11 @@
 
 use crate::models::dht::{ActionRow, AgentActivityItem, AgentActivityRow, ValidatedActionRow};
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, EntryHash, HoloHashed};
-use holochain_integrity_types::action::{Action, ActionData, ActionHeader, RecordValidity};
-use holochain_integrity_types::entry::Entry;
-use holochain_integrity_types::entry_def::EntryVisibility;
-use holochain_integrity_types::record::SignedHashed;
-use holochain_integrity_types::signature::Signature;
-use holochain_zome_types::action::SignedActionHashed;
-use holochain_zome_types::op::ChainOpType;
+use holochain_integrity_types::prelude::{
+    Action, ActionData, ActionHeader, Entry, EntryVisibility, RecordValidity, Signature,
+    SignedHashed,
+};
+use holochain_zome_types::prelude::{ChainOpType, SignedActionHashed};
 use sqlx::{Executor, Sqlite};
 
 /// Insert an `Action` row. `record_validity` is `Some(Accepted)` for

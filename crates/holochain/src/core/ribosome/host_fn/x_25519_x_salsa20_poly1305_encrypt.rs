@@ -83,7 +83,7 @@ pub mod wasm_test {
             .await;
 
         let decrypt_input =
-            holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
+            X25519XSalsa20Poly1305Decrypt::new(
                 bob_x25519,
                 alice_x25519,
                 encrypt_output.clone(),
@@ -96,7 +96,7 @@ pub mod wasm_test {
         assert_eq!(decrypt_output, Some(data.clone()),);
 
         let bad_decrypt_input =
-            holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
+            X25519XSalsa20Poly1305Decrypt::new(
                 carol_x25519,
                 alice_x25519,
                 encrypt_output,

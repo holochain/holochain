@@ -284,7 +284,7 @@ impl CascadeImpl {
     pub(crate) async fn fetch_must_get_agent_activity(
         &self,
         author: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
+        filter: ChainFilter,
         options: NetworkRequestOptions,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
         let network = self

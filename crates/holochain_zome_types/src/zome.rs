@@ -6,7 +6,7 @@
 //! using Rust closures, and is useful for quickly defining zomes on-the-fly
 //! for tests.
 
-pub use holochain_integrity_types::zome::*;
+use holochain_integrity_types::prelude::ZomeName;
 use holochain_serialized_bytes::prelude::*;
 
 mod error;

@@ -1,18 +1,21 @@
-use crate::prelude::*;
-pub use holochain_integrity_types::x_salsa20_poly1305::*;
+use holo_hash::AgentPubKey;
+use holochain_integrity_types::prelude::{
+    X25519PubKey, XSalsa20Poly1305Data, XSalsa20Poly1305EncryptedData, XSalsa20Poly1305KeyRef,
+};
+use holochain_serialized_bytes::prelude::*;
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct XSalsa20Poly1305SharedSecretExport {
     pub sender: X25519PubKey,
     pub recipient: X25519PubKey,
-    pub key_ref: crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef,
+    pub key_ref: XSalsa20Poly1305KeyRef,
 }
 
 impl XSalsa20Poly1305SharedSecretExport {
     pub fn new(
         sender: X25519PubKey,
         recipient: X25519PubKey,
-        key_ref: crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef,
+        key_ref: XSalsa20Poly1305KeyRef,
     ) -> Self {
         Self {
             sender,
@@ -29,7 +32,7 @@ impl XSalsa20Poly1305SharedSecretExport {
         &self.recipient
     }
 
-    pub fn as_key_ref_ref(&self) -> &crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef {
+    pub fn as_key_ref_ref(&self) -> &XSalsa20Poly1305KeyRef {
         &self.key_ref
     }
 }
@@ -38,16 +41,16 @@ impl XSalsa20Poly1305SharedSecretExport {
 pub struct XSalsa20Poly1305SharedSecretIngest {
     pub recipient: X25519PubKey,
     pub sender: X25519PubKey,
-    pub encrypted_data: crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
-    pub key_ref: Option<crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef>,
+    pub encrypted_data: XSalsa20Poly1305EncryptedData,
+    pub key_ref: Option<XSalsa20Poly1305KeyRef>,
 }
 
 impl XSalsa20Poly1305SharedSecretIngest {
     pub fn new(
         recipient: X25519PubKey,
         sender: X25519PubKey,
-        encrypted_data: crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
-        key_ref: Option<crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef>,
+        encrypted_data: XSalsa20Poly1305EncryptedData,
+        key_ref: Option<XSalsa20Poly1305KeyRef>,
     ) -> Self {
         Self {
             recipient,
@@ -65,38 +68,31 @@ impl XSalsa20Poly1305SharedSecretIngest {
         &self.sender
     }
 
-    pub fn as_encrypted_data_ref(
-        &self,
-    ) -> &crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData {
+    pub fn as_encrypted_data_ref(&self) -> &XSalsa20Poly1305EncryptedData {
         &self.encrypted_data
     }
 
-    pub fn as_key_ref_ref(
-        &self,
-    ) -> &Option<crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef> {
+    pub fn as_key_ref_ref(&self) -> &Option<XSalsa20Poly1305KeyRef> {
         &self.key_ref
     }
 }
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct XSalsa20Poly1305Encrypt {
-    pub key_ref: crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef,
-    pub data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
+    pub key_ref: XSalsa20Poly1305KeyRef,
+    pub data: XSalsa20Poly1305Data,
 }
 
 impl XSalsa20Poly1305Encrypt {
-    pub fn new(
-        key_ref: crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef,
-        data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
-    ) -> Self {
+    pub fn new(key_ref: XSalsa20Poly1305KeyRef, data: XSalsa20Poly1305Data) -> Self {
         Self { key_ref, data }
     }
 
-    pub fn as_key_ref_ref(&self) -> &crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef {
+    pub fn as_key_ref_ref(&self) -> &XSalsa20Poly1305KeyRef {
         &self.key_ref
     }
 
-    pub fn as_data_ref(&self) -> &crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data {
+    pub fn as_data_ref(&self) -> &XSalsa20Poly1305Data {
         &self.data
     }
 }
@@ -105,15 +101,11 @@ impl XSalsa20Poly1305Encrypt {
 pub struct X25519XSalsa20Poly1305Encrypt {
     pub sender: X25519PubKey,
     pub recipient: X25519PubKey,
-    pub data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
+    pub data: XSalsa20Poly1305Data,
 }
 
 impl X25519XSalsa20Poly1305Encrypt {
-    pub fn new(
-        sender: X25519PubKey,
-        recipient: X25519PubKey,
-        data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
-    ) -> Self {
+    pub fn new(sender: X25519PubKey, recipient: X25519PubKey, data: XSalsa20Poly1305Data) -> Self {
         Self {
             sender,
             recipient,
@@ -138,15 +130,11 @@ impl X25519XSalsa20Poly1305Encrypt {
 pub struct Ed25519XSalsa20Poly1305Encrypt {
     pub sender: AgentPubKey,
     pub recipient: AgentPubKey,
-    pub data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
+    pub data: XSalsa20Poly1305Data,
 }
 
 impl Ed25519XSalsa20Poly1305Encrypt {
-    pub fn new(
-        sender: AgentPubKey,
-        recipient: AgentPubKey,
-        data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
-    ) -> Self {
+    pub fn new(sender: AgentPubKey, recipient: AgentPubKey, data: XSalsa20Poly1305Data) -> Self {
         Self {
             sender,
             recipient,

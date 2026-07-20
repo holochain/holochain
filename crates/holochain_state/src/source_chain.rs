@@ -22,12 +22,11 @@ use holochain_types::op::{
 };
 use holochain_types::prelude::SignedActionHashedExt;
 use holochain_types::warrant::WarrantOp;
-use holochain_zome_types::action::{
+use holochain_zome_types::prelude::{
     build_action, from_countersigning_data, Action, ActionData, ActionHeader,
-    AgentValidationPkgData, CreateData, DeleteData, DnaData, RecordValidity, SignedAction,
+    AgentValidationPkgData, CreateData, DeleteData, DnaData, Record, RecordValidity, SignedAction,
     SignedActionHashed,
 };
-use holochain_zome_types::record::Record;
 use kitsune2_api::DhtArc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -156,7 +155,7 @@ impl SourceChain<DbWrite<Dht>> {
         let hash = action_hashed.as_hash().clone();
         let signed_action = SignedActionHashed::sign(&self.keystore, action_hashed).await?;
         let record_entry =
-            holochain_zome_types::record::RecordEntry::new(entry_visibility.as_ref(), maybe_entry);
+            holochain_zome_types::prelude::RecordEntry::new(entry_visibility.as_ref(), maybe_entry);
         let record = Record::new(signed_action, record_entry);
         self.scratch
             .apply(|scratch| insert_record_scratch(scratch, record, chain_top_ordering))?;
@@ -885,14 +884,8 @@ where
                         Some(eh) if query.include_entries => scratch.get_entry(eh).ok()?,
                         _ => None,
                     };
-                    let record_entry = holochain_zome_types::record::RecordEntry::new(
-                        sah.action().entry_visibility(),
-                        entry,
-                    );
-                    Some(holochain_zome_types::prelude::Record::new(
-                        sah.clone(),
-                        record_entry,
-                    ))
+                    let record_entry = RecordEntry::new(sah.action().entry_visibility(), entry);
+                    Some(Record::new(sah.clone(), record_entry))
                 })
                 .collect();
             scratch_records.sort_unstable_by_key(|e| e.action().action_seq());
@@ -1090,10 +1083,10 @@ pub async fn genesis(
         }
 
         // Insert chain ops for all three genesis actions.
-        let genesis_entries_slice: Vec<holochain_types::EntryHashed> = agent_entry_for_new_db
+        let genesis_entries_slice: Vec<EntryHashed> = agent_entry_for_new_db
             .as_ref()
             .map(|e| {
-                vec![holochain_types::EntryHashed::with_pre_hashed(
+                vec![EntryHashed::with_pre_hashed(
                     e.clone(),
                     agent_entry_hash.clone(),
                 )]
@@ -1218,10 +1211,7 @@ fn serialize_maybe_schedule_none(
 /// entry (if any) is looked up by `Action::entry_hash` in `entries`. Always
 /// succeeds: `op`'s `op_type` was derived from its own action by
 /// `produce_ops_from_record`, so the two always agree.
-pub(crate) fn encoded_chain_op_size(
-    op: &HashedChainOp,
-    entries: &[holochain_types::EntryHashed],
-) -> u32 {
+pub(crate) fn encoded_chain_op_size(op: &HashedChainOp, entries: &[EntryHashed]) -> u32 {
     let action = op.action.action();
     let maybe_entry: Option<Entry> = action
         .entry_hash()
@@ -1251,8 +1241,7 @@ mod tests {
     use holo_hash::fixt::DnaHashFixturator;
     use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator, EntryHashFixturator};
     use holochain_keystore::test_keystore;
-    use holochain_zome_types::action::{CloseChainData, InitZomesCompleteData, UpdateData};
-    use holochain_zome_types::Entry;
+    use holochain_zome_types::prelude::{CloseChainData, Entry, InitZomesCompleteData, UpdateData};
     use matches::assert_matches;
     use std::collections::{BTreeSet, HashSet};
 
@@ -1430,10 +1419,7 @@ mod tests {
 
         // The returned action is the agent-key `Create`: an `AgentPubKey`-typed
         // `Create` whose entry hash is the agent key.
-        assert_matches!(
-            action.data,
-            holochain_zome_types::action::ActionData::Create(_)
-        );
+        assert_matches!(action.data, ActionData::Create(_));
         assert_eq!(action.entry_type(), Some(&EntryType::AgentPubKey));
         let agent_key_entry_hash: EntryHash = agent_key.into();
         assert_eq!(action.entry_hash(), Some(&agent_key_entry_hash));
@@ -1997,10 +1983,7 @@ mod tests {
             .await?
             .expect("head record present in store");
         assert_eq!(head_record.action().action_seq(), 2);
-        assert!(matches!(
-            head_record.action().data,
-            holochain_zome_types::action::ActionData::Create(_)
-        ));
+        assert!(matches!(head_record.action().data, ActionData::Create(_)));
 
         Ok(())
     }
@@ -2597,7 +2580,7 @@ mod tests {
     /// in the new DHT schema.
     #[tokio::test(flavor = "multi_thread")]
     async fn flush_countersigning_op_sets_withhold_publish() {
-        use holochain_zome_types::countersigning::{
+        use holochain_zome_types::prelude::{
             CounterSigningAgentState, CounterSigningSessionData, CounterSigningSessionTimes,
             PreflightRequest,
         };
