@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Increase the SQLite `busy_timeout` from sqlx's 5s default to 15s, to reduce spurious "database is locked" errors logged by queue consumer workflows under writer contention.
 - **BREAKING CHANGE**: `holochain_zome_types::query::AgentActivity`, the response type of `hdk::chain::get_agent_activity`, is renamed to `AgentActivityStatus`. This resolves a name collision with the unrelated `AgentActivity` `Op` variant struct.
 - **BREAKING CHANGE**: `holochain_integrity_types::action::CapAccess` (the `CapGrant.cap_access` column discriminant) is renamed to `CapAccessType`. This resolves a name collision with `holochain_integrity_types::capability::CapAccess`, the data-carrying grant-access type used by `ZomeCallCapGrant`, which keeps the `CapAccess` name. \#5882
 - Remove the unused `holochain_zome_types::crdt::CrdtType` placeholder type.

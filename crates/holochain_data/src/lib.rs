@@ -218,6 +218,10 @@ fn configure_sqlite_options(
     // Always enable WAL mode for better concurrency
     opts = opts.journal_mode(SqliteJournalMode::Wal);
 
+    // Tolerate longer writer contention than sqlx's 5s default before a
+    // write fails with "database is locked".
+    opts = opts.busy_timeout(std::time::Duration::from_secs(15));
+
     // Set other pragmas
     let sync_value = config.sync_level.as_pragma_value().to_string();
     opts = opts
