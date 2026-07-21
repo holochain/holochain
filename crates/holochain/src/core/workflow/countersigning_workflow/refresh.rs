@@ -12,9 +12,9 @@ use tokio::sync::broadcast::Sender;
 /// The committed countersigning session at an agent's chain head: the record
 /// it was committed in, the entry's hash, and the decoded session data.
 type CurrentCountersigningSessionEntry = (
-    holochain_zome_types::record::Record,
+    holochain_zome_types::prelude::Record,
     holo_hash::EntryHash,
-    holochain_zome_types::countersigning::CounterSigningSessionData,
+    holochain_zome_types::prelude::CounterSigningSessionData,
 );
 
 /// Resolves the various states that the system can find itself in when operating a countersigning session.
