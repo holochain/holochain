@@ -39,7 +39,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             } => {
                 let _agent_activity = must_get_agent_activity(
                     action.author().to_owned(),
-                    ChainFilter::new(hash_action(action.to_owned())?),
+                    ChainFilter::new(hash_action(action.to_owned().into())?),
                 )?;
                 return Ok(ValidateCallbackResult::Valid);
             }

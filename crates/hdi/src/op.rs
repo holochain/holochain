@@ -24,7 +24,7 @@ use crate::flat_op;
 pub(crate) enum ActivityEntry<Unit> {
     App { entry_type: Option<Unit> },
     PrivateApp { entry_type: Option<Unit> },
-    Agent(AgentPubKey),
+    Agent,
     CapClaim,
     CapGrant,
 }
@@ -44,104 +44,132 @@ impl OpHelper for Op {
                 let r = match &a.data {
                     ActionData::Dna(d) => flat_op::OpRecord::Dna {
                         dna_hash: d.dna_hash.clone(),
-                        action: a.clone(),
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        },
                     },
                     ActionData::AgentValidationPkg(d) => flat_op::OpRecord::AgentValidationPkg {
                         membrane_proof: d.membrane_proof.clone(),
-                        action: a.clone(),
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        },
                     },
-                    ActionData::InitZomesComplete(_) => {
-                        flat_op::OpRecord::InitZomesComplete { action: a.clone() }
-                    }
-                    ActionData::OpenChain(_) => flat_op::OpRecord::open_chain(a.clone()),
-                    ActionData::CloseChain(_) => flat_op::OpRecord::close_chain(a.clone()),
+                    ActionData::InitZomesComplete(d) => flat_op::OpRecord::InitZomesComplete {
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        },
+                    },
+                    ActionData::OpenChain(d) => flat_op::OpRecord::OpenChain {
+                        previous_target: d.prev_target.clone(),
+                        close_hash: d.close_hash.clone(),
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        },
+                    },
+                    ActionData::CloseChain(d) => flat_op::OpRecord::CloseChain {
+                        new_target: d.new_target.clone(),
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        },
+                    },
                     ActionData::CreateLink(d) => {
                         let link_type = in_scope_link_type(d.zome_index, d.link_type)?;
                         flat_op::OpRecord::CreateLink {
-                            base_address: d.base_address.clone(),
-                            target_address: d.target_address.clone(),
-                            tag: d.tag.clone(),
                             link_type,
-                            action: a.clone(),
+                            action: TypedAction {
+                                header: a.header.clone(),
+                                data: d.clone(),
+                            },
                         }
                     }
                     ActionData::DeleteLink(d) => flat_op::OpRecord::DeleteLink {
-                        original_action_hash: d.link_add_address.clone(),
-                        base_address: d.base_address.clone(),
-                        action: a.clone(),
-                    },
-                    ActionData::Create(d) => match &d.entry_type {
-                        EntryType::AgentPubKey => flat_op::OpRecord::CreateAgent {
-                            agent: d.entry_hash.clone().into(),
-                            action: a.clone(),
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
                         },
-                        EntryType::App(entry_def) => {
-                            match get_app_entry_type_for_record_authority::<ET>(
-                                entry_def,
-                                record.entry.as_option(),
-                            )? {
-                                UnitEnumEither::Enum(app_entry) => flat_op::OpRecord::CreateEntry {
-                                    app_entry,
-                                    action: a.clone(),
-                                },
-                                UnitEnumEither::Unit(app_entry_type) => {
-                                    flat_op::OpRecord::CreatePrivateEntry {
-                                        app_entry_type,
-                                        action: a.clone(),
+                    },
+                    ActionData::Create(d) => {
+                        let typed_action = TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        };
+                        match &d.entry_type {
+                            EntryType::AgentPubKey => flat_op::OpRecord::CreateAgent {
+                                action: typed_action,
+                            },
+                            EntryType::App(entry_def) => {
+                                match get_app_entry_type_for_record_authority::<ET>(
+                                    entry_def,
+                                    record.entry.as_option(),
+                                )? {
+                                    UnitEnumEither::Enum(app_entry) => {
+                                        flat_op::OpRecord::CreateEntry {
+                                            app_entry,
+                                            action: typed_action,
+                                        }
+                                    }
+                                    UnitEnumEither::Unit(app_entry_type) => {
+                                        flat_op::OpRecord::CreatePrivateEntry {
+                                            app_entry_type,
+                                            action: typed_action,
+                                        }
                                     }
                                 }
                             }
+                            EntryType::CapClaim => flat_op::OpRecord::CreateCapClaim {
+                                action: typed_action,
+                            },
+                            EntryType::CapGrant => flat_op::OpRecord::CreateCapGrant {
+                                action: typed_action,
+                            },
                         }
-                        EntryType::CapClaim => {
-                            flat_op::OpRecord::CreateCapClaim { action: a.clone() }
-                        }
-                        EntryType::CapGrant => {
-                            flat_op::OpRecord::CreateCapGrant { action: a.clone() }
-                        }
-                    },
-                    ActionData::Update(d) => match &d.entry_type {
-                        EntryType::AgentPubKey => flat_op::OpRecord::UpdateAgent {
-                            original_key: d.original_entry_address.clone().into(),
-                            original_action_hash: d.original_action_address.clone(),
-                            new_key: d.entry_hash.clone().into(),
-                            action: a.clone(),
-                        },
-                        EntryType::App(entry_def) => {
-                            match get_app_entry_type_for_record_authority::<ET>(
-                                entry_def,
-                                record.entry.as_option(),
-                            )? {
-                                UnitEnumEither::Enum(app_entry) => flat_op::OpRecord::UpdateEntry {
-                                    original_action_hash: d.original_action_address.clone(),
-                                    original_entry_hash: d.original_entry_address.clone(),
-                                    app_entry,
-                                    action: a.clone(),
-                                },
-                                UnitEnumEither::Unit(app_entry_type) => {
-                                    flat_op::OpRecord::UpdatePrivateEntry {
-                                        original_action_hash: d.original_action_address.clone(),
-                                        original_entry_hash: d.original_entry_address.clone(),
-                                        app_entry_type,
-                                        action: a.clone(),
+                    }
+                    ActionData::Update(d) => {
+                        let typed_action = TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        };
+                        match &d.entry_type {
+                            EntryType::AgentPubKey => flat_op::OpRecord::UpdateAgent {
+                                action: typed_action,
+                            },
+                            EntryType::App(entry_def) => {
+                                match get_app_entry_type_for_record_authority::<ET>(
+                                    entry_def,
+                                    record.entry.as_option(),
+                                )? {
+                                    UnitEnumEither::Enum(app_entry) => {
+                                        flat_op::OpRecord::UpdateEntry {
+                                            app_entry,
+                                            action: typed_action,
+                                        }
+                                    }
+                                    UnitEnumEither::Unit(app_entry_type) => {
+                                        flat_op::OpRecord::UpdatePrivateEntry {
+                                            app_entry_type,
+                                            action: typed_action,
+                                        }
                                     }
                                 }
                             }
+                            EntryType::CapClaim => flat_op::OpRecord::UpdateCapClaim {
+                                action: typed_action,
+                            },
+                            EntryType::CapGrant => flat_op::OpRecord::UpdateCapGrant {
+                                action: typed_action,
+                            },
                         }
-                        EntryType::CapClaim => flat_op::OpRecord::UpdateCapClaim {
-                            original_action_hash: d.original_action_address.clone(),
-                            original_entry_hash: d.original_entry_address.clone(),
-                            action: a.clone(),
-                        },
-                        EntryType::CapGrant => flat_op::OpRecord::UpdateCapGrant {
-                            original_action_hash: d.original_action_address.clone(),
-                            original_entry_hash: d.original_entry_address.clone(),
-                            action: a.clone(),
-                        },
-                    },
+                    }
                     ActionData::Delete(d) => flat_op::OpRecord::DeleteEntry {
-                        original_action_hash: d.deletes_address.clone(),
-                        original_entry_hash: d.deletes_entry_address.clone(),
-                        action: a.clone(),
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        },
                     },
                 };
                 Ok(flat_op::FlatOp::CreateRecord(r))
@@ -149,54 +177,56 @@ impl OpHelper for Op {
             Op::CreateEntry(CreateEntry { action, entry }) => {
                 let a = &action.hashed.content;
                 let r = match &a.data {
-                    ActionData::Create(d) => match &d.entry_type {
-                        EntryType::AgentPubKey => flat_op::OpEntry::CreateAgent {
-                            agent: d.entry_hash.clone().into(),
-                            action: a.clone(),
-                        },
-                        EntryType::App(entry_def) => flat_op::OpEntry::CreateEntry {
-                            app_entry: get_app_entry_type_for_store_entry_authority(
-                                entry_def, entry,
-                            )?,
-                            action: a.clone(),
-                        },
-                        EntryType::CapClaim => flat_op::OpEntry::CreateCapClaim {
-                            entry: cap_claim_entry(entry)?,
-                            action: a.clone(),
-                        },
-                        EntryType::CapGrant => flat_op::OpEntry::CreateCapGrant {
-                            entry: cap_grant_entry(entry)?,
-                            action: a.clone(),
-                        },
-                    },
-                    ActionData::Update(d) => match &d.entry_type {
-                        EntryType::AgentPubKey => flat_op::OpEntry::UpdateAgent {
-                            original_key: d.original_entry_address.clone().into(),
-                            original_action_hash: d.original_action_address.clone(),
-                            new_key: d.entry_hash.clone().into(),
-                            action: a.clone(),
-                        },
-                        EntryType::App(entry_def) => flat_op::OpEntry::UpdateEntry {
-                            original_action_hash: d.original_action_address.clone(),
-                            original_entry_hash: d.original_entry_address.clone(),
-                            app_entry: get_app_entry_type_for_store_entry_authority(
-                                entry_def, entry,
-                            )?,
-                            action: a.clone(),
-                        },
-                        EntryType::CapClaim => flat_op::OpEntry::UpdateCapClaim {
-                            original_action_hash: d.original_action_address.clone(),
-                            original_entry_hash: d.original_entry_address.clone(),
-                            entry: cap_claim_entry(entry)?,
-                            action: a.clone(),
-                        },
-                        EntryType::CapGrant => flat_op::OpEntry::UpdateCapGrant {
-                            original_action_hash: d.original_action_address.clone(),
-                            original_entry_hash: d.original_entry_address.clone(),
-                            entry: cap_grant_entry(entry)?,
-                            action: a.clone(),
-                        },
-                    },
+                    ActionData::Create(d) => {
+                        let typed_action = TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        };
+                        match &d.entry_type {
+                            EntryType::AgentPubKey => flat_op::OpEntry::CreateAgent {
+                                action: typed_action,
+                            },
+                            EntryType::App(entry_def) => flat_op::OpEntry::CreateEntry {
+                                app_entry: get_app_entry_type_for_store_entry_authority(
+                                    entry_def, entry,
+                                )?,
+                                action: typed_action,
+                            },
+                            EntryType::CapClaim => flat_op::OpEntry::CreateCapClaim {
+                                entry: cap_claim_entry(entry)?,
+                                action: typed_action,
+                            },
+                            EntryType::CapGrant => flat_op::OpEntry::CreateCapGrant {
+                                entry: cap_grant_entry(entry)?,
+                                action: typed_action,
+                            },
+                        }
+                    }
+                    ActionData::Update(d) => {
+                        let typed_action = TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        };
+                        match &d.entry_type {
+                            EntryType::AgentPubKey => flat_op::OpEntry::UpdateAgent {
+                                action: typed_action,
+                            },
+                            EntryType::App(entry_def) => flat_op::OpEntry::UpdateEntry {
+                                app_entry: get_app_entry_type_for_store_entry_authority(
+                                    entry_def, entry,
+                                )?,
+                                action: typed_action,
+                            },
+                            EntryType::CapClaim => flat_op::OpEntry::UpdateCapClaim {
+                                entry: cap_claim_entry(entry)?,
+                                action: typed_action,
+                            },
+                            EntryType::CapGrant => flat_op::OpEntry::UpdateCapGrant {
+                                entry: cap_grant_entry(entry)?,
+                                action: typed_action,
+                            },
+                        }
+                    }
                     other => {
                         return Err(wasm_error!(WasmErrorInner::Guest(format!(
                             "CreateEntry op carried a non-entry-creation action: {:?}",
@@ -217,12 +247,15 @@ impl OpHelper for Op {
                         ))))
                     }
                 };
+                let typed_action = TypedAction {
+                    header: a.header.clone(),
+                    data: d.clone(),
+                };
                 let r = match &d.entry_type {
                     EntryType::AgentPubKey => flat_op::OpUpdate::Agent {
                         original_key: d.original_entry_address.clone().into(),
-                        original_action_hash: d.original_action_address.clone(),
                         new_key: d.entry_hash.clone().into(),
-                        action: a.clone(),
+                        action: typed_action,
                     },
                     EntryType::App(entry_def) => {
                         match get_app_entry_type_for_record_authority::<ET>(
@@ -231,22 +264,19 @@ impl OpHelper for Op {
                         )? {
                             UnitEnumEither::Enum(new) => flat_op::OpUpdate::Entry {
                                 app_entry: new,
-                                action: a.clone(),
+                                action: typed_action,
                             },
                             UnitEnumEither::Unit(new) => flat_op::OpUpdate::PrivateEntry {
-                                original_action_hash: d.original_action_address.clone(),
                                 app_entry_type: new,
-                                action: a.clone(),
+                                action: typed_action,
                             },
                         }
                     }
                     EntryType::CapClaim => flat_op::OpUpdate::CapClaim {
-                        original_action_hash: d.original_action_address.clone(),
-                        action: a.clone(),
+                        action: typed_action,
                     },
                     EntryType::CapGrant => flat_op::OpUpdate::CapGrant {
-                        original_action_hash: d.original_action_address.clone(),
-                        action: a.clone(),
+                        action: typed_action,
                     },
                 };
                 Ok(flat_op::FlatOp::Update(r))
@@ -256,98 +286,118 @@ impl OpHelper for Op {
                 let r = match &a.data {
                     ActionData::Dna(d) => flat_op::OpActivity::Dna {
                         dna_hash: d.dna_hash.clone(),
-                        action: a.clone(),
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        },
                     },
                     ActionData::AgentValidationPkg(d) => flat_op::OpActivity::AgentValidationPkg {
                         membrane_proof: d.membrane_proof.clone(),
-                        action: a.clone(),
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        },
                     },
-                    ActionData::InitZomesComplete(_) => {
-                        flat_op::OpActivity::InitZomesComplete { action: a.clone() }
-                    }
-                    ActionData::OpenChain(_) => flat_op::OpActivity::open_chain(a.clone()),
-                    ActionData::CloseChain(_) => flat_op::OpActivity::close_chain(a.clone()),
+                    ActionData::InitZomesComplete(d) => flat_op::OpActivity::InitZomesComplete {
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        },
+                    },
+                    ActionData::OpenChain(d) => flat_op::OpActivity::OpenChain {
+                        previous_target: d.prev_target.clone(),
+                        close_hash: d.close_hash.clone(),
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        },
+                    },
+                    ActionData::CloseChain(d) => flat_op::OpActivity::CloseChain {
+                        new_target: d.new_target.clone(),
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        },
+                    },
                     ActionData::CreateLink(d) => {
                         let link_type = activity_link_type(d.zome_index, d.link_type)?;
                         flat_op::OpActivity::CreateLink {
-                            base_address: d.base_address.clone(),
-                            target_address: d.target_address.clone(),
-                            tag: d.tag.clone(),
                             link_type,
-                            action: a.clone(),
+                            action: TypedAction {
+                                header: a.header.clone(),
+                                data: d.clone(),
+                            },
                         }
                     }
                     ActionData::DeleteLink(d) => flat_op::OpActivity::DeleteLink {
-                        original_action_hash: d.link_add_address.clone(),
-                        base_address: d.base_address.clone(),
-                        action: a.clone(),
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        },
                     },
                     ActionData::Create(d) => {
-                        match activity_entry::<ET>(&d.entry_type, &d.entry_hash)? {
+                        let typed_action = TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        };
+                        match activity_entry::<ET>(&d.entry_type)? {
                             ActivityEntry::App { entry_type, .. } => {
                                 flat_op::OpActivity::CreateEntry {
                                     app_entry_type: entry_type,
-                                    action: a.clone(),
+                                    action: typed_action,
                                 }
                             }
                             ActivityEntry::PrivateApp { entry_type, .. } => {
                                 flat_op::OpActivity::CreatePrivateEntry {
                                     app_entry_type: entry_type,
-                                    action: a.clone(),
+                                    action: typed_action,
                                 }
                             }
-                            ActivityEntry::Agent(agent) => flat_op::OpActivity::CreateAgent {
-                                agent,
-                                action: a.clone(),
+                            ActivityEntry::Agent => flat_op::OpActivity::CreateAgent {
+                                action: typed_action,
                             },
-                            ActivityEntry::CapClaim => {
-                                flat_op::OpActivity::CreateCapClaim { action: a.clone() }
-                            }
-                            ActivityEntry::CapGrant => {
-                                flat_op::OpActivity::CreateCapGrant { action: a.clone() }
-                            }
+                            ActivityEntry::CapClaim => flat_op::OpActivity::CreateCapClaim {
+                                action: typed_action,
+                            },
+                            ActivityEntry::CapGrant => flat_op::OpActivity::CreateCapGrant {
+                                action: typed_action,
+                            },
                         }
                     }
                     ActionData::Update(d) => {
-                        match activity_entry::<ET>(&d.entry_type, &d.entry_hash)? {
+                        let typed_action = TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        };
+                        match activity_entry::<ET>(&d.entry_type)? {
                             ActivityEntry::App { entry_type, .. } => {
                                 flat_op::OpActivity::UpdateEntry {
-                                    original_action_hash: d.original_action_address.clone(),
-                                    original_entry_hash: d.original_entry_address.clone(),
                                     app_entry_type: entry_type,
-                                    action: a.clone(),
+                                    action: typed_action,
                                 }
                             }
                             ActivityEntry::PrivateApp { entry_type, .. } => {
                                 flat_op::OpActivity::UpdatePrivateEntry {
-                                    original_action_hash: d.original_action_address.clone(),
-                                    original_entry_hash: d.original_entry_address.clone(),
                                     app_entry_type: entry_type,
-                                    action: a.clone(),
+                                    action: typed_action,
                                 }
                             }
-                            ActivityEntry::Agent(new_key) => flat_op::OpActivity::UpdateAgent {
-                                original_action_hash: d.original_action_address.clone(),
-                                original_key: d.original_entry_address.clone().into(),
-                                new_key,
-                                action: a.clone(),
+                            ActivityEntry::Agent => flat_op::OpActivity::UpdateAgent {
+                                action: typed_action,
                             },
                             ActivityEntry::CapClaim => flat_op::OpActivity::UpdateCapClaim {
-                                original_action_hash: d.original_action_address.clone(),
-                                original_entry_hash: d.original_entry_address.clone(),
-                                action: a.clone(),
+                                action: typed_action,
                             },
                             ActivityEntry::CapGrant => flat_op::OpActivity::UpdateCapGrant {
-                                original_action_hash: d.original_action_address.clone(),
-                                original_entry_hash: d.original_entry_address.clone(),
-                                action: a.clone(),
+                                action: typed_action,
                             },
                         }
                     }
                     ActionData::Delete(d) => flat_op::OpActivity::DeleteEntry {
-                        original_action_hash: d.deletes_address.clone(),
-                        original_entry_hash: d.deletes_entry_address.clone(),
-                        action: a.clone(),
+                        action: TypedAction {
+                            header: a.header.clone(),
+                            data: d.clone(),
+                        },
                     },
                 };
                 Ok(flat_op::FlatOp::AgentActivity(r))
@@ -365,11 +415,11 @@ impl OpHelper for Op {
                 };
                 let link_type = in_scope_link_type(d.zome_index, d.link_type)?;
                 Ok(flat_op::FlatOp::Link(flat_op::OpLink::CreateLink {
-                    base_address: d.base_address.clone(),
-                    target_address: d.target_address.clone(),
-                    tag: d.tag.clone(),
                     link_type,
-                    action: a.clone(),
+                    action: TypedAction {
+                        header: a.header.clone(),
+                        data: d.clone(),
+                    },
                 }))
             }
             Op::DeleteLink(DeleteLink {
@@ -377,15 +427,15 @@ impl OpHelper for Op {
                 create_link,
             }) => {
                 let delete_action = &delete_link.hashed.content;
-                match &delete_action.data {
-                    ActionData::DeleteLink(_) => {}
+                let delete_data = match &delete_action.data {
+                    ActionData::DeleteLink(d) => d,
                     other => {
                         return Err(wasm_error!(WasmErrorInner::Guest(format!(
                             "DeleteLink op carried a non-DeleteLink action: {:?}",
                             other.action_type()
                         ))))
                     }
-                }
+                };
                 let d = match &create_link.data {
                     ActionData::CreateLink(d) => d,
                     other => {
@@ -397,19 +447,25 @@ impl OpHelper for Op {
                 };
                 let link_type = in_scope_link_type(d.zome_index, d.link_type)?;
                 Ok(flat_op::FlatOp::Link(flat_op::OpLink::DeleteLink {
-                    original_action: create_link.clone(),
-                    base_address: d.base_address.clone(),
-                    target_address: d.target_address.clone(),
-                    tag: d.tag.clone(),
+                    original_action: TypedAction {
+                        header: create_link.header.clone(),
+                        data: d.clone(),
+                    },
                     link_type,
-                    action: delete_action.clone(),
+                    action: TypedAction {
+                        header: delete_action.header.clone(),
+                        data: delete_data.clone(),
+                    },
                 }))
             }
             Op::Delete(Delete { delete }) => {
                 let action = &delete.hashed.content;
                 match &action.data {
-                    ActionData::Delete(_) => Ok(flat_op::FlatOp::Delete(flat_op::OpDelete {
-                        action: action.clone(),
+                    ActionData::Delete(data) => Ok(flat_op::FlatOp::Delete(flat_op::OpDelete {
+                        action: TypedAction {
+                            header: action.header.clone(),
+                            data: data.clone(),
+                        },
                     })),
                     other => Err(wasm_error!(WasmErrorInner::Guest(format!(
                         "Delete op carried a non-Delete action: {:?}",
@@ -508,7 +564,6 @@ where
 /// the zome id is not a dependency of this zome.
 pub(crate) fn activity_entry<ET>(
     entry_type: &EntryType,
-    entry_hash: &EntryHash,
 ) -> Result<ActivityEntry<<ET as UnitEnum>::Unit>, WasmError>
 where
     ET: UnitEnum,
@@ -526,7 +581,7 @@ where
                 EntryVisibility::Private => Ok(ActivityEntry::PrivateApp { entry_type: unit }),
             }
         }
-        EntryType::AgentPubKey => Ok(ActivityEntry::Agent(entry_hash.clone().into())),
+        EntryType::AgentPubKey => Ok(ActivityEntry::Agent),
         EntryType::CapClaim => Ok(ActivityEntry::CapClaim),
         EntryType::CapGrant => Ok(ActivityEntry::CapGrant),
     }
@@ -614,7 +669,8 @@ mod tests {
     use crate::test_utils::short_hand::{e, public_app_entry_def};
     use holo_hash::{ActionHash, AgentPubKey, DnaHash, EntryHash};
     use holochain_integrity_types::prelude::{
-        EntryType, LinkTag, LinkType, RecordEntry, Signature, SignedHashed, ZomeIndex,
+        CloseChainData, EntryType, LinkTag, LinkType, MigrationTarget, OpenChainData, RecordEntry,
+        Signature, SignedHashed, ZomeIndex,
     };
 
     #[hdk_entry_helper]
@@ -728,6 +784,49 @@ mod tests {
     }
 
     #[test]
+    fn store_record_open_chain_resolves_previous_target() {
+        types();
+        let target = MigrationTarget::Dna(DnaHash::from_raw_36(vec![11u8; 36]));
+        let close = ActionHash::from_raw_36(vec![12u8; 36]);
+        let signed = signed_from_data(ActionData::OpenChain(OpenChainData {
+            prev_target: target.clone(),
+            close_hash: close.clone(),
+        }));
+        let record = Record::new(signed, RecordEntry::NA);
+        let op = Op::CreateRecord(CreateRecord { record });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        match flat {
+            FlatOp::CreateRecord(OpRecord::OpenChain {
+                previous_target,
+                close_hash,
+                ..
+            }) => {
+                assert_eq!(previous_target, target);
+                assert_eq!(close_hash, close);
+            }
+            other => panic!("expected OpenChain, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn store_record_close_chain_resolves_new_target() {
+        types();
+        let target = MigrationTarget::Dna(DnaHash::from_raw_36(vec![13u8; 36]));
+        let signed = signed_from_data(ActionData::CloseChain(CloseChainData {
+            new_target: Some(target.clone()),
+        }));
+        let record = Record::new(signed, RecordEntry::NA);
+        let op = Op::CreateRecord(CreateRecord { record });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        match flat {
+            FlatOp::CreateRecord(OpRecord::CloseChain { new_target, .. }) => {
+                assert_eq!(new_target, Some(target));
+            }
+            other => panic!("expected CloseChain, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn store_entry_create_app_flattens_to_create_entry() {
         types();
         let signed = signed_from_data(create_app_data());
@@ -761,6 +860,53 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn register_agent_activity_open_chain_resolves_previous_target() {
+        types();
+        let target = MigrationTarget::Dna(DnaHash::from_raw_36(vec![14u8; 36]));
+        let close = ActionHash::from_raw_36(vec![15u8; 36]);
+        let signed = signed_from_data(ActionData::OpenChain(OpenChainData {
+            prev_target: target.clone(),
+            close_hash: close.clone(),
+        }));
+        let op = Op::AgentActivity(AgentActivity {
+            action: signed,
+            cached_entry: None,
+        });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        match flat {
+            FlatOp::AgentActivity(OpActivity::OpenChain {
+                previous_target,
+                close_hash,
+                ..
+            }) => {
+                assert_eq!(previous_target, target);
+                assert_eq!(close_hash, close);
+            }
+            other => panic!("expected OpenChain, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn register_agent_activity_close_chain_resolves_new_target() {
+        types();
+        let target = MigrationTarget::Dna(DnaHash::from_raw_36(vec![16u8; 36]));
+        let signed = signed_from_data(ActionData::CloseChain(CloseChainData {
+            new_target: Some(target.clone()),
+        }));
+        let op = Op::AgentActivity(AgentActivity {
+            action: signed,
+            cached_entry: None,
+        });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        match flat {
+            FlatOp::AgentActivity(OpActivity::CloseChain { new_target, .. }) => {
+                assert_eq!(new_target, Some(target));
+            }
+            other => panic!("expected CloseChain, got {other:?}"),
+        }
     }
 
     #[test]

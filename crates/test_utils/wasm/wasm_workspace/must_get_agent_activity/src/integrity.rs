@@ -13,9 +13,9 @@ pub enum EntryTypes {
     Thing(Thing),
 }
 
-fn validate_create_thing(action: Action) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_thing(action: TypedAction<CreateData>) -> ExternResult<ValidateCallbackResult> {
     let author = action.author().clone();
-    let action_hash = hash_action(action)?;
+    let action_hash = hash_action(action.into())?;
     let filter = ChainFilter::new(action_hash);
     let result = must_get_agent_activity(author.clone(), filter)?;
     debug!("Agent Activity Count: {}", result.len());
