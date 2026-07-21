@@ -14,6 +14,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260721.103110
+
+## [hcterm-0.7.0-rc.3](crates/hcterm/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_cli-0.7.0-rc.3](crates/holochain_cli/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_cli\_bundle-0.7.0-rc.3](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_cli\_client-0.7.0-rc.3](crates/holochain_cli_client/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_cli\_sandbox-0.7.0-rc.3](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_client-0.9.0-rc.3](crates/holochain_client/CHANGELOG.md#0.9.0-rc.3)
+
+## [holochain-0.7.0-rc.3](crates/holochain/CHANGELOG.md#0.7.0-rc.3)
+
+- **BREAKING CHANGE**: `holochain_types` no longer depends on `holochain_keystore`. The signing/verification extension traits and methods that lived on `holochain_types` types (`SignedActionHashedExt`, `ValidationReceipt::sign`, `WarrantOp::sign`, `ReportEntryFetchedOps::verify`) have moved to new extension traits in `holochain_keystore` (`SignedActionHashedExt`, `ValidationReceiptExt`, `WarrantOpExt`, `ReportEntryFetchedOpsExt`). `holochain_types::prelude` no longer re-exports `holochain_keystore::AgentPubKeyExt`. Downstream code using these methods must import the traits from `holochain_keystore` instead.
+- **BREAKING CHANGE** `hdi`’s `FlatOp` sub-types (`OpEntry`, `OpUpdate`, `OpDelete`, `OpRecord`, `OpActivity`, `OpLink`) now carry a `TypedAction<D>` — the action’s `ActionHeader` paired with its exact `ActionData` payload, already known from which variant you matched — instead of the fully generic `Action`. `OpUpdate::original_action_hash()`/`original_entry_hash()` remain as accessor methods (every variant has one). `OpEntry`/`OpRecord`/`OpActivity`/`OpLink` drop the equivalent `original_action_hash`/`original_entry_hash`/link `base_address`/`target_address`/`tag` fields with no replacement method — once you’ve matched the specific variant, read `action.data.<field>` directly. `agent`/`new_key`/`original_key` (the `EntryHash` → `AgentPubKey` conversions) remain as accessor methods on `OpEntry`/`OpRecord`/`OpActivity`. A new `EntryCreationData`/`TypedAction<EntryCreationData>` restores the `Create`-or-`Update` narrowing the removed `EntryCreationAction` used to provide. Integrity zomes’ `validate_*` helper signatures need updating accordingly — see the `hdi::flat_op` module docs.
+- Increase the SQLite `busy_timeout` from sqlx’s 5s default to 15s, to reduce spurious “database is locked” errors logged by queue consumer workflows under writer contention.
+- **BREAKING CHANGE**: `holochain_zome_types::query::AgentActivity`, the response type of `hdk::chain::get_agent_activity`, is renamed to `AgentActivityStatus`. This resolves a name collision with the unrelated `AgentActivity` `Op` variant struct.
+- **BREAKING CHANGE**: `holochain_integrity_types::action::CapAccess` (the `CapGrant.cap_access` column discriminant) is renamed to `CapAccessType`. This resolves a name collision with `holochain_integrity_types::capability::CapAccess`, the data-carrying grant-access type used by `ZomeCallCapGrant`, which keeps the `CapAccess` name. \#5882
+- Remove the unused `holochain_zome_types::crdt::CrdtType` placeholder type.
+- **BREAKING CHANGE**: `holochain_integrity_types` no longer re-exports its prelude (or `Entry`) at the crate root, and `holochain_zome_types` drops its own crate-root `Action`/`Entry` re-exports. In `holochain_zome_types`, modules that only re-exported `holochain_integrity_types` types (`chain`, `countersigning`, `crdt`, `genesis`, `record`, `trace`) are removed, and modules that previously re-exported their `holochain_integrity_types` counterpart wholesale (`action`, `capability`, `entry`, `entry_def`, `link`, `op`, `warrant`, `x_salsa20_poly1305`, `zome_io`, and others) no longer do so. Code that imported shared types via a module-qualified `holochain_zome_types::<module>::...` or bare `holochain_integrity_types::...` path should import from `holochain_zome_types::prelude` / `holochain_integrity_types::prelude` (or the type’s owning module) instead. `hdi`/`hdk` zome code that only uses `hdi::prelude`/`hdk::prelude` is unaffected.
+
+## [holochain\_cascade-0.7.0-rc.3](crates/holochain_cascade/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_conductor\_config-0.7.0-rc.3](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_test\_wasm\_common-0.7.0-rc.2](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-rc.2)
+
+## [holochain\_wasm\_test\_utils-0.7.0-rc.3](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_websocket-0.7.0-rc.3](crates/holochain_websocket/CHANGELOG.md#0.7.0-rc.3)
+
+## [hdk-0.7.0-rc.2](crates/hdk/CHANGELOG.md#0.7.0-rc.2)
+
+## [holochain\_p2p-0.7.0-rc.3](crates/holochain_p2p/CHANGELOG.md#0.7.0-rc.3)
+
+## [hdi-0.8.0-rc.2](crates/hdi/CHANGELOG.md#0.8.0-rc.2)
+
+## [holochain\_state-0.7.0-rc.3](crates/holochain_state/CHANGELOG.md#0.7.0-rc.3)
+
+## [hdk\_derive-0.7.0-rc.2](crates/hdk_derive/CHANGELOG.md#0.7.0-rc.2)
+
+## [holochain\_data-0.7.0-rc.3](crates/holochain_data/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_conductor\_api-0.7.0-rc.3](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_keystore-0.7.0-rc.2](crates/holochain_keystore/CHANGELOG.md#0.7.0-rc.2)
+
+## [holochain\_state\_types-0.7.0-rc.2](crates/holochain_state_types/CHANGELOG.md#0.7.0-rc.2)
+
+## [holochain\_types-0.7.0-rc.3](crates/holochain_types/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_zome\_types-0.7.0-rc.2](crates/holochain_zome_types/CHANGELOG.md#0.7.0-rc.2)
+
+## [holochain\_integrity\_types-0.7.0-rc.2](crates/holochain_integrity_types/CHANGELOG.md#0.7.0-rc.2)
+
 # 20260720.031718
 
 ## [hcterm-0.7.0-rc.2](crates/hcterm/CHANGELOG.md#0.7.0-rc.2)

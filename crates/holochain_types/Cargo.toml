@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.7.0-rc.2"
+version = "0.7.0-rc.3"
 description = "Holochain common types"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -26,7 +26,7 @@ holochain_trace = { version = "^0.7.0-rc.1", path = "../holochain_trace" }
 holochain_util = { version = "^0.7.0-rc.1", path = "../holochain_util", features = [
   "backtrace",
 ] }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.7.0-rc.1", features = [
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.7.0-rc.2", features = [
   "full",
 ] }
 holochain_timestamp = { version = "^0.7.0-rc.1", path = "../timestamp" }
