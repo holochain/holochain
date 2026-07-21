@@ -17,6 +17,8 @@ use ::fixt::prelude::*;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
+use holochain_keystore::SignedActionHashedExt;
+use holochain_keystore::WarrantOpExt;
 use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
 
 /// Test that a valid ChainFork warrant is accepted when both actions:

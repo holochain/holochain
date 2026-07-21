@@ -12,6 +12,7 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
+async-trait = "0.1"
 base64 = "0.22"
 derive_more = { version = "2.0", features = ["from"] }
 futures = "0.3"
@@ -19,6 +20,7 @@ holo_hash = { version = "^0.7.0-rc.1", path = "../holo_hash", features = [
   "full",
 ] }
 holochain_serialized_bytes = "=0.0.57"
+holochain_types = { version = "0.7.0-rc.1", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.7.0-rc.1", path = "../holochain_zome_types" }
 holochain_secure_primitive = { version = "^0.7.0-rc.1", path = "../holochain_secure_primitive" }
 holochain_util = { version = "^0.7.0-rc.1", path = "../holochain_util" }
@@ -40,6 +42,7 @@ tracing = "0.1"
 url2 = "0.0.6"
 
 [dev-dependencies]
+holochain_timestamp = { version = "0.7.0-rc.1", path = "../timestamp" }
 assert_cmd = "2.0.4"
 yaml_serde = "0.10"
 tempfile = "3.23"

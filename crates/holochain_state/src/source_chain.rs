@@ -15,12 +15,11 @@ use holo_hash::HasHash;
 use holo_hash::HoloHashed;
 use holochain_data::kind::Dht;
 use holochain_data::{DbRead, DbWrite};
-use holochain_keystore::MetaLairClient;
+use holochain_keystore::{AgentPubKeyExt, MetaLairClient, SignedActionHashedExt};
 use holochain_state_types::SourceChainDump;
 use holochain_types::op::{
     produce_ops_from_record, ChainOp, DhtOp, DhtOpHashed, HashedChainOp, OpEntry,
 };
-use holochain_types::prelude::SignedActionHashedExt;
 use holochain_types::warrant::WarrantOp;
 use holochain_zome_types::prelude::{
     build_action, from_countersigning_data, Action, ActionData, ActionHeader,

@@ -3200,12 +3200,15 @@ name = "holochain_keystore"
 version = "0.7.0-rc.1"
 dependencies = [
  "assert_cmd",
+ "async-trait",
  "base64",
  "derive_more",
  "futures",
  "holo_hash",
  "holochain_secure_primitive",
  "holochain_serialized_bytes",
+ "holochain_timestamp",
+ "holochain_types",
  "holochain_util",
  "holochain_zome_types",
  "lair_keystore",
@@ -3431,16 +3434,13 @@ name = "holochain_types"
 version = "0.7.0-rc.2"
 dependencies = [
  "anyhow",
- "async-trait",
  "backtrace",
- "base64",
  "bytes",
  "derive_builder",
  "derive_more",
  "fixt",
  "futures",
  "holo_hash",
- "holochain_keystore",
  "holochain_nonce",
  "holochain_serialized_bytes",
  "holochain_timestamp",

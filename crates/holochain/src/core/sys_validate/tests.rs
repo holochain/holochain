@@ -29,23 +29,16 @@
 
 use super::*;
 use crate::conductor::space::TestSpaces;
-use crate::core::workflow::sys_validation_workflow::sys_validate_record;
-use crate::sweettest::SweetAgents;
-use crate::sweettest::SweetConductor;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
-use holochain_cascade::MockCascade;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_types::test_utils::valid_arbitrary_chain;
-use holochain_types::test_utils::ActionRefMut;
 use holochain_zome_types::fixt::{ActionFixturator, CreateAction, CreateLinkAction};
 use matches::assert_matches;
-use std::time::Duration;
 
 /// Entry type in the action matches the entry variant
 #[test]
@@ -180,40 +173,4 @@ fn create_entry_op_rejects_private_entry() {
         check_entry_visibility(&ChainOp::CreateRecord(sa, OpEntry::Hidden)),
         Ok(())
     );
-}
-
-/// Test that the valid_chain contrafact matches our chain validation function,
-/// since many other tests will depend on this constraint
-#[tokio::test(flavor = "multi_thread")]
-// XXX: the valid_arbitrary_chain as used here can't handle actions with
-// sys validation dependencies, so we filter out those action types.
-// Also, there are several other problems here that need to be addressed
-// to make this not flaky.
-#[ignore = "flaky"]
-async fn valid_chain_fact_test() {
-    let n = 100;
-    let keystore = SweetConductor::standard().await.keystore();
-    let author = SweetAgents::one(keystore.clone()).await;
-
-    let mut chain = valid_arbitrary_chain(&keystore, author, n).await;
-
-    validate_chain(chain.iter().map(|r| r.signed_action()), &None).unwrap();
-
-    let mut last = chain.pop().unwrap();
-    let penult = chain.last().unwrap();
-
-    // clean up this record so it's valid
-    *last.as_action_mut().timestamp_mut() =
-        (penult.action().timestamp() + Duration::from_secs(1)).unwrap();
-    // re-sign it
-    last.signed_action = SignedActionHashed::sign(
-        &keystore,
-        holo_hash::HoloHashed::from_content_sync(last.action().clone()),
-    )
-    .await
-    .unwrap();
-
-    let cascade = MockCascade::with_records(chain);
-
-    sys_validate_record(&last, Arc::new(cascade)).await.unwrap();
 }

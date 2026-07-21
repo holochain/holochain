@@ -22,7 +22,6 @@ pub use crate::signal::*;
 pub use crate::validation_receipt::*;
 pub use crate::warrant::*;
 pub use crate::wire_ops::*;
-pub use holochain_keystore::AgentPubKeyExt;
 pub use holochain_nonce::Nonce256Bits;
 pub use holochain_serialized_bytes::prelude::*;
 pub use holochain_util::{ffs, tokio_helper};

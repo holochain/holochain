@@ -13,6 +13,7 @@ use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
+use holochain_keystore::SignedActionHashedExt;
 use holochain_zome_types::fixt::{
     ActionFixturator, AgentValidationPkgAction, CloseChainAction, CreateAction, CreateLinkAction,
     DeleteAction, DeleteLinkAction, DnaAction, InitZomesCompleteAction, UpdateAction,

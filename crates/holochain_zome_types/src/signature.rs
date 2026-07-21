@@ -13,7 +13,6 @@ pub struct Sign {
     pub key: holo_hash::AgentPubKey,
 
     /// The data that should be signed.
-    // TODO double check
     pub data: Bytes,
 }
 
