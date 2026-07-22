@@ -36,6 +36,35 @@ impl DbRead<Dht> {
         action::get_actions_by_author(&mut *conn, author).await
     }
 
+    /// Fetch an exclusive page of accepted actions authored by `author`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query fails.
+    pub async fn get_actions_by_author_paginated(
+        &self,
+        author: &AgentPubKey,
+        after_sequence: Option<u32>,
+        limit: Option<u32>,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        let mut conn = self.timed_conn().await?;
+        action::get_actions_by_author_paginated(&mut *conn, author, after_sequence, limit).await
+    }
+
+    /// Resolve an accepted action hash to its sequence for `author`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query fails.
+    pub async fn get_accepted_action_sequence(
+        &self,
+        author: &AgentPubKey,
+        action_hash: &ActionHash,
+    ) -> sqlx::Result<Option<u32>> {
+        let mut conn = self.timed_conn().await?;
+        action::get_accepted_action_sequence(&mut *conn, author, action_hash).await
+    }
+
     /// Count actions authored by `author`, capped at `cap`. See
     /// `action::count_author_actions_capped`.
     pub async fn count_author_actions_capped(

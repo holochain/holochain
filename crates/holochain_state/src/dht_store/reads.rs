@@ -7,13 +7,14 @@
 
 use super::DhtStore;
 use crate::prelude::ActionSequenceAndHash;
-use crate::query::StateQueryResult;
+use crate::query::{StateQueryError, StateQueryResult};
 use crate::scratch::SyncScratch;
 use holo_hash::{
     ActionHash, AgentPubKey, AnyLinkableHash, DhtOpHash, EntryHash, ExternalHash, HasHash,
 };
 use holochain_data::kind::Dht;
 use holochain_data::DbRead;
+use holochain_state_types::{SourceChainCursor, SourceChainDump, SourceChainDumpRecord};
 use holochain_types::op::DhtOpHashed;
 use holochain_types::prelude::{
     ActionHashedContainer, AgentActivity, AgentActivityResponse, ChainItems, ChainItemsSource,
@@ -2101,11 +2102,47 @@ impl DhtStore<DbRead<Dht>> {
     pub async fn dump_source_chain(
         &self,
         author: &AgentPubKey,
-    ) -> StateQueryResult<holochain_state_types::SourceChainDump> {
-        use holochain_state_types::{SourceChainDump, SourceChainDumpRecord};
+    ) -> StateQueryResult<SourceChainDump> {
+        self.dump_source_chain_paginated(author, None, None).await
+    }
 
-        // All actions for this author in seq order.
-        let actions = self.db().get_actions_by_author(author.clone()).await?;
+    /// Dump one exclusive page of the author's source chain.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a zero limit or an action-hash cursor that does not
+    /// identify an accepted action authored by `author`.
+    pub async fn dump_source_chain_paginated(
+        &self,
+        author: &AgentPubKey,
+        cursor: Option<&SourceChainCursor>,
+        limit: Option<u32>,
+    ) -> StateQueryResult<SourceChainDump> {
+        if limit == Some(0) {
+            return Err(StateQueryError::InvalidInput(
+                "dump limit must be greater than zero".to_string(),
+            ));
+        }
+
+        let after_sequence = match cursor {
+            Some(SourceChainCursor::Sequence(sequence)) => Some(*sequence),
+            Some(SourceChainCursor::ActionHash(action_hash)) => Some(
+                self.db()
+                    .get_accepted_action_sequence(author, action_hash)
+                    .await?
+                    .ok_or_else(|| {
+                        StateQueryError::InvalidInput(format!(
+                            "source-chain cursor {action_hash} is unknown or belongs to another author"
+                        ))
+                    })?,
+            ),
+            None => None,
+        };
+
+        let actions = self
+            .db()
+            .get_actions_by_author_paginated(author, after_sequence, limit)
+            .await?;
 
         let mut records = Vec::with_capacity(actions.len());
         for sah in &actions {

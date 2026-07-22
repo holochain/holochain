@@ -229,6 +229,12 @@ pub enum AdminRequest {
     DumpState {
         /// The cell ID for which to dump state
         cell_id: Box<CellId>,
+        /// Last source-chain record seen; the next page starts after it.
+        #[serde(default)]
+        source_chain_cursor: Option<crate::state_dump::SourceChainCursor>,
+        /// Maximum number of source-chain records to return. Must be greater than zero.
+        #[serde(default)]
+        limit: Option<u32>,
     },
 
     /// Dump the state of the conductor, including the in-memory representation
@@ -257,9 +263,14 @@ pub enum AdminRequest {
     DumpFullState {
         /// The cell ID for which to dump the state
         cell_id: Box<CellId>,
-        /// Pagination cursor from a previous `DumpFullState`; only ops
-        /// integrated after it are returned. `None` starts from the beginning.
+        /// Pagination cursor from a previous `DumpFullState`; only DHT ops
+        /// received after it are returned. `None` starts from the beginning.
+        #[serde(default)]
         dht_ops_cursor: Option<crate::state_dump::DhtOpsCursor>,
+        /// Maximum number of DHT ops across all lifecycle buckets to return.
+        /// Must be greater than zero.
+        #[serde(default)]
+        limit: Option<u32>,
     },
 
     /// Dump the network metrics tracked by kitsune.
@@ -711,7 +722,9 @@ pub struct AppAuthenticationTokenIssued {
 
 #[cfg(test)]
 mod tests {
-    use crate::{AdminRequest, AdminResponse, ExternalApiWireError};
+    use crate::{AdminRequest, AdminResponse, DhtOpsCursor, ExternalApiWireError};
+    use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
+    use holochain_zome_types::cell::CellId;
     use serde::Deserialize;
 
     #[test]
@@ -761,5 +774,53 @@ mod tests {
         let json_actual = serde_json::to_string(&json_value).unwrap();
 
         assert_eq!(json_actual, json_expected);
+    }
+
+    #[test]
+    fn state_dump_requests_default_omitted_pagination_fields() {
+        let cell_id = CellId::new(
+            DnaHash::from_raw_36(vec![1; 36]),
+            AgentPubKey::from_raw_36(vec![2; 36]),
+        );
+
+        let dump_state: AdminRequest = serde_json::from_value(serde_json::json!({
+            "type": "dump_state",
+            "value": { "cell_id": cell_id.clone() }
+        }))
+        .unwrap();
+        assert!(matches!(
+            dump_state,
+            AdminRequest::DumpState {
+                source_chain_cursor: None,
+                limit: None,
+                ..
+            }
+        ));
+
+        let dump_full_state: AdminRequest = serde_json::from_value(serde_json::json!({
+            "type": "dump_full_state",
+            "value": { "cell_id": cell_id }
+        }))
+        .unwrap();
+        assert!(matches!(
+            dump_full_state,
+            AdminRequest::DumpFullState {
+                dht_ops_cursor: None,
+                limit: None,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn dht_ops_cursor_serializes_received_time() {
+        let cursor = DhtOpsCursor {
+            when_received: 42,
+            hash: DhtOpHash::from_raw_36(vec![3; 36]),
+        };
+        let value = serde_json::to_value(cursor).unwrap();
+
+        assert_eq!(value["when_received"], 42);
+        assert!(value.get("when_integrated").is_none());
     }
 }

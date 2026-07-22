@@ -16,7 +16,7 @@ use holo_hash::HoloHashed;
 use holochain_data::kind::Dht;
 use holochain_data::{DbRead, DbWrite};
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient, SignedActionHashedExt};
-use holochain_state_types::SourceChainDump;
+use holochain_state_types::{SourceChainCursor, SourceChainDump};
 use holochain_types::op::{
     produce_ops_from_record, ChainOp, DhtOp, DhtOpHashed, HashedChainOp, OpEntry,
 };
@@ -1139,8 +1139,23 @@ pub async fn dump_state(
     dht_store: &DhtStoreRead,
     author: AgentPubKey,
 ) -> Result<SourceChainDump, SourceChainError> {
+    dump_state_paginated(dht_store, author, None, None).await
+}
+
+/// Dump one exclusive page of an author's source chain.
+///
+/// # Errors
+///
+/// Returns an error for invalid pagination arguments or a failed state query.
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+pub async fn dump_state_paginated(
+    dht_store: &DhtStoreRead,
+    author: AgentPubKey,
+    cursor: Option<&SourceChainCursor>,
+    limit: Option<u32>,
+) -> Result<SourceChainDump, SourceChainError> {
     dht_store
-        .dump_source_chain(&author)
+        .dump_source_chain_paginated(&author, cursor, limit)
         .await
         .map_err(SourceChainError::other)
 }
@@ -1996,7 +2011,7 @@ mod tests {
             chain,
             agent_key,
             dht_store,
-            ..
+            keystore,
         } = TestCase::new().await;
 
         // Add a private-entry action (seq 3) on top of the genesis 3-action chain.
@@ -2046,6 +2061,118 @@ mod tests {
             dump.published_ops_count, 0,
             "no ops have been published yet"
         );
+
+        let published_op = dht_store
+            .as_read()
+            .ops_to_publish_for_wire(&agent_key)
+            .await?
+            .into_iter()
+            .next()
+            .expect("at least one authored op");
+        dht_store
+            .record_published_op_hashes(
+                vec![DhtOpHash::from_raw_36(published_op.op_hash)],
+                Timestamp::now(),
+            )
+            .await?;
+
+        let first_page = dht_store
+            .as_read()
+            .dump_source_chain_paginated(&agent_key, None, Some(2))
+            .await?;
+        assert_eq!(first_page.records.len(), 2);
+        assert_eq!(first_page.records, dump.records[..2]);
+        assert_eq!(first_page.published_ops_count, 1);
+
+        let sequence_page = dht_store
+            .as_read()
+            .dump_source_chain_paginated(
+                &agent_key,
+                Some(&SourceChainCursor::Sequence(1)),
+                Some(10),
+            )
+            .await?;
+        let hash_page = dht_store
+            .as_read()
+            .dump_source_chain_paginated(
+                &agent_key,
+                Some(&SourceChainCursor::ActionHash(
+                    dump.records[1].action_address.clone(),
+                )),
+                Some(10),
+            )
+            .await?;
+        assert_eq!(sequence_page, hash_page);
+        assert_eq!(sequence_page.records, dump.records[2..]);
+        assert_eq!(sequence_page.published_ops_count, 1);
+
+        let empty_page = dht_store
+            .as_read()
+            .dump_source_chain_paginated(&agent_key, Some(&SourceChainCursor::Sequence(3)), Some(5))
+            .await?;
+        assert!(empty_page.records.is_empty());
+        assert_eq!(empty_page.published_ops_count, 1);
+
+        assert!(dht_store
+            .as_read()
+            .dump_source_chain_paginated(&agent_key, None, Some(0))
+            .await
+            .is_err());
+        assert!(dht_store
+            .as_read()
+            .dump_source_chain_paginated(
+                &agent_key,
+                Some(&SourceChainCursor::ActionHash(ActionHash::from_raw_36(
+                    vec![42; 36],
+                ))),
+                Some(1),
+            )
+            .await
+            .is_err());
+
+        let mut rejected_action = dump.records[3].action.clone();
+        rejected_action.header.action_seq = 99;
+        rejected_action.header.prev_action = Some(dump.records[3].action_address.clone());
+        rejected_action.header.timestamp = Timestamp::now();
+        let rejected_action_hash = ActionHash::with_data_sync(&rejected_action);
+        let rejected_op =
+            DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::AgentActivity(
+                SignedAction::new(rejected_action, Signature::from([42; 64])),
+            ))));
+        dht_store
+            .record_incoming_ops(vec![(rejected_op, false)])
+            .await?;
+        assert!(dht_store
+            .as_read()
+            .dump_source_chain_paginated(
+                &agent_key,
+                Some(&SourceChainCursor::ActionHash(rejected_action_hash)),
+                Some(1),
+            )
+            .await
+            .is_err());
+
+        let other_agent = keystore.new_sign_keypair_random().await.unwrap();
+        genesis(
+            dht_store.clone(),
+            keystore,
+            chain.cell_id().dna_hash().clone(),
+            other_agent.clone(),
+            None,
+        )
+        .await?;
+        let other_dump = dht_store.as_read().dump_source_chain(&other_agent).await?;
+        assert!(dht_store
+            .as_read()
+            .dump_source_chain_paginated(
+                &agent_key,
+                Some(&SourceChainCursor::ActionHash(
+                    other_dump.records[0].action_address.clone(),
+                )),
+                Some(1),
+            )
+            .await
+            .is_err());
 
         Ok(())
     }

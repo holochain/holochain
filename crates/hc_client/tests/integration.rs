@@ -3,12 +3,14 @@ use std::process::Command as StdCommand;
 use std::time::Duration;
 
 use anyhow::{ensure, Result};
-use holo_hash::{AgentPubKey, AgentPubKeyB64, DnaHash, DnaHashB64};
+use holo_hash::{ActionHash, AgentPubKey, AgentPubKeyB64, DnaHash, DnaHashB64, HasHash};
 use holochain::{sweettest::*, test_utils::inline_zomes::simple_crud_zome};
-use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
+use holochain_client::AdminWebsocket;
+use holochain_conductor_api::{AdminInterfaceConfig, DhtOpsCursor, FullStateDump, InterfaceDriver};
+use holochain_types::op::{DhtOp, DhtOpHashed};
 use holochain_types::prelude::CellId;
 use holochain_types::websocket::AllowedOrigins;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command as TokioCommand;
 use tokio::sync::OnceCell;
@@ -64,6 +66,205 @@ async fn list_dnas() -> Result<()> {
 
     let hashes: Vec<String> = serde_json::from_slice(&output.stdout)?;
     assert_eq!(hashes, vec![expected_hash]);
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn dump_commands_return_single_cursor_page() -> Result<()> {
+    let mut conductor = SweetConductor::standard().await;
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let app = conductor.setup_app("app", &[dna]).await?;
+    let cell_id = app.cells()[0].cell_id().clone();
+    let dna = cell_id.dna_hash().to_string();
+    let agent = cell_id.agent_pubkey().to_string();
+    let admin_port = conductor
+        .get_arbitrary_admin_websocket_port()
+        .expect("admin port");
+    let admin_port_arg = admin_port.to_string();
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None).await?;
+
+    let unbounded_source_json: serde_json::Value =
+        serde_json::from_str(&admin_ws.dump_state(cell_id.clone(), None, None).await?)?;
+    let unbounded_records = unbounded_source_json[0]["source_chain_dump"]["records"]
+        .as_array()
+        .expect("unbounded source-chain records")
+        .clone();
+    assert!(unbounded_source_json[1]
+        .as_str()
+        .expect("source-chain summary")
+        .contains("Records returned:"));
+    let unbounded_full = admin_ws
+        .dump_full_state(cell_id.clone(), None, None)
+        .await?;
+
+    let first_source_page = get_hc_client_command()
+        .args([
+            "call",
+            "--port",
+            admin_port_arg.as_str(),
+            "dump-state",
+            dna.as_str(),
+            agent.as_str(),
+            "--limit",
+            "2",
+        ])
+        .output()?;
+    assert!(first_source_page.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&first_source_page.stdout)
+            .lines()
+            .count(),
+        1
+    );
+    let first_source_json: serde_json::Value = serde_json::from_slice(&first_source_page.stdout)?;
+    let first_records = first_source_json[0]["source_chain_dump"]["records"]
+        .as_array()
+        .expect("source-chain records")
+        .clone();
+    assert_eq!(first_records.len(), 2);
+    assert!(first_source_json[1]
+        .as_str()
+        .expect("paginated source-chain summary")
+        .contains("Records returned: 2"));
+
+    let second_source_page = get_hc_client_command()
+        .args([
+            "call",
+            "--port",
+            admin_port_arg.as_str(),
+            "dump-state",
+            dna.as_str(),
+            agent.as_str(),
+            "--limit",
+            "2",
+            "--cursor",
+            "1",
+        ])
+        .output()?;
+    assert!(second_source_page.status.success());
+    let second_source_json: serde_json::Value = serde_json::from_slice(&second_source_page.stdout)?;
+    assert_eq!(
+        String::from_utf8_lossy(&second_source_page.stdout)
+            .lines()
+            .count(),
+        1
+    );
+    let second_records = second_source_json[0]["source_chain_dump"]["records"]
+        .as_array()
+        .expect("source-chain records")
+        .clone();
+    assert!(!second_records.is_empty());
+    assert_ne!(
+        first_records.last().unwrap()["action_address"],
+        second_records.first().unwrap()["action_address"]
+    );
+
+    let combined_records: Vec<_> = first_records
+        .iter()
+        .chain(&second_records)
+        .cloned()
+        .collect();
+    assert_eq!(combined_records, unbounded_records);
+
+    let source_hash_cursor: ActionHash =
+        serde_json::from_value(first_records.last().unwrap()["action_address"].clone())?;
+    let hash_source_page = get_hc_client_command()
+        .args([
+            "call",
+            "--port",
+            admin_port_arg.as_str(),
+            "dump-state",
+            dna.as_str(),
+            agent.as_str(),
+            "--limit",
+            "2",
+            "--cursor",
+            source_hash_cursor.to_string().as_str(),
+        ])
+        .output()?;
+    assert!(hash_source_page.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&hash_source_page.stdout)
+            .lines()
+            .count(),
+        1
+    );
+    let hash_source_json: serde_json::Value = serde_json::from_slice(&hash_source_page.stdout)?;
+    assert_eq!(
+        hash_source_json[0]["source_chain_dump"]["records"],
+        second_source_json[0]["source_chain_dump"]["records"]
+    );
+
+    let expected_hashes: HashSet<_> = unbounded_full
+        .integration_dump
+        .validation_limbo
+        .iter()
+        .chain(&unbounded_full.integration_dump.integration_limbo)
+        .chain(&unbounded_full.integration_dump.integrated)
+        .cloned()
+        .map(DhtOpHashed::from_content_sync)
+        .map(|op| op.as_hash().clone())
+        .collect();
+    let mut actual_hashes = Vec::new();
+    let mut cursor: Option<DhtOpsCursor> = None;
+    let mut page_index = 0;
+    loop {
+        let mut command = get_hc_client_command();
+        command.args([
+            "call",
+            "--port",
+            admin_port_arg.as_str(),
+            "dump-full-state",
+            dna.as_str(),
+            agent.as_str(),
+            "--limit",
+            "2",
+        ]);
+        if let Some(cursor) = &cursor {
+            command.args([
+                "--cursor",
+                cursor.when_received.to_string().as_str(),
+                cursor.hash.to_string().as_str(),
+            ]);
+        }
+        let page_output = command.output()?;
+        assert!(page_output.status.success());
+        assert_eq!(
+            String::from_utf8_lossy(&page_output.stdout).lines().count(),
+            1
+        );
+        let page: FullStateDump = serde_json::from_slice(&page_output.stdout)?;
+        if page_index == 0 {
+            assert_eq!(page.peer_dump, unbounded_full.peer_dump);
+            assert_eq!(page.source_chain_dump, unbounded_full.source_chain_dump);
+        }
+        let page_ops = page
+            .integration_dump
+            .validation_limbo
+            .into_iter()
+            .chain(page.integration_dump.integration_limbo)
+            .chain(page.integration_dump.integrated)
+            .collect::<Vec<DhtOp>>();
+        assert!(page_ops.len() <= 2);
+        actual_hashes.extend(
+            page_ops
+                .into_iter()
+                .map(DhtOpHashed::from_content_sync)
+                .map(|op| op.as_hash().clone()),
+        );
+        cursor = page.integration_dump.dht_ops_cursor;
+        page_index += 1;
+        if cursor.is_none() {
+            break;
+        }
+    }
+    assert!(page_index > 1);
+    assert_eq!(actual_hashes.len(), expected_hashes.len());
+    assert_eq!(
+        actual_hashes.into_iter().collect::<HashSet<_>>(),
+        expected_hashes
+    );
 
     Ok(())
 }

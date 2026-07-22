@@ -370,7 +370,7 @@ fn display_op(op: &DhtOp) -> String {
 /// their hashes match the published set.
 async fn get_integrated_ops(dht_store: &DhtStoreRead) -> Vec<DhtOp> {
     let chain = dht_store
-        .integrated_chain_ops_for_dump(None)
+        .integrated_chain_ops_for_dump(None, None)
         .await
         .unwrap()
         .into_iter()

@@ -95,7 +95,7 @@ fn is_author_local_private_store_entry(op: &DhtOp) -> bool {
 /// their hashes match across nodes.
 async fn integrated_op_rows(dht_store: &DhtStoreRead) -> Result<Vec<DhtOpRow>, String> {
     let dump_rows = dht_store
-        .integrated_chain_ops_for_dump(None)
+        .integrated_chain_ops_for_dump(None, None)
         .await
         .map_err(|e| e.to_string())?;
     // Reconstruct each row on its own so its `when_integrated` stays paired with

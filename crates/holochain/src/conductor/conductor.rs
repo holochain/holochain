@@ -82,7 +82,7 @@ use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::PeerMetaInfo;
-use holochain_conductor_api::{DhtOpsCursor, FullIntegrationStateDump};
+use holochain_conductor_api::{DhtOpsCursor, FullIntegrationStateDump, SourceChainCursor};
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
 use holochain_keystore::MetaLairClient;
@@ -2501,14 +2501,27 @@ mod misc_impls {
             Ok(AppCapGrantInfo(grant_info))
         }
 
-        /// Create a JSON dump of the cell's state
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
+        /// Create a paginated JSON dump of the cell's state.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the cell cannot be read or pagination is invalid.
+        pub async fn dump_cell_state(
+            &self,
+            cell_id: &CellId,
+            source_chain_cursor: Option<&SourceChainCursor>,
+            limit: Option<u32>,
+        ) -> ConductorApiResult<String> {
             let dht_store = self.get_or_create_dht_store(cell_id.dna_hash())?;
             let agent_pub_key = cell_id.agent_pubkey().clone();
             let peer_dump = peer_store_dump(self, cell_id).await?;
-            let source_chain_dump =
-                source_chain::dump_state(&dht_store.as_read(), agent_pub_key).await?;
+            let source_chain_dump = source_chain::dump_state_paginated(
+                &dht_store.as_read(),
+                agent_pub_key,
+                source_chain_cursor,
+                limit,
+            )
+            .await?;
 
             let out = JsonDump {
                 peer_dump,
@@ -2564,11 +2577,16 @@ mod misc_impls {
             Ok(out)
         }
 
-        /// Create a comprehensive structured dump of a cell's state.
+        /// Create one paginated comprehensive dump of a cell's state.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the cell cannot be read or the limit is zero.
         pub async fn dump_full_cell_state(
             &self,
             cell_id: &CellId,
             dht_ops_cursor: Option<DhtOpsCursor>,
+            limit: Option<u32>,
         ) -> ConductorApiResult<FullStateDump> {
             let dht_store = self.get_or_create_dht_store(cell_id.dna_hash())?;
             let source_chain_dump =
@@ -2579,8 +2597,12 @@ mod misc_impls {
             let out = FullStateDump {
                 peer_dump,
                 source_chain_dump,
-                integration_dump: full_integration_dump(&dht_store.as_read(), dht_ops_cursor)
-                    .await?,
+                integration_dump: full_integration_dump_paginated(
+                    &dht_store.as_read(),
+                    dht_ops_cursor,
+                    limit,
+                )
+                .await?,
             };
             Ok(out)
         }
@@ -3599,41 +3621,48 @@ pub async fn full_integration_dump(
     dht_store: &DhtStoreRead,
     dht_ops_cursor: Option<DhtOpsCursor>,
 ) -> ConductorApiResult<FullIntegrationStateDump> {
-    // Page the (growing) integrated set by the `(when_integrated, hash)` cursor.
+    full_integration_dump_paginated(dht_store, dht_ops_cursor, None).await
+}
+
+/// Dump one page of the full integration JSON state.
+pub(crate) async fn full_integration_dump_paginated(
+    dht_store: &DhtStoreRead,
+    dht_ops_cursor: Option<DhtOpsCursor>,
+    limit: Option<u32>,
+) -> ConductorApiResult<FullIntegrationStateDump> {
     let after = dht_ops_cursor
         .as_ref()
-        .map(|c| (c.when_integrated, c.hash.get_raw_36().to_vec()));
-    let integrated_rows = dht_store
-        .integrated_chain_ops_for_dump(after.as_ref().map(|(t, h)| (*t, h.as_slice())))
-        .await?;
-
-    // The next cursor is the last integrated chain op returned (ordered by
-    // `(when_integrated, hash)`); `None` when nothing new was integrated.
-    let dht_ops_cursor = integrated_rows.last().map(|row| DhtOpsCursor {
-        when_integrated: row.when_integrated,
-        hash: holo_hash::DhtOpHash::from_raw_36(row.wire.op_hash.clone()),
+        .map(|cursor| (cursor.when_received, &cursor.hash));
+    let page = dht_store.dht_ops_page_for_dump(after, limit).await?;
+    let dht_ops_cursor = page.cursor.map(|cursor| DhtOpsCursor {
+        when_received: cursor.when_received,
+        hash: cursor.hash,
     });
-
-    let mut integrated: Vec<_> = integrated_rows
-        .into_iter()
-        .filter_map(|row| holochain_p2p::build_chain_dht_op(row.wire).ok())
-        .collect();
-    // Warrants are returned in full on every call (not cursor-paged); the cursor
-    // above tracks only the growing integrated chain-op list, so warrants can
-    // repeat across pages.
-    integrated.extend(
-        dht_store
-            .integrated_warrants_for_dump()
-            .await?
-            .into_iter()
-            .filter_map(|r| holochain_p2p::build_warrant_dht_op(r).ok()),
-    );
-
-    // Limbo sets are small and transient, so they are returned in full.
-    let validation_limbo =
-        wire_rows_to_ops(dht_store.limbo_chain_ops_for_dump(false).await?, Vec::new());
-    let integration_limbo =
-        wire_rows_to_ops(dht_store.limbo_chain_ops_for_dump(true).await?, Vec::new());
+    let mut validation_limbo = Vec::new();
+    let mut integration_limbo = Vec::new();
+    let mut integrated = Vec::new();
+    for row in page.rows {
+        let op = match row.wire {
+            holochain_state::dht_store::DumpOpWireRow::Chain(row) => {
+                holochain_p2p::build_chain_dht_op(row).ok()
+            }
+            holochain_state::dht_store::DumpOpWireRow::Warrant(row) => {
+                holochain_p2p::build_warrant_dht_op(row).ok()
+            }
+        };
+        let Some(op) = op else {
+            continue;
+        };
+        match row.state {
+            holochain_state::dht_store::DumpOpState::ValidationLimbo => {
+                validation_limbo.push(op);
+            }
+            holochain_state::dht_store::DumpOpState::IntegrationLimbo => {
+                integration_limbo.push(op);
+            }
+            holochain_state::dht_store::DumpOpState::Integrated => integrated.push(op),
+        }
+    }
 
     Ok(FullIntegrationStateDump {
         validation_limbo,

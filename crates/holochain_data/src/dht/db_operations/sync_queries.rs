@@ -4,12 +4,12 @@ use super::super::inner::sync_queries::{self, ArcBounds};
 use crate::handles::DbRead;
 use crate::kind::Dht;
 use crate::models::dht::{
-    DumpChainOpRow, K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow,
+    DumpChainOpRow, DumpOpPage, K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow,
     K2WarrantForWireRow,
 };
-use holo_hash::AgentPubKey;
 #[cfg(any(test, feature = "inspection"))]
-use holo_hash::{AnyLinkableHash, DhtOpHash};
+use holo_hash::AnyLinkableHash;
+use holo_hash::{AgentPubKey, DhtOpHash};
 
 impl DbRead<Dht> {
     /// `(hash, basis, size)` for every integrated, locally-validated op
@@ -216,9 +216,25 @@ impl DbRead<Dht> {
     pub async fn integrated_chain_ops_for_dump(
         &self,
         after: Option<(i64, &[u8])>,
+        limit: Option<u32>,
     ) -> sqlx::Result<Vec<DumpChainOpRow>> {
         let mut conn = self.timed_conn().await?;
-        sync_queries::integrated_chain_ops_for_dump(&mut *conn, after).await
+        sync_queries::integrated_chain_ops_for_dump(&mut *conn, after, limit).await
+    }
+
+    /// Select and hydrate a global DHT-op dump page in one read snapshot.
+    ///
+    /// Rows across integrated and limbo chain ops and warrants are ordered by
+    /// `(when_received, op_hash)`. Cache-only integrated chain ops are omitted.
+    pub async fn dht_ops_page_for_dump(
+        &self,
+        after: Option<(i64, &DhtOpHash)>,
+        limit: Option<u32>,
+    ) -> sqlx::Result<DumpOpPage> {
+        let mut tx = self.begin().await?;
+        let page = sync_queries::dht_ops_page_for_dump(tx.conn_mut(), after, limit).await?;
+        tx.close().await?;
+        Ok(page)
     }
 
     /// Limbo chain-op rows for the integration dump. `ready` selects the

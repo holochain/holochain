@@ -7,7 +7,7 @@ use holochain_integrity_types::prelude::{
     SignedHashed,
 };
 use holochain_zome_types::prelude::{ChainOpType, SignedActionHashed};
-use sqlx::{Executor, Sqlite};
+use sqlx::{Executor, QueryBuilder, Sqlite};
 
 /// Insert an `Action` row. `record_validity` is `Some(Accepted)` for
 /// self-authored actions and `None` for incoming network actions.
@@ -132,6 +132,62 @@ where
     .fetch_all(executor)
     .await?;
     rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
+/// Fetch an exclusive page of accepted actions authored by `author`.
+pub(crate) async fn get_actions_by_author_paginated<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+    after_sequence: Option<u32>,
+    limit: Option<u32>,
+) -> sqlx::Result<Vec<SignedActionHashed>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let mut query = QueryBuilder::<Sqlite>::new(
+        "SELECT hash, author, seq, prev_hash, timestamp, action_type,
+                action_data, signature, entry_hash, private_entry, record_validity
+         FROM Action WHERE author = ",
+    );
+    query.push_bind(author.get_raw_36());
+    query.push(" AND record_validity = ");
+    query.push_bind(i64::from(RecordValidity::Accepted));
+    if let Some(sequence) = after_sequence {
+        query.push(" AND seq > ");
+        query.push_bind(i64::from(sequence));
+    }
+    query.push(" ORDER BY seq ASC");
+    if let Some(limit) = limit {
+        query.push(" LIMIT ");
+        query.push_bind(i64::from(limit));
+    }
+
+    let rows = query
+        .build_query_as::<ActionRow>()
+        .fetch_all(executor)
+        .await?;
+    rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
+/// Resolve an accepted action hash to its sequence for the specified author.
+pub(crate) async fn get_accepted_action_sequence<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+    action_hash: &ActionHash,
+) -> sqlx::Result<Option<u32>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let sequence: Option<i64> = sqlx::query_scalar(
+        "SELECT seq FROM Action
+         WHERE hash = ? AND author = ? AND record_validity = ?",
+    )
+    .bind(action_hash.get_raw_36())
+    .bind(author.get_raw_36())
+    .bind(i64::from(RecordValidity::Accepted))
+    .fetch_optional(executor)
+    .await?;
+    Ok(sequence.map(|sequence| sequence as u32))
 }
 
 /// Count actions authored by `author`, stopping once `cap` rows have been
