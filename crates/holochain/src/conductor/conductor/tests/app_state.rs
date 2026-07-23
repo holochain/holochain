@@ -10,7 +10,6 @@ use crate::{
         error::ConductorError,
         ribosome_store::RibosomeStore,
         space::Spaces,
-        state::ConductorState,
         Conductor,
     },
     sweettest::*,
@@ -21,6 +20,7 @@ use holo_hash::{
     fixt::{AgentPubKeyFixturator, DnaHashFixturator},
     ActionHash,
 };
+use holochain_conductor_api::state::ConductorState;
 use holochain_conductor_api::{conductor::ConductorConfig, AppStatusFilter};
 use holochain_keystore::test_keystore;
 use holochain_state::prelude::test_db_dir;

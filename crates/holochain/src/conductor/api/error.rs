@@ -5,6 +5,7 @@ use crate::conductor::CellError;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::workflow::WorkflowError;
 use holo_hash::DnaHash;
+use holochain_conductor_api::state::ConductorStateError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
@@ -27,6 +28,10 @@ pub enum ConductorApiError {
     /// Conductor threw an error during API call.
     #[error("Conductor returned an error while using a ConductorApi: {0:?}")]
     ConductorError(#[from] ConductorError),
+
+    /// Conductor state access failed.
+    #[error(transparent)]
+    ConductorStateError(#[from] ConductorStateError),
 
     /// Io error.
     #[error("Io error while using a Interface Api: {0:?}")]

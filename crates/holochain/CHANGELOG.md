@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: The `holochain::conductor::state` module has been
+  removed. Its public types (`ConductorState`, `ConductorStateTag`,
+  `AppInterfaceId`, and `AppInterfaceConfig`) moved to
+  `holochain_conductor_api::state`. The unused
+  `ConductorState::get_network_compat` method was removed. \#5737
+
 ## 0.7.0-rc.3
 
 - **BREAKING CHANGE**: `holochain_types` no longer depends on `holochain_keystore`. The signing/verification extension traits and methods that lived on `holochain_types` types (`SignedActionHashedExt`, `ValidationReceipt::sign`, `WarrantOp::sign`, `ReportEntryFetchedOps::verify`) have moved to new extension traits in `holochain_keystore` (`SignedActionHashedExt`, `ValidationReceiptExt`, `WarrantOpExt`, `ReportEntryFetchedOpsExt`). `holochain_types::prelude` no longer re-exports `holochain_keystore::AgentPubKeyExt`. Downstream code using these methods must import the traits from `holochain_keystore` instead.

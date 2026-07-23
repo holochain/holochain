@@ -35,6 +35,7 @@ mod app_interface;
 pub mod config;
 pub mod peer_meta;
 pub mod signal_subscription;
+pub mod state;
 pub mod state_dump;
 pub mod storage_info;
 

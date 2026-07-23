@@ -23,8 +23,6 @@ mod metrics;
 pub mod paths;
 pub mod ribosome_store;
 pub mod space;
-pub mod state;
-pub mod state_persistence;
 
 pub use cell::error::CellError;
 pub use cell::Cell;

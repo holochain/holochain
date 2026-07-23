@@ -560,8 +560,6 @@ mod test {
     use crate::conductor::api::AdminResponse;
     use crate::conductor::api::AppInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
-    use crate::conductor::state::AppInterfaceId;
-    use crate::conductor::state::ConductorState;
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::sweettest::SweetDnaFile;
@@ -572,6 +570,8 @@ mod test {
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_conductor_api::conductor::ConductorConfig;
+    use holochain_conductor_api::state::AppInterfaceId;
+    use holochain_conductor_api::state::ConductorState;
     use holochain_conductor_api::*;
     use holochain_keystore::test_keystore;
     use holochain_serialized_bytes::prelude::*;

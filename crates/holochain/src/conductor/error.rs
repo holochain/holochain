@@ -155,6 +155,16 @@ impl From<one_err::OneErr> for ConductorError {
     }
 }
 
+impl From<holochain_conductor_api::state::ConductorStateError> for ConductorError {
+    fn from(e: holochain_conductor_api::state::ConductorStateError) -> Self {
+        use holochain_conductor_api::state::ConductorStateError;
+        match e {
+            ConductorStateError::AppNotInstalled(id) => Self::AppNotInstalled(id),
+            ConductorStateError::AppAlreadyInstalled(id) => Self::AppAlreadyInstalled(id),
+        }
+    }
+}
+
 impl From<ConductorError> for WasmErrorInner {
     fn from(e: ConductorError) -> Self {
         Self::Host(e.to_string())

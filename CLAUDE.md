@@ -53,7 +53,11 @@ Design references: `docs/design/state_model.md` and `docs/design/data_model.md` 
 - **Errors**: prefer `thiserror` for crate error types; `anyhow` is for application/binary code, not library APIs.
 - **Compiler warnings are not OK** in shared code (CONTRIBUTING.md). Fix, surgically `#[allow(...)]`, or escalate — don't disable globally.
 - **Public API docs**: `///` rustdoc on public items; module/crate docs should describe structure.
-- **Commits**: Conventional Commits (`feat:`, `fix:`, `refactor:`, etc.), bodies wrapped near 72 chars. Record notable changes in `crates/holochain/CHANGELOG.md` (bug fixes, new features, breaking changes).
+- **Commits**: Conventional Commits (`feat:`, `fix:`, `refactor:`, etc.), bodies wrapped near 72 chars.
+- **Changelog**: Write changelog entries only to
+  `crates/holochain/CHANGELOG.md`. Include only information relevant to end
+  users; omit internal implementation details and changes with no user-visible
+  impact.
 - **PRs**: branch off `develop`; changes are squash merged into `develop`; changes go from `develop` → `main` at release time and `main` should always be ignored for development.
 
 ## Project principles
