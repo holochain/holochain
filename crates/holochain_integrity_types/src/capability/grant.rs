@@ -15,18 +15,19 @@ use std::collections::{BTreeSet, HashSet};
 ///
 /// See `.is_valid()`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[allow(clippy::large_enum_variant)]
 pub enum CapGrant {
     /// Grants the capability of calling every extern to the calling agent, provided the calling
     /// agent is the local chain author.
-    /// This grant is compared to the current `Entry::Agent` entry on the source chain.
+    ///
+    /// This grant is compared to the current `Entry::Agent` entry on the source chain. See
+    /// [as_cap_grant](crate::Entry::as_cap_grant) to see how this conversion is defined.
     ChainAuthor(AgentPubKey),
 
     /// Any agent other than the chain author is attempting to call an extern.
     /// The pubkey of the calling agent is secured by the cryptographic handshake at the network
     /// layer and the caller must provide a secret that we check for in a private entry in the
     /// local chain.
-    RemoteAgent(ZomeCallCapGrant),
+    RemoteAgent(Box<ZomeCallCapGrant>),
 }
 
 impl From<holo_hash::AgentPubKey> for CapGrant {
@@ -100,7 +101,7 @@ impl ZomeCallCapGrant {
 impl From<ZomeCallCapGrant> for CapGrant {
     /// Create a new ZomeCall capability grant
     fn from(zccg: ZomeCallCapGrant) -> Self {
-        CapGrant::RemoteAgent(zccg)
+        CapGrant::RemoteAgent(Box::new(zccg))
     }
 }
 
@@ -118,9 +119,11 @@ impl CapGrant {
             // Grant is always valid if the author matches the check agent.
             CapGrant::ChainAuthor(author) => author == given_agent,
             // Otherwise we need to do more work…
-            CapGrant::RemoteAgent(ZomeCallCapGrant {
-                access, functions, ..
-            }) => {
+            CapGrant::RemoteAgent(grant) => {
+                let ZomeCallCapGrant {
+                    access, functions, ..
+                } = &**grant;
+
                 // The checked function needs to be in the grant…
                 let granted = match functions {
                     GrantedFunctions::All => true,

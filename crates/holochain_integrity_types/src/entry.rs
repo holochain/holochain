@@ -105,7 +105,7 @@ impl Entry {
     pub fn as_cap_grant(&self) -> Option<CapGrant> {
         match self {
             Entry::Agent(key) => Some(CapGrant::ChainAuthor(key.clone())),
-            Entry::CapGrant(data) => Some(CapGrant::RemoteAgent(data.clone())),
+            Entry::CapGrant(data) => Some(CapGrant::RemoteAgent(Box::new(data.clone()))),
             _ => None,
         }
     }
