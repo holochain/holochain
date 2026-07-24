@@ -1,6 +1,7 @@
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
+pub use holochain_state_types::SourceChainCursor;
 use holochain_state_types::SourceChainDump;
 use holochain_types::op::DhtOp;
 use serde::Deserialize;
@@ -54,33 +55,23 @@ pub struct FullIntegrationStateDump {
     /// Ops waiting to be integrated.
     pub integration_limbo: Vec<DhtOp>,
 
-    /// Ops that are integrated (includes rejected). Integrated **chain ops** are
-    /// paged by `dht_ops_cursor`; integrated **warrants** are appended in full on
-    /// every call and are not cursor-paged.
+    /// Ops that are integrated (includes rejected).
     pub integrated: Vec<DhtOp>,
 
-    /// Cursor marking the last integrated **chain op** returned. Pass it to a
-    /// subsequent `FullStateDump` to page forward through only the chain ops
-    /// integrated since. `None` when no integrated chain ops were returned.
-    ///
-    /// Only the (unbounded, growing) integrated chain-op list is paged. The two
-    /// limbo lists and integrated warrants are bounded/transient and returned in
-    /// full on every call, so they can repeat across pages.
+    /// Cursor marking the last DHT op selected across all lifecycle buckets.
+    /// Pass it to a subsequent `FullStateDump` to resume strictly after it.
+    /// `None` when the page selected no DHT ops.
     pub dht_ops_cursor: Option<DhtOpsCursor>,
 }
 
-/// Pagination cursor for the integrated **chain ops** in a
-/// [`FullIntegrationStateDump`]. Warrants and the limbo lists are not paged by it.
+/// Pagination cursor for all DHT ops in a [`FullIntegrationStateDump`].
 ///
-/// Integrated chain ops are ordered by `(when_integrated, hash)`; a cursor
-/// records the last op returned so the next dump resumes strictly after it.
-/// The DHT tables are `WITHOUT ROWID`, so pagination is keyed on this
-/// timestamp/hash pair rather than a rowid.
+/// `(when_received, hash)`.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DhtOpsCursor {
-    /// Microsecond integration timestamp of the last op returned.
-    pub when_integrated: i64,
-    /// Hash of the last op returned (tie-breaks ops sharing a timestamp).
+    /// Microsecond receipt timestamp of the last op selected.
+    pub when_received: i64,
+    /// Hash of the last op selected (tie-breaks ops sharing a timestamp).
     pub hash: DhtOpHash,
 }
 
@@ -115,7 +106,7 @@ impl std::fmt::Display for JsonDump {
         writeln!(f, "Number of other peers in p2p store: {num_other_peers},")?;
         writeln!(
             f,
-            "Records authored: {}, Ops published: {}",
+            "Records returned: {}, Ops published: {}",
             s.records.len(),
             s.published_ops_count
         )

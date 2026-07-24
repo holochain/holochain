@@ -8,8 +8,7 @@
 
 use holochain_data::kind::Dht;
 use holochain_data::DbWrite;
-use holochain_types::prelude::AgentPubKey;
-use holochain_types::prelude::Timestamp;
+use holochain_types::prelude::{AgentPubKey, DhtOpHash, Timestamp};
 
 use super::DhtStore;
 use crate::mutations::{StateMutationError, StateMutationResult};
@@ -128,17 +127,52 @@ where
         ))
     }
 
-    /// Integrated chain-op rows for the integration dump, paginated forward
-    /// from the `(when_integrated, op_hash)` cursor `after` (`None` from the
-    /// start, which yields the full set — also how the consistency harness
-    /// reads everything).
+    /// Return integrated chain-op rows after `after`, bounded by `limit`.
+    ///
+    /// `None` for `after` starts at the beginning, while `None` for `limit`
+    /// returns the full remaining set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `limit` is zero or the database query fails.
     pub async fn integrated_chain_ops_for_dump(
         &self,
         after: Option<(i64, &[u8])>,
+        limit: Option<u32>,
     ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::DumpChainOpRow>> {
+        if limit == Some(0) {
+            return Err(crate::query::StateQueryError::InvalidInput(
+                "dump limit must be greater than zero".to_string(),
+            ));
+        }
         self.db
             .as_ref()
-            .integrated_chain_ops_for_dump(after)
+            .integrated_chain_ops_for_dump(after, limit)
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Return one global DHT-op page ordered by `(when_received, op_hash)`.
+    ///
+    /// `None` for `after` starts at the beginning, while `None` for `limit`
+    /// returns the full remaining set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `limit` is zero or the database query fails.
+    pub async fn dht_ops_page_for_dump(
+        &self,
+        after: Option<(i64, &DhtOpHash)>,
+        limit: Option<u32>,
+    ) -> crate::query::StateQueryResult<holochain_data::models::dht::DumpOpPage> {
+        if limit == Some(0) {
+            return Err(crate::query::StateQueryError::InvalidInput(
+                "dump limit must be greater than zero".to_string(),
+            ));
+        }
+        self.db
+            .as_ref()
+            .dht_ops_page_for_dump(after, limit)
             .await
             .map_err(crate::query::StateQueryError::Sqlx)
     }

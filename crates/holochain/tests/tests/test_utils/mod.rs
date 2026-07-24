@@ -426,6 +426,7 @@ pub async fn dump_full_state(
     let request = AdminRequest::DumpFullState {
         cell_id: Box::new(cell_id),
         dht_ops_cursor,
+        limit: None,
     };
     let response = client.request(request);
     let response = check_timeout(response, 3000).await?;

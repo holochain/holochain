@@ -375,7 +375,7 @@ async fn grant_zome_call_capability_call() {
     // Take state dump before calling grant_zome_call_capability
     let before_state_dump = conductor
         .raw_handle()
-        .dump_full_cell_state(cell_id, None)
+        .dump_full_cell_state(cell_id, None, None)
         .await
         .expect("Failed to get state dump");
 
@@ -423,7 +423,7 @@ async fn grant_zome_call_capability_call() {
     // Take state dump after calling grant_zome_call_capability
     let after_state_dump = conductor
         .raw_handle()
-        .dump_full_cell_state(cell_id, None)
+        .dump_full_cell_state(cell_id, None, None)
         .await
         .expect("Failed to get state dump");
 
@@ -471,7 +471,7 @@ async fn grant_zome_call_capability_call_ensures_zome_initialization() {
     // Take state dump before calling grant_zome_call_capability
     let before_state_dump = conductor
         .raw_handle()
-        .dump_full_cell_state(cell_id, None)
+        .dump_full_cell_state(cell_id, None, None)
         .await
         .expect("Failed to get state dump");
 
@@ -503,7 +503,7 @@ async fn grant_zome_call_capability_call_ensures_zome_initialization() {
     // Take state dump after calling grant_zome_call_capability
     let after_state_dump = conductor
         .raw_handle()
-        .dump_full_cell_state(cell_id, None)
+        .dump_full_cell_state(cell_id, None, None)
         .await
         .expect("Failed to get state dump");
 
@@ -579,7 +579,7 @@ async fn revoke_zome_call_capability_call() {
     // Take a state dump, before calling revoke_zome_call_capability
     let before_state_dump = conductor
         .raw_handle()
-        .dump_full_cell_state(cell_id, None)
+        .dump_full_cell_state(cell_id, None, None)
         .await
         .expect("Failed to get state dump");
 
@@ -601,7 +601,7 @@ async fn revoke_zome_call_capability_call() {
     // Take a state dump, after calling revoke_zome_call_capability
     let after_state_dump = conductor
         .raw_handle()
-        .dump_full_cell_state(cell_id, None)
+        .dump_full_cell_state(cell_id, None, None)
         .await
         .expect("Failed to get state dump");
 
@@ -672,7 +672,7 @@ async fn revoke_zome_call_capability_call_ensures_zome_initialization() {
     // Take a state dump, before calling revoke_zome_call_capability
     let before_state_dump = conductor
         .raw_handle()
-        .dump_full_cell_state(cell_id, None)
+        .dump_full_cell_state(cell_id, None, None)
         .await
         .expect("Failed to get state dump");
 
@@ -694,7 +694,7 @@ async fn revoke_zome_call_capability_call_ensures_zome_initialization() {
     // Take a state dump, after calling revoke_zome_call_capability
     let after_state_dump = conductor
         .raw_handle()
-        .dump_full_cell_state(cell_id, None)
+        .dump_full_cell_state(cell_id, None, None)
         .await
         .expect("Failed to get state dump");
 

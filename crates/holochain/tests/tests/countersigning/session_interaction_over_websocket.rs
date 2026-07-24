@@ -839,6 +839,7 @@ async fn await_dht_sync(agents: &[&Agent]) {
                 AdminRequest::DumpFullState {
                     cell_id: Box::new(agent.cell_id.clone()),
                     dht_ops_cursor: None,
+                    limit: None,
                 },
                 &agent.admin_tx,
             )

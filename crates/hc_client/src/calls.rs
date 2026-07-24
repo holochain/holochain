@@ -7,12 +7,12 @@
 use anyhow::anyhow;
 use chrono::{DateTime, Utc};
 use clap::{Args, Parser, Subcommand};
-use holo_hash::{ActionHash, AgentPubKeyB64, DnaHashB64};
+use holo_hash::{ActionHash, AgentPubKeyB64, DhtOpHash, DnaHashB64};
 use holochain_client::AdminWebsocket;
-use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::PeerMetaInfo;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
+use holochain_conductor_api::{AppStatusFilter, DhtOpsCursor, SourceChainCursor};
 use holochain_types::app::AppManifest;
 use holochain_types::app::RoleSettingsMap;
 use holochain_types::app::RoleSettingsMapYaml;
@@ -74,6 +74,8 @@ pub enum AdminRequestCli {
     DisableApp(DisableApp),
     /// Calls [`AdminWebsocket::dump_state`].
     DumpState(DumpState),
+    /// Calls [`AdminWebsocket::dump_full_state`].
+    DumpFullState(DumpFullState),
     /// Calls [`AdminWebsocket::dump_conductor_state`].
     DumpConductorState,
     /// Calls [`AdminWebsocket::dump_network_metrics`].
@@ -223,6 +225,35 @@ pub struct DumpState {
     /// The agent half of the cell ID to dump.
     #[arg(value_parser = parse_agent_key)]
     pub agent_key: AgentPubKey,
+
+    /// Last source-chain sequence or action hash returned by the previous page.
+    #[arg(long, value_parser = parse_source_chain_cursor)]
+    pub cursor: Option<SourceChainCursor>,
+
+    /// Maximum number of source-chain records to return. Must be greater than zero.
+    #[arg(long, value_parser = parse_dump_limit)]
+    pub limit: Option<u32>,
+}
+
+/// Calls [`AdminWebsocket::dump_full_state`] and dumps one page of DHT state.
+#[derive(Debug, Args, Clone)]
+pub struct DumpFullState {
+    /// The DNA hash half of the cell ID to dump.
+    #[arg(value_parser = parse_dna_hash)]
+    pub dna: DnaHash,
+
+    /// The agent half of the cell ID to dump.
+    #[arg(value_parser = parse_agent_key)]
+    pub agent_key: AgentPubKey,
+
+    /// Last receipt timestamp and DHT op hash returned by the previous page.
+    #[arg(long, num_args = 2, value_names = ["WHEN_RECEIVED", "DHT_OP_HASH"])]
+    pub cursor: Option<Vec<String>>,
+
+    /// Maximum number of DHT ops across all lifecycle buckets to return.
+    /// Must be greater than zero.
+    #[arg(long, value_parser = parse_dump_limit)]
+    pub limit: Option<u32>,
 }
 
 /// Arguments for dumping network metrics.
@@ -387,8 +418,19 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             crate::msg!("Disabled app: \"{}\"", args.app_id);
         }
         AdminRequestCli::DumpState(args) => {
-            let state = client.dump_state(args.into()).await?;
+            let cell_id = CellId::new(args.dna, args.agent_key);
+            let state = client.dump_state(cell_id, args.cursor, args.limit).await?;
             println!("{state}");
+        }
+        AdminRequestCli::DumpFullState(args) => {
+            let cursor = args
+                .cursor
+                .as_deref()
+                .map(parse_dht_ops_cursor)
+                .transpose()?;
+            let cell_id = CellId::new(args.dna, args.agent_key);
+            let state = client.dump_full_state(cell_id, cursor, args.limit).await?;
+            println!("{}", serde_json::to_string(&state)?);
         }
         AdminRequestCli::DumpConductorState => {
             let state = client.dump_conductor_state().await?;
@@ -699,6 +741,38 @@ fn parse_dna_hash(arg: &str) -> anyhow::Result<DnaHash> {
     DnaHash::try_from(arg).map_err(|e| anyhow::anyhow!("{e:?}"))
 }
 
+fn parse_source_chain_cursor(arg: &str) -> anyhow::Result<SourceChainCursor> {
+    match arg.parse::<u32>() {
+        Ok(sequence) => Ok(SourceChainCursor::Sequence(sequence)),
+        Err(_) => ActionHash::try_from(arg)
+            .map(SourceChainCursor::ActionHash)
+            .map_err(|e| anyhow!("Invalid source-chain cursor: {e}")),
+    }
+}
+
+fn parse_dht_ops_cursor(values: &[String]) -> anyhow::Result<DhtOpsCursor> {
+    let [when_received, hash] = values else {
+        return Err(anyhow!("DHT cursor requires a receipt time and op hash"));
+    };
+    Ok(DhtOpsCursor {
+        when_received: when_received
+            .parse()
+            .map_err(|e| anyhow!("Invalid receipt time: {e}"))?,
+        hash: DhtOpHash::try_from(hash.as_str())
+            .map_err(|e| anyhow!("Invalid DHT op hash: {e}"))?,
+    })
+}
+
+fn parse_dump_limit(arg: &str) -> anyhow::Result<u32> {
+    let limit = arg
+        .parse()
+        .map_err(|e| anyhow!("Invalid dump limit: {e}"))?;
+    if limit == 0 {
+        return Err(anyhow!("dump limit must be greater than zero"));
+    }
+    Ok(limit)
+}
+
 fn parse_status_filter(arg: &str) -> anyhow::Result<AppStatusFilter> {
     match arg {
         "active" => Ok(AppStatusFilter::Enabled),
@@ -712,7 +786,12 @@ fn parse_status_filter(arg: &str) -> anyhow::Result<AppStatusFilter> {
 impl From<CellId> for DumpState {
     fn from(cell_id: CellId) -> Self {
         let (dna, agent_key) = cell_id.into_dna_and_agent();
-        Self { dna, agent_key }
+        Self {
+            dna,
+            agent_key,
+            cursor: None,
+            limit: None,
+        }
     }
 }
 
@@ -738,6 +817,122 @@ mod tests {
 
     fn test_agent_key(bytes: u8) -> AgentPubKey {
         AgentPubKey::from_raw_36(vec![bytes; 36])
+    }
+
+    #[test]
+    fn parses_dump_state_pagination_arguments() {
+        let dna = "uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm";
+        let agent = "uhCAkJCuynkgVdMn_bzZ2ZYaVfygkn0WCuzfFspczxFnZM1QAyXoo";
+        let call = Call::try_parse_from([
+            "hc-client",
+            "--port",
+            "1234",
+            "dump-state",
+            dna,
+            agent,
+            "--limit",
+            "5",
+            "--cursor",
+            "3",
+        ])
+        .unwrap();
+
+        let AdminRequestCli::DumpState(args) = call.call else {
+            panic!("expected dump-state arguments");
+        };
+        assert_eq!(args.limit, Some(5));
+        assert_eq!(args.cursor, Some(SourceChainCursor::Sequence(3)));
+    }
+
+    #[test]
+    fn parses_dump_full_state_cursor_pair() {
+        let dna = "uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm";
+        let agent = "uhCAkJCuynkgVdMn_bzZ2ZYaVfygkn0WCuzfFspczxFnZM1QAyXoo";
+        let hash = "uhCQkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm";
+        let call = Call::try_parse_from([
+            "hc-client",
+            "--port",
+            "1234",
+            "dump-full-state",
+            dna,
+            agent,
+            "--limit",
+            "10",
+            "--cursor",
+            "99",
+            hash,
+        ])
+        .unwrap();
+
+        let AdminRequestCli::DumpFullState(args) = call.call else {
+            panic!("expected dump-full-state arguments");
+        };
+        assert_eq!(args.limit, Some(10));
+        assert_eq!(
+            parse_dht_ops_cursor(args.cursor.as_deref().unwrap()).unwrap(),
+            DhtOpsCursor {
+                when_received: 99,
+                hash: DhtOpHash::try_from(hash).unwrap(),
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_dump_state_arguments() {
+        let dna = "uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm";
+        let agent = "uhCAkJCuynkgVdMn_bzZ2ZYaVfygkn0WCuzfFspczxFnZM1QAyXoo";
+
+        assert!(Call::try_parse_from([
+            "hc-client",
+            "--port",
+            "1234",
+            "dump-state",
+            dna,
+            agent,
+            "--limit",
+            "0",
+        ])
+        .is_err());
+        assert!(Call::try_parse_from([
+            "hc-client",
+            "--port",
+            "1234",
+            "dump-state",
+            dna,
+            agent,
+            "--cursor",
+            "not-a-sequence-or-action-hash",
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_dump_full_state_arguments() {
+        let dna = "uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm";
+        let agent = "uhCAkJCuynkgVdMn_bzZ2ZYaVfygkn0WCuzfFspczxFnZM1QAyXoo";
+
+        assert!(Call::try_parse_from([
+            "hc-client",
+            "--port",
+            "1234",
+            "dump-full-state",
+            dna,
+            agent,
+            "--limit",
+            "0",
+        ])
+        .is_err());
+        assert!(Call::try_parse_from([
+            "hc-client",
+            "--port",
+            "1234",
+            "dump-full-state",
+            dna,
+            agent,
+            "--cursor",
+            "99",
+        ])
+        .is_err());
     }
 
     fn test_cell_id(dna: u8, agent: u8) -> CellId {

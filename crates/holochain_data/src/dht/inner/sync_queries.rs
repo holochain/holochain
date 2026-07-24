@@ -37,13 +37,14 @@
 //! `WarrantOp`) to report the total observed DHT size.
 
 use crate::models::dht::{
-    DumpChainOpRow, K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow,
-    K2WarrantForWireRow,
+    DumpChainOpRow, DumpOpCursorRow, DumpOpPage, DumpOpRow, DumpOpState, DumpOpWireRow,
+    K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow,
 };
-use holo_hash::AgentPubKey;
 #[cfg(any(test, feature = "inspection"))]
-use holo_hash::{AnyLinkableHash, DhtOpHash};
+use holo_hash::AnyLinkableHash;
+use holo_hash::{AgentPubKey, DhtOpHash};
 use sqlx::{Executor, QueryBuilder, Sqlite};
+use std::collections::HashMap;
 
 /// Inclusive `[storage_start_loc, storage_end_loc]` arc bounds.
 #[derive(Debug, Clone, Copy)]
@@ -389,6 +390,7 @@ where
 pub(crate) async fn integrated_chain_ops_for_dump<'e, E>(
     executor: E,
     after: Option<(i64, &[u8])>,
+    limit: Option<u32>,
 ) -> sqlx::Result<Vec<DumpChainOpRow>>
 where
     E: Executor<'e, Database = Sqlite>,
@@ -422,6 +424,10 @@ where
         qb.push("))");
     }
     qb.push(" ORDER BY ChainOp.when_integrated ASC, ChainOp.hash ASC");
+    if let Some(limit) = limit {
+        qb.push(" LIMIT ");
+        qb.push_bind(i64::from(limit));
+    }
     qb.build_query_as::<DumpChainOpRow>()
         .fetch_all(executor)
         .await
@@ -529,6 +535,199 @@ where
     )
     .fetch_all(executor)
     .await
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct DumpOpKeyRow {
+    hash: Vec<u8>,
+    when_received: i64,
+    state: i64,
+    kind: i64,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum DumpChainTable {
+    Integrated,
+    Limbo,
+}
+
+/// Select and hydrate one globally ordered DHT-op dump page.
+///
+/// The caller must pass a connection inside a [`TxRead`](crate::TxRead), so
+/// selecting lightweight keys and hydrating their wire rows observes one
+/// immutable snapshot while workflow transactions promote ops between tables.
+pub(crate) async fn dht_ops_page_for_dump(
+    conn: &mut sqlx::SqliteConnection,
+    after: Option<(i64, &DhtOpHash)>,
+    limit: Option<u32>,
+) -> sqlx::Result<DumpOpPage> {
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT hash, when_received, state, kind FROM (
+            SELECT hash, when_received, 2 AS state, 0 AS kind
+            FROM ChainOp WHERE locally_validated = 1
+            UNION ALL
+            SELECT hash, when_received, 2 AS state, 1 AS kind FROM WarrantOp
+            UNION ALL
+            SELECT hash, when_received,
+                CASE WHEN ",
+    );
+    qb.push(LIMBO_CHAIN_OP_READY_PRED);
+    qb.push(
+        " THEN 1 ELSE 0 END AS state,
+            0 AS kind
+         FROM LimboChainOp
+         UNION ALL
+         SELECT hash, when_received,
+            CASE WHEN sys_validation_status IN (1, 2) THEN 1 ELSE 0 END AS state,
+            1 AS kind
+         FROM LimboWarrantOp
+         ) WHERE 1 = 1",
+    );
+    if let Some((when_received, hash)) = after {
+        qb.push(" AND (when_received > ");
+        qb.push_bind(when_received);
+        qb.push(" OR (when_received = ");
+        qb.push_bind(when_received);
+        qb.push(" AND hash > ");
+        qb.push_bind(hash.get_raw_36());
+        qb.push("))");
+    }
+    qb.push(" ORDER BY when_received ASC, hash ASC");
+    if let Some(limit) = limit {
+        qb.push(" LIMIT ");
+        qb.push_bind(i64::from(limit));
+    }
+    let keys = qb
+        .build_query_as::<DumpOpKeyRow>()
+        .fetch_all(&mut *conn)
+        .await?;
+
+    let cursor = keys.last().map(|key| DumpOpCursorRow {
+        when_received: key.when_received,
+        hash: DhtOpHash::from_raw_36(key.hash.clone()),
+    });
+    let integrated_chain_hashes = dump_hashes(&keys, Some(2), 0);
+    let limbo_chain_hashes = dump_hashes(&keys, None, 0);
+    let warrant_hashes = dump_hashes(&keys, None, 1);
+
+    let mut integrated_chain = chain_ops_for_dump_by_hashes(
+        &mut *conn,
+        DumpChainTable::Integrated,
+        &integrated_chain_hashes,
+    )
+    .await?
+    .into_iter()
+    .map(|row| (row.op_hash.clone(), row))
+    .collect::<HashMap<_, _>>();
+    let mut limbo_chain =
+        chain_ops_for_dump_by_hashes(&mut *conn, DumpChainTable::Limbo, &limbo_chain_hashes)
+            .await?
+            .into_iter()
+            .map(|row| (row.op_hash.clone(), row))
+            .collect::<HashMap<_, _>>();
+    let mut warrants = warrants_for_dump_by_hashes(&mut *conn, &warrant_hashes)
+        .await?
+        .into_iter()
+        .map(|row| (row.hash.clone(), row))
+        .collect::<HashMap<_, _>>();
+
+    let rows = keys
+        .into_iter()
+        .filter_map(|key| {
+            let state = match key.state {
+                0 => DumpOpState::ValidationLimbo,
+                1 => DumpOpState::IntegrationLimbo,
+                2 => DumpOpState::Integrated,
+                _ => return None,
+            };
+            let wire = match (key.kind, state) {
+                (0, DumpOpState::Integrated) => {
+                    integrated_chain.remove(&key.hash).map(DumpOpWireRow::Chain)
+                }
+                (0, _) => limbo_chain.remove(&key.hash).map(DumpOpWireRow::Chain),
+                (1, _) => warrants.remove(&key.hash).map(DumpOpWireRow::Warrant),
+                _ => None,
+            }?;
+            Some(DumpOpRow { state, wire })
+        })
+        .collect();
+
+    Ok(DumpOpPage { rows, cursor })
+}
+
+fn dump_hashes(keys: &[DumpOpKeyRow], state: Option<i64>, kind: i64) -> Vec<Vec<u8>> {
+    keys.iter()
+        .filter(|key| key.kind == kind && state.is_none_or(|state| key.state == state))
+        .map(|key| key.hash.clone())
+        .collect()
+}
+
+async fn chain_ops_for_dump_by_hashes(
+    conn: &mut sqlx::SqliteConnection,
+    table: DumpChainTable,
+    hashes: &[Vec<u8>],
+) -> sqlx::Result<Vec<K2ChainOpForWireRow>> {
+    if hashes.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT
+            op.hash AS op_hash,
+            op.basis_hash AS basis_hash,
+            op.op_type AS op_type,
+            Action.hash AS action_hash,
+            Action.author AS author,
+            Action.timestamp AS timestamp,
+            Action.seq AS seq,
+            Action.prev_hash AS prev_hash,
+            Action.action_data AS action_data,
+            Action.signature AS signature,
+            Entry.blob AS entry_blob
+         FROM ",
+    );
+    qb.push(match table {
+        DumpChainTable::Integrated => "ChainOp",
+        DumpChainTable::Limbo => "LimboChainOp",
+    });
+    qb.push(
+        " AS op
+         JOIN Action ON op.action_hash = Action.hash
+         LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+         WHERE op.hash IN (",
+    );
+    {
+        let mut separated = qb.separated(", ");
+        for hash in hashes {
+            separated.push_bind(hash);
+        }
+    }
+    qb.push(")");
+    qb.build_query_as::<K2ChainOpForWireRow>()
+        .fetch_all(conn)
+        .await
+}
+
+async fn warrants_for_dump_by_hashes(
+    conn: &mut sqlx::SqliteConnection,
+    hashes: &[Vec<u8>],
+) -> sqlx::Result<Vec<K2WarrantForWireRow>> {
+    if hashes.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT hash, author, timestamp, warrantee, proof, signature
+         FROM Warrant WHERE hash IN (",
+    );
+    {
+        let mut separated = qb.separated(", ");
+        for hash in hashes {
+            separated.push_bind(hash);
+        }
+    }
+    qb.push(")");
+    qb.build_query_as::<K2WarrantForWireRow>()
+        .fetch_all(conn)
+        .await
 }
 
 /// Minimum authored timestamp across both `ChainOp` (joined with `Action`)
@@ -865,8 +1064,9 @@ where
 mod tests {
     use crate::handles::DbWrite;
     use crate::kind::Dht;
+    use crate::models::dht::{DumpOpCursorRow, DumpOpRow, DumpOpState, DumpOpWireRow};
     use crate::test_open_db;
-    use holo_hash::{AgentPubKey, DnaHash};
+    use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
     use sqlx::{Pool, Sqlite};
     use std::sync::Arc;
 
@@ -931,6 +1131,132 @@ mod tests {
         .unwrap();
 
         op_hash
+    }
+
+    async fn seed_limbo_chain_op(
+        pool: &Pool<Sqlite>,
+        op_tag: u8,
+        when_received: i64,
+        ready: bool,
+    ) -> Vec<u8> {
+        let op_hash = vec![op_tag; 36];
+        let action_hash = vec![op_tag + 100; 36];
+        sqlx::query(
+            "INSERT INTO Action
+                (hash, author, seq, prev_hash, timestamp, action_type,
+                 action_data, signature, entry_hash, private_entry, record_validity)
+             VALUES (?, ?, 0, NULL, ?, 0, ?, ?, NULL, 0, NULL)",
+        )
+        .bind(&action_hash)
+        .bind(vec![AUTHOR; 36])
+        .bind(when_received)
+        .bind(vec![0u8])
+        .bind(vec![0u8])
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO LimboChainOp
+                (hash, op_type, action_hash, basis_hash, storage_center_loc,
+                 sys_validation_status, app_validation_status, require_receipt,
+                 when_received, serialized_size)
+             VALUES (?, ?, ?, ?, 0, ?, ?, 0, ?, 10)",
+        )
+        .bind(&op_hash)
+        .bind(STORE_RECORD)
+        .bind(&action_hash)
+        .bind(vec![op_tag + 50; 36])
+        .bind(ready.then_some(1_i64))
+        .bind(ready.then_some(1_i64))
+        .bind(when_received)
+        .execute(pool)
+        .await
+        .unwrap();
+        op_hash
+    }
+
+    async fn seed_warrant_op(
+        pool: &Pool<Sqlite>,
+        op_tag: u8,
+        when_received: i64,
+        state: DumpOpState,
+    ) -> Vec<u8> {
+        let hash = vec![op_tag; 36];
+        sqlx::query(
+            "INSERT INTO Warrant
+                (hash, author, timestamp, warrantee, proof, signature, reason)
+             VALUES (?, ?, ?, ?, ?, ?, NULL)",
+        )
+        .bind(&hash)
+        .bind(vec![AUTHOR; 36])
+        .bind(when_received)
+        .bind(vec![op_tag + 40; 36])
+        .bind(vec![0u8])
+        .bind(vec![0u8])
+        .execute(pool)
+        .await
+        .unwrap();
+        match state {
+            DumpOpState::Integrated => {
+                sqlx::query(
+                    "INSERT INTO WarrantOp
+                        (hash, storage_center_loc, when_received, when_integrated,
+                         validation_status, serialized_size)
+                     VALUES (?, 0, ?, ?, 1, 10)",
+                )
+                .bind(&hash)
+                .bind(when_received)
+                .bind(when_received + 1_000)
+                .execute(pool)
+                .await
+                .unwrap();
+            }
+            DumpOpState::ValidationLimbo | DumpOpState::IntegrationLimbo => {
+                sqlx::query(
+                    "INSERT INTO LimboWarrantOp
+                        (hash, storage_center_loc, sys_validation_status,
+                         when_received, serialized_size)
+                     VALUES (?, 0, ?, ?, 10)",
+                )
+                .bind(&hash)
+                .bind((state == DumpOpState::IntegrationLimbo).then_some(1_i64))
+                .bind(when_received)
+                .execute(pool)
+                .await
+                .unwrap();
+            }
+        }
+        hash
+    }
+
+    fn dump_row_hash(row: &DumpOpRow) -> &[u8] {
+        match &row.wire {
+            DumpOpWireRow::Chain(row) => &row.op_hash,
+            DumpOpWireRow::Warrant(row) => &row.hash,
+        }
+    }
+
+    async fn promote_seeded_limbo_chain_op(db: &DbWrite<Dht>, hash: &[u8]) {
+        let mut tx = db.begin().await.unwrap();
+        sqlx::query(
+            "INSERT INTO ChainOp
+                (hash, op_type, action_hash, basis_hash, storage_center_loc,
+                 validation_status, locally_validated, require_receipt,
+                 when_received, when_integrated, serialized_size)
+             SELECT hash, op_type, action_hash, basis_hash, storage_center_loc,
+                    1, 1, require_receipt, when_received, 999, serialized_size
+             FROM LimboChainOp WHERE hash = ?",
+        )
+        .bind(hash)
+        .execute(tx.conn_mut())
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM LimboChainOp WHERE hash = ?")
+            .bind(hash)
+            .execute(tx.conn_mut())
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
     }
 
     /// Seed three integrated ops that exercise the private-entry filter:
@@ -1070,6 +1396,123 @@ mod tests {
         assert!(
             !hashes.contains(&private),
             "private CreateEntry op must never be published"
+        );
+    }
+
+    #[tokio::test]
+    async fn integrated_dump_uses_exclusive_bounded_cursor_pages() {
+        let (db, public, private, record) = seed_filter_fixture().await;
+        let tied = seed_op(db.pool(), 4, STORE_RECORD, 0, 2000).await;
+
+        let first_page = db
+            .as_ref()
+            .integrated_chain_ops_for_dump(None, Some(2))
+            .await
+            .unwrap();
+        let first_hashes: Vec<_> = first_page
+            .iter()
+            .map(|row| row.wire.op_hash.clone())
+            .collect();
+        assert_eq!(first_hashes, vec![private, public]);
+
+        let last = first_page.last().unwrap();
+        let second_page = db
+            .as_ref()
+            .integrated_chain_ops_for_dump(
+                Some((last.when_integrated, last.wire.op_hash.as_slice())),
+                Some(10),
+            )
+            .await
+            .unwrap();
+        let second_hashes: Vec<_> = second_page
+            .iter()
+            .map(|row| row.wire.op_hash.clone())
+            .collect();
+        assert_eq!(second_hashes, vec![tied, record]);
+
+        let empty_page = db
+            .as_ref()
+            .integrated_chain_ops_for_dump(
+                Some((
+                    second_page[1].when_integrated,
+                    second_page[1].wire.op_hash.as_slice(),
+                )),
+                Some(10),
+            )
+            .await
+            .unwrap();
+        assert!(empty_page.is_empty());
+
+        let unbounded = db
+            .as_ref()
+            .integrated_chain_ops_for_dump(None, None)
+            .await
+            .unwrap();
+        assert_eq!(unbounded.len(), 4);
+    }
+
+    #[tokio::test]
+    async fn dht_dump_pages_all_tables_in_received_order() {
+        let db = test_open_db(dht_id()).await.unwrap();
+        let integrated_chain = seed_op(db.pool(), 1, STORE_RECORD, 0, 100).await;
+        let integrated_warrant = seed_warrant_op(db.pool(), 2, 100, DumpOpState::Integrated).await;
+        let validation_chain = seed_limbo_chain_op(db.pool(), 3, 100, false).await;
+        let integration_chain = seed_limbo_chain_op(db.pool(), 4, 100, true).await;
+        let validation_warrant =
+            seed_warrant_op(db.pool(), 5, 200, DumpOpState::ValidationLimbo).await;
+        let integration_warrant =
+            seed_warrant_op(db.pool(), 6, 200, DumpOpState::IntegrationLimbo).await;
+        let cache_only = seed_op(db.pool(), 7, STORE_RECORD, 0, 50).await;
+        sqlx::query("UPDATE ChainOp SET locally_validated = 0 WHERE hash = ?")
+            .bind(&cache_only)
+            .execute(db.pool())
+            .await
+            .unwrap();
+
+        let expected = vec![
+            (integrated_chain, DumpOpState::Integrated),
+            (integrated_warrant, DumpOpState::Integrated),
+            (validation_chain, DumpOpState::ValidationLimbo),
+            (integration_chain.clone(), DumpOpState::Integrated),
+            (validation_warrant, DumpOpState::ValidationLimbo),
+            (integration_warrant, DumpOpState::IntegrationLimbo),
+        ];
+        let mut actual = Vec::new();
+        let mut cursor = None;
+        let mut promoted = false;
+        loop {
+            let page = db
+                .as_ref()
+                .dht_ops_page_for_dump(
+                    cursor
+                        .as_ref()
+                        .map(|cursor: &DumpOpCursorRow| (cursor.when_received, &cursor.hash)),
+                    Some(2),
+                )
+                .await
+                .unwrap();
+            assert!(page.rows.len() <= 2);
+            actual.extend(
+                page.rows
+                    .iter()
+                    .map(|row| (dump_row_hash(row).to_vec(), row.state)),
+            );
+            cursor = page.cursor;
+            if cursor.is_none() {
+                break;
+            }
+            if !promoted {
+                promote_seeded_limbo_chain_op(&db, &integration_chain).await;
+                promoted = true;
+            }
+        }
+        assert_eq!(actual, expected);
+
+        let unbounded = db.as_ref().dht_ops_page_for_dump(None, None).await.unwrap();
+        assert_eq!(unbounded.rows.len(), expected.len());
+        assert_eq!(
+            unbounded.cursor.unwrap().hash,
+            DhtOpHash::from_raw_36(expected.last().unwrap().0.clone())
         );
     }
 }

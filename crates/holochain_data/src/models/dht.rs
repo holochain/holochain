@@ -7,6 +7,7 @@
 //! [`holochain_integrity_types::action`] and
 //! [`holochain_zome_types::action`]).
 
+use holo_hash::DhtOpHash;
 use holochain_integrity_types::prelude::{Entry, RecordValidity};
 use holochain_zome_types::prelude::SignedActionHashed;
 
@@ -468,6 +469,53 @@ pub struct K2WarrantForWireRow {
     pub proof: Vec<u8>,
     /// 64-byte warrant signature.
     pub signature: Vec<u8>,
+}
+
+/// Lifecycle bucket containing a DHT op in a full state dump.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DumpOpState {
+    /// The op is awaiting validation.
+    ValidationLimbo,
+    /// The op has completed validation and is awaiting integration.
+    IntegrationLimbo,
+    /// The op has been integrated.
+    Integrated,
+}
+
+/// Hydrated wire row for a DHT op selected by dump pagination.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DumpOpWireRow {
+    /// A chain op joined with its action and optional entry.
+    Chain(K2ChainOpForWireRow),
+    /// A warrant op joined with its warrant content.
+    Warrant(K2WarrantForWireRow),
+}
+
+/// Hydrated DHT-op row selected for a full state-dump page.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DumpOpRow {
+    /// Lifecycle bucket observed in the page's database snapshot.
+    pub state: DumpOpState,
+    /// Wire data required to reconstruct the DHT op.
+    pub wire: DumpOpWireRow,
+}
+
+/// Exclusive cursor key selected from the DHT database.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DumpOpCursorRow {
+    /// Microsecond timestamp at which the op was received.
+    pub when_received: i64,
+    /// DHT-op hash used to break timestamp ties.
+    pub hash: DhtOpHash,
+}
+
+/// One globally ordered page of DHT ops for a full state dump.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DumpOpPage {
+    /// Hydrated rows in global `(when_received, hash)` order.
+    pub rows: Vec<DumpOpRow>,
+    /// Last database key selected, even if wire reconstruction later fails.
+    pub cursor: Option<DumpOpCursorRow>,
 }
 
 /// `(slice_index, hash)` pair returned when enumerating slice hashes.

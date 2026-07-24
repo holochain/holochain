@@ -1174,11 +1174,16 @@ mod test {
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         // Get state
-        let expected = conductor_handle.dump_cell_state(&cell_id).await.unwrap();
+        let expected = conductor_handle
+            .dump_cell_state(&cell_id, None, None)
+            .await
+            .unwrap();
 
         let admin_api = AdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::DumpState {
             cell_id: Box::new(cell_id),
+            source_chain_cursor: None,
+            limit: None,
         };
         let respond = move |response: AdminResponse| {
             assert_matches!(response, AdminResponse::StateDumped(s) if s == expected);

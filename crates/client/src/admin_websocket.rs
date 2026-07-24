@@ -4,7 +4,8 @@ use holo_hash::{ActionHash, DnaHash};
 use holochain_conductor_api::{
     AdminInterfaceConfig, AdminRequest, AdminResponse, AppAuthenticationToken,
     AppAuthenticationTokenIssued, AppInfo, AppInterfaceInfo, AppStatusFilter, DhtOpsCursor,
-    FullStateDump, IssueAppAuthenticationTokenPayload, PeerMetaInfo, StorageInfo,
+    FullStateDump, IssueAppAuthenticationTokenPayload, PeerMetaInfo, SourceChainCursor,
+    StorageInfo,
 };
 use holochain_types::network::HolochainTransportStats;
 use holochain_types::websocket::AllowedOrigins;
@@ -449,9 +450,21 @@ impl AdminWebsocket {
         }
     }
 
-    pub async fn dump_state(&self, cell_id: CellId) -> ConductorApiResult<String> {
+    /// Dump one exclusive page of a cell's source-chain state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the pagination arguments are invalid.
+    pub async fn dump_state(
+        &self,
+        cell_id: CellId,
+        source_chain_cursor: Option<SourceChainCursor>,
+        limit: Option<u32>,
+    ) -> ConductorApiResult<String> {
         let msg = AdminRequest::DumpState {
             cell_id: Box::new(cell_id),
+            source_chain_cursor,
+            limit,
         };
         let response = self.send(msg).await?;
         match response {
@@ -469,14 +482,21 @@ impl AdminWebsocket {
         }
     }
 
+    /// Dump one page of a cell's full state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the limit is zero.
     pub async fn dump_full_state(
         &self,
         cell_id: CellId,
         dht_ops_cursor: Option<DhtOpsCursor>,
+        limit: Option<u32>,
     ) -> ConductorApiResult<FullStateDump> {
         let msg = AdminRequest::DumpFullState {
             cell_id: Box::new(cell_id),
             dht_ops_cursor,
+            limit,
         };
         let response = self.send(msg).await?;
         match response {

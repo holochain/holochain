@@ -188,8 +188,15 @@ impl AdminInterfaceApi {
                 let interfaces = self.conductor_handle.list_app_interfaces().await?;
                 Ok(AdminResponse::AppInterfacesListed(interfaces))
             }
-            DumpState { cell_id } => {
-                let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
+            DumpState {
+                cell_id,
+                source_chain_cursor,
+                limit,
+            } => {
+                let state = self
+                    .conductor_handle
+                    .dump_cell_state(&cell_id, source_chain_cursor.as_ref(), limit)
+                    .await?;
                 Ok(AdminResponse::StateDumped(state))
             }
             DumpConductorState => {
@@ -199,10 +206,11 @@ impl AdminInterfaceApi {
             DumpFullState {
                 cell_id,
                 dht_ops_cursor,
+                limit,
             } => {
                 let state = self
                     .conductor_handle
-                    .dump_full_cell_state(&cell_id, dht_ops_cursor)
+                    .dump_full_cell_state(&cell_id, dht_ops_cursor, limit)
                     .await?;
                 Ok(AdminResponse::FullStateDumped(state))
             }
