@@ -2,6 +2,20 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2026-07-23: v0.7.0-rc.3
+
+*Success*
+- Ran a test with 3 nodes.
+- All checks passed
+- Sending for Wind Tunnel testing
+
+## 2026-07-22: v0.7.0-rc.1
+
+*Failure*
+- Ran a test with 3 nodes.
+- The bootstrap server hadn't been updated and only two peers could connect, the other could not.
+- There were packaging issues from kangaroo-electron which needed fixing, and prevented passing flags to the app. 
+
 ## 2026-07-07: v0.6.2
 
 *Success*
