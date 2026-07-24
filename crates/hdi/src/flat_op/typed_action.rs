@@ -1,6 +1,12 @@
 //! [`TypedAction`] pairs the header fields common to every action variant with action data
 //! whose specific shape is already known from context — the `FlatOp`/`OpEntry`/`OpUpdate`/...
 //! variant this value lives in already guarantees which [`ActionData`] case it holds.
+//!
+//! Every `try_from_action` in this module narrows an already-fetched [`Action`] whose shape
+//! sys validation has already guaranteed. If that narrowing ever fails, the guarantee was
+//! violated — that's a fault in how the op reached this code, not invalid application data.
+//! Propagate the error with `?` rather than returning `ValidateCallbackResult::Invalid`,
+//! which would incorrectly blame the data's author.
 
 use super::*;
 
@@ -113,7 +119,8 @@ impl TypedAction<EntryCreationData> {
     /// Narrows a freshly-fetched [`Action`] (e.g. from `must_get_action`) down to the
     /// entry-creation case, for use directly in a validate callback's `?`-chain — unlike
     /// [`TryFrom<Action>`](TypedAction#impl-TryFrom%3CAction%3E-for-TypedAction%3CEntryCreationData%3E),
-    /// this returns [`ExternResult`] instead of [`WrongActionError`].
+    /// this returns [`ExternResult`](crate::prelude::ExternResult) instead of
+    /// [`WrongActionError`].
     pub fn try_from_action(action: Action) -> crate::prelude::ExternResult<Self> {
         narrow_action(action)
     }
