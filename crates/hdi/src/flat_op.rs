@@ -69,28 +69,28 @@ impl<LT> OpLink<LT> {
     /// The base address of the link this operation touches.
     pub fn base_address(&self) -> &AnyLinkableHash {
         match self {
-            OpLink::CreateLink { action, .. } => &action.data.base_address,
-            OpLink::DeleteLink { action, .. } => &action.data.base_address,
+            OpLink::CreateLink { action, .. } => &action.base_address,
+            OpLink::DeleteLink { action, .. } => &action.base_address,
         }
     }
 
     /// The target address of the link this operation touches.
     pub fn target_address(&self) -> &AnyLinkableHash {
         match self {
-            OpLink::CreateLink { action, .. } => &action.data.target_address,
+            OpLink::CreateLink { action, .. } => &action.target_address,
             OpLink::DeleteLink {
                 original_action, ..
-            } => &original_action.data.target_address,
+            } => &original_action.target_address,
         }
     }
 
     /// The tag of the link this operation touches.
     pub fn tag(&self) -> &LinkTag {
         match self {
-            OpLink::CreateLink { action, .. } => &action.data.tag,
+            OpLink::CreateLink { action, .. } => &action.tag,
             OpLink::DeleteLink {
                 original_action, ..
-            } => &original_action.data.tag,
+            } => &original_action.tag,
         }
     }
 }

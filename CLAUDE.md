@@ -52,7 +52,7 @@ Design references: `docs/design/state_model.md` and `docs/design/data_model.md` 
   - Test-support code exposed from library crates must be feature-gated so it never compiles into production builds. Read-only inspection queries (op counts, existence checks) use `#[cfg(any(test, feature = "inspection"))]`; test-only writes and fixture builders use `#[cfg(feature = "test_utils")]` (which also enables `inspection`).
 - **Errors**: prefer `thiserror` for crate error types; `anyhow` is for application/binary code, not library APIs.
 - **Compiler warnings are not OK** in shared code (CONTRIBUTING.md). Fix, surgically `#[allow(...)]`, or escalate — don't disable globally.
-- **Public API docs**: `///` rustdoc on public items; module/crate docs should describe structure.
+- **Public API docs**: `///` rustdoc on public items; module/crate docs should describe structure. Follow [rustdoc's guidance](https://doc.rust-lang.org/rustdoc/how-to-write-documentation.html#documenting-components): keep the first line a short, one-sentence summary — everything up to the first blank `///` line is reused as the summary in module/search listings — then a blank `///` line before any further detail.
 - **Commits**: Conventional Commits (`feat:`, `fix:`, `refactor:`, etc.), bodies wrapped near 72 chars.
 - **Changelog**: Write changelog entries only to
   `crates/holochain/CHANGELOG.md`. Include only information relevant to end
