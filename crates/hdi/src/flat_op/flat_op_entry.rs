@@ -21,6 +21,8 @@ where
     /// This operation stores the [`Entry`](holochain_integrity_types::entry::Entry) for an
     /// [`AgentPubKey`].
     CreateAgent {
+        /// The agent key this action creates.
+        agent: AgentPubKey,
         /// The Create action that creates this agent's key.
         action: TypedAction<CreateData>,
     },
@@ -36,6 +38,10 @@ where
     /// This operation stores the [`Entry`](holochain_integrity_types::entry::Entry) for an updated
     /// [`AgentPubKey`].
     UpdateAgent {
+        /// The new [`AgentPubKey`].
+        new_key: AgentPubKey,
+        /// The original [`AgentPubKey`].
+        original_key: AgentPubKey,
         /// The Update action that updates this entry.
         action: TypedAction<UpdateData>,
     },
@@ -71,34 +77,6 @@ where
         /// The new entry to store.
         entry: CapClaimEntry,
     },
-}
-
-impl<ET: UnitEnum> OpEntry<ET> {
-    /// The agent key this action creates, for [`OpEntry::CreateAgent`].
-    pub fn agent(&self) -> Option<AgentPubKey> {
-        match self {
-            OpEntry::CreateAgent { action } => Some(action.data.entry_hash.clone().into()),
-            _ => None,
-        }
-    }
-
-    /// The new agent key this action updates to, for [`OpEntry::UpdateAgent`].
-    pub fn new_key(&self) -> Option<AgentPubKey> {
-        match self {
-            OpEntry::UpdateAgent { action } => Some(action.data.entry_hash.clone().into()),
-            _ => None,
-        }
-    }
-
-    /// The original agent key being updated, for [`OpEntry::UpdateAgent`].
-    pub fn original_key(&self) -> Option<AgentPubKey> {
-        match self {
-            OpEntry::UpdateAgent { action } => {
-                Some(action.data.original_entry_address.clone().into())
-            }
-            _ => None,
-        }
-    }
 }
 
 /// Data specific to the [`Op::Update`](holochain_integrity_types::op::Op::Update)
@@ -245,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn op_entry_create_agent_exposes_agent_key() {
+    fn op_entry_create_agent_carries_the_agent_key() {
         let action = TypedAction {
             header: header(),
             data: CreateData {
@@ -253,34 +231,34 @@ mod tests {
                 entry_hash: eh(9),
             },
         };
-        let op = OpEntry::<()>::CreateAgent { action };
-        assert_eq!(op.agent(), Some(AgentPubKey::from(eh(9))));
-        assert_eq!(op.new_key(), None);
-    }
-
-    #[test]
-    fn op_entry_update_agent_exposes_keys() {
-        let action = update_action(ah(10), eh(11));
-        let op = OpEntry::<()>::UpdateAgent { action };
-        assert_eq!(op.new_key(), Some(AgentPubKey::from(eh(9))));
-        assert_eq!(op.original_key(), Some(AgentPubKey::from(eh(11))));
-    }
-
-    #[test]
-    fn op_entry_create_entry_has_no_agent_key() {
-        let action = TypedAction {
-            header: header(),
-            data: CreateData {
-                entry_type: holochain_integrity_types::action::EntryType::App(
-                    crate::test_utils::short_hand::public_app_entry_def(0, 0),
-                ),
-                entry_hash: eh(12),
-            },
-        };
-        let op = OpEntry::<()>::CreateEntry {
-            app_entry: (),
+        let op = OpEntry::<()>::CreateAgent {
+            agent: AgentPubKey::from(eh(9)),
             action,
         };
-        assert_eq!(op.agent(), None);
+        match op {
+            OpEntry::CreateAgent { agent, .. } => assert_eq!(agent, AgentPubKey::from(eh(9))),
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn op_entry_update_agent_carries_both_keys() {
+        let action = update_action(ah(10), eh(11));
+        let op = OpEntry::<()>::UpdateAgent {
+            new_key: AgentPubKey::from(eh(9)),
+            original_key: AgentPubKey::from(eh(11)),
+            action,
+        };
+        match op {
+            OpEntry::UpdateAgent {
+                new_key,
+                original_key,
+                ..
+            } => {
+                assert_eq!(new_key, AgentPubKey::from(eh(9)));
+                assert_eq!(original_key, AgentPubKey::from(eh(11)));
+            }
+            _ => unreachable!(),
+        }
     }
 }

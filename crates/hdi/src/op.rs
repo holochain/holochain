@@ -100,6 +100,7 @@ impl OpHelper for Op {
                         };
                         match &d.entry_type {
                             EntryType::AgentPubKey => flat_op::OpRecord::CreateAgent {
+                                agent: d.entry_hash.clone().into(),
                                 action: typed_action,
                             },
                             EntryType::App(entry_def) => {
@@ -136,6 +137,8 @@ impl OpHelper for Op {
                         };
                         match &d.entry_type {
                             EntryType::AgentPubKey => flat_op::OpRecord::UpdateAgent {
+                                new_key: d.entry_hash.clone().into(),
+                                original_key: d.original_entry_address.clone().into(),
                                 action: typed_action,
                             },
                             EntryType::App(entry_def) => {
@@ -184,6 +187,7 @@ impl OpHelper for Op {
                         };
                         match &d.entry_type {
                             EntryType::AgentPubKey => flat_op::OpEntry::CreateAgent {
+                                agent: d.entry_hash.clone().into(),
                                 action: typed_action,
                             },
                             EntryType::App(entry_def) => flat_op::OpEntry::CreateEntry {
@@ -209,6 +213,8 @@ impl OpHelper for Op {
                         };
                         match &d.entry_type {
                             EntryType::AgentPubKey => flat_op::OpEntry::UpdateAgent {
+                                new_key: d.entry_hash.clone().into(),
+                                original_key: d.original_entry_address.clone().into(),
                                 action: typed_action,
                             },
                             EntryType::App(entry_def) => flat_op::OpEntry::UpdateEntry {
@@ -354,6 +360,7 @@ impl OpHelper for Op {
                                 }
                             }
                             ActivityEntry::Agent => flat_op::OpActivity::CreateAgent {
+                                agent: d.entry_hash.clone().into(),
                                 action: typed_action,
                             },
                             ActivityEntry::CapClaim => flat_op::OpActivity::CreateCapClaim {
@@ -383,6 +390,8 @@ impl OpHelper for Op {
                                 }
                             }
                             ActivityEntry::Agent => flat_op::OpActivity::UpdateAgent {
+                                new_key: d.entry_hash.clone().into(),
+                                original_key: d.original_entry_address.clone().into(),
                                 action: typed_action,
                             },
                             ActivityEntry::CapClaim => flat_op::OpActivity::UpdateCapClaim {
@@ -736,17 +745,47 @@ mod tests {
     #[test]
     fn store_record_create_agent_flattens_to_create_agent() {
         types();
+        let entry_hash = EntryHash::from_raw_36(vec![3u8; 36]);
         let signed = signed_from_data(ActionData::Create(CreateData {
             entry_type: EntryType::AgentPubKey,
-            entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
+            entry_hash: entry_hash.clone(),
         }));
         let record = Record::new(signed, RecordEntry::NA);
         let op = Op::CreateRecord(CreateRecord { record });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
-        assert!(matches!(
-            flat,
-            FlatOp::CreateRecord(OpRecord::CreateAgent { .. })
-        ));
+        match flat {
+            FlatOp::CreateRecord(OpRecord::CreateAgent { agent, .. }) => {
+                assert_eq!(agent, AgentPubKey::from(entry_hash));
+            }
+            other => panic!("expected CreateAgent, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn store_record_update_agent_flattens_to_update_agent() {
+        types();
+        let new_entry_hash = EntryHash::from_raw_36(vec![17u8; 36]);
+        let original_entry_hash = EntryHash::from_raw_36(vec![18u8; 36]);
+        let signed = signed_from_data(ActionData::Update(UpdateData {
+            original_action_address: ActionHash::from_raw_36(vec![19u8; 36]),
+            original_entry_address: original_entry_hash.clone(),
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: new_entry_hash.clone(),
+        }));
+        let record = Record::new(signed, RecordEntry::NA);
+        let op = Op::CreateRecord(CreateRecord { record });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        match flat {
+            FlatOp::CreateRecord(OpRecord::UpdateAgent {
+                new_key,
+                original_key,
+                ..
+            }) => {
+                assert_eq!(new_key, AgentPubKey::from(new_entry_hash));
+                assert_eq!(original_key, AgentPubKey::from(original_entry_hash));
+            }
+            other => panic!("expected UpdateAgent, got {other:?}"),
+        }
     }
 
     #[test]
@@ -845,6 +884,56 @@ mod tests {
     }
 
     #[test]
+    fn store_entry_create_agent_flattens_to_create_agent() {
+        types();
+        let entry_hash = EntryHash::from_raw_36(vec![20u8; 36]);
+        let signed = signed_from_data(ActionData::Create(CreateData {
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: entry_hash.clone(),
+        }));
+        let op = Op::CreateEntry(CreateEntry {
+            action: signed,
+            entry: Entry::Agent(AgentPubKey::from(entry_hash.clone())),
+        });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        match flat {
+            FlatOp::CreateEntry(OpEntry::CreateAgent { agent, .. }) => {
+                assert_eq!(agent, AgentPubKey::from(entry_hash));
+            }
+            other => panic!("expected CreateAgent, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn store_entry_update_agent_flattens_to_update_agent() {
+        types();
+        let new_entry_hash = EntryHash::from_raw_36(vec![21u8; 36]);
+        let original_entry_hash = EntryHash::from_raw_36(vec![22u8; 36]);
+        let signed = signed_from_data(ActionData::Update(UpdateData {
+            original_action_address: ActionHash::from_raw_36(vec![23u8; 36]),
+            original_entry_address: original_entry_hash.clone(),
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: new_entry_hash.clone(),
+        }));
+        let op = Op::CreateEntry(CreateEntry {
+            action: signed,
+            entry: Entry::Agent(AgentPubKey::from(new_entry_hash.clone())),
+        });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        match flat {
+            FlatOp::CreateEntry(OpEntry::UpdateAgent {
+                new_key,
+                original_key,
+                ..
+            }) => {
+                assert_eq!(new_key, AgentPubKey::from(new_entry_hash));
+                assert_eq!(original_key, AgentPubKey::from(original_entry_hash));
+            }
+            other => panic!("expected UpdateAgent, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn register_agent_activity_create_app_flattens_with_unit_type() {
         types();
         let signed = signed_from_data(create_app_data());
@@ -860,6 +949,56 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn register_agent_activity_create_agent_flattens_to_create_agent() {
+        types();
+        let entry_hash = EntryHash::from_raw_36(vec![24u8; 36]);
+        let signed = signed_from_data(ActionData::Create(CreateData {
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: entry_hash.clone(),
+        }));
+        let op = Op::AgentActivity(AgentActivity {
+            action: signed,
+            cached_entry: None,
+        });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        match flat {
+            FlatOp::AgentActivity(OpActivity::CreateAgent { agent, .. }) => {
+                assert_eq!(agent, AgentPubKey::from(entry_hash));
+            }
+            other => panic!("expected CreateAgent, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn register_agent_activity_update_agent_flattens_to_update_agent() {
+        types();
+        let new_entry_hash = EntryHash::from_raw_36(vec![25u8; 36]);
+        let original_entry_hash = EntryHash::from_raw_36(vec![26u8; 36]);
+        let signed = signed_from_data(ActionData::Update(UpdateData {
+            original_action_address: ActionHash::from_raw_36(vec![27u8; 36]),
+            original_entry_address: original_entry_hash.clone(),
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: new_entry_hash.clone(),
+        }));
+        let op = Op::AgentActivity(AgentActivity {
+            action: signed,
+            cached_entry: None,
+        });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        match flat {
+            FlatOp::AgentActivity(OpActivity::UpdateAgent {
+                new_key,
+                original_key,
+                ..
+            }) => {
+                assert_eq!(new_key, AgentPubKey::from(new_entry_hash));
+                assert_eq!(original_key, AgentPubKey::from(original_entry_hash));
+            }
+            other => panic!("expected UpdateAgent, got {other:?}"),
+        }
     }
 
     #[test]
