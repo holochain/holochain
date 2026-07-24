@@ -31,6 +31,8 @@ pub enum OpRecord<ET: UnitEnum, LT> {
     /// This operation stores the [`Record`](holochain_integrity_types::record::Record) for an
     /// [`AgentPubKey`] that has been created.
     CreateAgent {
+        /// The agent key this action creates.
+        agent: AgentPubKey,
         /// The Create action that creates the entry.
         action: TypedAction<CreateData>,
     },
@@ -71,6 +73,10 @@ pub enum OpRecord<ET: UnitEnum, LT> {
     /// This operation stores the [`Record`](holochain_integrity_types::record::Record) for an
     /// updated [`AgentPubKey`].
     UpdateAgent {
+        /// The new [`AgentPubKey`].
+        new_key: AgentPubKey,
+        /// The original [`AgentPubKey`].
+        original_key: AgentPubKey,
         /// The Update action that updates the entry.
         action: TypedAction<UpdateData>,
     },
@@ -152,32 +158,4 @@ pub enum OpRecord<ET: UnitEnum, LT> {
         /// The InitZomesComplete action.
         action: TypedAction<InitZomesCompleteData>,
     },
-}
-
-impl<ET: UnitEnum, LT> OpRecord<ET, LT> {
-    /// The agent key this action creates, for [`OpRecord::CreateAgent`].
-    pub fn agent(&self) -> Option<AgentPubKey> {
-        match self {
-            OpRecord::CreateAgent { action } => Some(action.data.entry_hash.clone().into()),
-            _ => None,
-        }
-    }
-
-    /// The new agent key this action updates to, for [`OpRecord::UpdateAgent`].
-    pub fn new_key(&self) -> Option<AgentPubKey> {
-        match self {
-            OpRecord::UpdateAgent { action } => Some(action.data.entry_hash.clone().into()),
-            _ => None,
-        }
-    }
-
-    /// The original agent key being updated, for [`OpRecord::UpdateAgent`].
-    pub fn original_key(&self) -> Option<AgentPubKey> {
-        match self {
-            OpRecord::UpdateAgent { action } => {
-                Some(action.data.original_entry_address.clone().into())
-            }
-            _ => None,
-        }
-    }
 }

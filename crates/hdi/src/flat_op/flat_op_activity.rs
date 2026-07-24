@@ -31,6 +31,8 @@ pub enum OpActivity<UnitType, LT> {
     /// This operation registers the Action for an
     /// [`AgentPubKey`] to the author's chain.
     CreateAgent {
+        /// The agent key this action creates.
+        agent: AgentPubKey,
         /// The Create action that creates the entry.
         action: TypedAction<CreateData>,
     },
@@ -69,6 +71,10 @@ pub enum OpActivity<UnitType, LT> {
     /// This operation registers the Action for an
     /// updated [`AgentPubKey`] to the author's chain.
     UpdateAgent {
+        /// The new [`AgentPubKey`].
+        new_key: AgentPubKey,
+        /// The original [`AgentPubKey`].
+        original_key: AgentPubKey,
         /// The Update action that updates the agent's key.
         action: TypedAction<UpdateData>,
     },
@@ -151,32 +157,4 @@ pub enum OpActivity<UnitType, LT> {
         /// The InitZomesComplete action.
         action: TypedAction<InitZomesCompleteData>,
     },
-}
-
-impl<UnitType, LT> OpActivity<UnitType, LT> {
-    /// The agent key this action creates, for [`OpActivity::CreateAgent`].
-    pub fn agent(&self) -> Option<AgentPubKey> {
-        match self {
-            OpActivity::CreateAgent { action } => Some(action.data.entry_hash.clone().into()),
-            _ => None,
-        }
-    }
-
-    /// The new agent key this action updates to, for [`OpActivity::UpdateAgent`].
-    pub fn new_key(&self) -> Option<AgentPubKey> {
-        match self {
-            OpActivity::UpdateAgent { action } => Some(action.data.entry_hash.clone().into()),
-            _ => None,
-        }
-    }
-
-    /// The original agent key being updated, for [`OpActivity::UpdateAgent`].
-    pub fn original_key(&self) -> Option<AgentPubKey> {
-        match self {
-            OpActivity::UpdateAgent { action } => {
-                Some(action.data.original_entry_address.clone().into())
-            }
-            _ => None,
-        }
-    }
 }
