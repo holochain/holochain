@@ -117,7 +117,9 @@ impl TypedAction<EntryCreationData> {
     }
 
     /// Narrows a freshly-fetched [`Action`] (e.g. from `must_get_action`) down to the
-    /// entry-creation case, for use directly in a validate callback's `?`-chain — unlike
+    /// entry-creation case.
+    ///
+    /// For use directly in a validate callback's `?`-chain — unlike
     /// [`TryFrom<Action>`](TypedAction#impl-TryFrom%3CAction%3E-for-TypedAction%3CEntryCreationData%3E),
     /// this returns [`ExternResult`](crate::prelude::ExternResult) instead of
     /// [`WrongActionError`].
@@ -149,9 +151,10 @@ impl TryFrom<Action> for TypedAction<EntryCreationData> {
     }
 }
 
-/// Shared plumbing behind every `TypedAction<D>::try_from_action`: narrow, then convert a
-/// mismatch straight into a guest [`WasmError`](crate::prelude::WasmError) instead of a
-/// [`WrongActionError`].
+/// Shared plumbing behind every `TypedAction<D>::try_from_action`.
+///
+/// Narrows the action, then converts a mismatch straight into a guest
+/// [`WasmError`](crate::prelude::WasmError) instead of a [`WrongActionError`].
 fn narrow_action<D>(action: Action) -> crate::prelude::ExternResult<TypedAction<D>>
 where
     TypedAction<D>: TryFrom<Action, Error = WrongActionError>,
@@ -311,8 +314,9 @@ impl TypedAction<DeleteLinkData> {
     }
 }
 
-/// Data known statically to be a [`CreateData`] or [`UpdateData`]. Lets a
-/// `TypedAction<CreateData>` or `TypedAction<UpdateData>` convert into a
+/// Data known statically to be a [`CreateData`] or [`UpdateData`].
+///
+/// Lets a `TypedAction<CreateData>` or `TypedAction<UpdateData>` convert into a
 /// `TypedAction<EntryCreationData>` via `.into()`, so validation code can share one
 /// function between the create and update path instead of the fallible narrowing that
 /// [`TryFrom<Action>`](TypedAction#impl-TryFrom<Action>-for-TypedAction<EntryCreationData>)
