@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state_types"
-version = "0.7.0-rc.2"
+version = "0.7.0-rc.3"
 description = "Types for the holochain_state crate"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"

@@ -7,15 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Add exclusive cursor pagination and optional limits to `DumpState` and
-  `DumpFullState`, plus matching `hc client` options. Full-state limits apply
-  globally to integrated and limbo chain ops and warrants, ordered by receipt
-  time and op hash. [\#5774](https://github.com/holochain/holochain/issues/5774)
-- **BREAKING CHANGE**: The `holochain::conductor::state` module has been
-  removed. Its public types (`ConductorState`, `ConductorStateTag`,
-  `AppInterfaceId`, and `AppInterfaceConfig`) moved to
-  `holochain_conductor_api::state`. The unused
-  `ConductorState::get_network_compat` method was removed. \#5737
+## 0.7.0-rc.4
+
+- Add exclusive cursor pagination and optional limits to `DumpState` and `DumpFullState`, plus matching `hc client` options. Full-state limits apply globally to integrated and limbo chain ops and warrants, ordered by receipt time and op hash. [\#5774](https://github.com/holochain/holochain/issues/5774)
+- **BREAKING CHANGE**: The `holochain::conductor::state` module has been removed. Its public types (`ConductorState`, `ConductorStateTag`, `AppInterfaceId`, and `AppInterfaceConfig`) moved to `holochain_conductor_api::state`. The unused `ConductorState::get_network_compat` method was removed. \#5737
 
 ## 0.7.0-rc.3
 
