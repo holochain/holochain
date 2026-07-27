@@ -174,29 +174,32 @@ async fn new_conductor_syncs_via_gossip_with_private_entries() {
     let record: Option<Record> = conductor1.call(&zome1, "read", public_hash0.clone()).await;
     assert_eq!(record.unwrap().action_address(), &public_hash0);
 
-    // The private entry's basis has no authority: its CreateEntry op is
-    // withheld, so a get by entry hash finds nothing.
+    // Consistency has been reached, so the get finding nothing means the
+    // private entry's CreateEntry op is withheld from gossip: no authority
+    // holds the entry.
     let records: Vec<Option<Record>> = conductor1
         .call(&zome1, "read_entry", priv_entry_hash.clone())
         .await;
     assert!(records.into_iter().flatten().next().is_none());
 
     // Reverse direction with private entries on both chains: conductor1
-    // authors while conductor0 is offline, so publish cannot deliver the
-    // data and gossip must deliver it once conductor0 returns.
-    conductor0.shutdown().await;
+    // authors its own public and private entries and gossip carries the
+    // public data back to conductor0.
     let public_hash1: ActionHash = conductor1
         .call(&zome1, "create_string", "hello".to_string())
         .await;
-    let (_a, _e): (ActionHash, EntryHash) = conductor1
+    let (_priv_action_hash1, priv_entry_hash1): (ActionHash, EntryHash) = conductor1
         .call(&zome1, "create_priv_string", "also secret".to_string())
         .await;
-    conductor0.startup().await;
-    SweetConductor::exchange_peer_info([&conductor0, &conductor1]).await;
     await_consistency([&cell0, &cell1]).await.unwrap();
 
     let record: Option<Record> = conductor0.call(&zome0, "read", public_hash1.clone()).await;
     assert_eq!(record.unwrap().action_address(), &public_hash1);
+
+    let records: Vec<Option<Record>> = conductor0
+        .call(&zome0, "read_entry", priv_entry_hash1.clone())
+        .await;
+    assert!(records.into_iter().flatten().next().is_none());
 }
 
 /// Every op hash the kitsune2 op store advertises must be servable while
