@@ -140,11 +140,14 @@ async fn new_conductor_reaches_consistency_with_existing_conductor() {
 async fn new_conductor_syncs_via_gossip_with_private_entries() {
     holochain_trace::test_run();
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-    let mut conductor0 = SweetConductor::from_config_rendezvous(
-        SweetConductorConfig::rendezvous(true),
-        SweetLocalRendezvous::new().await,
-    )
-    .await;
+    // Disable publishing on both conductors so gossip is the only possible
+    // transport, rather than relying on the publish interval to exceed the
+    // consistency window.
+    let config =
+        SweetConductorConfig::rendezvous(true).tune_network_config(|nc| nc.disable_publish = true);
+    let mut conductor0 =
+        SweetConductor::from_config_rendezvous(config.clone(), SweetLocalRendezvous::new().await)
+            .await;
     let app0 = conductor0.setup_app("app", [&dna_file]).await.unwrap();
     let cell0 = app0.into_cells().pop().unwrap();
     let zome0 = cell0.zome(SweetInlineZomes::COORDINATOR);
@@ -157,11 +160,9 @@ async fn new_conductor_syncs_via_gossip_with_private_entries() {
         .call(&zome0, "create_priv_string", "secret".to_string())
         .await;
 
-    let mut conductor1 = SweetConductor::from_config_rendezvous(
-        SweetConductorConfig::rendezvous(true),
-        conductor0.rendezvous().unwrap().clone(),
-    )
-    .await;
+    let mut conductor1 =
+        SweetConductor::from_config_rendezvous(config, conductor0.rendezvous().unwrap().clone())
+            .await;
     let app1 = conductor1.setup_app("app", [&dna_file]).await.unwrap();
     let cell1 = app1.into_cells().pop().unwrap();
     let zome1 = cell1.zome(SweetInlineZomes::COORDINATOR);
@@ -181,8 +182,8 @@ async fn new_conductor_syncs_via_gossip_with_private_entries() {
     assert!(records.into_iter().flatten().next().is_none());
 
     // Reverse direction with private entries on both chains: conductor1
-    // authors while conductor0 is offline, so publish cannot deliver and
-    // gossip must once conductor0 returns.
+    // authors while conductor0 is offline, so publish cannot deliver the
+    // data and gossip must deliver it once conductor0 returns.
     conductor0.shutdown().await;
     let public_hash1: ActionHash = conductor1
         .call(&zome1, "create_string", "hello".to_string())
@@ -263,8 +264,7 @@ async fn advertised_ops_are_servable_with_private_entries_on_chain() {
         std::sync::Arc::new(std::sync::OnceLock::new()),
     );
 
-    // Poll until validation and integration have made the authored records
-    // servable; the private CreateEntry op is processed in the same batch.
+    // Wait until the authored ops are advertised.
     let advertised: Vec<OpId> = tokio::time::timeout(Duration::from_secs(30), async {
         loop {
             let (ids, _total_size) = op_store
