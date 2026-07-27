@@ -63,6 +63,7 @@ use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUN
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
 use crate::core::ribosome::real_ribosome::module_cache::ModuleCache;
 use crate::core::ribosome::real_ribosome::WasmBackend;
+use crate::core::workflow::restore_workflow::{restore_workflow, RestoreOutcome};
 use crate::core::workflow::ZomeCallResult;
 use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
@@ -73,6 +74,7 @@ use futures::future::FutureExt;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
+use holochain_cascade::CascadeImpl;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::state::AppInterfaceConfig;
 use holochain_conductor_api::state::AppInterfaceId;
@@ -92,6 +94,7 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
+use holochain_state::DhtStore;
 pub use holochain_types::share;
 use holochain_zome_types::prelude::{AppCapGrantInfo, ClonedCell, Signature, Timestamp};
 use indexmap::IndexMap;
@@ -376,6 +379,12 @@ mod startup_shutdown_impls {
             }
 
             info!("Conductor startup: apps enabled.");
+
+            // Resume the restore orchestrator for any app whose restore is in progress
+            for (installed_app_id, _) in state.awaiting_restore_apps() {
+                self.clone()
+                    .spawn_restore_orchestrator(installed_app_id.clone());
+            }
 
             // Start recording conductor uptime
             register_uptime_metric(std::time::Instant::now());
@@ -1129,6 +1138,8 @@ pub struct InstallAppCommonFlags {
     pub defer_memproofs: bool,
     /// From [`InstallAppPayload::ignore_genesis_failure`]
     pub ignore_genesis_failure: bool,
+    /// From [`InstallAppPayload::restore_from_dht`]
+    pub restore_from_dht: bool,
 }
 
 /// Methods related to app installation and management
@@ -1198,6 +1209,7 @@ mod app_impls {
                     flags.unwrap_or(InstallAppCommonFlags {
                         defer_memproofs: false,
                         ignore_genesis_failure: false,
+                        restore_from_dht: false,
                     }),
                     InitPropertiesMap::new(),
                 )
@@ -1247,7 +1259,27 @@ mod app_impls {
                 self.clone().register_dna_file(cell_id, dna).await?;
             }
 
-            if flags.defer_memproofs {
+            if flags.restore_from_dht {
+                let roles = ops.role_assignments;
+                let app = InstalledAppCommon::new(
+                    installed_app_id.clone(),
+                    agent_key.clone(),
+                    roles,
+                    manifest,
+                    Timestamp::now(),
+                )?;
+
+                let (_, app) = self
+                    .update_state_prime(move |mut state| {
+                        let app = state.add_app_awaiting_restore(app)?;
+                        Ok((state, app))
+                    })
+                    .await?;
+
+                self.clone().spawn_restore_orchestrator(installed_app_id);
+
+                Ok(app)
+            } else if flags.defer_memproofs {
                 let roles = ops.role_assignments;
                 let app = InstalledAppCommon::new(
                     installed_app_id.clone(),
@@ -1351,9 +1383,23 @@ mod app_impls {
                 AppManifest::V0(m) => m.allow_deferred_memproofs && membrane_proofs.is_empty(),
             };
 
+            if restore_from_dht && defer_memproofs {
+                return Err(ConductorError::AppStatusError(
+                    "restore_from_dht cannot be combined with allow_deferred_memproofs".to_string(),
+                ));
+            }
+
+            if restore_from_dht && !membrane_proofs.is_empty() {
+                return Err(ConductorError::AppStatusError(
+                    "restore_from_dht cannot be combined with membrane proofs as they would never be used due to restore skipping genesis entirely"
+                        .to_string(),
+                ));
+            }
+
             let flags = InstallAppCommonFlags {
                 defer_memproofs,
                 ignore_genesis_failure,
+                restore_from_dht,
             };
 
             let installed_app_id =
@@ -1651,6 +1697,148 @@ mod app_impls {
 
             Ok(app_dnas.into_iter().collect())
         }
+    }
+}
+
+/// The backoff duration between retrying restore attempts. Used for a cell's own retryable states
+/// (peer disagreement, incomplete chain, pending warrants) and between cells if the per-app
+/// orchestrator needs to wait.
+const RESTORE_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Methods related to the per-app source-chain-restore orchestrator. The per-cell workflow itself
+/// lives in [`crate::core::workflow::restore_workflow`]. This module drives that workflow for each
+/// of an app's cells and determines the app-level status and signals from the per-cell results.
+mod restore_impls {
+    use super::*;
+
+    impl Conductor {
+        /// Spawn the per-app restore orchestrator as an ignored conductor task. Used at install
+        /// time, for a fresh `restore_from_dht` install, and during conductor startup to resume any
+        /// app left in [`AppStatus::AwaitingRestore`] by a crash.
+        pub(crate) fn spawn_restore_orchestrator(
+            self: Arc<Self>,
+            installed_app_id: InstalledAppId,
+        ) {
+            self.task_manager().add_conductor_task_ignored(
+                "restore_orchestrator",
+                move || async move {
+                    if let Err(err) =
+                        run_restore_orchestrator(self, installed_app_id.clone()).await
+                    {
+                        tracing::error!(?err, %installed_app_id, "Restore orchestrator stopped due to an error. A conductor restart will retry the restore");
+                    }
+                    Ok(())
+                },
+            );
+        }
+    }
+
+    /// Drives the [`restore_workflow`] across every provisioned cell of the `installed_app_id`, in
+    /// order, stopping at the first permanent failure. Determines the app's status and emits the
+    /// corresponding [`SystemSignal`] as each cell, and eventually the whole app, settles.
+    ///
+    /// A cell-workflow error is treated as an exception which should not lead to a retry. Instead,
+    /// the error is returned to the caller, leaving the app in [`AppStatus::AwaitingRestore`]. A
+    /// future conductor restart will rerun the orchestrator from scratch. This is the same recovery
+    /// path a mid-restore crash takes.
+    async fn run_restore_orchestrator(
+        conductor: ConductorHandle,
+        installed_app_id: InstalledAppId,
+    ) -> ConductorResult<()> {
+        let state = conductor.get_state().await?;
+        let cell_ids: Vec<CellId> = state
+            .get_app(&installed_app_id)?
+            .provisioned_cells()
+            .map(|(_, cell_id)| cell_id)
+            .collect();
+
+        let quorum = conductor.config.restore_chain_quorum;
+
+        for cell_id in cell_ids {
+            let (cascade, dht_store) = build_restore_cascade(&conductor, &cell_id)?;
+
+            let outcome = restore_workflow(
+                cell_id.clone(),
+                cascade,
+                dht_store,
+                quorum,
+                RESTORE_RETRY_DELAY,
+            )
+            .await?;
+
+            let signal_tx = conductor
+                .app_broadcast
+                .create_send_handle(installed_app_id.clone());
+
+            match outcome {
+                RestoreOutcome::Complete => {
+                    signal_tx
+                        .send(Signal::System(SystemSignal::RestoreComplete {
+                            cell_id: cell_id.clone(),
+                        }))
+                        .ok();
+                }
+                RestoreOutcome::PermanentFailure(reason) => {
+                    conductor
+                        .update_state_prime({
+                            let installed_app_id = installed_app_id.clone();
+                            let cell_id = cell_id.clone();
+                            let reason = reason.clone();
+                            move |mut state| {
+                                let app = state.get_app_mut(&installed_app_id)?;
+                                app.status = AppStatus::Unrecoverable(cell_id, reason);
+                                Ok((state, ()))
+                            }
+                        })
+                        .await?;
+                    signal_tx
+                        .send(Signal::System(SystemSignal::RestoreFailed {
+                            cell_id,
+                            reason,
+                        }))
+                        .ok();
+                    return Ok(());
+                }
+            }
+        }
+
+        conductor
+            .update_state_prime({
+                let installed_app_id = installed_app_id.clone();
+                move |mut state| {
+                    let app = state.get_app_mut(&installed_app_id)?;
+                    app.status = AppStatus::Disabled(DisabledAppReason::NeverStarted);
+                    Ok((state, ()))
+                }
+            })
+            .await?;
+
+        conductor
+            .app_broadcast
+            .create_send_handle(installed_app_id.clone())
+            .send(Signal::System(SystemSignal::AppRestoreComplete {
+                installed_app_id,
+            }))
+            .ok();
+
+        Ok(())
+    }
+
+    /// Builds the [`CascadeImpl`]/[`DhtStore`] pair that the [`restore_workflow`] needs for a cell.
+    fn build_restore_cascade(
+        conductor: &Conductor,
+        cell_id: &CellId,
+    ) -> ConductorResult<(CascadeImpl, DhtStore)> {
+        let space = conductor
+            .get_or_create_space(cell_id.dna_hash())
+            .map_err(ConductorError::from)?;
+        let dht_store = space.dht_store;
+        let network = Arc::new(holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            cell_id.dna_hash().clone(),
+        ));
+        let cascade = CascadeImpl::empty(dht_store.clone()).with_network(network);
+        Ok((cascade, dht_store))
     }
 }
 
@@ -2047,14 +2235,27 @@ mod app_status_impls {
             // Check if app can be enabled.
             let state = self.clone().get_state().await?;
             let app = state.get_app(&app_id)?;
-            if app.status == AppStatus::AwaitingMemproofs {
-                return Err(ConductorError::AppStatusError(
-                    "App is awaiting membrane proofs and cannot be enabled.".to_string(),
-                ));
-            }
-            // If app is already enabled, short circuit here.
-            if app.status == AppStatus::Enabled {
-                return Ok(app.clone());
+            match app.status {
+                AppStatus::AwaitingMemproofs => {
+                    return Err(ConductorError::AppStatusError(
+                        "App is awaiting membrane proofs and cannot be enabled.".to_string(),
+                    ));
+                }
+                AppStatus::AwaitingRestore => {
+                    return Err(ConductorError::AppStatusError(
+                        "App is awaiting source chain restore and cannot be enabled.".to_string(),
+                    ));
+                }
+                AppStatus::Unrecoverable(_, _) => {
+                    return Err(ConductorError::AppStatusError(
+                        "App's source chain restore failed permanently. It cannot be enabled and must be uninstalled.".to_string(),
+                    ));
+                }
+
+                // If app is already enabled, short circuit here.
+                AppStatus::Enabled => return Ok(app.clone()),
+
+                AppStatus::Disabled(_) => {}
             }
 
             self.load_wasms_into_ribosome_for_app(app).await?;
