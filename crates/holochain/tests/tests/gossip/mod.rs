@@ -10,7 +10,12 @@ use holochain::sweettest::SweetInlineZomes;
 use holochain::sweettest::{await_consistency, SweetConductor, SweetDnaFile};
 use holochain::sweettest::{SweetConductorBatch, SweetLocalRendezvous};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
-use holochain_zome_types::prelude::Record;
+use holochain_p2p::HolochainOpStore;
+use holochain_types::op::{produce_ops_from_record, ChainOp, DhtOp, OpEntry};
+use holochain_zome_types::prelude::{ChainOpType, Record};
+use kitsune2_api::{DhtArc, OpId, OpStore};
+use std::collections::HashSet;
+use std::time::Duration;
 
 /// Test that conductors with arcs clamped to zero do not gossip.
 #[tokio::test(flavor = "multi_thread")]
@@ -208,13 +213,6 @@ async fn new_conductor_syncs_via_gossip_with_private_entries() {
 /// and storage arcs never grow.
 #[tokio::test(flavor = "multi_thread")]
 async fn advertised_ops_are_servable_with_private_entries_on_chain() {
-    use holochain_p2p::HolochainOpStore;
-    use holochain_types::op::{produce_ops_from_record, ChainOp, DhtOp, OpEntry};
-    use holochain_zome_types::prelude::ChainOpType;
-    use kitsune2_api::{DhtArc, OpId, OpStore};
-    use std::collections::HashSet;
-    use std::time::Duration;
-
     holochain_trace::test_run();
 
     let mut conductor = SweetConductor::standard().await;
