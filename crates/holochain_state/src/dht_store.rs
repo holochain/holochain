@@ -1153,11 +1153,26 @@ impl DhtStore<DbWrite<Dht>> {
         &self,
         warrant: DhtOpHashed,
     ) -> StateMutationResult<()> {
+        self.test_insert_integrated_warrant_with_status(warrant, OpValidity::Accepted)
+            .await
+    }
+
+    /// As [`Self::test_insert_integrated_warrant`], but with an explicit validation verdict
+    /// rather than always seeding an accepted (i.e. [`ValidationStatus::Valid`]) warrant.
+    ///
+    /// [`ValidationStatus::Valid`]: holochain_zome_types::validate::ValidationStatus::Valid
+    pub async fn test_insert_integrated_warrant_with_status(
+        &self,
+        warrant: DhtOpHashed,
+        status: OpValidity,
+    ) -> StateMutationResult<()> {
         use holochain_data::dht::InsertWarrant;
 
         let warrant_op = match warrant.as_content() {
             DhtOp::WarrantOp(w) => w,
-            DhtOp::ChainOp(_) => panic!("test_insert_integrated_warrant requires a WarrantOp"),
+            DhtOp::ChainOp(_) => {
+                panic!("test_insert_integrated_warrant_with_status requires a WarrantOp")
+            }
         };
         let serialized_size = holochain_serialized_bytes::encode(warrant.as_content())
             .map_err(StateMutationError::from)?
@@ -1178,7 +1193,7 @@ impl DhtStore<DbWrite<Dht>> {
             storage_center_loc: warrant_op.warrantee.get_loc(),
             when_received: now,
             when_integrated: now,
-            validation_status: 1,
+            validation_status: i64::from(status),
             serialized_size,
         })
         .await
