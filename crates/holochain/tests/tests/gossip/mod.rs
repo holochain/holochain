@@ -197,3 +197,145 @@ async fn new_conductor_syncs_via_gossip_with_private_entries() {
     let record: Option<Record> = conductor0.call(&zome0, "read", public_hash1.clone()).await;
     assert_eq!(record.unwrap().action_address(), &public_hash1);
 }
+
+/// Every op hash the kitsune2 op store advertises must be servable while
+/// private entries sit on the chain. An advertised-but-unservable op is the
+/// #5871 failure class: peers request it forever, op stores never converge,
+/// and storage arcs never grow.
+#[tokio::test(flavor = "multi_thread")]
+async fn advertised_ops_are_servable_with_private_entries_on_chain() {
+    use holochain_p2p::HolochainOpStore;
+    use holochain_types::op::{produce_ops_from_record, ChainOp, DhtOp, OpEntry};
+    use holochain_zome_types::prelude::ChainOpType;
+    use kitsune2_api::{DhtArc, OpId, OpStore};
+    use std::collections::HashSet;
+    use std::time::Duration;
+
+    holochain_trace::test_run();
+
+    let mut conductor = SweetConductor::standard().await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
+    let cell = app.into_cells().pop().unwrap();
+    let zome = cell.zome(SweetInlineZomes::COORDINATOR);
+
+    const PRIVATE_CONTENT: &str = "private-entry-content-sentinel";
+
+    let public_hash: ActionHash = conductor
+        .call(&zome, "create_string", "public-entry-content".to_string())
+        .await;
+    let (priv_action_hash, _priv_entry_hash): (ActionHash, EntryHash) = conductor
+        .call(&zome, "create_priv_string", PRIVATE_CONTENT.to_string())
+        .await;
+
+    // The author's own get returns the private record with its entry, which
+    // is what `produce_ops_from_record` needs to compute the full op set.
+    let public_record: Option<Record> = conductor.call(&zome, "read", public_hash.clone()).await;
+    let private_record: Option<Record> = conductor
+        .call(&zome, "read", priv_action_hash.clone())
+        .await;
+    let private_record = private_record.unwrap();
+    assert!(private_record.entry().as_option().is_some());
+
+    let priv_ops = produce_ops_from_record(&private_record);
+    let priv_create_entry = priv_ops
+        .iter()
+        .find(|o| o.op_type == ChainOpType::CreateEntry)
+        .expect("a private create must still produce a CreateEntry op locally");
+    let priv_create_entry_id = priv_create_entry
+        .op_hash
+        .to_located_k2_op_id(&priv_create_entry.basis_hash);
+    let priv_create_entry_raw = priv_create_entry.op_hash.get_raw_36().to_vec();
+
+    let expected_servable: HashSet<OpId> = produce_ops_from_record(&public_record.unwrap())
+        .iter()
+        .chain(
+            priv_ops
+                .iter()
+                .filter(|o| o.op_type != ChainOpType::CreateEntry),
+        )
+        .map(|o| o.op_hash.to_located_k2_op_id(&o.basis_hash))
+        .collect();
+
+    let op_store = HolochainOpStore::new(
+        cell.dht_store().clone(),
+        dna_file.dna_hash().clone(),
+        std::sync::Arc::new(std::sync::OnceLock::new()),
+    );
+
+    // Poll until validation and integration have made the authored records
+    // servable; the private CreateEntry op is processed in the same batch.
+    let advertised: Vec<OpId> = tokio::time::timeout(Duration::from_secs(30), async {
+        loop {
+            let (ids, _total_size) = op_store
+                .retrieve_op_hashes_in_time_slice(
+                    DhtArc::FULL,
+                    kitsune2_api::Timestamp::from_micros(0),
+                    kitsune2_api::Timestamp::from_micros(i64::MAX),
+                )
+                .await
+                .unwrap();
+            let set: HashSet<OpId> = ids.iter().cloned().collect();
+            if expected_servable.is_subset(&set) {
+                break ids;
+            }
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+    })
+    .await
+    .expect("timed out waiting for authored ops to become servable");
+
+    // The private CreateEntry op is stored locally for its author, so this
+    // test is not passing vacuously.
+    let held = cell
+        .dht_store()
+        .as_read()
+        .check_op_hashes_present(&[priv_create_entry_raw])
+        .await
+        .unwrap();
+    assert_eq!(
+        held.len(),
+        1,
+        "private CreateEntry op must be stored locally"
+    );
+
+    // ...but it is never advertised.
+    let advertised_set: HashSet<OpId> = advertised.iter().cloned().collect();
+    assert!(
+        !advertised_set.contains(&priv_create_entry_id),
+        "private CreateEntry op must not be advertised"
+    );
+
+    // Everything advertised must be servable.
+    let served = op_store.retrieve_ops(advertised.clone()).await.unwrap();
+    let served_ids: HashSet<OpId> = served.iter().map(|op| op.op_id.clone()).collect();
+    assert_eq!(
+        advertised_set, served_ids,
+        "every advertised op must be servable"
+    );
+
+    // No served op carries the private entry content, and every served
+    // CreateEntry op carries its entry.
+    let sentinel = PRIVATE_CONTENT.as_bytes();
+    let mut served_create_entry_count = 0;
+    for meta_op in &served {
+        assert!(
+            !meta_op
+                .op_data
+                .windows(sentinel.len())
+                .any(|w| w == sentinel),
+            "private entry content leaked into a served op"
+        );
+        let op: DhtOp = holochain_serialized_bytes::prelude::decode(&meta_op.op_data).unwrap();
+        if let DhtOp::ChainOp(chain_op) = &op {
+            if let ChainOp::CreateEntry(_, entry) = &**chain_op {
+                assert!(
+                    matches!(entry, OpEntry::Present(_)),
+                    "served CreateEntry op is missing its entry"
+                );
+                served_create_entry_count += 1;
+            }
+        }
+    }
+    assert!(served_create_entry_count >= 1);
+}
