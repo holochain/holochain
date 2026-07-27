@@ -14,6 +14,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260727.022800
+
+## [hcterm-0.7.0-rc.4](crates/hcterm/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_cli-0.7.0-rc.4](crates/holochain_cli/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_cli\_client-0.7.0-rc.4](crates/holochain_cli_client/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_cli\_sandbox-0.7.0-rc.4](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_client-0.9.0-rc.4](crates/holochain_client/CHANGELOG.md#0.9.0-rc.4)
+
+## [holochain-0.7.0-rc.4](crates/holochain/CHANGELOG.md#0.7.0-rc.4)
+
+- Add exclusive cursor pagination and optional limits to `DumpState` and `DumpFullState`, plus matching `hc client` options. Full-state limits apply globally to integrated and limbo chain ops and warrants, ordered by receipt time and op hash. [\#5774](https://github.com/holochain/holochain/issues/5774)
+- **BREAKING CHANGE**: The `holochain::conductor::state` module has been removed. Its public types (`ConductorState`, `ConductorStateTag`, `AppInterfaceId`, and `AppInterfaceConfig`) moved to `holochain_conductor_api::state`. The unused `ConductorState::get_network_compat` method was removed. \#5737
+
+## [holochain\_cascade-0.7.0-rc.4](crates/holochain_cascade/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_conductor\_config-0.7.0-rc.4](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_test\_wasm\_common-0.7.0-rc.3](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-rc.3)
+
+## [hdk-0.7.0-rc.3](crates/hdk/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_p2p-0.7.0-rc.4](crates/holochain_p2p/CHANGELOG.md#0.7.0-rc.4)
+
+## [hdi-0.8.0-rc.3](crates/hdi/CHANGELOG.md#0.8.0-rc.3)
+
+## [holochain\_state-0.7.0-rc.4](crates/holochain_state/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_data-0.7.0-rc.4](crates/holochain_data/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_conductor\_api-0.7.0-rc.4](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_state\_types-0.7.0-rc.3](crates/holochain_state_types/CHANGELOG.md#0.7.0-rc.3)
+
 # 20260721.103110
 
 ## [hcterm-0.7.0-rc.3](crates/hcterm/CHANGELOG.md#0.7.0-rc.3)
