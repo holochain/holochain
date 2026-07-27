@@ -170,14 +170,11 @@ impl TryFrom<Action> for TypedAction<CreateData> {
     /// Narrows a freshly-fetched [`Action`] down to the `Create` case, erroring if it's
     /// anything else.
     fn try_from(action: Action) -> Result<Self, Self::Error> {
-        let data = match action.data {
-            ActionData::Create(data) => data,
-            other => {
-                return Err(WrongActionError(format!(
-                    "Expected a Create action, got {:?}",
-                    other.action_type()
-                )))
-            }
+        let action_type = action.data.action_type();
+        let ActionData::Create(data) = action.data else {
+            return Err(WrongActionError(format!(
+                "Expected a Create action, got {action_type:?}"
+            )));
         };
         Ok(TypedAction {
             header: action.header,
@@ -200,14 +197,11 @@ impl TryFrom<Action> for TypedAction<UpdateData> {
     /// Narrows a freshly-fetched [`Action`] down to the `Update` case, erroring if it's
     /// anything else.
     fn try_from(action: Action) -> Result<Self, Self::Error> {
-        let data = match action.data {
-            ActionData::Update(data) => data,
-            other => {
-                return Err(WrongActionError(format!(
-                    "Expected an Update action, got {:?}",
-                    other.action_type()
-                )))
-            }
+        let action_type = action.data.action_type();
+        let ActionData::Update(data) = action.data else {
+            return Err(WrongActionError(format!(
+                "Expected an Update action, got {action_type:?}"
+            )));
         };
         Ok(TypedAction {
             header: action.header,
@@ -230,14 +224,11 @@ impl TryFrom<Action> for TypedAction<DeleteData> {
     /// Narrows a freshly-fetched [`Action`] down to the `Delete` case, erroring if it's
     /// anything else.
     fn try_from(action: Action) -> Result<Self, Self::Error> {
-        let data = match action.data {
-            ActionData::Delete(data) => data,
-            other => {
-                return Err(WrongActionError(format!(
-                    "Expected a Delete action, got {:?}",
-                    other.action_type()
-                )))
-            }
+        let action_type = action.data.action_type();
+        let ActionData::Delete(data) = action.data else {
+            return Err(WrongActionError(format!(
+                "Expected a Delete action, got {action_type:?}"
+            )));
         };
         Ok(TypedAction {
             header: action.header,
@@ -260,14 +251,11 @@ impl TryFrom<Action> for TypedAction<CreateLinkData> {
     /// Narrows a freshly-fetched [`Action`] down to the `CreateLink` case, erroring if
     /// it's anything else.
     fn try_from(action: Action) -> Result<Self, Self::Error> {
-        let data = match action.data {
-            ActionData::CreateLink(data) => data,
-            other => {
-                return Err(WrongActionError(format!(
-                    "Expected a CreateLink action, got {:?}",
-                    other.action_type()
-                )))
-            }
+        let action_type = action.data.action_type();
+        let ActionData::CreateLink(data) = action.data else {
+            return Err(WrongActionError(format!(
+                "Expected a CreateLink action, got {action_type:?}"
+            )));
         };
         Ok(TypedAction {
             header: action.header,
@@ -290,14 +278,11 @@ impl TryFrom<Action> for TypedAction<DeleteLinkData> {
     /// Narrows a freshly-fetched [`Action`] down to the `DeleteLink` case, erroring if
     /// it's anything else.
     fn try_from(action: Action) -> Result<Self, Self::Error> {
-        let data = match action.data {
-            ActionData::DeleteLink(data) => data,
-            other => {
-                return Err(WrongActionError(format!(
-                    "Expected a DeleteLink action, got {:?}",
-                    other.action_type()
-                )))
-            }
+        let action_type = action.data.action_type();
+        let ActionData::DeleteLink(data) = action.data else {
+            return Err(WrongActionError(format!(
+                "Expected a DeleteLink action, got {action_type:?}"
+            )));
         };
         Ok(TypedAction {
             header: action.header,
