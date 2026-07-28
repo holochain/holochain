@@ -1755,7 +1755,8 @@ mod restore_impls {
         let quorum = conductor.config.restore_chain_quorum;
 
         for cell_id in cell_ids {
-            let (cascade, dht_store) = build_restore_cascade(&conductor, &cell_id)?;
+            let (cascade, dht_store, network) =
+                join_network_and_build_restore_cascade(&conductor, &cell_id).await?;
 
             let outcome = restore_workflow(
                 cell_id.clone(),
@@ -1779,6 +1780,15 @@ mod restore_impls {
                         .ok();
                 }
                 RestoreOutcome::PermanentFailure(reason) => {
+                    // Cell will never run, so it should leave the network to not linger as a peer.
+                    if let Err(err) = network.leave(cell_id.agent_pubkey().clone()).await {
+                        tracing::warn!(
+                            ?err,
+                            ?cell_id,
+                            "Failed to leave the network for a permanently failed restore cell"
+                        );
+                    }
+
                     conductor
                         .update_state_prime({
                             let installed_app_id = installed_app_id.clone();
@@ -1824,11 +1834,15 @@ mod restore_impls {
         Ok(())
     }
 
-    /// Builds the [`CascadeImpl`]/[`DhtStore`] pair that the [`restore_workflow`] needs for a cell.
-    fn build_restore_cascade(
+    /// Joins the cell's agent into the DNA's network space, then builds the [`CascadeImpl`]/
+    /// [`DhtStore`] pair the [`restore_workflow`] needs. Joining the network here is required as
+    /// otherwise the cell wouldn't join until the app is enabled and any P2P query against it would
+    /// fail. The joined network handle is also returned so the caller can `leave` it again if
+    /// restore ends in permanent failure.
+    async fn join_network_and_build_restore_cascade(
         conductor: &Conductor,
         cell_id: &CellId,
-    ) -> ConductorResult<(CascadeImpl, DhtStore)> {
+    ) -> ConductorResult<(CascadeImpl, DhtStore, holochain_p2p::DynHolochainP2pDna)> {
         let space = conductor
             .get_or_create_space(cell_id.dna_hash())
             .map_err(ConductorError::from)?;
@@ -1837,8 +1851,11 @@ mod restore_impls {
             conductor.holochain_p2p().clone(),
             cell_id.dna_hash().clone(),
         ));
-        let cascade = CascadeImpl::empty(dht_store.clone()).with_network(network);
-        Ok((cascade, dht_store))
+        network
+            .join(cell_id.agent_pubkey().clone(), None, None)
+            .await?;
+        let cascade = CascadeImpl::empty(dht_store.clone()).with_network(network.clone());
+        Ok((cascade, dht_store, network))
     }
 }
 
