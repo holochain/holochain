@@ -97,61 +97,82 @@ pub fn simple_crud_zome() -> InlineZomeSet {
     let string_entry_def = EntryDef::default_from_id("string");
     let unit_entry_def = EntryDef::default_from_id("unit");
     let bytes_entry_def = EntryDef::default_from_id("bytes");
+    let mut priv_string_entry_def = EntryDef::default_from_id("priv_string");
+    priv_string_entry_def.visibility = EntryVisibility::Private;
 
-    SweetInlineZomes::new(vec![string_entry_def, unit_entry_def, bytes_entry_def], 0)
-        .function("create_string", move |api, s: AppString| {
-            let entry = Entry::app(s.try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
-                EntryVisibility::Public,
-                entry,
-                ChainTopOrdering::default(),
-            ))?;
-            Ok(hash)
-        })
-        .function("create_unit", move |api, ()| {
-            let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, EntryDefIndex(1)),
-                EntryVisibility::Public,
-                entry,
-                ChainTopOrdering::default(),
-            ))?;
-            Ok(hash)
-        })
-        .function("create_bytes", move |api, bs: Bytes| {
-            let entry = Entry::app(UnsafeBytes::from(bs.to_vec()).into()).unwrap();
-            let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, EntryDefIndex(2)),
-                EntryVisibility::Public,
-                entry,
-                ChainTopOrdering::default(),
-            ))?;
-            Ok(hash)
-        })
-        .function("delete", move |api, action_hash: ActionHash| {
-            let hash = api.delete(DeleteInput::new(action_hash, ChainTopOrdering::default()))?;
-            Ok(hash)
-        })
-        .function("read", |api, hash: ActionHash| {
-            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
-                .map(|e| e.into_iter().next().unwrap())
-                .map_err(Into::into)
-        })
-        .function("read_multi", |api, hashes: Vec<ActionHash>| {
-            let gets = hashes
-                .iter()
-                .map(|h| GetInput::new(h.clone().into(), GetOptions::default()))
-                .collect();
-            api.get(gets).map_err(Into::into)
-        })
-        .function("read_entry", |api, hash: EntryHash| {
-            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
-                .map_err(Into::into)
-        })
-        .function("emit_signal", |api, ()| {
-            api.emit_signal(AppSignal::new(ExternIO::encode(()).unwrap()))
-                .map_err(Into::into)
-        })
-        .0
+    SweetInlineZomes::new(
+        vec![
+            string_entry_def,
+            unit_entry_def,
+            bytes_entry_def,
+            priv_string_entry_def,
+        ],
+        0,
+    )
+    .function("create_string", move |api, s: AppString| {
+        let entry = Entry::app(s.try_into().unwrap()).unwrap();
+        let hash = api.create(CreateInput::new(
+            InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+            EntryVisibility::Public,
+            entry,
+            ChainTopOrdering::default(),
+        ))?;
+        Ok(hash)
+    })
+    .function("create_unit", move |api, ()| {
+        let entry = Entry::app(().try_into().unwrap()).unwrap();
+        let hash = api.create(CreateInput::new(
+            InlineZomeSet::get_entry_location(&api, EntryDefIndex(1)),
+            EntryVisibility::Public,
+            entry,
+            ChainTopOrdering::default(),
+        ))?;
+        Ok(hash)
+    })
+    .function("create_bytes", move |api, bs: Bytes| {
+        let entry = Entry::app(UnsafeBytes::from(bs.to_vec()).into()).unwrap();
+        let hash = api.create(CreateInput::new(
+            InlineZomeSet::get_entry_location(&api, EntryDefIndex(2)),
+            EntryVisibility::Public,
+            entry,
+            ChainTopOrdering::default(),
+        ))?;
+        Ok(hash)
+    })
+    .function("create_priv_string", move |api, s: AppString| {
+        let entry = Entry::app(s.try_into().unwrap()).unwrap();
+        let entry_hash = EntryHash::with_data_sync(&entry);
+        let action_hash = api.create(CreateInput::new(
+            InlineZomeSet::get_entry_location(&api, EntryDefIndex(3)),
+            EntryVisibility::Private,
+            entry,
+            ChainTopOrdering::default(),
+        ))?;
+        Ok((action_hash, entry_hash))
+    })
+    .function("delete", move |api, action_hash: ActionHash| {
+        let hash = api.delete(DeleteInput::new(action_hash, ChainTopOrdering::default()))?;
+        Ok(hash)
+    })
+    .function("read", |api, hash: ActionHash| {
+        api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
+            .map(|e| e.into_iter().next().unwrap())
+            .map_err(Into::into)
+    })
+    .function("read_multi", |api, hashes: Vec<ActionHash>| {
+        let gets = hashes
+            .iter()
+            .map(|h| GetInput::new(h.clone().into(), GetOptions::default()))
+            .collect();
+        api.get(gets).map_err(Into::into)
+    })
+    .function("read_entry", |api, hash: EntryHash| {
+        api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
+            .map_err(Into::into)
+    })
+    .function("emit_signal", |api, ()| {
+        api.emit_signal(AppSignal::new(ExternIO::encode(()).unwrap()))
+            .map_err(Into::into)
+    })
+    .0
 }
