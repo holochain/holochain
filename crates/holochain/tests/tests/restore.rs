@@ -1,0 +1,232 @@
+//! End-to-end tests for the `restore_from_dht` install path.
+
+use holo_hash::ActionHash;
+use holochain::conductor::api::error::ConductorApiError;
+use holochain::conductor::error::ConductorError;
+use holochain::sweettest::*;
+use holochain_conductor_api::CellInfo;
+use holochain_types::app::{AppStatus, DisabledAppReason};
+use holochain_types::prelude::*;
+use holochain_types::signal::SystemSignal;
+use holochain_wasm_test_utils::TestWasm;
+
+/// Build a single-role [`AppBundle`] wrapping the passed [`DnaFile`], packing it ready for
+/// [`InstallAppPayload::source`].
+fn pack_bundle(dna_file: &DnaFile) -> bytes::Bytes {
+    AppBundle::new(
+        AppManifestCurrentBuilder::default()
+            .name("restored".into())
+            .description(None)
+            .roles(vec![AppRoleManifest {
+                name: "role".into(),
+                dna: AppRoleDnaManifest {
+                    path: Some(format!("{}", dna_file.dna_hash())),
+                    modifiers: DnaModifiersOpt::default(),
+                    installed_hash: None,
+                    clone_limit: 0,
+                },
+                provisioning: Some(CellProvisioning::Create { deferred: false }),
+            }])
+            .build()
+            .unwrap()
+            .into(),
+        vec![(
+            format!("{}", dna_file.dna_hash()),
+            DnaBundle::from_dna_file(dna_file.clone()).unwrap(),
+        )],
+    )
+    .unwrap()
+    .pack()
+    .unwrap()
+}
+
+/// The kitsune2 agent IDs currently joined to the network space of the passed [`DnaHash`].
+async fn joined_agents(
+    conductor: &SweetConductor,
+    dna_hash: &DnaHash,
+) -> Vec<kitsune2_api::AgentId> {
+    conductor
+        .raw_handle()
+        .holochain_p2p()
+        .test_kitsune()
+        .space(dna_hash.to_k2_space(), None)
+        .await
+        .unwrap()
+        .local_agent_store()
+        .get_all()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|agent| agent.agent().clone())
+        .collect()
+}
+
+/// Installs an app for an `agent` on a fresh conductor via the restore workflow.
+/// It asserts the intermediate steps, including that the cell's agent joins the DNA's network space
+/// while awaiting restore and that the cell is not callable until the app is enabled. It then
+/// confirms the enabled cell can author on top of the restored chain head rather than starting over
+/// from genesis.
+///
+/// A second conductor with its own agent is required as restore depends on fetching an agent's
+/// chain from other peers and never from the original device directly.
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_from_dht_end_to_end() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+    // Conductor A authors a chain for `agent` the normal way.
+    let mut conductor_a = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let keystore = conductor_a.keystore();
+    let agent = SweetAgents::one(keystore.clone()).await;
+
+    let app_a = conductor_a
+        .setup_app_for_agent("app", agent.clone(), std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_a = app_a.into_cells().remove(0);
+    conductor_a
+        .declare_full_storage_arcs(cell_a.dna_hash())
+        .await;
+
+    // Conductor C is a full-arc peer for a different agent on the same DNA. It gossips with A and
+    // is the authority restore actually queries.
+    let mut conductor_c = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let app_c = conductor_c
+        .setup_app("app", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_c = app_c.into_cells().remove(0);
+    conductor_c
+        .declare_full_storage_arcs(cell_c.dna_hash())
+        .await;
+
+    let _: ActionHash = conductor_a
+        .call(&cell_a.zome(TestWasm::Create), "create_entry", ())
+        .await;
+    let last_hash_on_a: ActionHash = conductor_a
+        .call(&cell_a.zome(TestWasm::Create), "create_entry", ())
+        .await;
+
+    await_consistency([&cell_a, &cell_c]).await.unwrap();
+
+    let last_record_on_a: Option<Record> = conductor_a
+        .call(&cell_a.zome(TestWasm::Create), "get_post", last_hash_on_a)
+        .await;
+    let last_seq_on_a = last_record_on_a.unwrap().action().action_seq();
+
+    // Conductor B restores the same agent's chain from the DHT on a fresh node. Quorum is dropped
+    // to 1 because the current `get_agent_activity_multi` stand-in only ever returns a single
+    // merged response (see the `Thin-wrapper note` on `restore_workflow::agent_activity`).
+    let mut config_b = SweetConductorConfig::rendezvous(true);
+    config_b.restore_chain_quorum = 1;
+    let conductor_b =
+        SweetConductor::create_with_defaults(config_b, Some(keystore.clone()), Some(rendezvous))
+            .await;
+
+    let app_id = "restored".to_string();
+    let mut signal_rx = conductor_b.subscribe_to_app_signals(app_id.clone());
+
+    conductor_b
+        .raw_handle()
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: Some(agent.clone()),
+            source: AppBundleSource::Bytes(pack_bundle(&dna_file)),
+            installed_app_id: Some(app_id.clone()),
+            network_seed: None,
+            roles_settings: None,
+            ignore_genesis_failure: false,
+            restore_from_dht: true,
+        })
+        .await
+        .unwrap();
+
+    let app_info = conductor_b
+        .raw_handle()
+        .get_app_info(&app_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(app_info.status, AppStatus::AwaitingRestore);
+
+    let restore_cell_id = match app_info.cell_info["role"].first().unwrap() {
+        CellInfo::Provisioned(c) => c.cell_id.clone(),
+        other => panic!("Expected a provisioned cell, got: {other:?}"),
+    };
+    let restore_cell = conductor_b.get_sweet_cell(restore_cell_id).unwrap();
+
+    // The cell's agent must have joined the DNA's network space in order to query it, even though
+    // the cell itself is not yet running. The restore orchestrator is spawned as a background task,
+    // so poll rather than checking immediately after install returns.
+    holochain::retry_until_timeout!(10_000, 100, {
+        if joined_agents(&conductor_b, dna_file.dna_hash())
+            .await
+            .contains(&agent.to_k2_agent())
+        {
+            break;
+        }
+    });
+
+    // `enable_app` has not been called yet, so the cell must not be callable.
+    let err = conductor_b
+        .call_fallible::<_, ActionHash>(&restore_cell.zome(TestWasm::Create), "create_entry", ())
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(
+            err,
+            ConductorApiError::ConductorError(ConductorError::CellDisabled(_))
+        ),
+        "expected CellDisabled while awaiting restore, got: {err:?}"
+    );
+
+    let signal = tokio::time::timeout(std::time::Duration::from_secs(60), async {
+        loop {
+            match signal_rx.recv().await.unwrap() {
+                signal @ Signal::System(SystemSignal::AppRestoreComplete { .. }) => break signal,
+                Signal::System(SystemSignal::RestoreFailed { cell_id, reason }) => {
+                    panic!("Restore failed unexpectedly for {cell_id:?}: {reason:?}");
+                }
+                _ => continue,
+            }
+        }
+    })
+    .await
+    .expect("timed out waiting for AppRestoreComplete");
+    assert!(matches!(
+        signal,
+        Signal::System(SystemSignal::AppRestoreComplete { installed_app_id }) if installed_app_id == app_id
+    ));
+
+    let app_info = conductor_b
+        .raw_handle()
+        .get_app_info(&app_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        app_info.status,
+        AppStatus::Disabled(DisabledAppReason::NeverStarted)
+    );
+
+    conductor_b.enable_app(app_id).await.unwrap();
+
+    // The cell continues authoring from the restored chain head rather than starting over.
+    let new_hash: ActionHash = conductor_b
+        .call(&restore_cell.zome(TestWasm::Create), "create_entry", ())
+        .await;
+    let new_record: Option<Record> = conductor_b
+        .call(&restore_cell.zome(TestWasm::Create), "get_post", new_hash)
+        .await;
+    assert_eq!(new_record.unwrap().action().action_seq(), last_seq_on_a + 1);
+}

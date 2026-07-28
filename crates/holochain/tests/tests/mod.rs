@@ -24,6 +24,7 @@ mod new_lair;
 mod paths;
 mod publish;
 mod regression;
+mod restore;
 mod schedule;
 mod send_signal;
 mod ser_regression;
