@@ -4413,9 +4413,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2"
-version = "0.5.0-dev.6"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4af3752cd8e662d2fbfb67037881a730667550ec46fccaad2923c21254f20ba"
+checksum = "eed54db66ff85d8b7b8a88658438ef94fdd5d1885a4557db477cf63f4dff3d0c"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4427,9 +4427,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_api"
-version = "0.5.0-dev.6"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13b9952821727dfca743f844193e2fae88c21168ea86e6e3c488060d298289bc"
+checksum = "35592adcc191d30f24edff73da41ea697b692caf5397aa6b640800ed3523c117"
 dependencies = [
  "base64",
  "bytes",
@@ -4444,9 +4444,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_bootstrap_client"
-version = "0.5.0-dev.6"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "178a72df991cc9dd83f72507dd62db1905254277f7adc3bbcf0facc94f6eaf3d"
+checksum = "f26b07b724567aade174c12e618830268d1bce71b9e74349f1874e785416ad64"
 dependencies = [
  "base64",
  "kitsune2_api",
@@ -4459,9 +4459,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_bootstrap_srv"
-version = "0.5.0-dev.6"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e421fa71a036b27cc208c17bafeaf61db21fafe6ad08fa4a7903f6339a4b0c"
+checksum = "29026f6f9e805c1c06a36b7f93687cbb11c6f537c2b1c418131e9ec164b50b6d"
 dependencies = [
  "async-channel",
  "axum",
@@ -4496,9 +4496,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_core"
-version = "0.5.0-dev.6"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3059cff8efd3cd2317fde0833b13e852235b645b61b2b14b2f45df830acbd1c5"
+checksum = "3e1207d2f463f5e0b136ae918cc665f042abe78a21c63e7d5f6ed4faf10fc46e"
 dependencies = [
  "base64",
  "bytes",
@@ -4529,9 +4529,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_gossip"
-version = "0.5.0-dev.6"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2896231d2feb18cf3107e69e6ad423d66cc88220b91bf2e88e9081092ab3e00"
+checksum = "76215d8944011a4ae3e897cc45e33314f071f6c704b8e694df9204b39c6d6d43"
 dependencies = [
  "bytes",
  "futures",
@@ -4550,9 +4550,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_test_utils"
-version = "0.5.0-dev.6"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7d2dc31e0acd46d909aaabfc0bb5e12e67c474951558dd6a837c5ea0ac799b0"
+checksum = "1925c738833cd9167933cb34324afbb18bb05759c49ed390434ce20fb52fd506"
 dependencies = [
  "axum",
  "bytes",
@@ -4567,9 +4567,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_transport_iroh"
-version = "0.5.0-dev.6"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d99ca5ee46c51107167f680cc8c410f5d8045093c8907f51e7cae952691ea73"
+checksum = "564abdfe9800443a58e3bf6985b7950c1ff2af2158ac4a22a2278ea4bcc9e31d"
 dependencies = [
  "base64",
  "bytes",
