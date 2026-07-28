@@ -270,7 +270,7 @@ Failures classified as retryable in this design are handled inside the workflow:
 - Zero peers respond.
 - Fewer than `restore_chain_quorum` peers respond.
 - Responding peers disagree on `ChainHead`.
-- Incomplete chain returned (gaps in `0..=H`): keep requesting missing sequences from peers that might hold them.
+- Incomplete chain returned (gaps in `0..=H`): the walk cannot resolve back to seq 0, so nothing is written. Instead, the workflow returns to Step 1 and re-issues `get_agent_activity_multi` from scratch, in case other peers can now supply the missing records.
 - Warrants returned by peers are pending local validation: wait for the validation pipeline's verdict before advancing.
 - Individual records arrive with bad signatures or hashes that do not match the Step 1 candidate. These are discarded record-by-record; restore keeps requesting until at least one honest peer per `seq` has been heard from.
 
@@ -355,7 +355,7 @@ Applications that rely on the lost categories must accept degraded post-restore 
 | `agent_key` not present in local Lair | Reject the install at admit time. |
 | Fewer than `restore_chain_quorum` peers respond | Internal retry (see [Retry behaviour](#retry-behaviour)). App stays in `AwaitingRestore`. |
 | Responding peers disagree on `ChainHead` | Internal retry. App stays in `AwaitingRestore`. |
-| Incomplete chain (gap in `0..=H`) | Internal retry. Re-request missing sequences. App stays in `AwaitingRestore`. |
+| Incomplete chain (gap in `0..=H`) | Internal retry. Re-runs Step 1 from scratch. App stays in `AwaitingRestore`. |
 | Restored record fails signature check against `A` | Record discarded. Restore continues with responses from other peers. |
 | Restored record's hash does not match the Step 1 candidate for its sequence | Record discarded. Restore continues with responses from other peers. |
 | Warrant returned by a peer for `A` | Submitted to local validation. App stays in `AwaitingRestore` until validation completes; outcome below. |
