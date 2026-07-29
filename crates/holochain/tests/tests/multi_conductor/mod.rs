@@ -13,19 +13,22 @@ struct AppString(String);
 /// even with gossip disabled.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-async fn test_publish() {
+async fn publish() {
     use holochain::{retry_until_timeout, test_utils::inline_zomes::simple_create_read_zome};
-    use holochain_conductor_api::conductor::{ConductorConfig, NetworkConfig};
 
     holochain_trace::test_run();
 
-    let config = ConductorConfig {
-        network: NetworkConfig {
-            disable_gossip: true,
-            ..Default::default()
-        },
-        ..Default::default()
-    };
+    let config = SweetConductorConfig::rendezvous(true)
+        .tune_network_config(|nc| {
+            nc.disable_gossip = true;
+        })
+        .tune_conductor(|tune| {
+            // Publishing an op is a best-effort notification. Keep the
+            // publish loop and the per-op publish cooldown short so that a
+            // missed notification is retried within this test's timeout.
+            tune.publish_trigger_interval = Some(std::time::Duration::from_millis(500));
+            tune.min_publish_interval = Some(std::time::Duration::from_millis(500));
+        });
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
     let dna_file = SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
