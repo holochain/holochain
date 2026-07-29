@@ -214,6 +214,17 @@ impl AdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::FullStateDumped(state))
             }
+            DumpOpTimings {
+                dna_hash,
+                cursor,
+                limit,
+            } => {
+                let timings = self
+                    .conductor_handle
+                    .dump_op_timings(&dna_hash, cursor, limit)
+                    .await?;
+                Ok(AdminResponse::OpTimingsDumped(timings))
+            }
             DumpNetworkMetrics {
                 dna_hash,
                 include_dht_summary,

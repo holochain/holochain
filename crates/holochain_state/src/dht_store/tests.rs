@@ -2731,6 +2731,32 @@ async fn authority_updates_for_entry_returns_integrated_updates() {
     assert_eq!(updates[0].1, ValidationStatus::Valid);
 }
 
+#[tokio::test]
+async fn op_timings_page_rejects_zero_limit() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+    let err = store
+        .op_timings_page_for_dump(None, Some(0))
+        .await
+        .unwrap_err();
+
+    assert!(
+        matches!(err, crate::query::StateQueryError::InvalidInput(ref msg)
+            if msg == "dump limit must be greater than zero"),
+        "unexpected error: {err:?}"
+    );
+}
+
+#[tokio::test]
+async fn op_timings_page_is_empty_for_a_fresh_store() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+    let page = store.op_timings_page_for_dump(None, None).await.unwrap();
+
+    assert!(page.timings.is_empty());
+    assert!(page.cursor.is_none());
+}
+
 /// Direct coverage of the publish-queue query (`get_ops_to_publish` /
 /// `num_still_needing_publish`) against the `DhtStore`. The publish *workflow*
 /// that consumes this query is tested in the `publish_dht_ops_workflow` unit

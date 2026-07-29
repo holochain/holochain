@@ -6,12 +6,15 @@
 //! `DhtStore<DbWrite<Dht>>` expose them; the slice-hash write needs
 //! `DbWrite`. All `sqlx::Error`s map into `StateQueryError`.
 
+use holochain_conductor_api::{OpTimingDump, OpTimingsCursor, OpTimingsDump};
 use holochain_data::kind::Dht;
+use holochain_data::models::dht::OpTimingRow;
 use holochain_data::DbWrite;
-use holochain_types::prelude::{AgentPubKey, DhtOpHash, Timestamp};
+use holochain_types::prelude::{AgentPubKey, DhtOpHash, OpValidity, Timestamp};
 
 use super::DhtStore;
 use crate::mutations::{StateMutationError, StateMutationResult};
+use crate::query::{StateQueryError, StateQueryResult};
 
 impl<Db> DhtStore<Db>
 where
@@ -177,6 +180,48 @@ where
             .map_err(crate::query::StateQueryError::Sqlx)
     }
 
+    /// One page of DHT-op lifecycle timings ordered by `(when_received, hash)`.
+    ///
+    /// `after` is exclusive, so passing the previous page's cursor resumes
+    /// strictly after it. `None` for `limit` returns the full remaining set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `limit` is zero, the database query fails, or a
+    /// stored validation status is not a value this version can decode.
+    pub async fn op_timings_page_for_dump(
+        &self,
+        after: Option<&OpTimingsCursor>,
+        limit: Option<u32>,
+    ) -> StateQueryResult<OpTimingsDump> {
+        if limit == Some(0) {
+            return Err(StateQueryError::InvalidInput(
+                "dump limit must be greater than zero".to_string(),
+            ));
+        }
+        let page = self
+            .db
+            .as_ref()
+            .op_timings_page(
+                after.map(|cursor| (cursor.when_received, &cursor.hash)),
+                limit,
+            )
+            .await
+            .map_err(StateQueryError::Sqlx)?;
+
+        Ok(OpTimingsDump {
+            timings: page
+                .rows
+                .into_iter()
+                .map(op_timing_dump)
+                .collect::<StateQueryResult<Vec<_>>>()?,
+            cursor: page.cursor.map(|cursor| OpTimingsCursor {
+                when_received: cursor.when_received,
+                hash: cursor.hash,
+            }),
+        })
+    }
+
     /// Limbo chain-op rows for the integration dump. `ready` selects the
     /// integration-limbo subset; `!ready` selects the validation-limbo subset.
     pub async fn limbo_chain_ops_for_dump(
@@ -271,6 +316,29 @@ where
             .await
             .map_err(crate::query::StateQueryError::Sqlx)
     }
+}
+
+/// Decode one raw op-timings row into its typed dump form.
+///
+/// # Errors
+///
+/// Returns an error if the row's `validation_status` is not a value this
+/// version can decode.
+fn op_timing_dump(row: OpTimingRow) -> StateQueryResult<OpTimingDump> {
+    Ok(OpTimingDump {
+        op_hash: DhtOpHash::from_raw_36(row.hash),
+        when_received: Timestamp::from_micros(row.when_received),
+        when_integrated: row.when_integrated.map(Timestamp::from_micros),
+        abandoned_at: row.abandoned_at.map(Timestamp::from_micros),
+        validation_status: row
+            .validation_status
+            .map(OpValidity::try_from)
+            .transpose()
+            .map_err(|status| {
+                StateQueryError::Other(format!("invalid stored validation status {status}"))
+            })?,
+        locally_validated: row.locally_validated.map(|flag| flag != 0),
+    })
 }
 
 impl DhtStore<DbWrite<Dht>> {

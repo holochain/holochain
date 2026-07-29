@@ -12,7 +12,7 @@ use holochain_client::AdminWebsocket;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::PeerMetaInfo;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
-use holochain_conductor_api::{AppStatusFilter, DhtOpsCursor, SourceChainCursor};
+use holochain_conductor_api::{AppStatusFilter, DhtOpsCursor, OpTimingsCursor, SourceChainCursor};
 use holochain_types::app::AppManifest;
 use holochain_types::app::RoleSettingsMap;
 use holochain_types::app::RoleSettingsMapYaml;
@@ -76,6 +76,8 @@ pub enum AdminRequestCli {
     DumpState(DumpState),
     /// Calls [`AdminWebsocket::dump_full_state`].
     DumpFullState(DumpFullState),
+    /// Calls [`AdminWebsocket::dump_op_timings`].
+    DumpOpTimings(DumpOpTimings),
     /// Calls [`AdminWebsocket::dump_conductor_state`].
     DumpConductorState,
     /// Calls [`AdminWebsocket::dump_network_metrics`].
@@ -246,12 +248,28 @@ pub struct DumpFullState {
     #[arg(value_parser = parse_agent_key)]
     pub agent_key: AgentPubKey,
 
-    /// Last receipt timestamp and DHT op hash returned by the previous page.
+    /// Last received timestamp and DHT op hash returned by the previous page.
     #[arg(long, num_args = 2, value_names = ["WHEN_RECEIVED", "DHT_OP_HASH"])]
     pub cursor: Option<Vec<String>>,
 
     /// Maximum number of DHT ops across all lifecycle buckets to return.
     /// Must be greater than zero.
+    #[arg(long, value_parser = parse_dump_limit)]
+    pub limit: Option<u32>,
+}
+
+/// Calls [`AdminWebsocket::dump_op_timings`] and dumps one page of op timings.
+#[derive(Debug, Args, Clone)]
+pub struct DumpOpTimings {
+    /// The DNA hash whose DHT arc to dump.
+    #[arg(value_parser = parse_dna_hash)]
+    pub dna: DnaHash,
+
+    /// Last received timestamp and DHT op hash returned by the previous page.
+    #[arg(long, num_args = 2, value_names = ["WHEN_RECEIVED", "DHT_OP_HASH"])]
+    pub cursor: Option<Vec<String>>,
+
+    /// Maximum number of ops to return. Must be greater than zero.
     #[arg(long, value_parser = parse_dump_limit)]
     pub limit: Option<u32>,
 }
@@ -431,6 +449,15 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             let cell_id = CellId::new(args.dna, args.agent_key);
             let state = client.dump_full_state(cell_id, cursor, args.limit).await?;
             println!("{}", serde_json::to_string(&state)?);
+        }
+        AdminRequestCli::DumpOpTimings(args) => {
+            let cursor = args
+                .cursor
+                .as_deref()
+                .map(parse_op_timings_cursor)
+                .transpose()?;
+            let timings = client.dump_op_timings(args.dna, cursor, args.limit).await?;
+            println!("{}", serde_json::to_string(&timings)?);
         }
         AdminRequestCli::DumpConductorState => {
             let state = client.dump_conductor_state().await?;
@@ -752,12 +779,27 @@ fn parse_source_chain_cursor(arg: &str) -> anyhow::Result<SourceChainCursor> {
 
 fn parse_dht_ops_cursor(values: &[String]) -> anyhow::Result<DhtOpsCursor> {
     let [when_received, hash] = values else {
-        return Err(anyhow!("DHT cursor requires a receipt time and op hash"));
+        return Err(anyhow!("DHT cursor requires a received time and op hash"));
     };
     Ok(DhtOpsCursor {
         when_received: when_received
             .parse()
-            .map_err(|e| anyhow!("Invalid receipt time: {e}"))?,
+            .map_err(|e| anyhow!("Invalid received time: {e}"))?,
+        hash: DhtOpHash::try_from(hash.as_str())
+            .map_err(|e| anyhow!("Invalid DHT op hash: {e}"))?,
+    })
+}
+
+fn parse_op_timings_cursor(values: &[String]) -> anyhow::Result<OpTimingsCursor> {
+    let [when_received, hash] = values else {
+        return Err(anyhow!(
+            "op-timings cursor requires a received time and op hash"
+        ));
+    };
+    Ok(OpTimingsCursor {
+        when_received: when_received
+            .parse()
+            .map_err(|e| anyhow!("Invalid received time: {e}"))?,
         hash: DhtOpHash::try_from(hash.as_str())
             .map_err(|e| anyhow!("Invalid DHT op hash: {e}"))?,
     })
@@ -807,6 +849,7 @@ mod tests {
     use holo_hash::{AgentPubKey, DnaHash};
     use holochain_client::{SerializedBytes, Timestamp};
     use holochain_conductor_api::CellInfo;
+    use holochain_conductor_api::OpTimingsCursor;
     use holochain_types::app::{AppManifestV0Builder, AppRoleManifest, AppStatus};
     use holochain_types::prelude::{CellId, DnaModifiers, RoleName};
     use indexmap::IndexMap;
@@ -904,6 +947,69 @@ mod tests {
             "not-a-sequence-or-action-hash",
         ])
         .is_err());
+    }
+
+    #[test]
+    fn parses_dump_op_timings_cursor_pair() {
+        let dna = "uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm";
+        let hash = "uhCQkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm";
+        let call = Call::try_parse_from([
+            "hc-client",
+            "--port",
+            "1234",
+            "dump-op-timings",
+            dna,
+            "--limit",
+            "10",
+            "--cursor",
+            "99",
+            hash,
+        ])
+        .unwrap();
+
+        let AdminRequestCli::DumpOpTimings(args) = call.call else {
+            panic!("expected dump-op-timings arguments");
+        };
+        assert_eq!(args.limit, Some(10));
+        assert_eq!(
+            parse_op_timings_cursor(args.cursor.as_deref().unwrap()).unwrap(),
+            OpTimingsCursor {
+                when_received: 99,
+                hash: DhtOpHash::try_from(hash).unwrap(),
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_dump_op_timings_arguments() {
+        let dna = "uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm";
+
+        // Zero limit.
+        assert!(Call::try_parse_from([
+            "hc-client",
+            "--port",
+            "1234",
+            "dump-op-timings",
+            dna,
+            "--limit",
+            "0",
+        ])
+        .is_err());
+
+        // Cursor needs both a received time and a hash.
+        assert!(Call::try_parse_from([
+            "hc-client",
+            "--port",
+            "1234",
+            "dump-op-timings",
+            dna,
+            "--cursor",
+            "99",
+        ])
+        .is_err());
+
+        // Cursor hash must be a DHT op hash.
+        assert!(parse_op_timings_cursor(&["99".to_string(), "not-a-hash".to_string()]).is_err());
     }
 
     #[test]

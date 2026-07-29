@@ -167,6 +167,17 @@ impl AppInterfaceApi {
                     .await?;
                 Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }
+            AppRequest::DumpOpTimings {
+                dna_hash,
+                cursor,
+                limit,
+            } => {
+                let timings = self
+                    .conductor_handle
+                    .dump_op_timings_for_app(&installed_app_id, &dna_hash, cursor, limit)
+                    .await?;
+                Ok(AppResponse::OpTimingsDumped(timings))
+            }
             AppRequest::DumpNetworkMetrics {
                 dna_hash,
                 include_dht_summary,

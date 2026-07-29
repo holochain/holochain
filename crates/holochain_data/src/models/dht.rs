@@ -518,6 +518,40 @@ pub struct DumpOpPage {
     pub cursor: Option<DumpOpCursorRow>,
 }
 
+/// Lifecycle timings for one DHT op, selected for an op-timings dump page.
+///
+/// `when_integrated`, `validation_status` and `locally_validated` are `NULL`
+/// for ops still in a validation limbo, and `locally_validated` is always
+/// `NULL` for warrants, whose table has no such column. `abandoned_at` is only
+/// recorded on the limbo tables, so it is `NULL` for integrated ops.
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct OpTimingRow {
+    /// DHT op hash.
+    pub hash: Vec<u8>,
+    /// Microsecond timestamp at which the op was received.
+    pub when_received: i64,
+    /// Microsecond timestamp at which the op was integrated, where recorded.
+    pub when_integrated: Option<i64>,
+    /// Microsecond timestamp at which validation of the op was abandoned,
+    /// where recorded. An abandoned op stays in limbo and will not integrate.
+    pub abandoned_at: Option<i64>,
+    /// `1` when the op was accepted, `2` when it was rejected, `NULL` while
+    /// validation has not concluded.
+    pub validation_status: Option<i64>,
+    /// `1` when this authority validated the op itself, `0` when it was
+    /// accepted from the cache, `NULL` when not recorded.
+    pub locally_validated: Option<i64>,
+}
+
+/// One globally ordered page of op timings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpTimingsPage {
+    /// Rows in global `(when_received, hash)` order.
+    pub rows: Vec<OpTimingRow>,
+    /// Last database key selected, or `None` when the page was empty.
+    pub cursor: Option<DumpOpCursorRow>,
+}
+
 /// `(slice_index, hash)` pair returned when enumerating slice hashes.
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct SliceHashIndexedRow {

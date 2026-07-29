@@ -4,8 +4,8 @@ use holo_hash::{ActionHash, DnaHash};
 use holochain_conductor_api::{
     AdminInterfaceConfig, AdminRequest, AdminResponse, AppAuthenticationToken,
     AppAuthenticationTokenIssued, AppInfo, AppInterfaceInfo, AppStatusFilter, DhtOpsCursor,
-    FullStateDump, IssueAppAuthenticationTokenPayload, PeerMetaInfo, SourceChainCursor,
-    StorageInfo,
+    FullStateDump, IssueAppAuthenticationTokenPayload, OpTimingsCursor, OpTimingsDump,
+    PeerMetaInfo, SourceChainCursor, StorageInfo,
 };
 use holochain_types::network::HolochainTransportStats;
 use holochain_types::websocket::AllowedOrigins;
@@ -501,6 +501,32 @@ impl AdminWebsocket {
         let response = self.send(msg).await?;
         match response {
             AdminResponse::FullStateDumped(state) => Ok(state),
+            _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
+
+    /// Dump one page of a DNA's DHT-op lifecycle timings.
+    ///
+    /// Pass the previous page's `cursor` to resume; `None` starts at the
+    /// oldest op by received time.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the limit is zero.
+    pub async fn dump_op_timings(
+        &self,
+        dna_hash: DnaHash,
+        cursor: Option<OpTimingsCursor>,
+        limit: Option<u32>,
+    ) -> ConductorApiResult<OpTimingsDump> {
+        let msg = AdminRequest::DumpOpTimings {
+            dna_hash,
+            cursor,
+            limit,
+        };
+        let response = self.send(msg).await?;
+        match response {
+            AdminResponse::OpTimingsDumped(timings) => Ok(timings),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }

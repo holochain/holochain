@@ -1,4 +1,5 @@
 use crate::peer_meta::PeerMetaInfo;
+use crate::state_dump::{OpTimingsCursor, OpTimingsDump};
 use crate::{AppAuthenticationToken, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
@@ -193,6 +194,33 @@ pub enum AppRequest {
     /// [`AppResponse::CloneCellEnabled`]
     EnableCloneCell(Box<EnableCloneCellPayload>),
 
+    /// Dump the lifecycle timings of the DHT ops held by this conductor for
+    /// the DNA of one of this app's cells.
+    ///
+    /// Identical to [`AdminRequest::DumpOpTimings`](crate::admin_interface::AdminRequest::DumpOpTimings)
+    /// except that `dna_hash` must be the DNA of a cell of the app this
+    /// connection is authenticated for. As there, the DHT database is shared
+    /// by every cell running the same DNA, so the dump covers the whole DHT
+    /// arc this conductor is currently holding for that DNA, not the ops of
+    /// any one agent running the DNA.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::OpTimingsDumped`]
+    DumpOpTimings {
+        /// The DNA whose DHT arc to dump op timings for. This app must run a
+        /// cell of this DNA.
+        dna_hash: DnaHash,
+        /// Pagination cursor from a previous `DumpOpTimings`; only ops
+        /// ordered strictly after it are returned. `None` starts from the
+        /// beginning.
+        #[serde(default)]
+        cursor: Option<OpTimingsCursor>,
+        /// Maximum number of ops to return. Must be greater than zero.
+        #[serde(default)]
+        limit: Option<u32>,
+    },
+
     /// Retrieve network metrics for the current app.
     ///
     /// Identical to what [`AdminRequest::DumpNetworkMetrics`](crate::admin_interface::AdminRequest::DumpNetworkMetrics)
@@ -336,6 +364,9 @@ pub enum AppResponse {
     /// A previously disabled clone cell has been enabled. The [`ClonedCell`]
     /// is returned.
     CloneCellEnabled(ClonedCell),
+
+    /// The successful result of a call to [`AppRequest::DumpOpTimings`].
+    OpTimingsDumped(OpTimingsDump),
 
     /// The successful result of a call to [`AppRequest::DumpNetworkMetrics`].
     NetworkMetricsDumped(HashMap<DnaHash, Kitsune2NetworkMetrics>),
@@ -643,5 +674,27 @@ mod tests {
             serde_json::to_string(&status).unwrap(),
             "{\"type\":\"disabled\",\"value\":{\"type\":\"user\"}}",
         );
+    }
+
+    #[test]
+    fn dump_op_timings_request_defaults_omitted_pagination_fields() {
+        use holo_hash::DnaHash;
+
+        let dna_hash = DnaHash::from_raw_36(vec![1; 36]);
+
+        let request: AppRequest = serde_json::from_value(serde_json::json!({
+            "type": "dump_op_timings",
+            "value": { "dna_hash": dna_hash }
+        }))
+        .unwrap();
+
+        assert!(matches!(
+            request,
+            AppRequest::DumpOpTimings {
+                cursor: None,
+                limit: None,
+                ..
+            }
+        ));
     }
 }

@@ -5,7 +5,7 @@ use crate::handles::DbRead;
 use crate::kind::Dht;
 use crate::models::dht::{
     DumpChainOpRow, DumpOpPage, K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow,
-    K2WarrantForWireRow,
+    K2WarrantForWireRow, OpTimingsPage,
 };
 #[cfg(any(test, feature = "inspection"))]
 use holo_hash::AnyLinkableHash;
@@ -235,6 +235,20 @@ impl DbRead<Dht> {
         let page = sync_queries::dht_ops_page_for_dump(tx.conn_mut(), after, limit).await?;
         tx.close().await?;
         Ok(page)
+    }
+
+    /// One page of DHT-op lifecycle timings ordered by `(when_received, hash)`.
+    ///
+    /// Covers limbo and integrated chain ops and warrants, including
+    /// cache-inserted ops. `after` is exclusive; `None` starts at the
+    /// beginning and `None` for `limit` returns the full remaining set.
+    pub async fn op_timings_page(
+        &self,
+        after: Option<(i64, &DhtOpHash)>,
+        limit: Option<u32>,
+    ) -> sqlx::Result<OpTimingsPage> {
+        let mut conn = self.timed_conn().await?;
+        sync_queries::op_timings_page(&mut *conn, after, limit).await
     }
 
     /// Limbo chain-op rows for the integration dump. `ready` selects the
