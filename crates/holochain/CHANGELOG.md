@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.7.0-rc.5
+
 - Add `DumpOpTimings` to the admin and app APIs, plus a matching `hc client dump-op-timings` command. It reports, for each DHT op the conductor holds for a DNA, when the op was received, when it was integrated or when its validation was abandoned, whether it was accepted or rejected, and whether this node validated it locally. The request takes a DNA hash: the DHT database is shared by every cell running the same DNA, so the dump covers the whole DHT arc this conductor is currently holding for that DNA rather than the ops of any one agent. On the app API the DNA must be one the calling app runs. Results are paginated with an exclusive cursor over received time and op hash, covering both in-flight and integrated ops. [\#5772](https://github.com/holochain/holochain/issues/5772)
 
 ## 0.7.0-rc.4

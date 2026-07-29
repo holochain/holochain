@@ -14,6 +14,60 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260729.163910
+
+## [hcterm-0.7.0-rc.5](crates/hcterm/CHANGELOG.md#0.7.0-rc.5)
+
+## [holochain\_cli-0.7.0-rc.5](crates/holochain_cli/CHANGELOG.md#0.7.0-rc.5)
+
+## [holochain\_cli\_bundle-0.7.0-rc.4](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_cli\_client-0.7.0-rc.5](crates/holochain_cli_client/CHANGELOG.md#0.7.0-rc.5)
+
+## [holochain\_cli\_sandbox-0.7.0-rc.5](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-rc.5)
+
+## [holochain\_client-0.9.0-rc.5](crates/holochain_client/CHANGELOG.md#0.9.0-rc.5)
+
+## [holochain-0.7.0-rc.5](crates/holochain/CHANGELOG.md#0.7.0-rc.5)
+
+- Add `DumpOpTimings` to the admin and app APIs, plus a matching `hc client dump-op-timings` command. It reports, for each DHT op the conductor holds for a DNA, when the op was received, when it was integrated or when its validation was abandoned, whether it was accepted or rejected, and whether this node validated it locally. The request takes a DNA hash: the DHT database is shared by every cell running the same DNA, so the dump covers the whole DHT arc this conductor is currently holding for that DNA rather than the ops of any one agent. On the app API the DNA must be one the calling app runs. Results are paginated with an exclusive cursor over received time and op hash, covering both in-flight and integrated ops. [\#5772](https://github.com/holochain/holochain/issues/5772)
+
+## [holochain\_cascade-0.7.0-rc.5](crates/holochain_cascade/CHANGELOG.md#0.7.0-rc.5)
+
+## [holochain\_conductor\_config-0.7.0-rc.5](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-rc.5)
+
+## [holochain\_test\_wasm\_common-0.7.0-rc.4](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_wasm\_test\_utils-0.7.0-rc.4](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_websocket-0.7.0-rc.4](crates/holochain_websocket/CHANGELOG.md#0.7.0-rc.4)
+
+## [hdk-0.7.0-rc.4](crates/hdk/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_p2p-0.7.0-rc.5](crates/holochain_p2p/CHANGELOG.md#0.7.0-rc.5)
+
+## [hdi-0.8.0-rc.4](crates/hdi/CHANGELOG.md#0.8.0-rc.4)
+
+## [holochain\_state-0.7.0-rc.5](crates/holochain_state/CHANGELOG.md#0.7.0-rc.5)
+
+## [hdk\_derive-0.7.0-rc.3](crates/hdk_derive/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_data-0.7.0-rc.5](crates/holochain_data/CHANGELOG.md#0.7.0-rc.5)
+
+## [holochain\_conductor\_api-0.7.0-rc.5](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-rc.5)
+
+## [holochain\_keystore-0.7.0-rc.3](crates/holochain_keystore/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_state\_types-0.7.0-rc.4](crates/holochain_state_types/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_types-0.7.0-rc.4](crates/holochain_types/CHANGELOG.md#0.7.0-rc.4)
+
+## [holochain\_zome\_types-0.7.0-rc.3](crates/holochain_zome_types/CHANGELOG.md#0.7.0-rc.3)
+
+## [holochain\_integrity\_types-0.7.0-rc.3](crates/holochain_integrity_types/CHANGELOG.md#0.7.0-rc.3)
+
+## [holo\_hash-0.7.0-rc.2](crates/holo_hash/CHANGELOG.md#0.7.0-rc.2)
+
 # 20260727.022800
 
 ## [hcterm-0.7.0-rc.4](crates/hcterm/CHANGELOG.md#0.7.0-rc.4)
