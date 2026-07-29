@@ -194,18 +194,19 @@ mod tests {
         SignedWarrant::new(warrant, ::fixt::fixt!(Signature))
     }
 
-    /// A mock network that returns one canned response per call, advancing through
-    /// `responses` in order and repeating the last one once exhausted.
+    /// A mock network that returns one canned response, from a single fixed peer, per call,
+    /// advancing through `responses` in order and repeating the last one once exhausted.
     fn mock_network(responses: Vec<AgentActivityResponse>) -> DynHolochainP2pDna {
         let call = Arc::new(AtomicUsize::new(0));
+        let peer = ::fixt::fixt!(AgentPubKey);
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(true));
-        mock.expect_get_agent_activity()
-            .returning(move |_, _, _, _| {
+        mock.expect_get_agent_activity_multi()
+            .returning(move |_, _, _| {
                 let i = call
                     .fetch_add(1, Ordering::Relaxed)
                     .min(responses.len() - 1);
-                Ok(vec![responses[i].clone()])
+                Ok(vec![(peer.clone(), responses[i].clone())])
             });
         Arc::new(mock)
     }

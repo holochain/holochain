@@ -2,23 +2,13 @@
 //! head by requiring unanimous agreement across responses. Warrants naming the agent are also
 //! collected alongside the head agreement, since a validated warrant is grounds for permanent
 //! failure regardless of whether or not a chain head could be agreed.
-//!
-//! ## Thin-wrapper note
-//!
-//! [`acquire_responses`] currently calls the existing [`CascadeImpl::get_agent_activity`] function
-//! and wraps the merged results in a singleton [`Vec`].
-//! When [#5799](https://github.com/holochain/holochain/issues/5799) is completed, the new
-//! `get_agent_activity_multi` function will replace it, which will return one response per peer,
-//! enabling genuine multi-peer agreement. The evaluation logic in [`evaluate_responses`] is already
-//! written for that function's response and should remain unchanged.
 
 use holo_hash::{ActionHash, AgentPubKey};
-use holochain_cascade::CascadeImpl;
+use holochain_cascade::{error::CascadeError, CascadeImpl};
 use holochain_keystore::AgentPubKeyExt;
-use holochain_p2p::actor::GetActivityOptions;
+use holochain_p2p::{actor::GetActivityMultiOptions, event::GetActivityOptions, HolochainP2pError};
 use holochain_types::activity::{AgentActivityResponse, ChainItems};
 use holochain_zome_types::{
-    entry::GetOptions,
     prelude::{Record, SignedWarrant},
     query::{ChainQueryFilter, ChainStatus},
 };
@@ -70,22 +60,46 @@ pub(super) async fn acquire_responses(
     agent: &AgentPubKey,
     quorum: u8,
 ) -> WorkflowResult<(AcquireOutcome, Vec<SignedWarrant>)> {
-    let options = GetActivityOptions {
-        include_valid_activity: true,
-        include_rejected_activity: true,
-        include_warrants: true,
-        include_full_records: true,
-        get_options: GetOptions::network(),
-        ..Default::default()
+    let options = GetActivityMultiOptions {
+        target_peer_count: quorum.saturating_add(1),
+        required_responses: quorum,
+        timeout_ms: None,
+        remote_options: GetActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: true,
+            include_warrants: true,
+            include_full_records: true,
+        },
     };
     let query = ChainQueryFilter::new().include_entries(true);
-    let response = cascade
-        // TODO: Replace this with `get_agent_activity_multi` when #5799 is completed.
-        .get_agent_activity(agent.clone(), query, options)
+    let responses = match cascade
+        .get_agent_activity_multi(agent.clone(), query, options)
         .await
-        .map_err(WorkflowError::CascadeError)?;
+    {
+        Ok(responses) => responses
+            .into_iter()
+            .map(|(_, response)| response)
+            .collect(),
+        // Not enough peers held data for this agent within the timeout. This could mean that the
+        // agent's chain hasn't been gossiped yet, or peers are unreachable. Therefore, we should
+        // retry instead of a hard error.
+        Err(CascadeError::NetworkError(HolochainP2pError::InsufficientResponses {
+            received,
+            required,
+            ..
+        })) => {
+            return Ok((
+                AcquireOutcome::Retry(RetryReason::TooFewResponses {
+                    got: received,
+                    need: required as u8,
+                }),
+                Vec::new(),
+            ));
+        }
+        Err(err) => return Err(WorkflowError::CascadeError(err)),
+    };
 
-    let (mut outcome, warrants) = evaluate_responses(agent, vec![response], quorum);
+    let (mut outcome, warrants) = evaluate_responses(agent, responses, quorum);
 
     // If the peers agreed on a head, filter the collected records by signature.
     // Records whose signature fails verification are dropped so that a misbehaving peer cannot
@@ -577,5 +591,69 @@ mod tests {
         let record = make_record_for_agent(&agent);
         let result = filter_records_by_author_and_signature(&agent, vec![record]).await;
         assert!(result.is_empty());
+    }
+
+    async fn cascade_with_network(network: holochain_p2p::DynHolochainP2pDna) -> CascadeImpl {
+        let dht_id = holochain_state::data::Dht::new(std::sync::Arc::new(
+            holo_hash::DnaHash::from_raw_36(vec![0u8; 36]),
+        ));
+        let dht_store = holochain_state::dht_store::DhtStore::new_test(dht_id)
+            .await
+            .unwrap();
+        CascadeImpl::empty(dht_store).with_network(network)
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn acquire_responses_merges_multiple_peer_responses() {
+        let agent = ::fixt::fixt!(AgentPubKey);
+        let hash = ::fixt::fixt!(ActionHash);
+        let peer_a = ::fixt::fixt!(AgentPubKey);
+        let peer_b = ::fixt::fixt!(AgentPubKey);
+        let mut mock = holochain_p2p::MockHolochainP2pDnaT::new();
+        let response_agent = agent.clone();
+        mock.expect_get_agent_activity_multi()
+            .returning(move |_, _, _| {
+                Ok(vec![
+                    (
+                        peer_a.clone(),
+                        make_response(&response_agent, valid_head(5, hash.clone())),
+                    ),
+                    (
+                        peer_b.clone(),
+                        make_response(&response_agent, valid_head(5, hash.clone())),
+                    ),
+                ])
+            });
+        let network: holochain_p2p::DynHolochainP2pDna = std::sync::Arc::new(mock);
+        let cascade = cascade_with_network(network).await;
+
+        let (outcome, warrants) = acquire_responses(&cascade, &agent, 2).await.unwrap();
+        assert!(matches!(
+            outcome,
+            AcquireOutcome::Agreed { head_seq: 5, .. }
+        ));
+        assert!(warrants.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn acquire_responses_maps_insufficient_responses_to_retry() {
+        let agent = ::fixt::fixt!(AgentPubKey);
+        let mut mock = holochain_p2p::MockHolochainP2pDnaT::new();
+        mock.expect_get_agent_activity_multi().returning(|_, _, _| {
+            Err(holochain_p2p::HolochainP2pError::InsufficientResponses {
+                operation: "get_agent_activity_multi".into(),
+                received: 1,
+                required: 2,
+            })
+        });
+        let network: holochain_p2p::DynHolochainP2pDna = std::sync::Arc::new(mock);
+        let cascade = cascade_with_network(network).await;
+
+        let (outcome, warrants) = acquire_responses(&cascade, &agent, 2).await.unwrap();
+        assert!(matches!(
+            outcome,
+            AcquireOutcome::Retry(RetryReason::TooFewResponses { got: 1, need: 2 })
+        ));
+        assert!(warrants.is_empty());
     }
 }
