@@ -144,25 +144,42 @@ pub(super) fn evaluate_responses(
     // (action_seq, hash) pair.
     let mut agreed_head = None;
     for response in &responses {
-        match &response.status {
-            ChainStatus::Empty => {}
+        let head_candidate = match &response.status {
+            ChainStatus::Empty => None,
 
-            ChainStatus::Valid(head) | ChainStatus::Invalid(head) | ChainStatus::Closed(head) => {
-                if let Some((prev_seq, prev_hash)) = &agreed_head {
-                    if &head.action_seq != prev_seq || &head.hash != prev_hash {
-                        return (
-                            AcquireOutcome::Retry(RetryReason::HeadDisagreement),
-                            warrants_for_agent,
-                        );
-                    }
-                } else {
-                    agreed_head = Some((head.action_seq, head.hash.clone()));
-                }
+            ChainStatus::Valid(head) | ChainStatus::Closed(head) => {
+                Some((head.action_seq, head.hash.clone()))
             }
+
+            // The inner `head` of `Invalid` is the first rejected action and not the chain head we
+            // expect. Therefore, we need to derive the chain head from the records.
+            ChainStatus::Invalid(_) if let ChainItems::Full(records) = &response.valid_activity => {
+                records
+                    .iter()
+                    .max_by_key(|record| record.action().action_seq())
+                    .map(|record| {
+                        (
+                            record.action().action_seq(),
+                            record.action_address().clone(),
+                        )
+                    })
+            }
+
+            // An invalid chain head with no valid records.
+            ChainStatus::Invalid(_) => None,
 
             // A fork status means that the peer cannot single out a single chain head, so this is
             // treated as a disagreement, prompting the workflow to retry.
             ChainStatus::Forked(_) => {
+                return (
+                    AcquireOutcome::Retry(RetryReason::HeadDisagreement),
+                    warrants_for_agent,
+                );
+            }
+        };
+
+        if let Some(candidate) = head_candidate {
+            if agreed_head.get_or_insert_with(|| candidate.clone()) != &candidate {
                 return (
                     AcquireOutcome::Retry(RetryReason::HeadDisagreement),
                     warrants_for_agent,
@@ -480,21 +497,45 @@ mod tests {
     }
 
     #[test]
-    fn invalid_status_uses_chain_head() {
+    fn invalid_status_derives_head_from_valid_activity() {
         let agent = ::fixt::fixt!(AgentPubKey);
-        let hash = ::fixt::fixt!(ActionHash);
-        let head = ChainStatus::Invalid(ChainHead {
+        let record = make_record_for_agent(&agent);
+        let valid_hash = record.action_address().clone();
+        // The rejected action's own hash must not be used as the chain head.
+        let status = ChainStatus::Invalid(ChainHead {
             action_seq: 5,
-            hash: hash.clone(),
+            hash: ::fixt::fixt!(ActionHash),
         });
         let responses = vec![
-            make_response(&agent, head.clone()),
-            make_response(&agent, head),
+            make_response_with_records(&agent, status.clone(), vec![record.clone()]),
+            make_response_with_records(&agent, status, vec![record]),
         ];
         let (outcome, _warrants) = evaluate_responses(&agent, responses, 2);
         assert!(matches!(
             outcome,
-            AcquireOutcome::Agreed { head_seq: 5, .. }
+            AcquireOutcome::Agreed {
+                head_seq: 0,
+                head_hash,
+                ..
+            } if head_hash == valid_hash
+        ));
+    }
+
+    #[test]
+    fn invalid_status_without_valid_records_returns_no_activity() {
+        let agent = ::fixt::fixt!(AgentPubKey);
+        let status = ChainStatus::Invalid(ChainHead {
+            action_seq: 5,
+            hash: ::fixt::fixt!(ActionHash),
+        });
+        let responses = vec![
+            make_response(&agent, status.clone()),
+            make_response(&agent, status),
+        ];
+        let (outcome, _warrants) = evaluate_responses(&agent, responses, 2);
+        assert!(matches!(
+            outcome,
+            AcquireOutcome::Retry(RetryReason::NoActivity)
         ));
     }
 
