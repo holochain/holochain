@@ -82,7 +82,9 @@ use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::PeerMetaInfo;
-use holochain_conductor_api::{DhtOpsCursor, FullIntegrationStateDump, SourceChainCursor};
+use holochain_conductor_api::{
+    DhtOpsCursor, FullIntegrationStateDump, OpTimingsCursor, OpTimingsDump, SourceChainCursor,
+};
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
 use holochain_keystore::MetaLairClient;
@@ -2605,6 +2607,65 @@ mod misc_impls {
                 .await?,
             };
             Ok(out)
+        }
+
+        /// Dump one page of DHT-op lifecycle timings for a DNA.
+        ///
+        /// Ops are ordered by `(when_received, op_hash)` across both
+        /// validation limbos and the integrated set, so a page can mix
+        /// in-flight and integrated ops.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the DNA's DHT store cannot be read or the
+        /// limit is zero.
+        pub async fn dump_op_timings(
+            &self,
+            dna_hash: &DnaHash,
+            cursor: Option<OpTimingsCursor>,
+            limit: Option<u32>,
+        ) -> ConductorApiResult<OpTimingsDump> {
+            let dht_store = self.get_or_create_dht_store(dna_hash)?;
+            Ok(dht_store
+                .as_read()
+                .op_timings_page_for_dump(cursor.as_ref(), limit)
+                .await?)
+        }
+
+        /// Dump one page of DHT-op lifecycle timings for a DNA of `installed_app_id`.
+        ///
+        /// This is the app-interface entry point: `dna_hash` must be the DNA of
+        /// one of the calling app's cells, so an app cannot inspect the DHT of
+        /// a DNA it does not run.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the app is unknown, the app runs no cell of
+        /// `dna_hash`, the DHT store cannot be read, or the limit is zero.
+        pub async fn dump_op_timings_for_app(
+            &self,
+            installed_app_id: &InstalledAppId,
+            dna_hash: &DnaHash,
+            cursor: Option<OpTimingsCursor>,
+            limit: Option<u32>,
+        ) -> ConductorApiResult<OpTimingsDump> {
+            let belongs_to_app = {
+                let state = self.get_state().await?;
+                let installed_app = state.get_app(installed_app_id)?;
+                // `all_cells()` borrows from `state`, and as the block's tail
+                // expression its temporary would outlive `state` (E0597). The
+                // binding forces the iterator to drop before the block ends,
+                // so do not collapse it into the tail expression.
+                let belongs = installed_app
+                    .all_cells()
+                    .any(|id| id.dna_hash() == dna_hash);
+                belongs
+            };
+            if !belongs_to_app {
+                return Err(ConductorApiError::Other("DNA hash not found in app".into()));
+            }
+
+            self.dump_op_timings(dna_hash, cursor, limit).await
         }
 
         /// Dump of network metrics from Kitsune2.

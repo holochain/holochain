@@ -3,7 +3,7 @@ use std::process::Command as StdCommand;
 use std::time::Duration;
 
 use anyhow::{ensure, Result};
-use holo_hash::{ActionHash, AgentPubKey, AgentPubKeyB64, DnaHash, DnaHashB64, HasHash};
+use holo_hash::{ActionHash, AgentPubKey, AgentPubKeyB64, DhtOpHash, DnaHash, DnaHashB64, HasHash};
 use holochain::{sweettest::*, test_utils::inline_zomes::simple_crud_zome};
 use holochain_client::AdminWebsocket;
 use holochain_conductor_api::{AdminInterfaceConfig, DhtOpsCursor, FullStateDump, InterfaceDriver};
@@ -264,6 +264,90 @@ async fn dump_commands_return_single_cursor_page() -> Result<()> {
     assert_eq!(
         actual_hashes.into_iter().collect::<HashSet<_>>(),
         expected_hashes
+    );
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn dump_op_timings_command_pages() -> Result<()> {
+    let mut conductor = SweetConductor::standard().await;
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let app = conductor.setup_app("app", &[dna]).await?;
+    let cell_id = app.cells()[0].cell_id().clone();
+    let dna_hash = cell_id.dna_hash().clone();
+    let dna = dna_hash.to_string();
+    let admin_port = conductor
+        .get_arbitrary_admin_websocket_port()
+        .expect("admin port");
+    let admin_port_arg = admin_port.to_string();
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None).await?;
+
+    let unbounded = admin_ws.dump_op_timings(dna_hash, None, None).await?;
+    ensure!(
+        unbounded.timings.len() >= 2,
+        "expected the genesis ops to be dumped"
+    );
+
+    let first_page = get_hc_client_command()
+        .args([
+            "call",
+            "--port",
+            admin_port_arg.as_str(),
+            "dump-op-timings",
+            dna.as_str(),
+            "--limit",
+            "1",
+        ])
+        .output()?;
+    ensure!(first_page.status.success(), "dump-op-timings failed");
+
+    let first_json: serde_json::Value = serde_json::from_slice(&first_page.stdout)?;
+    let timings = first_json["timings"]
+        .as_array()
+        .expect("timings array")
+        .clone();
+    ensure!(timings.len() == 1, "limit was not applied");
+    ensure!(
+        timings[0]["when_received"].is_i64(),
+        "received time is reported"
+    );
+
+    let when_received = first_json["cursor"]["when_received"]
+        .as_i64()
+        .expect("cursor received time")
+        .to_string();
+    // `DhtOpHash` serializes to JSON as a byte array (see `holo_hash::ser`), not a
+    // base64 string, so it must be decoded before it can be passed back to the CLI,
+    // which expects the base64 string form accepted by `DhtOpHash::try_from(&str)`.
+    let cursor_hash: DhtOpHash = serde_json::from_value(first_json["cursor"]["hash"].clone())?;
+    let cursor_hash = cursor_hash.to_string();
+
+    let second_page = get_hc_client_command()
+        .args([
+            "call",
+            "--port",
+            admin_port_arg.as_str(),
+            "dump-op-timings",
+            dna.as_str(),
+            "--limit",
+            "1",
+            "--cursor",
+            when_received.as_str(),
+            cursor_hash.as_str(),
+        ])
+        .output()?;
+    ensure!(second_page.status.success(), "paged dump-op-timings failed");
+
+    let second_json: serde_json::Value = serde_json::from_slice(&second_page.stdout)?;
+    let second_timings = second_json["timings"].as_array().expect("timings array");
+    ensure!(
+        second_timings.len() == 1,
+        "second page limit was not applied"
+    );
+    ensure!(
+        second_timings[0]["op_hash"] != timings[0]["op_hash"],
+        "cursor is exclusive"
     );
 
     Ok(())

@@ -127,8 +127,9 @@ pub type DhtStoreRead = DhtStore<holochain_data::DbRead<Dht>>;
 // downstream crates (`holochain_p2p`) can consume them without depending
 // on `holochain_data` directly.
 pub use holochain_data::models::dht::{
-    DumpOpPage, DumpOpRow, DumpOpState, DumpOpWireRow, K2ChainOpForWireRow, K2OpHashRow,
-    K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow, SliceHashIndexedRow,
+    DumpOpCursorRow, DumpOpPage, DumpOpRow, DumpOpState, DumpOpWireRow, K2ChainOpForWireRow,
+    K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow, OpTimingRow, OpTimingsPage,
+    SliceHashIndexedRow,
 };
 use holochain_zome_types::prelude::{Action, ActionData, OpValidity, SignedActionHashed};
 

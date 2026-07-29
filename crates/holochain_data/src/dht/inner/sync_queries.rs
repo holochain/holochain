@@ -39,6 +39,7 @@
 use crate::models::dht::{
     DumpChainOpRow, DumpOpCursorRow, DumpOpPage, DumpOpRow, DumpOpState, DumpOpWireRow,
     K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow,
+    OpTimingRow, OpTimingsPage,
 };
 #[cfg(any(test, feature = "inspection"))]
 use holo_hash::AnyLinkableHash;
@@ -655,6 +656,101 @@ pub(crate) async fn dht_ops_page_for_dump(
     Ok(DumpOpPage { rows, cursor })
 }
 
+/// Select one globally ordered page of DHT-op lifecycle timings.
+///
+/// Unions the two limbo tables with the two integrated tables so in-flight and
+/// integrated ops share one `(when_received, hash)` ordering and one limit.
+/// Unlike [`dht_ops_page_for_dump`] this does not filter out cache-inserted
+/// chain ops: `locally_validated = 0` is what explains an op whose integration
+/// time equals its received time.
+///
+/// One op hash can be present in an integrated table and in its limbo
+/// counterpart at the same time, so each pair carries a `NOT EXISTS` clause
+/// that suppresses the shadowed row and keeps the page at one row per op:
+///
+/// - `ChainOp` / `LimboChainOp`: the cascade mirrors ops into `ChainOp` with
+///   `locally_validated = 0` without deleting anything from limbo, and
+///   `op_exists` deliberately ignores those mirrored rows so the op is still
+///   delivered into the validation path. The limbo row is the truthful one
+///   there — the op is not integrated, its mirrored `when_integrated` is just
+///   the cache-write time — so the mirror is dropped. In the reverse case
+///   (`locally_validated = 1` alongside a limbo row, which promotion should
+///   have deleted) the integrated row is the truthful one and the limbo row is
+///   dropped instead.
+/// - `WarrantOp` / `LimboWarrantOp`: the cascade re-stages warrants that come
+///   back with a get response into limbo unconditionally, so an already
+///   integrated warrant can regain a limbo row. A `WarrantOp` row is only ever
+///   written by promotion, so it always wins and the limbo row is dropped.
+pub(crate) async fn op_timings_page<'e, E>(
+    executor: E,
+    after: Option<(i64, &DhtOpHash)>,
+    limit: Option<u32>,
+) -> sqlx::Result<OpTimingsPage>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT hash, when_received, when_integrated, abandoned_at,
+                validation_status, locally_validated FROM (
+            SELECT hash, when_received, when_integrated,
+                   NULL AS abandoned_at, validation_status, locally_validated
+            FROM ChainOp
+            WHERE locally_validated = 1
+               OR NOT EXISTS (
+                   SELECT 1 FROM LimboChainOp
+                   WHERE LimboChainOp.hash = ChainOp.hash
+               )
+            UNION ALL
+            SELECT hash, when_received, when_integrated,
+                   NULL AS abandoned_at, validation_status,
+                   NULL AS locally_validated
+            FROM WarrantOp
+            UNION ALL
+            SELECT hash, when_received, NULL AS when_integrated, abandoned_at,
+                   NULL AS validation_status, NULL AS locally_validated
+            FROM LimboChainOp
+            WHERE NOT EXISTS (
+                SELECT 1 FROM ChainOp
+                WHERE ChainOp.hash = LimboChainOp.hash
+                  AND ChainOp.locally_validated = 1
+            )
+            UNION ALL
+            SELECT hash, when_received, NULL AS when_integrated, abandoned_at,
+                   NULL AS validation_status, NULL AS locally_validated
+            FROM LimboWarrantOp
+            WHERE NOT EXISTS (
+                SELECT 1 FROM WarrantOp
+                WHERE WarrantOp.hash = LimboWarrantOp.hash
+            )
+         ) WHERE 1 = 1",
+    );
+    if let Some((when_received, hash)) = after {
+        qb.push(" AND (when_received > ");
+        qb.push_bind(when_received);
+        qb.push(" OR (when_received = ");
+        qb.push_bind(when_received);
+        qb.push(" AND hash > ");
+        qb.push_bind(hash.get_raw_36());
+        qb.push("))");
+    }
+    qb.push(" ORDER BY when_received ASC, hash ASC");
+    if let Some(limit) = limit {
+        qb.push(" LIMIT ");
+        qb.push_bind(i64::from(limit));
+    }
+
+    let rows = qb
+        .build_query_as::<OpTimingRow>()
+        .fetch_all(executor)
+        .await?;
+    let cursor = rows.last().map(|row| DumpOpCursorRow {
+        when_received: row.when_received,
+        hash: DhtOpHash::from_raw_36(row.hash.clone()),
+    });
+
+    Ok(OpTimingsPage { rows, cursor })
+}
+
 fn dump_hashes(keys: &[DumpOpKeyRow], state: Option<i64>, kind: i64) -> Vec<Vec<u8>> {
     keys.iter()
         .filter(|key| key.kind == kind && state.is_none_or(|state| key.state == state))
@@ -1064,7 +1160,7 @@ where
 mod tests {
     use crate::handles::DbWrite;
     use crate::kind::Dht;
-    use crate::models::dht::{DumpOpCursorRow, DumpOpRow, DumpOpState, DumpOpWireRow};
+    use crate::models::dht::{DumpOpCursorRow, DumpOpRow, DumpOpState, DumpOpWireRow, OpTimingRow};
     use crate::test_open_db;
     use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
     use sqlx::{Pool, Sqlite};
@@ -1514,5 +1610,167 @@ mod tests {
             unbounded.cursor.unwrap().hash,
             DhtOpHash::from_raw_36(expected.last().unwrap().0.clone())
         );
+    }
+
+    #[tokio::test]
+    async fn op_timings_page_orders_and_pages_every_op_table() {
+        let db = test_open_db(dht_id()).await.unwrap();
+        // Two ops share when_received = 100 so the hash tie-break is exercised.
+        let integrated_chain = seed_op(db.pool(), 1, STORE_RECORD, 0, 100).await;
+        let integrated_warrant = seed_warrant_op(db.pool(), 2, 100, DumpOpState::Integrated).await;
+        let limbo_chain = seed_limbo_chain_op(db.pool(), 3, 200, false).await;
+        let limbo_warrant = seed_warrant_op(db.pool(), 4, 300, DumpOpState::ValidationLimbo).await;
+        let cache_only = seed_op(db.pool(), 5, STORE_RECORD, 0, 400).await;
+        sqlx::query("UPDATE ChainOp SET locally_validated = 0 WHERE hash = ?")
+            .bind(&cache_only)
+            .execute(db.pool())
+            .await
+            .unwrap();
+        let abandoned = seed_limbo_chain_op(db.pool(), 6, 500, false).await;
+        sqlx::query("UPDATE LimboChainOp SET abandoned_at = 550 WHERE hash = ?")
+            .bind(&abandoned)
+            .execute(db.pool())
+            .await
+            .unwrap();
+
+        let expected = vec![
+            integrated_chain,
+            integrated_warrant,
+            limbo_chain,
+            limbo_warrant,
+            cache_only.clone(),
+            abandoned.clone(),
+        ];
+
+        // Page through two at a time.
+        let mut actual: Vec<Vec<u8>> = Vec::new();
+        let mut cursor: Option<DumpOpCursorRow> = None;
+        loop {
+            let page = db
+                .as_ref()
+                .op_timings_page(
+                    cursor
+                        .as_ref()
+                        .map(|cursor| (cursor.when_received, &cursor.hash)),
+                    Some(2),
+                )
+                .await
+                .unwrap();
+            assert!(page.rows.len() <= 2);
+            actual.extend(page.rows.iter().map(|row| row.hash.clone()));
+            cursor = page.cursor;
+            if cursor.is_none() {
+                break;
+            }
+        }
+        assert_eq!(actual, expected);
+
+        // Unbounded read reports the per-state fields.
+        let unbounded = db.as_ref().op_timings_page(None, None).await.unwrap();
+        let by_hash = |hash: &[u8]| -> OpTimingRow {
+            unbounded
+                .rows
+                .iter()
+                .find(|row| row.hash == hash)
+                .expect("seeded op present")
+                .clone()
+        };
+
+        let integrated = by_hash(&expected[0]);
+        assert_eq!(integrated.when_received, 100);
+        assert_eq!(integrated.when_integrated, Some(100));
+        assert_eq!(integrated.abandoned_at, None);
+        assert_eq!(integrated.validation_status, Some(1));
+        assert_eq!(integrated.locally_validated, Some(1));
+
+        let warrant = by_hash(&expected[1]);
+        assert_eq!(warrant.when_integrated, Some(1_100));
+        assert_eq!(warrant.validation_status, Some(1));
+        assert_eq!(warrant.locally_validated, None);
+
+        let limbo = by_hash(&expected[2]);
+        assert_eq!(limbo.when_received, 200);
+        assert_eq!(limbo.when_integrated, None);
+        assert_eq!(limbo.abandoned_at, None);
+        assert_eq!(limbo.validation_status, None);
+        assert_eq!(limbo.locally_validated, None);
+
+        let cached = by_hash(&cache_only);
+        assert_eq!(cached.locally_validated, Some(0));
+        // A cache insert stamps `when_integrated` with the received time, which
+        // is exactly what `locally_validated = 0` explains.
+        assert_eq!(cached.when_integrated, Some(400));
+
+        let abandoned_row = by_hash(&abandoned);
+        assert_eq!(abandoned_row.when_received, 500);
+        assert_eq!(abandoned_row.when_integrated, None);
+        assert_eq!(abandoned_row.abandoned_at, Some(550));
+        assert_eq!(abandoned_row.validation_status, None);
+    }
+
+    /// One op hash can be present in an integrated table and its limbo
+    /// counterpart at the same time: the cascade mirrors an op into `ChainOp`
+    /// with `locally_validated = 0` while the same op sits in `LimboChainOp`,
+    /// and it re-stages an already integrated warrant into `LimboWarrantOp`.
+    /// Every such op must still be reported exactly once, by the row that
+    /// reflects its real lifecycle position.
+    #[tokio::test]
+    async fn op_timings_page_reports_a_shadowed_op_once() {
+        let db = test_open_db(dht_id()).await.unwrap();
+
+        // Cache mirror of an op that is also awaiting validation in limbo.
+        let cache_shadowed = seed_op(db.pool(), 1, STORE_RECORD, 0, 100).await;
+        sqlx::query("UPDATE ChainOp SET locally_validated = 0 WHERE hash = ?")
+            .bind(&cache_shadowed)
+            .execute(db.pool())
+            .await
+            .unwrap();
+        seed_limbo_chain_op(db.pool(), 1, 150, false).await;
+
+        // Integrated chain op with a stale limbo row still present.
+        let integrated_shadowed = seed_op(db.pool(), 2, STORE_RECORD, 0, 200).await;
+        seed_limbo_chain_op(db.pool(), 2, 250, false).await;
+
+        // Integrated warrant re-staged into limbo by a later cascade fetch.
+        let warrant_shadowed = seed_warrant_op(db.pool(), 3, 300, DumpOpState::Integrated).await;
+        sqlx::query(
+            "INSERT INTO LimboWarrantOp
+                (hash, storage_center_loc, sys_validation_status,
+                 when_received, serialized_size)
+             VALUES (?, 0, NULL, ?, 10)",
+        )
+        .bind(&warrant_shadowed)
+        .bind(350_i64)
+        .execute(db.pool())
+        .await
+        .unwrap();
+
+        let page = db.as_ref().op_timings_page(None, None).await.unwrap();
+        assert_eq!(page.rows.len(), 3, "each op hash must be reported once");
+        let by_hash = |hash: &[u8]| -> OpTimingRow {
+            page.rows
+                .iter()
+                .find(|row| row.hash == hash)
+                .expect("seeded op present")
+                .clone()
+        };
+
+        // The limbo row wins over a cache mirror: the op is not integrated yet.
+        let cached = by_hash(&cache_shadowed);
+        assert_eq!(cached.when_received, 150);
+        assert_eq!(cached.when_integrated, None);
+        assert_eq!(cached.locally_validated, None);
+
+        // The integrated row wins over a stale limbo row.
+        let integrated = by_hash(&integrated_shadowed);
+        assert_eq!(integrated.when_received, 200);
+        assert_eq!(integrated.when_integrated, Some(200));
+        assert_eq!(integrated.locally_validated, Some(1));
+
+        // The integrated warrant wins over its re-staged limbo row.
+        let warrant = by_hash(&warrant_shadowed);
+        assert_eq!(warrant.when_received, 300);
+        assert_eq!(warrant.when_integrated, Some(1_300));
+        assert_eq!(warrant.locally_validated, None);
     }
 }

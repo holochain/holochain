@@ -7,7 +7,7 @@ use crate::{
     sweettest::{SweetConductor, SweetDnaFile, SweetZome},
 };
 use holo_hash::{ActionHash, DhtOpHash, HasHash};
-use holochain_conductor_api::{FullIntegrationStateDump, FullStateDump};
+use holochain_conductor_api::{FullIntegrationStateDump, FullStateDump, OpTimingsCursor};
 use holochain_state::dht_store::SysOutcome;
 use holochain_state::source_chain;
 use holochain_types::op::{DhtOp, DhtOpHashed};
@@ -206,4 +206,138 @@ async fn dump_full_state() {
             .await
             .is_err()
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn dump_op_timings_pages_in_received_order() {
+    let mut conductor = SweetConductor::standard().await;
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd])
+        .await
+        .0;
+    let app = conductor.setup_app("", &[dna_file]).await.unwrap();
+    let cell_id = app.cells()[0].cell_id();
+    let _: ActionHash = conductor
+        .call(
+            &SweetZome::new(cell_id.clone(), TestWasm::Crd.coordinator_zome_name()),
+            "create",
+            (),
+        )
+        .await;
+
+    // Wait until the authored ops have been integrated so the dump has both
+    // an integration time and a locally-validated flag to report.
+    retry_until_timeout!({
+        if conductor
+            .all_ops_integrated(cell_id.dna_hash())
+            .await
+            .unwrap()
+        {
+            break;
+        }
+    });
+
+    let unbounded = conductor
+        .raw_handle()
+        .dump_op_timings(cell_id.dna_hash(), None, None)
+        .await
+        .unwrap();
+    assert!(unbounded.timings.len() >= 2, "expected several ops");
+    assert!(
+        unbounded
+            .timings
+            .iter()
+            .all(|t| t.when_integrated.is_some()),
+        "every op is integrated by now: {:?}",
+        unbounded.timings
+    );
+    assert!(
+        unbounded.timings.iter().all(|t| t.validation_status
+            == Some(holochain_zome_types::prelude::OpValidity::Accepted)
+            && t.abandoned_at.is_none()),
+        "integrated ops are accepted and not abandoned: {:?}",
+        unbounded.timings
+    );
+    assert!(
+        unbounded
+            .timings
+            .iter()
+            .any(|t| t.locally_validated == Some(true)),
+        "authored ops are recorded as locally validated: {:?}",
+        unbounded.timings
+    );
+
+    // Ordered by (when_received, op_hash), ascending.
+    let keys: Vec<_> = unbounded
+        .timings
+        .iter()
+        .map(|t| (t.when_received, t.op_hash.clone()))
+        .collect();
+    let mut sorted = keys.clone();
+    sorted.sort();
+    assert_eq!(keys, sorted);
+
+    // Paging one at a time visits exactly the same ops, in the same order.
+    let mut paged = Vec::new();
+    let mut cursor: Option<OpTimingsCursor> = None;
+    loop {
+        let page = conductor
+            .raw_handle()
+            .dump_op_timings(cell_id.dna_hash(), cursor.clone(), Some(1))
+            .await
+            .unwrap();
+        assert!(page.timings.len() <= 1);
+        paged.extend(page.timings.iter().map(|t| t.op_hash.clone()));
+        cursor = page.cursor;
+        if cursor.is_none() {
+            break;
+        }
+    }
+    assert_eq!(
+        paged,
+        unbounded
+            .timings
+            .iter()
+            .map(|t| t.op_hash.clone())
+            .collect::<Vec<_>>()
+    );
+
+    // A zero limit is rejected rather than silently treated as unbounded.
+    assert!(conductor
+        .raw_handle()
+        .dump_op_timings(cell_id.dna_hash(), None, Some(0))
+        .await
+        .is_err());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn dump_op_timings_for_app_rejects_a_foreign_dna() {
+    let mut conductor = SweetConductor::standard().await;
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd])
+        .await
+        .0;
+    let other_dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd])
+        .await
+        .0;
+    let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
+    let other_app = conductor
+        .setup_app("other", &[other_dna_file])
+        .await
+        .unwrap();
+    let dna_hash = app.cells()[0].cell_id().dna_hash().clone();
+    let other_dna_hash = other_app.cells()[0].cell_id().dna_hash().clone();
+    assert_ne!(dna_hash, other_dna_hash);
+
+    // A DNA the app runs is dumpable.
+    conductor
+        .raw_handle()
+        .dump_op_timings_for_app(&"app".to_string(), &dna_hash, None, None)
+        .await
+        .unwrap();
+
+    // A DNA only another app runs is not.
+    assert!(conductor
+        .raw_handle()
+        .dump_op_timings_for_app(&"app".to_string(), &other_dna_hash, None, None)
+        .await
+        .is_err());
 }

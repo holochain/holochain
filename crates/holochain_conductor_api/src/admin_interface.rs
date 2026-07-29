@@ -1,5 +1,5 @@
 use crate::peer_meta::PeerMetaInfo;
-use crate::{AppInfo, FullStateDump, StorageInfo};
+use crate::{AppInfo, FullStateDump, OpTimingsDump, StorageInfo};
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
@@ -273,6 +273,36 @@ pub enum AdminRequest {
         limit: Option<u32>,
     },
 
+    /// Dump the lifecycle timings of the DHT ops held by this conductor for
+    /// the DNA specified by argument `dna_hash`.
+    ///
+    /// The DHT database is shared by every cell running the same DNA, so the
+    /// dump covers the whole DHT arc this conductor is currently holding for
+    /// that DNA, not the ops of any one agent running the DNA.
+    ///
+    /// Ops are returned oldest received first, across both validation limbos
+    /// and the integrated set, so a page can mix in-flight and integrated ops.
+    ///
+    /// The DHT op tables carry no index on received time, so each page is a
+    /// full scan and sort of the arc. Dumping a large arc is expensive;
+    /// always pass `limit` and page with the returned cursor.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::OpTimingsDumped`]
+    DumpOpTimings {
+        /// The DNA whose DHT arc to dump op timings for
+        dna_hash: DnaHash,
+        /// Pagination cursor from a previous `DumpOpTimings`; only ops
+        /// ordered strictly after it are returned. `None` starts from the
+        /// beginning.
+        #[serde(default)]
+        cursor: Option<crate::state_dump::OpTimingsCursor>,
+        /// Maximum number of ops to return. Must be greater than zero.
+        #[serde(default)]
+        limit: Option<u32>,
+    },
+
     /// Dump the network metrics tracked by kitsune.
     ///
     /// # Returns
@@ -510,6 +540,11 @@ pub enum AdminResponse {
     /// Note that this result can be very big, as it's requesting the full database of the cell.
     FullStateDumped(FullStateDump),
 
+    /// The successful response to an [`AdminRequest::DumpOpTimings`].
+    ///
+    /// Contains one page of op timings plus the cursor to resume from.
+    OpTimingsDumped(OpTimingsDump),
+
     /// The successful response to an [`AdminRequest::DumpConductorState`].
     ///
     /// Simply a JSON serialized snapshot of `Conductor` and `ConductorState` from the `holochain` crate.
@@ -722,7 +757,7 @@ pub struct AppAuthenticationTokenIssued {
 
 #[cfg(test)]
 mod tests {
-    use crate::{AdminRequest, AdminResponse, DhtOpsCursor, ExternalApiWireError};
+    use crate::{AdminRequest, AdminResponse, DhtOpsCursor, ExternalApiWireError, OpTimingsCursor};
     use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
     use holochain_zome_types::cell::CellId;
     use serde::Deserialize;
@@ -822,5 +857,40 @@ mod tests {
 
         assert_eq!(value["when_received"], 42);
         assert!(value.get("when_integrated").is_none());
+    }
+
+    #[test]
+    fn dump_op_timings_request_defaults_omitted_pagination_fields() {
+        let dna_hash = DnaHash::from_raw_36(vec![1; 36]);
+
+        let request: AdminRequest = serde_json::from_value(serde_json::json!({
+            "type": "dump_op_timings",
+            "value": { "dna_hash": dna_hash }
+        }))
+        .unwrap();
+
+        assert!(matches!(
+            request,
+            AdminRequest::DumpOpTimings {
+                cursor: None,
+                limit: None,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn op_timings_cursor_round_trips() {
+        let cursor = OpTimingsCursor {
+            when_received: 42,
+            hash: DhtOpHash::from_raw_36(vec![3; 36]),
+        };
+        let value = serde_json::to_value(cursor.clone()).unwrap();
+
+        assert_eq!(value["when_received"], 42);
+        assert_eq!(
+            serde_json::from_value::<OpTimingsCursor>(value).unwrap(),
+            cursor
+        );
     }
 }
