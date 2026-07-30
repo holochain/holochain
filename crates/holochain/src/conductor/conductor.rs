@@ -58,6 +58,7 @@ use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueConsumerMap;
 #[cfg(any(test, feature = "test_utils"))]
 use crate::core::queue_consumer::QueueTriggers;
+use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
@@ -1766,12 +1767,16 @@ mod restore_impls {
             let (cascade, dht_store, network) =
                 join_network_and_build_restore_cascade(&conductor, &cell_id).await?;
 
+            // TODO: Replace with the restoring cell's sys-validation consumer once spawned.
+            let (sys_validation_trigger, _) = TriggerSender::new();
+
             let outcome = restore_workflow(
                 cell_id.clone(),
                 cascade,
                 dht_store,
                 quorum,
                 RESTORE_RETRY_DELAY,
+                sys_validation_trigger,
             )
             .await?;
 

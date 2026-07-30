@@ -28,6 +28,7 @@ use holochain_state::dht_store::DhtStore;
 use holochain_types::prelude::*;
 use tokio::time::sleep;
 
+use crate::core::queue_consumer::TriggerSender;
 use crate::core::workflow::error::WorkflowResult;
 
 use agent_activity::AcquireOutcome;
@@ -48,12 +49,16 @@ pub(crate) enum RestoreOutcome {
 
 /// Reconstructs `cell_id`'s source chain from the DHT, retrying with `retry_delay` backoff until
 /// the chain is written or a validated warrant proves it unrecoverable.
+///
+/// Without a valid `sys_validation_trigger`, any staged warrants won't reach a verdict and
+/// the restore workflow would just loop forever without resolving.
 pub(crate) async fn restore_workflow(
     cell_id: CellId,
     cascade: CascadeImpl,
     dht_store: DhtStore,
     quorum: u8,
     retry_delay: Duration,
+    sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<RestoreOutcome> {
     loop {
         let (outcome, warrants) =
@@ -61,7 +66,13 @@ pub(crate) async fn restore_workflow(
 
         if !warrants.is_empty() {
             loop {
-                match warrants::stage_and_check_warrants(&dht_store, warrants.clone()).await? {
+                match warrants::stage_and_check_warrants(
+                    &dht_store,
+                    warrants.clone(),
+                    &sys_validation_trigger,
+                )
+                .await?
+                {
                     WarrantOutcome::Warranted(reason) => {
                         return Ok(RestoreOutcome::PermanentFailure(reason));
                     }
@@ -227,9 +238,16 @@ mod tests {
         let dht_store = DhtStore::new_test(dht_id()).await.unwrap();
         let cascade = CascadeImpl::empty(dht_store.clone()).with_network(network);
 
-        let outcome = restore_workflow(cell_id, cascade, dht_store, 1, Duration::from_millis(1))
-            .await
-            .unwrap();
+        let outcome = restore_workflow(
+            cell_id,
+            cascade,
+            dht_store,
+            1,
+            Duration::from_millis(1),
+            TriggerSender::new().0,
+        )
+        .await
+        .unwrap();
         assert!(matches!(outcome, RestoreOutcome::Complete));
     }
 
@@ -259,9 +277,16 @@ mod tests {
         )]);
         let cascade = CascadeImpl::empty(dht_store.clone()).with_network(network);
 
-        let outcome = restore_workflow(cell_id, cascade, dht_store, 1, Duration::from_millis(1))
-            .await
-            .unwrap();
+        let outcome = restore_workflow(
+            cell_id,
+            cascade,
+            dht_store,
+            1,
+            Duration::from_millis(1),
+            TriggerSender::new().0,
+        )
+        .await
+        .unwrap();
         assert!(matches!(
             outcome,
             RestoreOutcome::PermanentFailure(UnrecoverableCellReason::ChainForkWarrant(_))
@@ -294,9 +319,16 @@ mod tests {
         )]);
         let cascade = CascadeImpl::empty(dht_store.clone()).with_network(network);
 
-        let outcome = restore_workflow(cell_id, cascade, dht_store, 1, Duration::from_millis(1))
-            .await
-            .unwrap();
+        let outcome = restore_workflow(
+            cell_id,
+            cascade,
+            dht_store,
+            1,
+            Duration::from_millis(1),
+            TriggerSender::new().0,
+        )
+        .await
+        .unwrap();
         assert!(matches!(outcome, RestoreOutcome::Complete));
     }
 
@@ -323,9 +355,16 @@ mod tests {
         let dht_store = DhtStore::new_test(dht_id()).await.unwrap();
         let cascade = CascadeImpl::empty(dht_store.clone()).with_network(network);
 
-        let outcome = restore_workflow(cell_id, cascade, dht_store, 1, Duration::from_millis(1))
-            .await
-            .unwrap();
+        let outcome = restore_workflow(
+            cell_id,
+            cascade,
+            dht_store,
+            1,
+            Duration::from_millis(1),
+            TriggerSender::new().0,
+        )
+        .await
+        .unwrap();
         assert!(matches!(outcome, RestoreOutcome::Complete));
     }
 
@@ -374,9 +413,16 @@ mod tests {
         // A quorum of 2 requires that both peers to respond in the same round, and as the mock only
         // ever returns these responses, then a success can only come from combining them and not
         // from a later retry against different data.
-        let outcome = restore_workflow(cell_id, cascade, dht_store, 2, Duration::from_millis(1))
-            .await
-            .unwrap();
+        let outcome = restore_workflow(
+            cell_id,
+            cascade,
+            dht_store,
+            2,
+            Duration::from_millis(1),
+            TriggerSender::new().0,
+        )
+        .await
+        .unwrap();
         assert!(matches!(outcome, RestoreOutcome::Complete));
     }
 
@@ -397,9 +443,16 @@ mod tests {
         let dht_store = DhtStore::new_test(dht_id()).await.unwrap();
         let cascade = CascadeImpl::empty(dht_store.clone()).with_network(network);
 
-        let outcome = restore_workflow(cell_id, cascade, dht_store, 1, Duration::from_millis(1))
-            .await
-            .unwrap();
+        let outcome = restore_workflow(
+            cell_id,
+            cascade,
+            dht_store,
+            1,
+            Duration::from_millis(1),
+            TriggerSender::new().0,
+        )
+        .await
+        .unwrap();
         assert!(matches!(outcome, RestoreOutcome::Complete));
     }
 }
