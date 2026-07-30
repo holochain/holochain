@@ -395,6 +395,25 @@ impl ConductorBuilder {
         self
     }
 
+    /// Point the network at an address nothing is listening on.
+    ///
+    /// [`NetworkConfig::default`] carries the public bootstrap and relay servers, which a test
+    /// that does not exercise networking has no reason to reach. Call this to keep such a test
+    /// off them.
+    ///
+    /// [`NetworkConfig::default`]: holochain_conductor_api::conductor::NetworkConfig::default
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn with_unreachable_network(mut self) -> Self {
+        // Discard port, so a connection attempt fails immediately.
+        const UNSERVED: &str = "http://127.0.0.1:9";
+
+        self.config.network.bootstrap_url = url2::url2!("{}", UNSERVED);
+        self.config.network.relay_url = url2::url2!("{}", UNSERVED);
+        self
+    }
+}
+
+impl ConductorBuilder {
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope)))]

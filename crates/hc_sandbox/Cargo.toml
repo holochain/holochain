@@ -45,6 +45,7 @@ url2 = "0.0.6"
 walkdir = "2"
 
 [dev-dependencies]
+kitsune2_test_utils = { version = "0.5.0", features = ["relay"] }
 tempfile = "3.20.0"
 
 [target.'cfg(unix)'.dev-dependencies]

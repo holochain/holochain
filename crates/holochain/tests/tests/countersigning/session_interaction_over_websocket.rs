@@ -620,7 +620,7 @@ impl Agent {
         let admin_port = 0;
         let tmp_dir = TempDir::new().unwrap();
         let environment_path = tmp_dir.path().to_path_buf();
-        let mut config = create_config(admin_port, environment_path.clone().into());
+        let mut config = create_config(admin_port, environment_path.clone().into()).await;
         config.network.request_timeout_s = 10;
         config.network.advanced = Some(serde_json::json!({
             // Gossip faster to speed up the test.

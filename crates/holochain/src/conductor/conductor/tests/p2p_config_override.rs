@@ -21,6 +21,7 @@ async fn should_override_space_config() {
     // Hit a bootstrap service so it can blow up and return an error if we get our end of
     // things totally wrong.
     config.network.bootstrap_url = url2::url2!("{rendezvous_bootstrap_addr}");
+    config.network.relay_url = url2::url2!("{}", rendezvous.relay_addr());
 
     let mut conductor = SweetConductor::from_config_rendezvous(config, rendezvous).await;
 
@@ -91,8 +92,10 @@ async fn should_override_space_config_with_relay_url() {
     .await;
 
     let rendezvous = SweetLocalRendezvous::new().await;
-    let mut conductor =
-        SweetConductor::from_config_rendezvous(ConductorConfig::default(), rendezvous).await;
+    let mut config = ConductorConfig::default();
+    config.network.bootstrap_url = url2::url2!("{}", rendezvous.bootstrap_addr());
+    config.network.relay_url = url2::url2!("{}", rendezvous.relay_addr());
+    let mut conductor = SweetConductor::from_config_rendezvous(config, rendezvous).await;
 
     let role_name = "role".to_string();
     let override_relay_url = "wss://override-relay.test:5678".to_string();

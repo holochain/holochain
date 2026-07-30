@@ -7,6 +7,7 @@ use futures::Future;
 use hdk::prelude::*;
 use holochain::conductor::ConductorHandle;
 pub use holochain::sweettest::websocket_client_by_port;
+use holochain::sweettest::{DynSweetRendezvous, SweetLocalRendezvous};
 use holochain::{
     conductor::api::ZomeCallParamsSigned,
     conductor::api::{AdminRequest, AdminResponse, AppRequest},
@@ -33,6 +34,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::process::Child;
 use tokio::process::Command;
+use url2::Url2;
 
 pub async fn admin_port(conductor: &ConductorHandle) -> u16 {
     conductor
@@ -373,9 +375,29 @@ pub async fn check_started(holochain: &mut Child) {
     }
 }
 
+/// A bootstrap and relay server shared by the tests in this binary.
+static TEST_NETWORK_SERVERS: tokio::sync::OnceCell<DynSweetRendezvous> =
+    tokio::sync::OnceCell::const_new();
+
+/// Point a conductor config at a local bootstrap and relay server.
+///
+/// Conductors built through [`ConductorBuilder::test`] get this for free, but
+/// these tests reach the conductor through `build` or by spawning the
+/// `holochain` binary, where `NetworkConfig::default()`'s public bootstrap and
+/// relay servers would otherwise be used.
+///
+/// [`ConductorBuilder::test`]: holochain::conductor::ConductorBuilder::test
+pub async fn use_local_network_servers(config: &mut ConductorConfig) {
+    let rendezvous = TEST_NETWORK_SERVERS
+        .get_or_init(SweetLocalRendezvous::new)
+        .await;
+    config.network.bootstrap_url = Url2::parse(rendezvous.bootstrap_addr());
+    config.network.relay_url = Url2::parse(rendezvous.relay_addr());
+}
+
 /// Create test config with test keystore.
-pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig {
-    ConductorConfig {
+pub async fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig {
+    let mut config = ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket {
                 port,
@@ -386,7 +408,9 @@ pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,
         ..Default::default()
-    }
+    };
+    use_local_network_servers(&mut config).await;
+    config
 }
 
 pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {

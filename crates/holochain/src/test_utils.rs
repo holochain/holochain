@@ -136,6 +136,7 @@ pub async fn setup_app_in_new_conductor(
     let db_dir = test_db_dir();
     let conductor_handle = ConductorBuilder::new()
         .with_data_root_path(db_dir.path().to_path_buf().into())
+        .with_unreachable_network()
         .test()
         .await
         .unwrap();

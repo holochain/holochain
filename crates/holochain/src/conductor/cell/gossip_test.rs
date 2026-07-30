@@ -43,6 +43,7 @@ async fn signature_smoke_test() {
     // Hit a bootstrap service so it can blow up and return an error if we get our end of
     // things totally wrong.
     config.network.bootstrap_url = url2::url2!("{}", rendezvous.bootstrap_addr());
+    config.network.relay_url = url2::url2!("{}", rendezvous.relay_addr());
     let zomes = vec![TestWasm::Anchor];
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(zomes).await;
     let mut conductor = SweetConductor::from_config_rendezvous(config, rendezvous).await;

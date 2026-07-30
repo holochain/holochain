@@ -12,6 +12,7 @@ use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
     WebsocketSender,
 };
+use kitsune2_test_utils::bootstrap::TestBootstrapSrv;
 use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
@@ -179,6 +180,9 @@ async fn generate_sandbox_and_connect() {
         .join("tests/fixtures/my-app/");
 
     holochain_trace::test_run();
+    // Keep the sandbox off the public bootstrap and relay servers.
+    let local_network = TestBootstrapSrv::new(false).await;
+    let local_network_url = local_network.addr().to_string();
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -190,6 +194,10 @@ async fn generate_sandbox_and_connect() {
         .arg("--in-process-lair")
         .arg("--run=0")
         .arg(app_path)
+        .arg("network")
+        .arg(format!("--bootstrap={local_network_url}"))
+        .arg("quic")
+        .arg(&local_network_url)
         .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -232,6 +240,9 @@ async fn generate_sandbox_memproof_deferred_and_call_list_apps() {
         .join("tests/fixtures/my-app-deferred/");
 
     holochain_trace::test_run();
+    // Keep the sandbox off the public bootstrap and relay servers.
+    let local_network = TestBootstrapSrv::new(false).await;
+    let local_network_url = local_network.addr().to_string();
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -243,6 +254,10 @@ async fn generate_sandbox_memproof_deferred_and_call_list_apps() {
         .arg("--in-process-lair")
         .arg("--run=0")
         .arg(app_path)
+        .arg("network")
+        .arg(format!("--bootstrap={local_network_url}"))
+        .arg("quic")
+        .arg(&local_network_url)
         .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -416,6 +431,9 @@ async fn generate_sandbox_with_roles_settings_override() {
         .join("tests/fixtures/roles-settings.yaml");
 
     holochain_trace::test_run();
+    // Keep the sandbox off the public bootstrap and relay servers.
+    let local_network = TestBootstrapSrv::new(false).await;
+    let local_network_url = local_network.addr().to_string();
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -429,6 +447,10 @@ async fn generate_sandbox_with_roles_settings_override() {
         .arg("--in-process-lair")
         .arg("--run=0")
         .arg(app_path)
+        .arg("network")
+        .arg(format!("--bootstrap={local_network_url}"))
+        .arg("quic")
+        .arg(&local_network_url)
         .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -629,6 +651,9 @@ async fn generate_sandbox_and_get_admin_ports() {
     holochain_trace::test_run();
 
     // Generate and run sandboxes (ports will be allocated dynamically)
+    // Keep the sandbox off the public bootstrap and relay servers.
+    let local_network = TestBootstrapSrv::new(false).await;
+    let local_network_url = local_network.addr().to_string();
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -640,6 +665,10 @@ async fn generate_sandbox_and_get_admin_ports() {
         .arg("--in-process-lair")
         .arg("--run=0")
         .arg(app_path)
+        .arg("network")
+        .arg(format!("--bootstrap={local_network_url}"))
+        .arg("quic")
+        .arg(&local_network_url)
         .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

@@ -41,6 +41,7 @@ async fn test_cell_handle_publish() {
         .config(config.into())
         .with_keystore(keystore.clone())
         .with_data_root_path(data_root_path.clone())
+        .with_unreachable_network()
         .test()
         .await
         .unwrap();

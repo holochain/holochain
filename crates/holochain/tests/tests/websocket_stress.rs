@@ -35,7 +35,7 @@ static BAD_CLOSE: AtomicU64 = AtomicU64::new(0);
 pub async fn websocket_stress() {
     let tmp_dir = TempDir::new().unwrap();
     let data_root_path = tmp_dir.path().to_path_buf();
-    let config = ConductorConfig {
+    let mut config = ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket {
                 port: 0,
@@ -46,6 +46,7 @@ pub async fn websocket_stress() {
         keystore: KeystoreConfig::DangerTestKeystore,
         ..Default::default()
     };
+    crate::tests::test_utils::use_local_network_servers(&mut config).await;
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = conductor_handle
         .get_arbitrary_admin_websocket_port()

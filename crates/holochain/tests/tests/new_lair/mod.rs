@@ -38,7 +38,7 @@ async fn test_new_lair_conductor_integration() {
     println!("\n## keystore config ##\n{keystore_config}");
 
     // set up conductor config to use the started keystore
-    let conductor_config = ConductorConfig {
+    let mut conductor_config = ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket {
                 port: ADMIN_PORT,
@@ -52,6 +52,7 @@ async fn test_new_lair_conductor_integration() {
         },
         ..Default::default()
     };
+    crate::tests::test_utils::use_local_network_servers(&mut conductor_config).await;
 
     // write the conductor config
     let conductor_config = yaml_serde::to_string(&conductor_config).unwrap();

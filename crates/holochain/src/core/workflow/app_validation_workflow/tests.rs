@@ -941,6 +941,7 @@ async fn check_app_entry_def_test() {
     let data_root_dir: DataRootPath = db_dir.path().to_path_buf().into();
     let conductor_handle = Conductor::builder()
         .with_data_root_path(data_root_dir)
+        .with_unreachable_network()
         .test()
         .await
         .unwrap();

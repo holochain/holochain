@@ -21,6 +21,7 @@ async fn should_not_allow_installing_apps_with_same_dna_but_different_overrides(
     // Hit a bootstrap service so it can blow up and return an error if we get our end of
     // things totally wrong.
     config.network.bootstrap_url = url2::url2!("{rendezvous_bootstrap_addr}");
+    config.network.relay_url = url2::url2!("{}", rendezvous.relay_addr());
 
     let mut conductor = SweetConductor::from_config_rendezvous(config, rendezvous).await;
 
@@ -97,6 +98,7 @@ async fn should_install_apps_with_same_dna_and_same_overrides() {
     // Hit a bootstrap service so it can blow up and return an error if we get our end of
     // things totally wrong.
     config.network.bootstrap_url = url2::url2!("{rendezvous_bootstrap_addr}");
+    config.network.relay_url = url2::url2!("{}", rendezvous.relay_addr());
 
     let mut conductor = SweetConductor::from_config_rendezvous(config, rendezvous).await;
 
