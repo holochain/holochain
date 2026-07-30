@@ -1843,9 +1843,7 @@ mod restore_impls {
         conductor: &Conductor,
         cell_id: &CellId,
     ) -> ConductorResult<(CascadeImpl, DhtStore, holochain_p2p::DynHolochainP2pDna)> {
-        let space = conductor
-            .get_or_create_space(cell_id.dna_hash())
-            .map_err(ConductorError::from)?;
+        let space = conductor.get_or_create_space(cell_id.dna_hash())?;
         let dht_store = space.dht_store;
         let network = Arc::new(holochain_p2p::HolochainP2pDna::new(
             conductor.holochain_p2p().clone(),
