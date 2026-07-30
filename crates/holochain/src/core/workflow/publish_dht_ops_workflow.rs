@@ -54,6 +54,12 @@ pub async fn publish_dht_ops_workflow(
             .publish(basis, agent.clone(), op_hash_list.clone(), None)
             .await
         {
+            // Nothing was sent, so the ops are left unrecorded and stay queued
+            // for a later run of this workflow. Having no peers is expected
+            // while offline, so it is not reported as a failure.
+            Err(holochain_p2p::HolochainP2pError::NoPeersForLocation(_, loc)) => {
+                debug!(?loc, "No peers to publish to");
+            }
             Err(e) => {
                 // If we get a routing error it means the space hasn't started yet and we should try publishing again.
                 if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {

@@ -1990,6 +1990,15 @@ impl actor::HcP2p for HolochainP2pActor {
             })
             .collect();
 
+            // Report reaching nobody as an error so the caller does not treat
+            // these ops as published.
+            if urls.is_empty() {
+                return Err(HolochainP2pError::NoPeersForLocation(
+                    String::from("publish"),
+                    basis_hash.get_loc(),
+                ));
+            }
+
             for url in urls {
                 space
                     .publish()

@@ -463,18 +463,25 @@ async fn test_publish() {
         loop {
             tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
-            hc2.publish(
-                dna_hash.clone(),
-                HoloHash::from_raw_36_and_type(
-                    op_hash.get_raw_36().to_vec(),
-                    holo_hash::hash_type::AnyLinkable::Action,
-                ),
-                AgentPubKey::from_raw_32(vec![2; 32]),
-                vec![op_hash.clone()],
-                None,
-            )
-            .await
-            .unwrap();
+            match hc2
+                .publish(
+                    dna_hash.clone(),
+                    HoloHash::from_raw_36_and_type(
+                        op_hash.get_raw_36().to_vec(),
+                        holo_hash::hash_type::AnyLinkable::Action,
+                    ),
+                    AgentPubKey::from_raw_32(vec![2; 32]),
+                    vec![op_hash.clone()],
+                    None,
+                )
+                .await
+            {
+                Ok(()) => (),
+                // Peer discovery may not have reached this node yet, leaving
+                // nobody to publish to. Keep waiting.
+                Err(HolochainP2pError::NoPeersForLocation(_, _)) => continue,
+                Err(err) => panic!("publish failed: {err:?}"),
+            }
 
             if let Some(res) = handler.calls.lock().unwrap().first() {
                 assert_eq!("publish", res);

@@ -4,7 +4,9 @@ use crate::{
         full_integration_dump,
     },
     retry_until_timeout,
-    sweettest::{SweetConductor, SweetDnaFile, SweetZome},
+    sweettest::{
+        SweetConductor, SweetConductorConfig, SweetDnaFile, SweetLocalRendezvous, SweetZome,
+    },
 };
 use holo_hash::{ActionHash, DhtOpHash, HasHash};
 use holochain_conductor_api::{FullIntegrationStateDump, FullStateDump, OpTimingsCursor};
@@ -17,7 +19,7 @@ use holochain_zome_types::prelude::{
     AgentPubKey, ChainIntegrityWarrant, ChainOpType, Signature, SignedWarrant, Timestamp, Warrant,
     WarrantProof,
 };
-use std::{collections::HashSet, time::Duration};
+use std::collections::HashSet;
 
 fn test_warrant(seed: u8) -> DhtOpHashed {
     let warrant = SignedWarrant::new(
@@ -53,7 +55,13 @@ fn dump_op_hashes(dump: &FullIntegrationStateDump) -> Vec<DhtOpHash> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn dump_full_state() {
-    let mut conductor = SweetConductor::standard().await;
+    // The publish workflow raises `published_ops_count` in the background as it
+    // records publish times, which would race the expected and actual dumps
+    // built a moment apart below. Publishing is not under test here.
+    let config =
+        SweetConductorConfig::rendezvous(true).tune_network_config(|nc| nc.disable_publish = true);
+    let mut conductor =
+        SweetConductor::from_config_rendezvous(config, SweetLocalRendezvous::new().await).await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd])
         .await
         .0;
@@ -78,25 +86,6 @@ async fn dump_full_state() {
     });
 
     let dht_store = conductor.get_dht_store(cell_id.dna_hash()).unwrap();
-
-    // Wait for publishing to quiesce so the two dumps below observe the same
-    // `published_ops_count`. The publish workflow runs in the background and
-    // raises that count as it records publish times, so building the expected
-    // and actual dumps a moment apart would otherwise race it. With a recency
-    // window wide enough to exclude anything published during the test, an op
-    // only remains in `get_ops_to_publish` until it has been published at least
-    // once; an empty result therefore means every publishable op has a recorded
-    // publish time and the count is stable.
-    retry_until_timeout!(30_000, 100, {
-        let pending = dht_store
-            .as_read()
-            .get_ops_to_publish(cell_id.agent_pubkey(), Duration::from_secs(60 * 60))
-            .await
-            .unwrap();
-        if pending.is_empty() {
-            break;
-        }
-    });
 
     let peer_dump = peer_store_dump(&conductor, cell_id).await.unwrap();
     let source_chain_dump =
