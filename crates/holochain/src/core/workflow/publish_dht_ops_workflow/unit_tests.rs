@@ -120,6 +120,45 @@ async fn workflow_handles_publish_errors() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn no_publish_time_recorded_without_peers() {
+    holochain_trace::test_run();
+
+    let dht_store = test_dht_store(fixt!(DnaHash)).await;
+
+    let agent = fixt!(AgentPubKey);
+
+    let op_hash = create_op(&dht_store, agent.clone()).await.unwrap();
+
+    let mut network = MockHolochainP2pDnaT::new();
+    network.expect_publish().return_once(|_, _, _, _| {
+        Err(holochain_p2p::HolochainP2pError::NoPeersForLocation(
+            "publish".to_string(),
+            0,
+        ))
+    });
+
+    let (tx, rx) =
+        TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
+
+    let work_complete = publish_dht_ops_workflow(
+        dht_store.clone(),
+        Arc::new(network),
+        tx,
+        agent,
+        ConductorTuningParams::default().min_publish_interval(),
+    )
+    .await
+    .unwrap();
+
+    let publish_timestamp = get_publish_time(&dht_store, op_hash).await;
+
+    assert_eq!(WorkComplete::Complete, work_complete);
+    // The op stays queued so a later run can publish it once peers are known.
+    assert!(!rx.is_paused());
+    assert!(publish_timestamp.is_none());
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn retry_publish_until_receipts_received() {
     holochain_trace::test_run();
 
