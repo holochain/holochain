@@ -264,7 +264,9 @@ async fn filter_records_by_author_and_signature(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator, DnaHashFixturator};
+    use holo_hash::fixt::{
+        ActionHashFixturator, AgentPubKeyFixturator, DnaHashFixturator, EntryHashFixturator,
+    };
     use holochain_keystore::AgentPubKeyExt;
     use holochain_types::activity::ChainItems;
     use holochain_zome_types::prelude::*;
@@ -334,6 +336,33 @@ mod tests {
             highest_observed: None,
             warrants: vec![],
         }
+    }
+
+    fn make_record_with_seq(agent: &AgentPubKey, seq: u32) -> Record {
+        use ::fixt::prelude::*;
+        let action = Action {
+            header: ActionHeader {
+                author: agent.clone(),
+                timestamp: Timestamp::from_micros(seq as i64),
+                action_seq: seq,
+                prev_action: if seq == 0 {
+                    None
+                } else {
+                    Some(fixt!(ActionHash))
+                },
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: fixt!(EntryHash),
+            }),
+        };
+        let action_hashed = ActionHashed::from_content_sync(action);
+        let signed = SignedActionHashed::with_presigned(action_hashed, fixt!(Signature));
+        Record::new(signed, RecordEntry::NA)
     }
 
     fn make_signed_warrant(agent: &AgentPubKey) -> SignedWarrant {
@@ -537,6 +566,103 @@ mod tests {
             outcome,
             AcquireOutcome::Retry(RetryReason::NoActivity)
         ));
+    }
+
+    #[test]
+    fn invalid_status_derives_highest_seq_head_when_multiple_valid_records() {
+        let agent = ::fixt::fixt!(AgentPubKey);
+        let low = make_record_with_seq(&agent, 2);
+        let high = make_record_with_seq(&agent, 7);
+        let high_hash = high.action_address().clone();
+        // The sequence number of the rejected action is higher than any valid record but the head
+        // must still be derived from the valid records, not the rejected one.
+        let status = ChainStatus::Invalid(ChainHead {
+            action_seq: 8,
+            hash: ::fixt::fixt!(ActionHash),
+        });
+        let responses = vec![
+            make_response_with_records(&agent, status.clone(), vec![low.clone(), high.clone()]),
+            make_response_with_records(&agent, status, vec![low, high]),
+        ];
+        let (outcome, _warrants) = evaluate_responses(&agent, responses, 2);
+        assert!(matches!(
+            outcome,
+            AcquireOutcome::Agreed {
+                head_seq: 7,
+                head_hash,
+                ..
+            } if head_hash == high_hash
+        ));
+    }
+
+    #[test]
+    fn invalid_status_disagreement_between_peers_returns_retry() {
+        let agent = ::fixt::fixt!(AgentPubKey);
+        let record_a = make_record_with_seq(&agent, 3);
+        let record_b = make_record_with_seq(&agent, 5);
+        let status = ChainStatus::Invalid(ChainHead {
+            action_seq: 9,
+            hash: ::fixt::fixt!(ActionHash),
+        });
+        let responses = vec![
+            make_response_with_records(&agent, status.clone(), vec![record_a]),
+            make_response_with_records(&agent, status, vec![record_b]),
+        ];
+        let (outcome, _warrants) = evaluate_responses(&agent, responses, 2);
+        assert!(matches!(
+            outcome,
+            AcquireOutcome::Retry(RetryReason::HeadDisagreement)
+        ));
+    }
+
+    #[test]
+    fn valid_and_invalid_peers_agreeing_on_same_head_are_accepted() {
+        let agent = ::fixt::fixt!(AgentPubKey);
+        let record = make_record_with_seq(&agent, 5);
+        let head_hash = record.action_address().clone();
+        // One peer has seen and rejected the next action but the other hasn't. However, both should
+        // still converge on the same derived head.
+        let invalid_status = ChainStatus::Invalid(ChainHead {
+            action_seq: 6,
+            hash: ::fixt::fixt!(ActionHash),
+        });
+        let responses = vec![
+            make_response(&agent, valid_head(5, head_hash.clone())),
+            make_response_with_records(&agent, invalid_status, vec![record]),
+        ];
+        let (outcome, _warrants) = evaluate_responses(&agent, responses, 2);
+        assert!(matches!(
+            outcome,
+            AcquireOutcome::Agreed {
+                head_seq: 5,
+                head_hash: h,
+                ..
+            } if h == head_hash
+        ));
+    }
+
+    #[test]
+    fn invalid_status_with_warrant_collects_warrant_independent_of_head() {
+        let agent = ::fixt::fixt!(AgentPubKey);
+        let record = make_record_with_seq(&agent, 4);
+        let warrant = make_signed_warrant(&agent);
+        let status = ChainStatus::Invalid(ChainHead {
+            action_seq: 5,
+            hash: ::fixt::fixt!(ActionHash),
+        });
+        let mut response_with_warrant =
+            make_response_with_records(&agent, status.clone(), vec![record.clone()]);
+        response_with_warrant.warrants = vec![warrant];
+        let responses = vec![
+            response_with_warrant,
+            make_response_with_records(&agent, status, vec![record]),
+        ];
+        let (outcome, warrants) = evaluate_responses(&agent, responses, 2);
+        assert!(matches!(
+            outcome,
+            AcquireOutcome::Agreed { head_seq: 4, .. }
+        ));
+        assert_eq!(warrants.len(), 1);
     }
 
     #[test]
