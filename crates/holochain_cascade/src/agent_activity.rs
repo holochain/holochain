@@ -495,6 +495,34 @@ mod tests {
     }
 
     #[test]
+    fn invalid_status_carries_the_rejected_actions_own_head_not_the_valid_tip() {
+        use holo_hash::fixt::*;
+
+        let valid_tip_hash = ::fixt::prelude::fixt!(ActionHash);
+        let rejected_hash = ::fixt::prelude::fixt!(ActionHash);
+        let valid = vec![
+            (0u32, ::fixt::prelude::fixt!(ActionHash)),
+            (3, valid_tip_hash.clone()),
+        ];
+        let rejected = vec![(4u32, rejected_hash.clone())];
+
+        let (status, valid_out, rejected_out) =
+            compute_chain_status(valid.into_iter(), rejected.into_iter());
+
+        //  The chain head inside `Invalid` should be the first rejected action and not the valid
+        //  chain head.
+        assert_eq!(
+            status,
+            ChainStatus::Invalid(ChainHead {
+                action_seq: 4,
+                hash: rejected_hash,
+            })
+        );
+        assert_eq!(valid_out.last().unwrap().1, valid_tip_hash);
+        assert_eq!(rejected_out.len(), 1);
+    }
+
+    #[test]
     fn combine_status_priority() {
         use ChainStatus::*;
 
