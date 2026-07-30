@@ -54,6 +54,7 @@ use crate::conductor::conductor::app_auth_token_store::AppAuthTokenStore;
 use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
+use crate::core::queue_consumer::spawn_space_validation_consumers;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueConsumerMap;
 #[cfg(any(test, feature = "test_utils"))]
@@ -1764,11 +1765,11 @@ mod restore_impls {
         let quorum = conductor.config.restore_chain_quorum;
 
         for cell_id in cell_ids {
-            let (cascade, dht_store, network) =
+            let (cascade, dht_store, network, sys_validation_trigger) =
                 join_network_and_build_restore_cascade(&conductor, &cell_id).await?;
 
-            // TODO: Replace with the restoring cell's sys-validation consumer once spawned.
-            let (sys_validation_trigger, _) = TriggerSender::new();
+            // Marks the cell as undergoing chain restore for the lifetime of this guard
+            let _restoring_guard = RestoringCellGuard::new(conductor.clone(), cell_id.clone());
 
             let outcome = restore_workflow(
                 cell_id.clone(),
@@ -1852,12 +1853,22 @@ mod restore_impls {
     /// otherwise the cell wouldn't join until the app is enabled and any P2P query against it would
     /// fail. The joined network handle is also returned so the caller can `leave` it again if
     /// restore ends in permanent failure.
+    ///
+    /// Also spawns (or reuses, if already running for this DNA) the sys/app validation, integration
+    /// and validation-receipt consumers, and returns the sys-validation trigger. A restoring cell
+    /// has not gone through [`Cell::create`], so without this, warrants staged by the restore
+    /// workflow would sit in limbo forever with nothing to process them.
     async fn join_network_and_build_restore_cascade(
-        conductor: &Conductor,
+        conductor: &ConductorHandle,
         cell_id: &CellId,
-    ) -> ConductorResult<(CascadeImpl, DhtStore, holochain_p2p::DynHolochainP2pDna)> {
+    ) -> ConductorResult<(
+        CascadeImpl,
+        DhtStore,
+        holochain_p2p::DynHolochainP2pDna,
+        TriggerSender,
+    )> {
         let space = conductor.get_or_create_space(cell_id.dna_hash())?;
-        let dht_store = space.dht_store;
+        let dht_store = space.dht_store.clone();
         let network = Arc::new(holochain_p2p::HolochainP2pDna::new(
             conductor.holochain_p2p().clone(),
             cell_id.dna_hash().clone(),
@@ -1866,7 +1877,46 @@ mod restore_impls {
             .join(cell_id.agent_pubkey().clone(), None, None)
             .await?;
         let cascade = CascadeImpl::empty(dht_store.clone()).with_network(network.clone());
-        Ok((cascade, dht_store, network))
+
+        // No publish consumer runs during restore (republishing is deferred to `enable_app`,
+        // which spawns one covering every `ChainOpPublish` row already written by then), so the
+        // trigger threaded into app/sys validation here has no consumer behind it. Triggering it
+        // is a harmless no-op.
+        let (dummy_publish_trigger, _) = TriggerSender::new();
+        let triggers = spawn_space_validation_consumers(
+            Arc::new(cell_id.dna_hash().clone()),
+            network.clone(),
+            &space,
+            conductor.clone(),
+            dummy_publish_trigger,
+        );
+        // In case this DNA space already has warrants sitting in limbo from a previous run of
+        // this cell's restore (e.g. after a crash), give sys validation an immediate nudge rather
+        // than waiting for a fresh warrant to be staged.
+        triggers.sys_validation.trigger(&"restore_workflow");
+
+        Ok((cascade, dht_store, network, triggers.sys_validation))
+    }
+
+    /// Keeps the `cell_id` marked as restoring for as long as the guard is alive, so
+    /// `get_representative_agent` treats it as having a valid representative agent. Unmarks it on
+    /// drop so it stays correct during normal completion and any failures.
+    struct RestoringCellGuard {
+        conductor: ConductorHandle,
+        cell_id: CellId,
+    }
+
+    impl RestoringCellGuard {
+        fn new(conductor: ConductorHandle, cell_id: CellId) -> Self {
+            conductor.mark_cell_restoring(cell_id.clone());
+            Self { conductor, cell_id }
+        }
+    }
+
+    impl Drop for RestoringCellGuard {
+        fn drop(&mut self) {
+            self.conductor.unmark_cell_restoring(&self.cell_id);
+        }
     }
 }
 
@@ -1911,6 +1961,22 @@ mod cell_impls {
         /// See [`Self::restoring_cells`] for why this exists alongside `running_cell_ids`.
         pub(crate) fn restoring_cell_ids(&self) -> HashSet<CellId> {
             self.restoring_cells.share_ref(|cells| cells.clone())
+        }
+
+        /// Marks the `cell_id` as undergoing source-chain restore. Must be paired with
+        /// [`Self::unmark_cell_restoring`] once restore ends for the cell, success or failure.
+        pub(crate) fn mark_cell_restoring(&self, cell_id: CellId) {
+            self.restoring_cells.share_mut(|cells| {
+                cells.insert(cell_id);
+            });
+        }
+
+        /// Unmarks the `cell_id` as undergoing source-chain restore due to a successful restore or
+        /// a failure. Reverses [`Self::mark_cell_restoring`].
+        pub(crate) fn unmark_cell_restoring(&self, cell_id: &CellId) {
+            self.restoring_cells.share_mut(|cells| {
+                cells.remove(cell_id);
+            });
         }
 
         /// Returns all installed cells which are forward compatible with the specified DNA,
