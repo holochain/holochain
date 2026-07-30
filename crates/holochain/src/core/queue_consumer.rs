@@ -71,33 +71,39 @@ mod witnessing_consumer;
 #[cfg(test)]
 mod tests;
 
-/// Spawns several long-running tasks which are responsible for processing work
-/// which shows up on various databases.
+/// The subset of queue consumers that are scoped to a DNA space rather than to an individual cell.
+/// These are deduplicated per DNA hash via [`QueueConsumerMap`], so spawning them is safe to call
+/// more than once for the same DNA as later calls will just return the already existing triggers.
+pub(crate) struct SpaceValidationTriggers {
+    pub(crate) validation_receipt: TriggerSender,
+    pub(crate) integration: TriggerSender,
+    pub(crate) app_validation: TriggerSender,
+    pub(crate) sys_validation: TriggerSender,
+}
+
+/// Spawns the validation-receipt, integration, app-validation, and sys-validation consumers for
+/// `dna_hash`, or returns the triggers of the ones already running for it.
 ///
-/// Waits for the initial loop to complete before returning, to prevent causing
-/// a race condition by trying to run a workflow too soon after cell creation.
-#[allow(clippy::too_many_arguments)]
-pub async fn spawn_queue_consumer_tasks(
-    cell_id: CellId,
+/// This is the part of cell startup that a restoring cell also needs to allow sys validation to
+/// resolve warrants staged by the restore workflow, so it must run even though the restoring cell
+/// has not been fully created yet.
+///
+/// # Notes
+/// `trigger_publish` is forwarded into the app/sys validation consumers as their downstream publish
+/// trigger. Callers that have not spawned a publish consumer like the restore workflow can pass a
+/// trigger with no consumer behind it, since firing an unconsumed trigger is a no-op.
+pub(crate) fn spawn_space_validation_consumers(
+    dna_hash: Arc<DnaHash>,
     network: DynHolochainP2pDna,
     space: &Space,
     conductor: ConductorHandle,
-) -> ConductorResult<(QueueTriggers, InitialQueueTriggers)> {
+    trigger_publish: TriggerSender,
+) -> SpaceValidationTriggers {
     let keystore = conductor.keystore().clone();
-    let dna_hash = Arc::new(cell_id.dna_hash().clone());
     let queue_consumer_map = conductor.get_queue_consumer_workflows();
-
-    // Publish
-    let tx_publish = spawn_publish_dht_ops_consumer(
-        cell_id.clone(),
-        space.dht_store.clone(),
-        conductor.clone(),
-        network.clone(),
-    );
 
     // Validation Receipt
     // One per space.
-
     let tx_receipt = queue_consumer_map.spawn_once_validation_receipt(dna_hash.clone(), || {
         spawn_validation_receipt_consumer(
             dna_hash.clone(),
@@ -127,7 +133,7 @@ pub async fn spawn_queue_consumer_tasks(
             AppValidationWorkspace::new(space.dht_store.clone(), keystore.clone()),
             conductor.clone(),
             tx_integration.clone(),
-            tx_publish.clone(),
+            trigger_publish.clone(),
             network.clone(),
         )
     });
@@ -138,7 +144,7 @@ pub async fn spawn_queue_consumer_tasks(
         spawn_sys_validation_consumer(
             SysValidationWorkspace::new(
                 space.dht_store.clone(),
-                cell_id.dna_hash().clone(),
+                dna_hash.as_ref().clone(),
                 conductor
                     .get_config()
                     .conductor_tuning_params()
@@ -148,11 +154,54 @@ pub async fn spawn_queue_consumer_tasks(
             conductor.clone(),
             tx_app.clone(),
             tx_integration.clone(),
-            tx_publish.clone(),
+            trigger_publish,
             network.clone(),
             conductor.keystore().clone(),
         )
     });
+
+    SpaceValidationTriggers {
+        validation_receipt: tx_receipt,
+        integration: tx_integration,
+        app_validation: tx_app,
+        sys_validation: tx_sys,
+    }
+}
+
+/// Spawns several long-running tasks which are responsible for processing work
+/// which shows up on various databases.
+///
+/// Waits for the initial loop to complete before returning, to prevent causing
+/// a race condition by trying to run a workflow too soon after cell creation.
+#[allow(clippy::too_many_arguments)]
+pub async fn spawn_queue_consumer_tasks(
+    cell_id: CellId,
+    network: DynHolochainP2pDna,
+    space: &Space,
+    conductor: ConductorHandle,
+) -> ConductorResult<(QueueTriggers, InitialQueueTriggers)> {
+    let dna_hash = Arc::new(cell_id.dna_hash().clone());
+
+    // Publish
+    let tx_publish = spawn_publish_dht_ops_consumer(
+        cell_id.clone(),
+        space.dht_store.clone(),
+        conductor.clone(),
+        network.clone(),
+    );
+
+    let SpaceValidationTriggers {
+        validation_receipt: tx_receipt,
+        integration: tx_integration,
+        app_validation: tx_app,
+        sys_validation: tx_sys,
+    } = spawn_space_validation_consumers(
+        dna_hash.clone(),
+        network.clone(),
+        space,
+        conductor.clone(),
+        tx_publish.clone(),
+    );
 
     let workspace = {
         let mut guard = space.countersigning_workspaces.lock();
@@ -181,14 +230,16 @@ pub async fn spawn_queue_consumer_tasks(
         tx_publish.clone(),
     );
 
-    let tx_witnessing = queue_consumer_map.spawn_once_witnessing(dna_hash, || {
-        spawn_witnessing_consumer(
-            space.clone(),
-            conductor.task_manager(),
-            network.clone(),
-            tx_sys.clone(),
-        )
-    });
+    let tx_witnessing = conductor
+        .get_queue_consumer_workflows()
+        .spawn_once_witnessing(dna_hash, || {
+            spawn_witnessing_consumer(
+                space.clone(),
+                conductor.task_manager(),
+                network.clone(),
+                tx_sys.clone(),
+            )
+        });
 
     Ok((
         QueueTriggers {
