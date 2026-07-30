@@ -330,6 +330,57 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn forged_record_from_one_peer_dropped_restore_succeeds_via_other_peer_same_round() {
+        let keystore = test_keystore();
+        let agent = AgentPubKey::new_random(&keystore).await.unwrap();
+        let cell_id = CellId::new(::fixt::fixt!(DnaHash), agent.clone());
+
+        let chain = build_chain(&keystore, &agent, 3).await;
+        let head_hash = chain.last().unwrap().action_address().clone();
+
+        // Peer B has a record with a signature that the agent never produced, acting as a
+        // misbehaving peer relaying a corrupted record.
+        let mut tampered_chain = chain.clone();
+        let tampered_action = ActionHashed::from_content_sync(tampered_chain[1].action().clone());
+        tampered_chain[1] = Record::new(
+            SignedActionHashed::with_presigned(tampered_action, ::fixt::fixt!(Signature)),
+            RecordEntry::NA,
+        );
+
+        let peer_a = ::fixt::fixt!(AgentPubKey);
+        let peer_b = ::fixt::fixt!(AgentPubKey);
+        let response_a = make_response(&agent, valid_head(2, head_hash.clone()), chain, vec![]);
+        let response_b = make_response(
+            &agent,
+            valid_head(2, head_hash.clone()),
+            tampered_chain,
+            vec![],
+        );
+
+        let mut mock = MockHolochainP2pDnaT::new();
+        mock.expect_authority_for_hash().returning(|_| Ok(true));
+        mock.expect_get_agent_activity_multi()
+            .returning(move |_, _, _| {
+                Ok(vec![
+                    (peer_a.clone(), response_a.clone()),
+                    (peer_b.clone(), response_b.clone()),
+                ])
+            });
+        let network: DynHolochainP2pDna = Arc::new(mock);
+
+        let dht_store = DhtStore::new_test(dht_id()).await.unwrap();
+        let cascade = CascadeImpl::empty(dht_store.clone()).with_network(network);
+
+        // A quorum of 2 requires that both peers to respond in the same round, and as the mock only
+        // ever returns these responses, then a success can only come from combining them and not
+        // from a later retry against different data.
+        let outcome = restore_workflow(cell_id, cascade, dht_store, 2, Duration::from_millis(1))
+            .await
+            .unwrap();
+        assert!(matches!(outcome, RestoreOutcome::Complete));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn happy_path_writes_and_completes() {
         let keystore = test_keystore();
         let agent = AgentPubKey::new_random(&keystore).await.unwrap();
