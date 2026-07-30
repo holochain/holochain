@@ -142,9 +142,9 @@ pub(super) fn evaluate_responses(
         .cloned()
         .collect();
 
-    // Determine the agreed chain head. Every non-empty response must share the same
-    // (action_seq, hash) pair.
+    // Every non-empty response must share the same (action_seq, hash) pair to result in an agreed chain head.
     let mut agreed_head = None;
+    let mut non_empty_count = 0_usize;
     for response in &responses {
         let head_candidate = match &response.status {
             ChainStatus::Empty => None,
@@ -181,6 +181,7 @@ pub(super) fn evaluate_responses(
         };
 
         if let Some(candidate) = head_candidate {
+            non_empty_count += 1;
             if agreed_head.get_or_insert_with(|| candidate.clone()) != &candidate {
                 return (
                     AcquireOutcome::Retry(RetryReason::HeadDisagreement),
@@ -196,6 +197,17 @@ pub(super) fn evaluate_responses(
             warrants_for_agent,
         );
     };
+
+    // The number of non-empty responses must meet the quorum.
+    if non_empty_count < quorum as usize {
+        return (
+            AcquireOutcome::Retry(RetryReason::TooFewResponses {
+                got: non_empty_count,
+                need: quorum,
+            }),
+            warrants_for_agent,
+        );
+    }
 
     // Gather all full records from every response, we only enforce that the record's author field
     // matches `agent`. Filtering on signatures should be applied by the caller.
@@ -430,6 +442,25 @@ mod tests {
                 head_hash,
                 ..
             } if head_hash == hash
+        ));
+        assert!(warrants.is_empty());
+    }
+
+    #[test]
+    fn empty_responses_padding_out_quorum_does_not_count_towards_agreement() {
+        let agent = ::fixt::fixt!(AgentPubKey);
+        let hash = ::fixt::fixt!(ActionHash);
+        // Enough total responses to satisfy quorum by count, but only one of them actually
+        // reports a head, the rest are empty.
+        let responses = vec![
+            make_response(&agent, valid_head(10, hash)),
+            make_response(&agent, ChainStatus::Empty),
+            make_response(&agent, ChainStatus::Empty),
+        ];
+        let (outcome, warrants) = evaluate_responses(&agent, responses, 3);
+        assert!(matches!(
+            outcome,
+            AcquireOutcome::Retry(RetryReason::TooFewResponses { got: 1, need: 3 })
         ));
         assert!(warrants.is_empty());
     }
