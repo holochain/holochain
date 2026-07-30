@@ -1270,6 +1270,13 @@ mod app_impls {
             }
 
             if flags.restore_from_dht {
+                if !init_properties.is_empty() {
+                    return Err(ConductorError::AppStatusError(
+                            "init_properties cannot be set when called with restore_from_dht as this skips genesis so init_properties would be ignored"
+                            .to_string(),
+                    ));
+                }
+
                 let roles = ops.role_assignments;
                 let app = InstalledAppCommon::new(
                     installed_app_id.clone(),
