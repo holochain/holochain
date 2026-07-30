@@ -139,6 +139,13 @@ pub struct Conductor {
     /// The collection of available, running cells associated with this Conductor
     running_cells: RwShare<IndexMap<CellId, Arc<Cell>>>,
 
+    /// Cells currently undergoing source-chain restore.
+    ///
+    /// These need to be able to query peers and trigger sys/app validation to resolve warrants
+    /// found during the restore, but cannot be part of `running_cells` since the app is not yet
+    /// enabled.
+    restoring_cells: RwShare<HashSet<CellId>>,
+
     /// The config used to create this Conductor
     pub config: Arc<ConductorConfig>,
 
@@ -276,6 +283,7 @@ mod startup_shutdown_impls {
             Self {
                 spaces,
                 running_cells: RwShare::new(IndexMap::new()),
+                restoring_cells: RwShare::new(HashSet::new()),
                 config,
                 shutting_down: Arc::new(AtomicBool::new(false)),
                 task_manager: TaskManagerClient::new(outcome_sender, tracing_scope),
@@ -1892,6 +1900,12 @@ mod cell_impls {
         pub fn running_cell_ids(&self) -> HashSet<CellId> {
             self.running_cells
                 .share_ref(|cells| cells.keys().cloned().collect())
+        }
+
+        /// Cell IDs currently undergoing source-chain restore.
+        /// See [`Self::restoring_cells`] for why this exists alongside `running_cell_ids`.
+        pub(crate) fn restoring_cell_ids(&self) -> HashSet<CellId> {
+            self.restoring_cells.share_ref(|cells| cells.clone())
         }
 
         /// Returns all installed cells which are forward compatible with the specified DNA,
