@@ -111,11 +111,13 @@ pub(super) async fn acquire_responses(
     Ok((outcome, warrants))
 }
 
-/// Evaluates a set of [`AgentActivityResponse`]s and produces an [`AcquireOutcome`] by checking
-/// quorum, requiring unanimous chain-head agreement, and collecting the full records. Warrants
-/// naming `agent` are also collected and returned alongside the outcome regardless of whether a
-/// chain head was agreed upon or not as a validated warrant is grounds for permanent failure no
-/// matter the outcome of the chain-head agreement. No signature filtering is applied on the
+/// Evaluates a set of [`AgentActivityResponse`]s and produces an [`AcquireOutcome`] by requiring
+/// unanimous chain-head agreement.
+///
+/// The unanimous agreement needs to be made by at least the number of peers set by `quorum`. The
+/// full records are also collected for the agreed chain head along with any warrants for this
+/// `agent`. The warrants must be validated locally but any confirmed warrant is grounds for
+/// permanent failure even if a chain head was agreed upon. No signature filtering is applied on the
 /// returned records so this should be done by the caller.
 pub(super) fn evaluate_responses(
     agent: &AgentPubKey,
