@@ -31,9 +31,7 @@ holochain_util = { version = "^0.7.0", path = "../holochain_util", features = [
 ] }
 holochain_serialized_bytes = "=0.0.57"
 holochain_types = { version = "^0.7.0", path = "../holochain_types" }
-mr_bundle = { version = "^0.7.0", path = "../mr_bundle", features = [
-  "fs",
-] }
+mr_bundle = { version = "^0.7.0", path = "../mr_bundle", features = ["fs"] }
 yaml_serde = "0.10"
 thiserror = "2.0"
 tokio = { version = "1.27", features = ["full"] }
