@@ -1,6 +1,5 @@
 ---
-semver_increment_mode: minor
-default_semver_increment_mode: !pre_patch rc
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
