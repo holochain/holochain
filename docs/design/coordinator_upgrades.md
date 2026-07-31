@@ -265,10 +265,10 @@ grant to the coordinator it was created under**, with the coordinator hash
 - A capability check honours a grant only if the grant's coordinator hash matches
   the coordinator currently installed under that name. Grants pointing at
   non-extant coordinators are inert (present but never satisfied).
-- Grants committed **before this design** carry no recorded coordinator hash.
-  They keep working via legacy matching on `(zome_name, function_name[])` alone;
-  the hash check applies only to grants stamped under this design. A coordinator
-  that wants a legacy grant bound to its hash re-creates it, as above.
+
+This is a **breaking change** to the `CapGrant` record: the coordinator hash is a
+required field with no backfill or legacy-matching path. It is safe to make it
+breaking because there will be no existing cap grants when this lands.
 
 ### Remote calls and claims
 
