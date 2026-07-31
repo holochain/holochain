@@ -200,16 +200,20 @@ dangling.
 
 ### Reconciliation algorithm
 
-`update_app` **validates the whole update before changing anything**, so it never
-leaves an app half-updated. It runs in two phases.
+`update_app` **validates the whole update before changing anything**. It runs in
+two phases: phase 1 changes nothing, so it cannot leave the app partly updated,
+and phase 2 is applied atomically, so a failure mid-apply rolls back to the
+pre-upgrade state.
 
 **Phase 1 — validate every role, apply nothing.** For each role in the bundle,
 compute the plan without touching the installation:
 
-- **Integrity.** Compare the role's integrity version against the installed one.
-  If it differs, the role needs a migration; until chain continuation ships this
-  makes the whole update fail with `MigrationNotSupported` naming the role.
-  `update_app` never silently ignores an integrity change.
+- **DNA identity.** Compare the role's effective DNA identity — the `DnaHash`,
+  which is integrity code together with the network seed and properties — against
+  the installed one. Any difference (changed integrity, seed, or properties) means
+  the role needs a *migration*; until chain continuation ships this makes the whole
+  update fail with `MigrationNotSupported` naming the role. `update_app` never
+  silently applies a coordinator update to a role whose DNA identity moved.
 - **Coordinators.** Diff the installed coordinator set against the bundle's set
   for this role, by coordinator name, into replace/install/remove actions.
 
@@ -225,9 +229,17 @@ installation is untouched — no partial update.
 2. **Capabilities.** Coordinator changes are followed by the capability
    reconciliation described in [Coordinators and
    capabilities](#coordinators-and-capabilities).
-3. **New / removed roles.** A **new role** registers its DNA and instantiates its
-   cell, as at install; a role present only in the installed app is removed under
-   the same strict-state policy.
+3. **New / removed roles.** A **new role** is provisioned per its manifest
+   strategy, exactly as at install: an immediate role registers its DNA and
+   instantiates its cell, while a `provisioning.deferred` role registers its DNA
+   but is not instantiated until deferred provisioning. A role present only in the
+   installed app is removed under the same strict-state policy.
+
+Phase 2 is applied as one unit. The coordinator, capability, and DNA-registry
+writes commit in a single transaction; the one step with external side effects —
+instantiating a new role's cell — is ordered last and, if any part of the apply
+fails, the freshly registered cell is torn down so the installation is left on
+its pre-upgrade state.
 
 The upgrade hook of an installed/replaced coordinator is not run inline here; it
 is invoked lazily (see [The upgrade hook](#the-upgrade-hook)).
@@ -253,13 +265,19 @@ grant to the coordinator it was created under**, with the coordinator hash
 - A capability check honours a grant only if the grant's coordinator hash matches
   the coordinator currently installed under that name. Grants pointing at
   non-extant coordinators are inert (present but never satisfied).
+- Grants committed **before this design** carry no recorded coordinator hash.
+  They keep working via legacy matching on `(zome_name, function_name[])` alone;
+  the hash check applies only to grants stamped under this design. A coordinator
+  that wants a legacy grant bound to its hash re-creates it, as above.
 
 ### Remote calls and claims
 
-- **Remote calls** may optionally specify the coordinator hash to target, for
-  callers that need to pin a specific coordinator version; by default a call
-  routes to the current coordinator under the named zome. This addresses the
-  "zome calls routed to the wrong hApp/coordinator" class of bug
+- **Remote calls** route to the coordinator **currently** installed under the
+  named zome; a cell runs one coordinator set, so there is no older version to
+  target. A caller may pass the expected coordinator hash as a **guard** — the
+  call proceeds only if it matches the installed hash and is rejected otherwise,
+  rather than silently running a different coordinator. This addresses the "zome
+  calls routed to the wrong hApp/coordinator" class of bug
   ([holochain/holochain#2145](https://github.com/holochain/holochain/issues/2145)).
 - **Cap claims** are held by the caller and are matched against the grantor's
   current coordinator, not pinned by the claim holder to a grantor hash they
@@ -303,9 +321,9 @@ The target workflow — an app release that changes both — is one `update_app`
 
 1. The developer builds a new app bundle whose role carries a new coordinator set
    and (optionally) a new integrity version.
-2. `update_app` reconciles each role: an integrity change is delegated to the
-   migration path, and the coordinator set is strict-state reconciled
-   (replace/install/remove).
+2. `update_app` reconciles each role: a DNA-identity change (integrity, seed, or
+   properties) is delegated to the migration path, and the coordinator set is
+   strict-state reconciled (replace/install/remove).
 3. On the next zome call, the new coordinators' `init_upgrade` hook runs lazily
    and re-creates the grants they carry forward.
 
