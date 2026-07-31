@@ -216,6 +216,11 @@ compute the plan without touching the installation:
   silently applies a coordinator update to a role whose DNA identity moved.
 - **Coordinators.** Diff the installed coordinator set against the bundle's set
   for this role, by coordinator name, into replace/install/remove actions.
+- **Role fields.** Diff the bundle's role-level fields (e.g. `clone_limit`,
+  provisioning) against the installed role. Strict state covers these too: a
+  field that can change in place is planned for application, and a change to a
+  field that cannot be reconciled in place fails the role rather than silently
+  leaving the installation off the desired state.
 
 If *any* role fails validation, `update_app` returns an error and the
 installation is untouched — no partial update.
@@ -229,7 +234,9 @@ installation is untouched — no partial update.
 2. **Capabilities.** Coordinator changes are followed by the capability
    reconciliation described in [Coordinators and
    capabilities](#coordinators-and-capabilities).
-3. **New / removed roles.** A **new role** is provisioned per its manifest
+3. **Role fields.** Apply the reconciled role-level fields (e.g. `clone_limit`)
+   so the installed role matches the bundle.
+4. **New / removed roles.** A **new role** is provisioned per its manifest
    strategy, exactly as at install: an immediate role registers its DNA and
    instantiates its cell, while a `provisioning.deferred` role registers its DNA
    but is not instantiated until deferred provisioning. A role present only in the
