@@ -1,12 +1,13 @@
 //! Part of the restore workflow. Walks the records collected in [`super::agent_activity`] backward
 //! from the agreed chain head to the genesis, verifying that each record's action hash matches its
-//! content and that the resulting chain is a contiguous, gap-free sequence from the agreed head
-//! back to sequence number 0, which is in a genesis `Dna` action.
+//! content, that any attached entry matches its action's declared entry hash, and that the
+//! resulting chain is a contiguous, gap-free sequence from the agreed head back to sequence number
+//! 0, which is in a genesis `Dna` action.
 
 use std::collections::HashMap;
 
-use holo_hash::ActionHash;
-use holochain_zome_types::prelude::{ActionType, Record};
+use holo_hash::{ActionHash, EntryHash};
+use holochain_zome_types::prelude::{ActionType, Record, RecordEntry};
 
 /// The result of walking the collected records backward from the agreed chain head.
 #[derive(Debug)]
@@ -23,12 +24,13 @@ pub(super) enum ReconstructionOutcome {
 /// Walks records backward from the head's hash, following each action's prev_action link all the
 /// way back to genesis' Dna action.
 ///
-/// Records whose declared hash does not match a hash recomputed from their content are discarded
-/// before the walk begins, so a tampered `prev_action` label cannot be trusted. Records that are
-/// not reachable from the head's hash, such as an abandoned fork branch, are excluded from the
-/// result even though they were present in records. The walk requires strictly contiguous sequence
-/// numbers from `head_seq` back to 0 and a genesis `Dna` action at the end, so a peer that agreed
-/// on a bogus head cannot pass off a shorter, unrelated chain as the agreed one.
+/// Any records found to be invalid are discarded before walking back. This could be records whose
+/// hash does not match a hash of their content or the attached entry does not match the action's
+/// entry hash. Records that are not reachable from the head's hash, such as an abandoned fork
+/// branch, are also excluded from the result even though they were present in records. The walk
+/// requires strictly contiguous sequence numbers from `head_seq` back to 0 and a genesis `Dna`
+/// action at the end, so a peer that agreed on a bogus head cannot pass off a shorter, unrelated
+/// chain as the agreed one.
 pub(super) fn reconstruct_chain(
     records: Vec<Record>,
     head_seq: u32,
@@ -39,6 +41,7 @@ pub(super) fn reconstruct_chain(
     let mut by_hash: HashMap<ActionHash, Record> = records
         .into_iter()
         .filter(|record| record.action_hashed().verify_hash_sync().is_ok())
+        .filter(entry_matches_declared_hash)
         .map(|record| (record.action_address().clone(), record))
         .collect();
 
@@ -71,6 +74,18 @@ pub(super) fn reconstruct_chain(
 
     chain.reverse();
     ReconstructionOutcome::Complete(chain)
+}
+
+/// Does the record's action hash match the content, or is there no hash as the record is private.
+fn entry_matches_declared_hash(record: &Record) -> bool {
+    let Some(declared_hash) = record.action().entry_hash() else {
+        return true;
+    };
+    match record.entry() {
+        RecordEntry::Present(entry) => EntryHash::with_data_sync(entry) == *declared_hash,
+        RecordEntry::Hidden => true,
+        RecordEntry::NA | RecordEntry::NotStored => false,
+    }
 }
 
 #[cfg(test)]
@@ -209,6 +224,46 @@ mod tests {
         let head_hash = record.action_address().clone();
 
         let outcome = reconstruct_chain(vec![record], 0, &head_hash);
+        assert!(matches!(outcome, ReconstructionOutcome::Incomplete));
+    }
+
+    #[test]
+    fn mismatched_entry_hash_is_excluded() {
+        let agent = fixt!(AgentPubKey);
+        let dna = make_record(dna_action(&agent));
+        let real_entry = Entry::App(AppEntryBytes(
+            holochain_serialized_bytes::SerializedBytes::from(
+                holochain_serialized_bytes::UnsafeBytes::from(vec![1; 8]),
+            ),
+        ));
+        let declared_hash = EntryHash::with_data_sync(&real_entry);
+        let create_action = Action {
+            header: ActionHeader {
+                author: agent.clone(),
+                timestamp: Timestamp::from_micros(1000),
+                action_seq: 1,
+                prev_action: Some(dna.action_address().clone()),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: declared_hash,
+            }),
+        };
+        let action_hashed = ActionHashed::from_content_sync(create_action);
+        let signed = SignedActionHashed::with_presigned(action_hashed, fixt!(Signature));
+        let tampered_entry = Entry::App(AppEntryBytes(
+            holochain_serialized_bytes::SerializedBytes::from(
+                holochain_serialized_bytes::UnsafeBytes::from(vec![2; 8]),
+            ),
+        ));
+        let create = Record::new(signed, RecordEntry::Present(tampered_entry));
+        let head_hash = create.action_address().clone();
+
+        let outcome = reconstruct_chain(vec![dna, create], 1, &head_hash);
         assert!(matches!(outcome, ReconstructionOutcome::Incomplete));
     }
 }
