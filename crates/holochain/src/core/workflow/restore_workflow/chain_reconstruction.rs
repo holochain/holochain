@@ -1,11 +1,12 @@
 //! Part of the restore workflow. Walks the records collected in [`super::agent_activity`] backward
 //! from the agreed chain head to the genesis, verifying that each record's action hash matches its
-//! content before trusting its `prev_action` link.
+//! content and that the resulting chain is a contiguous, gap-free sequence from the agreed head
+//! back to sequence number 0, which is in a genesis `Dna` action.
 
 use std::collections::HashMap;
 
 use holo_hash::ActionHash;
-use holochain_zome_types::prelude::Record;
+use holochain_zome_types::prelude::{ActionType, Record};
 
 /// The result of walking the collected records backward from the agreed chain head.
 #[derive(Debug)]
@@ -13,8 +14,9 @@ pub(super) enum ReconstructionOutcome {
     /// Every action from the agreed head back to the genesis was resolved.
     /// Holds the chain ordered from genesis to head, ready to be written to the per-DNA database.
     Complete(Vec<Record>),
-    /// The walk could not resolve a `prev_action` link before reaching genesis, meaning the
-    /// collected records do not cover the full chain. A fresh acquisition attempt is needed.
+    /// The collected records do not cover the full chain, this could be due to a `prev_action` link
+    /// not being able to be resolved, the sequence numbers not being contiguous down to 0, or that
+    /// the terminal action was not a genesis `Dna` action. A fresh acquisition attempt is needed.
     Incomplete,
 }
 
@@ -24,25 +26,46 @@ pub(super) enum ReconstructionOutcome {
 /// Records whose declared hash does not match a hash recomputed from their content are discarded
 /// before the walk begins, so a tampered `prev_action` label cannot be trusted. Records that are
 /// not reachable from the head's hash, such as an abandoned fork branch, are excluded from the
-/// result even though they were present in records.
+/// result even though they were present in records. The walk requires strictly contiguous sequence
+/// numbers from `head_seq` back to 0 and a genesis `Dna` action at the end, so a peer that agreed
+/// on a bogus head cannot pass off a shorter, unrelated chain as the agreed one.
 pub(super) fn reconstruct_chain(
     records: Vec<Record>,
+    head_seq: u32,
     head_hash: &ActionHash,
 ) -> ReconstructionOutcome {
+    let mut chain = Vec::with_capacity(records.len());
+
     let mut by_hash: HashMap<ActionHash, Record> = records
         .into_iter()
         .filter(|record| record.action_hashed().verify_hash_sync().is_ok())
         .map(|record| (record.action_address().clone(), record))
         .collect();
 
-    let mut chain = Vec::new();
-    let mut next_hash = Some(head_hash.clone());
+    let mut hash = head_hash.clone();
 
-    while let Some(hash) = next_hash {
+    for expected_seq in (0..=head_seq).rev() {
         let Some(record) = by_hash.remove(&hash) else {
             return ReconstructionOutcome::Incomplete;
         };
-        next_hash = record.action().prev_action().cloned();
+        if record.action().action_seq() != expected_seq {
+            return ReconstructionOutcome::Incomplete;
+        }
+
+        if expected_seq == 0 {
+            // The genesis action must be a Dna action with no dangling prev_action.
+            if record.action().action_type() != ActionType::Dna
+                || record.action().prev_action().is_some()
+            {
+                return ReconstructionOutcome::Incomplete;
+            }
+        } else {
+            let Some(prev) = record.action().prev_action() else {
+                return ReconstructionOutcome::Incomplete;
+            };
+            hash = prev.clone();
+        }
+
         chain.push(record);
     }
 
@@ -112,7 +135,7 @@ mod tests {
         let records = build_chain(&agent, 4);
         let head_hash = records.last().unwrap().action_address().clone();
 
-        let outcome = reconstruct_chain(records, &head_hash);
+        let outcome = reconstruct_chain(records, 3, &head_hash);
         let ReconstructionOutcome::Complete(chain) = outcome else {
             panic!("expected Complete");
         };
@@ -131,7 +154,7 @@ mod tests {
         // Remove the record at seq 1, breaking the link between seq 2 and the genesis Dna action.
         records.remove(1);
 
-        let outcome = reconstruct_chain(records, &head_hash);
+        let outcome = reconstruct_chain(records, 3, &head_hash);
         assert!(matches!(outcome, ReconstructionOutcome::Incomplete));
     }
 
@@ -146,7 +169,7 @@ mod tests {
         let fork_record = make_record(linked_action(&agent, 2, fork_prev));
         records.push(fork_record);
 
-        let outcome = reconstruct_chain(records, &head_hash);
+        let outcome = reconstruct_chain(records, 2, &head_hash);
         let ReconstructionOutcome::Complete(chain) = outcome else {
             panic!("expected Complete");
         };
@@ -162,7 +185,30 @@ mod tests {
         // becomes unreachable under its true hash, which seq 2's `prev_action` still points to.
         records[1].signed_action.hashed.hash = fixt!(ActionHash);
 
-        let outcome = reconstruct_chain(records, &head_hash);
+        let outcome = reconstruct_chain(records, 3, &head_hash);
+        assert!(matches!(outcome, ReconstructionOutcome::Incomplete));
+    }
+
+    #[test]
+    fn mismatched_head_seq_returns_incomplete() {
+        let agent = fixt!(AgentPubKey);
+        let records = build_chain(&agent, 4);
+        let head_hash = records.last().unwrap().action_address().clone();
+
+        let outcome = reconstruct_chain(records, 2, &head_hash);
+        assert!(matches!(outcome, ReconstructionOutcome::Incomplete));
+    }
+
+    #[test]
+    fn non_dna_genesis_returns_incomplete() {
+        let agent = fixt!(AgentPubKey);
+        let bogus_genesis = linked_action(&agent, 0, fixt!(ActionHash));
+        let mut action = bogus_genesis;
+        action.header.prev_action = None;
+        let record = make_record(action);
+        let head_hash = record.action_address().clone();
+
+        let outcome = reconstruct_chain(vec![record], 0, &head_hash);
         assert!(matches!(outcome, ReconstructionOutcome::Incomplete));
     }
 }

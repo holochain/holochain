@@ -88,7 +88,7 @@ pub(crate) async fn restore_workflow(
             } => {
                 tracing::debug!(head_seq, ?head_hash, ?cell_id, "Restore: chain head agreed");
                 if let ReconstructionOutcome::Complete(chain) =
-                    chain_reconstruction::reconstruct_chain(records, &head_hash)
+                    chain_reconstruction::reconstruct_chain(records, head_seq, &head_hash)
                 {
                     dht_store
                         .write_restored_chain(cell_id.agent_pubkey(), chain)
