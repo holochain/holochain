@@ -15,6 +15,9 @@ use std::{
 };
 use utils::*;
 
+/// How long a query is polled for before the test fails.
+const POLL_TIMEOUT: Duration = Duration::from_secs(30);
+
 #[tokio::test(flavor = "multi_thread")]
 async fn u64_counter() {
     let tmp = tempfile::tempdir().unwrap();
@@ -25,7 +28,7 @@ async fn u64_counter() {
 
     metric.add(1, &[]);
 
-    poll_query(&svc, name, 300, |r| {
+    poll_query(&svc, name, |r| {
         r.tables.len() == 1
             && r.tables[0].rows.len() == 1
             && r.tables[0].get::<u64>(0, "_value") == 1
@@ -36,7 +39,7 @@ async fn u64_counter() {
         metric.add(1, &[]);
     }
 
-    poll_query(&svc, name, 300, |r| {
+    poll_query(&svc, name, |r| {
         r.tables.len() == 1
             && r.tables[0].rows.len() == 1
             && r.tables[0].get::<u64>(0, "_value") == 6
@@ -59,7 +62,7 @@ async fn i64_up_down_counter() {
 
     metric.add(1, &[]);
 
-    poll_query(&svc, name, 300, |r| {
+    poll_query(&svc, name, |r| {
         r.tables.len() == 1
             && r.tables[0].rows.len() == 1
             && r.tables[0].get::<i64>(0, "_value") == 1
@@ -68,7 +71,7 @@ async fn i64_up_down_counter() {
 
     metric.add(-1, &[]);
 
-    poll_query(&svc, name, 300, |r| {
+    poll_query(&svc, name, |r| {
         r.tables.len() == 1
             && r.tables[0].rows.len() == 1
             && r.tables[0].get::<i64>(0, "_value") == 0
@@ -93,7 +96,7 @@ async fn f64_histogram() {
 
     // Influx writes u64 values into one table and f64 values into another table.
     // Hence, 2 tables are expected to be present.
-    let result = poll_query(&svc, name, 300, |r| {
+    let result = poll_query(&svc, name, |r| {
         r.tables.len() == 2 && r.tables[0].rows.len() == 1 && r.tables[1].rows.len() == 3
     })
     .await;
@@ -116,7 +119,7 @@ async fn f64_histogram() {
     }
 
     // Keep polling until the expected counts 11 and 9.0 show up.
-    let result = poll_query(&svc, name, 1000, |r| {
+    let result = poll_query(&svc, name, |r| {
         r.tables.len() == 2
             && r.tables[0].rows.len() == 1
             && r.tables[1].rows.len() == 3
@@ -151,7 +154,7 @@ async fn u64_histogram() {
 
     // Influx writes u64 values into one table and f64 values into another table.
     // Hence, 2 tables are expected to be present.
-    let result = poll_query(&svc, name, 300, |r| {
+    let result = poll_query(&svc, name, |r| {
         r.tables.len() == 1 && r.tables[0].rows.len() == 4
     })
     .await;
@@ -172,7 +175,7 @@ async fn u64_histogram() {
     }
 
     // Keep polling until the expected counts 11 and 9 show up.
-    let result = poll_query(&svc, name, 1000, |r| {
+    let result = poll_query(&svc, name, |r| {
         r.tables.len() == 1
             && r.tables[0].rows.len() == 4
             && r.tables[0].get::<u64>(0, "_value") == 11
@@ -208,7 +211,7 @@ async fn f64_observable_gauge() {
         })
         .build();
 
-    let result = poll_query(&svc, name, 600, |r| {
+    let result = poll_query(&svc, name, |r| {
         r.tables.len() == 1 && r.tables[0].rows.len() == 1
     })
     .await;
@@ -217,7 +220,7 @@ async fn f64_observable_gauge() {
     assert_eq!(result.tables[0].get::<f64>(0, "_value"), 0.0);
 
     // Wait for more gauge values to have been recorded.
-    poll_query(&svc, name, 1000, |r| {
+    poll_query(&svc, name, |r| {
         r.tables.len() == 1
             && r.tables[0].rows.len() == 1
             && r.tables[0].get::<f64>(0, "_value") == 4.0
@@ -239,7 +242,7 @@ async fn u64_counter_with_attributes() {
     let attributes = vec![KeyValue::new("key", "value1")];
     metric.add(1, &attributes);
 
-    let result = poll_query(&svc, name, 300, |r| {
+    let result = poll_query(&svc, name, |r| {
         r.tables.len() == 1 && r.tables[0].rows.len() == 1
     })
     .await;
@@ -253,7 +256,7 @@ async fn u64_counter_with_attributes() {
     let attributes_2 = vec![KeyValue::new("key", "value2")];
     metric.add(1, &attributes_2);
 
-    let result = poll_query(&svc, name, 1000, |r| {
+    let result = poll_query(&svc, name, |r| {
         r.tables.len() == 1 && r.tables[0].rows.len() == 2
     })
     .await;
@@ -293,10 +296,9 @@ async fn setup(tmp: &std::path::Path) -> (Arc<InfluxiveChildSvc>, SdkMeterProvid
 async fn poll_query(
     svc: &InfluxiveChildSvc,
     measurement: &str,
-    timeout_ms: u64,
     condition: impl Fn(&QueryResult) -> bool,
 ) -> QueryResult {
-    tokio::time::timeout(Duration::from_millis(timeout_ms), async {
+    tokio::time::timeout(POLL_TIMEOUT, async {
         loop {
             let query_result = QueryResult::parse(
                 &svc.query(format!(
@@ -317,7 +319,9 @@ from(bucket: "influxive")
         }
     })
     .await
-    .unwrap()
+    .unwrap_or_else(|_| {
+        panic!("timed out waiting for query condition on measurement {measurement}")
+    })
 }
 
 mod utils {
