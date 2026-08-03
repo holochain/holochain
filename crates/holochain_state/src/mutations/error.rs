@@ -24,6 +24,9 @@ pub enum StateMutationError {
     #[error("Cannot remove a fully published countersigning session")]
     CannotRemoveFullyPublished,
 
+    #[error("A record's entry hash does not match the one declared for it in its action")]
+    MismatchedEntryHash,
+
     #[error("{0}")]
     Other(String),
 }

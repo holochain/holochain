@@ -3,14 +3,14 @@
 
 use std::collections::HashSet;
 
-use holo_hash::{AgentPubKey, HasHash};
+use holo_hash::{AgentPubKey, EntryHash, HasHash};
 use holochain_data::dht::InsertChainOp;
 use holochain_data::kind::Dht;
 use holochain_data::DbWrite;
 use holochain_types::op::{produce_ops_from_record, HashedChainOp};
 use holochain_zome_types::prelude::{EntryHashed, EntryVisibility, Record, RecordValidity};
 
-use crate::mutations::StateMutationResult;
+use crate::mutations::{StateMutationError, StateMutationResult};
 use crate::source_chain::{cap_grant_index_params, encoded_chain_op_size};
 
 use super::DhtStore;
@@ -22,6 +22,9 @@ impl DhtStore<DbWrite<Dht>> {
     /// `prev_action` link already verified. Every action is inserted as
     /// [`RecordValidity::Accepted`], bypassing validation limbo, and a `ChainOpPublish` row is
     /// inserted for every op, marking it ready for publish.
+    ///
+    /// Any entry whose hash does not match the one declared in its action is rejected with
+    /// [`StateMutationError::MismatchedEntryHash`].
     pub async fn write_restored_chain(
         &self,
         author: &AgentPubKey,
@@ -35,6 +38,9 @@ impl DhtStore<DbWrite<Dht>> {
             let (signed_action, record_entry) = record.into_inner();
             if let Some(entry) = record_entry.into_option() {
                 if let Some(entry_hash) = signed_action.action().entry_hash() {
+                    if EntryHash::with_data_sync(&entry) != *entry_hash {
+                        return Err(StateMutationError::MismatchedEntryHash);
+                    }
                     entries.push(EntryHashed::with_pre_hashed(entry, entry_hash.clone()));
                 }
             }
@@ -266,6 +272,40 @@ mod tests {
             publish_row.is_some(),
             "a ChainOpPublish row should exist for the restored op"
         );
+    }
+
+    #[tokio::test]
+    async fn mismatched_entry_hash_is_rejected() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let author = fixt!(AgentPubKey);
+
+        let dna = dna_record(&author);
+        let declared_hash = EntryHash::with_data_sync(&app_entry(1));
+        let create_action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(1000),
+                action_seq: 1,
+                prev_action: Some(dna.action_address().clone()),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: declared_hash,
+            }),
+        };
+        let action_hashed = holo_hash::HoloHashed::from_content_sync(create_action);
+        let signed = SignedActionHashed::with_presigned(action_hashed, fixt!(Signature));
+        let create = Record::new(signed, RecordEntry::Present(app_entry(2)));
+
+        let result = store.write_restored_chain(&author, vec![dna, create]).await;
+        assert!(matches!(
+            result,
+            Err(StateMutationError::MismatchedEntryHash)
+        ));
     }
 
     #[tokio::test]
