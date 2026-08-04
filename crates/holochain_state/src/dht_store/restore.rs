@@ -1,8 +1,6 @@
 //! Writes a pre-verified chain of [`Record`]s directly into the store as authored state, bypassing
 //! validation limbo.
 
-use std::collections::HashSet;
-
 use holo_hash::{AgentPubKey, EntryHash, HasHash};
 use holochain_data::dht::InsertChainOp;
 use holochain_data::kind::Dht;
@@ -39,43 +37,34 @@ impl DhtStore<DbWrite<Dht>> {
                 return Err(StateMutationError::AuthorsMustMatch);
             }
             if let Some(entry) = record_entry.into_option() {
-                if let Some(entry_hash) = signed_action.action().entry_hash() {
+                let action = signed_action.action();
+                if let Some(entry_hash) = action.entry_hash() {
                     if EntryHash::with_data_sync(&entry) != *entry_hash {
                         return Err(StateMutationError::MismatchedEntryHash);
                     }
-                    entries.push(EntryHashed::with_pre_hashed(entry, entry_hash.clone()));
+                    let visibility = action.entry_visibility().copied().unwrap_or_default();
+                    entries.push((
+                        EntryHashed::with_pre_hashed(entry, entry_hash.clone()),
+                        visibility,
+                    ));
                 }
             }
             actions.push(signed_action);
         }
 
-        // Entries whose authoring action declares them private go to `PrivateEntry`; every other
-        // entry goes to the public `Entry` table.
-        let private_entry_hashes: HashSet<_> = actions
-            .iter()
-            .filter_map(|sah| {
-                let action = sah.action();
-                let visibility = action.entry_visibility()?;
-                if *visibility == EntryVisibility::Private {
-                    action.entry_hash().cloned()
-                } else {
-                    None
-                }
-            })
-            .collect();
-
         let mut tx = self.db().begin().await?;
-
-        for entry_hashed in &entries {
+        for (entry_hashed, visibility) in &entries {
             let entry_hash = entry_hashed.as_hash();
             let entry = entry_hashed.as_content();
-            if private_entry_hashes.contains(entry_hash) {
+            if visibility == &EntryVisibility::Private {
                 tx.insert_private_entry(entry_hash, author, entry).await?;
             } else {
                 tx.insert_entry(entry_hash, entry).await?;
             }
         }
 
+        // Visibility no longer required so strip it
+        let entries: Vec<_> = entries.into_iter().map(|(entry, _)| entry).collect();
         for sah in &actions {
             tx.insert_action(sah, Some(RecordValidity::Accepted))
                 .await?;
@@ -330,6 +319,69 @@ mod tests {
 
         let result = store.write_restored_chain(&author, vec![dna, create]).await;
         assert!(matches!(result, Err(StateMutationError::AuthorsMustMatch)));
+    }
+
+    #[tokio::test]
+    async fn identical_entry_content_with_different_visibility_is_written_to_both_tables() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let author = fixt!(AgentPubKey);
+
+        let dna = dna_record(&author);
+        let entry = app_entry(3);
+        let entry_hash = EntryHash::with_data_sync(&entry);
+
+        let public_create = create_record(
+            &author,
+            dna.action_address().clone(),
+            EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry.clone(),
+        );
+        let private_create = make_record(
+            Action {
+                header: ActionHeader {
+                    author: author.clone(),
+                    timestamp: Timestamp::from_micros(2000),
+                    action_seq: 2,
+                    prev_action: Some(public_create.action_address().clone()),
+                },
+                data: ActionData::Create(CreateData {
+                    entry_type: EntryType::App(AppEntryDef::new(
+                        0.into(),
+                        0.into(),
+                        EntryVisibility::Private,
+                    )),
+                    entry_hash: entry_hash.clone(),
+                }),
+            },
+            Some(entry),
+        );
+
+        store
+            .write_restored_chain(&author, vec![dna, public_create, private_create])
+            .await
+            .unwrap();
+
+        // The public copy is visible without an author.
+        assert!(store
+            .db()
+            .as_ref()
+            .get_entry(entry_hash.clone(), None)
+            .await
+            .unwrap()
+            .is_some());
+
+        // The private copy is visible when read back as the owning author.
+        assert!(store
+            .db()
+            .as_ref()
+            .get_entry(entry_hash, Some(&author))
+            .await
+            .unwrap()
+            .is_some());
     }
 
     #[tokio::test]
