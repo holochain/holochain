@@ -5,6 +5,8 @@ use holochain::conductor::api::error::ConductorApiError;
 use holochain::conductor::error::ConductorError;
 use holochain::sweettest::*;
 use holochain_conductor_api::CellInfo;
+use holochain_keystore::{AgentPubKeyExt, WarrantOpExt};
+use holochain_state::dht_store::DhtStore;
 use holochain_types::app::{AppStatus, DisabledAppReason};
 use holochain_types::prelude::*;
 use holochain_types::signal::SystemSignal;
@@ -230,4 +232,160 @@ async fn restore_from_dht_end_to_end() {
         .call(&restore_cell.zome(TestWasm::Create), "get_post", new_hash)
         .await;
     assert_eq!(new_record.unwrap().action().action_seq(), last_seq_on_a + 1);
+}
+
+async fn build_fork_pair(
+    keystore: &holochain_keystore::MetaLairClient,
+    agent: &AgentPubKey,
+    dna_hash: &DnaHash,
+) -> (SignedActionHashed, SignedActionHashed) {
+    async fn make(
+        keystore: &holochain_keystore::MetaLairClient,
+        agent: &AgentPubKey,
+        dna_hash: &DnaHash,
+        micros: i64,
+    ) -> SignedActionHashed {
+        let action = Action {
+            header: ActionHeader {
+                author: agent.clone(),
+                timestamp: Timestamp::from_micros(micros),
+                action_seq: 0,
+                prev_action: None,
+            },
+            data: ActionData::Dna(DnaData {
+                dna_hash: dna_hash.clone(),
+            }),
+        };
+        let signature = agent.sign(keystore, action.clone()).await.unwrap();
+        SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature)
+    }
+    (
+        make(keystore, agent, dna_hash, 0).await,
+        make(keystore, agent, dna_hash, 1).await,
+    )
+}
+
+async fn insert_fetchable_action(store: &DhtStore, signed: &SignedActionHashed) {
+    let signed_action = SignedAction::new(signed.hashed.content.clone(), signed.signature.clone());
+    let chain_op = ChainOp::CreateRecord(signed_action, OpEntry::ActionOnly);
+    let op = DhtOpHashed::from_content_sync(DhtOp::from(chain_op));
+    store
+        .test_insert_authored_chain_op(op, None, None, None)
+        .await
+        .unwrap();
+}
+
+/// Fabricates a fork of an agent's chain with a matching warrant for that fork. Then attempts to
+/// restore the forked agent's chain on a new conductor, checking that local validation confirms the
+/// warrant and correctly marks the app as unrecoverable with a restore failed signal.
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_from_dht_chain_fork_warrant_transitions_to_unrecoverable() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+    let mut conductor_c = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let app_c = conductor_c
+        .setup_app("app", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_c = app_c.into_cells().remove(0);
+    conductor_c
+        .declare_full_storage_arcs(cell_c.dna_hash())
+        .await;
+
+    let mut config_d = SweetConductorConfig::rendezvous(true);
+    config_d.restore_chain_quorum = 1;
+    let conductor_d = SweetConductor::from_config_rendezvous(config_d, rendezvous.clone()).await;
+    let keystore = conductor_d.keystore();
+    let agent = SweetAgents::one(keystore.clone()).await;
+
+    let (a1, a2) = build_fork_pair(&keystore, &agent, dna_file.dna_hash()).await;
+    let store_c = conductor_c.get_dht_store(dna_file.dna_hash()).unwrap();
+    insert_fetchable_action(&store_c, &a1).await;
+    insert_fetchable_action(&store_c, &a2).await;
+
+    let warrant = Warrant::new(
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+            chain_author: agent.clone(),
+            action_pair: (
+                (a1.as_hash().clone(), a1.signature.clone()),
+                (a2.as_hash().clone(), a2.signature.clone()),
+            ),
+            seq: 0,
+        }),
+        cell_c.agent_pubkey().clone(),
+        Timestamp::now(),
+        agent.clone(),
+    );
+    let warrant_op = WarrantOp::sign(&conductor_c.keystore(), warrant)
+        .await
+        .unwrap();
+    let warrant_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from((*warrant_op).clone()));
+    store_c
+        .test_insert_integrated_warrant(warrant_op_hashed)
+        .await
+        .unwrap();
+
+    let app_id = "restored".to_string();
+    let mut signal_rx = conductor_d.subscribe_to_app_signals(app_id.clone());
+
+    conductor_d
+        .raw_handle()
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: Some(agent.clone()),
+            source: AppBundleSource::Bytes(pack_bundle(&dna_file)),
+            installed_app_id: Some(app_id.clone()),
+            network_seed: None,
+            roles_settings: None,
+            ignore_genesis_failure: false,
+            restore_from_dht: true,
+        })
+        .await
+        .unwrap();
+
+    let (restore_cell_id, reason) =
+        tokio::time::timeout(std::time::Duration::from_secs(60), async {
+            loop {
+                match signal_rx.recv().await.unwrap() {
+                    Signal::System(SystemSignal::RestoreFailed { cell_id, reason }) => {
+                        break (cell_id, reason);
+                    }
+                    signal @ Signal::System(SystemSignal::AppRestoreComplete { .. }) => {
+                        panic!("Restore unexpectedly succeeded: {signal:?}");
+                    }
+                    _ => continue,
+                }
+            }
+        })
+        .await
+        .expect("timed out waiting for RestoreFailed");
+
+    assert!(
+        matches!(reason, UnrecoverableCellReason::ChainForkWarrant(_)),
+        "expected a ChainForkWarrant reason, got: {reason:?}"
+    );
+
+    let app_info = conductor_d
+        .raw_handle()
+        .get_app_info(&app_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        app_info.status,
+        AppStatus::Unrecoverable(restore_cell_id, reason)
+    );
+
+    let err = conductor_d.enable_app(app_id).await.unwrap_err();
+    assert!(
+        matches!(err, ConductorError::AppStatusError(_)),
+        "expected AppStatusError, got: {err:?}"
+    );
 }
