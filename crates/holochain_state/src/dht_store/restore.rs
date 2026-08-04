@@ -18,13 +18,12 @@ use super::DhtStore;
 impl DhtStore<DbWrite<Dht>> {
     /// Writes `records` into the store as authored state, in one transaction.
     ///
-    /// `records` must be ordered genesis-to-head, with each record's action hash and
-    /// `prev_action` link already verified. Every action is inserted as
-    /// [`RecordValidity::Accepted`], bypassing validation limbo, and a `ChainOpPublish` row is
-    /// inserted for every op, marking it ready for publish.
-    ///
-    /// Any entry whose hash does not match the one declared in its action is rejected with
-    /// [`StateMutationError::MismatchedEntryHash`].
+    /// `records` must be ordered genesis-to-head, with each record's action hash and `prev_action`
+    /// link already verified. Every action is inserted as [`RecordValidity::Accepted`], bypassing
+    /// validation limbo, and a `ChainOpPublish` row is inserted for every op, marking it ready for
+    /// publish. Any entry whose hash does not match the one declared in its action is rejected with
+    /// [`StateMutationError::MismatchedEntryHash`] and any action whose author does not match
+    /// `author` is rejected with [`StateMutationError::AuthorsMustMatch`].
     pub async fn write_restored_chain(
         &self,
         author: &AgentPubKey,
@@ -36,6 +35,9 @@ impl DhtStore<DbWrite<Dht>> {
         let mut entries = Vec::with_capacity(records.len());
         for record in records {
             let (signed_action, record_entry) = record.into_inner();
+            if signed_action.action().author() != author {
+                return Err(StateMutationError::AuthorsMustMatch);
+            }
             if let Some(entry) = record_entry.into_option() {
                 if let Some(entry_hash) = signed_action.action().entry_hash() {
                     if EntryHash::with_data_sync(&entry) != *entry_hash {
@@ -306,6 +308,28 @@ mod tests {
             result,
             Err(StateMutationError::MismatchedEntryHash)
         ));
+    }
+
+    #[tokio::test]
+    async fn foreign_author_action_is_rejected() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let author = fixt!(AgentPubKey);
+        let impostor = fixt!(AgentPubKey);
+
+        let dna = dna_record(&author);
+        let create = create_record(
+            &impostor,
+            dna.action_address().clone(),
+            EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Private,
+            )),
+            app_entry(1),
+        );
+
+        let result = store.write_restored_chain(&author, vec![dna, create]).await;
+        assert!(matches!(result, Err(StateMutationError::AuthorsMustMatch)));
     }
 
     #[tokio::test]
