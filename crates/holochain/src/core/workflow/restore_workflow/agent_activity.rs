@@ -40,7 +40,7 @@ pub(super) enum RetryReason {
         /// Number of responses received.
         got: usize,
         /// Minimum number required.
-        need: u8,
+        need: usize,
     },
     /// The peer responses disagreed on the chain head, or at least one peer reported a
     /// [`ChainStatus::Forked`] status.
@@ -91,7 +91,7 @@ pub(super) async fn acquire_responses(
             return Ok((
                 AcquireOutcome::Retry(RetryReason::TooFewResponses {
                     got: received,
-                    need: required as u8,
+                    need: required,
                 }),
                 Vec::new(),
             ));
@@ -128,7 +128,7 @@ pub(super) fn evaluate_responses(
         return (
             AcquireOutcome::Retry(RetryReason::TooFewResponses {
                 got: responses.len(),
-                need: quorum,
+                need: quorum as usize,
             }),
             Vec::new(),
         );
@@ -203,7 +203,7 @@ pub(super) fn evaluate_responses(
         return (
             AcquireOutcome::Retry(RetryReason::TooFewResponses {
                 got: non_empty_count,
-                need: quorum,
+                need: quorum as usize,
             }),
             warrants_for_agent,
         );
