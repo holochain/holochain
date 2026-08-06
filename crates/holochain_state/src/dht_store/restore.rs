@@ -1,5 +1,4 @@
-//! Writes a pre-verified chain of [`Record`]s directly into the store as authored state, bypassing
-//! validation limbo.
+//! Writes a pre-verified chain of [`Record`]s directly into the store as authored state.
 
 use holo_hash::{AgentPubKey, EntryHash, HasHash};
 use holochain_data::dht::InsertChainOp;
@@ -17,11 +16,13 @@ impl DhtStore<DbWrite<Dht>> {
     /// Writes `records` into the store as authored state, in one transaction.
     ///
     /// `records` must be ordered genesis-to-head, with each record's action hash and `prev_action`
-    /// link already verified. Every action is inserted as [`RecordValidity::Accepted`], bypassing
-    /// validation limbo, and a `ChainOpPublish` row is inserted for every op, marking it ready for
-    /// publish. Any entry whose hash does not match the one declared in its action is rejected with
-    /// [`StateMutationError::MismatchedEntryHash`] and any action whose author does not match
-    /// `author` is rejected with [`StateMutationError::AuthorsMustMatch`].
+    /// link already verified.
+    ///
+    /// # Returns
+    ///
+    /// - [`StateMutationError::MismatchedEntryHash`] if an entry's hash doesn't match the one
+    ///   declared in its action.
+    /// - [`StateMutationError::AuthorsMustMatch`] if an action's author doesn't match `author`.
     pub async fn write_restored_chain(
         &self,
         author: &AgentPubKey,
