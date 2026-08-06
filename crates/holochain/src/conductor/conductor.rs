@@ -1862,11 +1862,11 @@ mod restore_impls {
         Ok(())
     }
 
-    /// Joins the cell's agent into the DNA's network space, then builds the [`CascadeImpl`]/
-    /// [`DhtStore`] pair the [`restore_workflow`] needs. Joining the network here is required as
-    /// otherwise the cell wouldn't join until the app is enabled and any P2P query against it would
-    /// fail. The joined network handle is also returned so the caller can `leave` it again if
-    /// restore ends in permanent failure.
+    /// Joins the cell's agent to the DNA's network and builds restore's cascade and store.
+    ///
+    /// Joining the network is required, otherwise the cell wouldn't join until the app is enabled
+    /// and any P2P query against it would fail. The joined network handle is returned so the caller
+    /// can leave it again if restore ends in permanent failure.
     ///
     /// Also spawns (or reuses, if already running for this DNA) the sys/app validation, integration
     /// and validation-receipt consumers, and returns the sys-validation trigger. A restoring cell
