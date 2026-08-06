@@ -1278,6 +1278,12 @@ mod app_impls {
                     ));
                 }
 
+                if flags.defer_memproofs {
+                    return Err(ConductorError::InvalidInstallAppPayload(
+                        "restore_from_dht cannot be combined with defer_memproofs".to_string(),
+                    ));
+                }
+
                 let roles = ops.role_assignments;
                 let app = InstalledAppCommon::new(
                     installed_app_id.clone(),
@@ -1400,12 +1406,6 @@ mod app_impls {
             let defer_memproofs = match &manifest {
                 AppManifest::V0(m) => m.allow_deferred_memproofs && membrane_proofs.is_empty(),
             };
-
-            if restore_from_dht && defer_memproofs {
-                return Err(ConductorError::InvalidInstallAppPayload(
-                    "restore_from_dht cannot be combined with allow_deferred_memproofs".to_string(),
-                ));
-            }
 
             if restore_from_dht && !membrane_proofs.is_empty() {
                 return Err(ConductorError::InvalidInstallAppPayload(
