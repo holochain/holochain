@@ -1731,9 +1731,14 @@ mod restore_impls {
     use super::*;
 
     impl Conductor {
-        /// Spawn the per-app restore orchestrator as an ignored conductor task. Used at install
-        /// time, for a fresh `restore_from_dht` install, and during conductor startup to resume any
-        /// app left in [`AppStatus::AwaitingRestore`] by a crash.
+        /// Spawn the per-app restore orchestrator as a conductor-managed task, so it is cancelled
+        /// if the conductor shuts down mid-restore. Errors are logged but not propagated, since a
+        /// failed attempt is recoverable by a conductor restart rather than something that should
+        /// affect other managed tasks.
+        ///
+        /// Used at install time, for a fresh `restore_from_dht` install, and during conductor
+        /// startup to resume any app left in [`AppStatus::AwaitingRestore`] by an unexpected
+        /// shutdown.
         pub(crate) fn spawn_restore_orchestrator(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
