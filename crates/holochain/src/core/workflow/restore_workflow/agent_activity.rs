@@ -114,6 +114,7 @@ pub(super) async fn acquire_responses(
 /// Evaluates a set of [`AgentActivityResponse`]s and produces an [`AcquireOutcome`] by requiring
 /// unanimous chain-head agreement.
 ///
+/// `responses` length is expected to meet `quorum` and is not directly checked by this function.
 /// The unanimous agreement needs to be made by at least the number of peers set by `quorum`. The
 /// full records are also collected for the agreed chain head along with any warrants for this
 /// `agent`. The warrants must be validated locally but any confirmed warrant is grounds for
@@ -124,16 +125,6 @@ pub(super) fn evaluate_responses(
     responses: Vec<AgentActivityResponse>,
     quorum: u8,
 ) -> (AcquireOutcome, Vec<SignedWarrant>) {
-    if responses.len() < quorum as usize {
-        return (
-            AcquireOutcome::Retry(RetryReason::TooFewResponses {
-                got: responses.len(),
-                need: quorum as usize,
-            }),
-            Vec::new(),
-        );
-    }
-
     // Collect warrants naming this agent from every response.
     let warrants_for_agent: Vec<SignedWarrant> = responses
         .iter()
@@ -396,19 +387,6 @@ mod tests {
             agent.clone(), // warrantee
         );
         SignedWarrant::new(warrant, fixt!(Signature))
-    }
-
-    #[test]
-    fn insufficient_responses_returns_retry() {
-        let agent = ::fixt::fixt!(AgentPubKey);
-        let hash = ::fixt::fixt!(ActionHash);
-        let responses = vec![make_response(&agent, valid_head(5, hash))];
-        let (outcome, warrants) = evaluate_responses(&agent, responses, 2);
-        assert!(matches!(
-            outcome,
-            AcquireOutcome::Retry(RetryReason::TooFewResponses { got: 1, need: 2 })
-        ));
-        assert!(warrants.is_empty());
     }
 
     #[test]
