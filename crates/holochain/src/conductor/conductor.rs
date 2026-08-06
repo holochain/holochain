@@ -1273,9 +1273,8 @@ mod app_impls {
 
             if flags.restore_from_dht {
                 if !init_properties.is_empty() {
-                    return Err(ConductorError::AppStatusError(
-                            "init_properties cannot be set when called with restore_from_dht as this skips genesis so init_properties would be ignored"
-                            .to_string(),
+                    return Err(ConductorError::InvalidInstallAppPayload(
+                        "restore_from_dht cannot be combined with init_properties".to_string(),
                     ));
                 }
 
@@ -1403,15 +1402,14 @@ mod app_impls {
             };
 
             if restore_from_dht && defer_memproofs {
-                return Err(ConductorError::AppStatusError(
+                return Err(ConductorError::InvalidInstallAppPayload(
                     "restore_from_dht cannot be combined with allow_deferred_memproofs".to_string(),
                 ));
             }
 
             if restore_from_dht && !membrane_proofs.is_empty() {
-                return Err(ConductorError::AppStatusError(
-                    "restore_from_dht cannot be combined with membrane proofs as they would never be used due to restore skipping genesis entirely"
-                        .to_string(),
+                return Err(ConductorError::InvalidInstallAppPayload(
+                    "restore_from_dht cannot be combined with membrane_proofs".to_string(),
                 ));
             }
 
