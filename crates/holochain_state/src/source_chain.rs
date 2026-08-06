@@ -1161,8 +1161,7 @@ pub async fn dump_state_paginated(
 }
 
 // ---------------------------------------------------------------------------
-// Helpers for the new-DB writes in `flush` and `genesis`, also shared with
-// `DhtStore::write_restored_chain`.
+// Helpers for the new-DB writes used by flush, genesis, and restore.
 // ---------------------------------------------------------------------------
 
 /// Return the `(cap_access_i64, Option<tag>)` parameters needed for
