@@ -1240,6 +1240,32 @@ mod app_impls {
             flags: InstallAppCommonFlags,
             init_properties: InitPropertiesMap,
         ) -> ConductorResult<InstalledApp> {
+            if flags.restore_from_dht {
+                if agent_key.is_none() {
+                    return Err(ConductorError::InvalidInstallAppPayload(
+                        "restore_from_dht requires agent_key to be specified".to_string(),
+                    ));
+                }
+
+                if !init_properties.is_empty() {
+                    return Err(ConductorError::InvalidInstallAppPayload(
+                        "restore_from_dht cannot be combined with init_properties".to_string(),
+                    ));
+                }
+
+                if flags.defer_memproofs {
+                    return Err(ConductorError::InvalidInstallAppPayload(
+                        "restore_from_dht cannot be combined with defer_memproofs".to_string(),
+                    ));
+                }
+
+                if ops.dnas_to_register.iter().any(|(_, mp)| mp.is_some()) {
+                    return Err(ConductorError::InvalidInstallAppPayload(
+                        "restore_from_dht cannot be combined with membrane_proofs".to_string(),
+                    ));
+                }
+            }
+
             let agent_key = match agent_key {
                 Some(key) => key,
                 None => {
@@ -1272,18 +1298,6 @@ mod app_impls {
             }
 
             if flags.restore_from_dht {
-                if !init_properties.is_empty() {
-                    return Err(ConductorError::InvalidInstallAppPayload(
-                        "restore_from_dht cannot be combined with init_properties".to_string(),
-                    ));
-                }
-
-                if flags.defer_memproofs {
-                    return Err(ConductorError::InvalidInstallAppPayload(
-                        "restore_from_dht cannot be combined with defer_memproofs".to_string(),
-                    ));
-                }
-
                 let roles = ops.role_assignments;
                 let app = InstalledAppCommon::new(
                     installed_app_id.clone(),
@@ -1370,12 +1384,6 @@ mod app_impls {
                 restore_from_dht,
             } = payload;
 
-            if restore_from_dht && agent_key.is_none() {
-                return Err(ConductorError::AppStatusError(
-                    "restore_from_dht requires agent_key to be specified".to_string(),
-                ));
-            }
-
             if let Some(ref key) = agent_key {
                 let keys_in_lair = self.keystore.list_public_keys().await?;
                 if !keys_in_lair.contains(key) {
@@ -1406,12 +1414,6 @@ mod app_impls {
             let defer_memproofs = match &manifest {
                 AppManifest::V0(m) => m.allow_deferred_memproofs && membrane_proofs.is_empty(),
             };
-
-            if restore_from_dht && !membrane_proofs.is_empty() {
-                return Err(ConductorError::InvalidInstallAppPayload(
-                    "restore_from_dht cannot be combined with membrane_proofs".to_string(),
-                ));
-            }
 
             let flags = InstallAppCommonFlags {
                 defer_memproofs,
