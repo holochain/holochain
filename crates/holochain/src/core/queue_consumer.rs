@@ -84,11 +84,14 @@ pub(crate) struct SpaceValidationTriggers {
 /// Spawns the validation-receipt, integration, app-validation, and sys-validation consumers for
 /// `dna_hash`, or returns the triggers of the ones already running for it.
 ///
-/// This is the part of cell startup that a restoring cell also needs to allow sys validation to
-/// resolve warrants staged by the restore workflow, so it must run even though the restoring cell
-/// has not been fully created yet.
+/// This is the part of cell startup that a restoring cell also needs to resolve warrants staged by
+/// the restore workflow, so it must run even though the restoring cell has not been fully created
+/// yet. A warrant's verdict depends on the validation status of the action it accuses, which is
+/// only settled once that action has gone through the full pipeline, including app validation, so
+/// both consumers are needed, not just sys validation.
 ///
 /// # Notes
+///
 /// `trigger_publish` is forwarded into the app/sys validation consumers as their downstream publish
 /// trigger. Callers that have not spawned a publish consumer like the restore workflow can pass a
 /// trigger with no consumer behind it, since firing an unconsumed trigger is a no-op.

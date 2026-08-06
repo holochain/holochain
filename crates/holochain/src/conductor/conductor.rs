@@ -143,9 +143,11 @@ pub struct Conductor {
 
     /// Cells currently undergoing source-chain restore.
     ///
-    /// These need to be able to query peers and trigger sys/app validation to resolve warrants
-    /// found during the restore, but cannot be part of `running_cells` since the app is not yet
-    /// enabled.
+    /// These need to be able to query peers and keep the DNA space's sys and app validation
+    /// consumers running, so that warrants found during the restore can reach a verdict. Warrants
+    /// themselves only require sys validation but the action it accuses requires app and sys
+    /// validation so both need to be running. Restoring cells cannot be part of `running_cells`
+    /// since the app is not yet enabled.
     restoring_cells: RwShare<HashSet<CellId>>,
 
     /// The config used to create this Conductor
