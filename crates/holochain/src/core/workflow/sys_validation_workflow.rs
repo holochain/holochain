@@ -45,7 +45,10 @@
 //! A [`WarrantOp`] is produced as a proof that an agent broke the rules of the DHT. That may be the
 //! rules of this workflow or the rules set by the application and checked in the app validation
 //! workflow.
-//! Warrant validation is performed entirely by sys validation, and the steps performed are:
+//! Checking a [`WarrantOp`] is triggered from this workflow, but it waits on the validation status
+//! of the warranted [`Action`], which is only settled once that action has gone through the full
+//! validation pipeline, including app validation. The steps performed once that status is
+//! available are:
 //! - For a [`WarrantOpType::ChainIntegrityWarrant`]:
 //!   - The warranted [`Action`] must be found locally. If it is not found, then it will be fetched.
 //!   - The warranted [`Action`] will be completely validated, including app validation.
