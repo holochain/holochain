@@ -1783,7 +1783,7 @@ mod restore_impls {
                 join_network_and_build_restore_cascade(&conductor, &cell_id).await?;
 
             // Marks the cell as undergoing chain restore for the lifetime of this guard
-            let _restoring_guard = RestoringCellGuard::new(conductor.clone(), cell_id.clone());
+            let _restoring_guard = RestoringCellGuard::new(conductor.clone(), cell_id.clone())?;
 
             let outcome = restore_workflow(
                 cell_id.clone(),
@@ -1921,9 +1921,14 @@ mod restore_impls {
     }
 
     impl RestoringCellGuard {
-        fn new(conductor: ConductorHandle, cell_id: CellId) -> Self {
-            conductor.mark_cell_restoring(cell_id.clone());
-            Self { conductor, cell_id }
+        /// Fails if cell is already marked so there can't be overlapping guards for the same cell.
+        fn new(conductor: ConductorHandle, cell_id: CellId) -> ConductorResult<Self> {
+            if !conductor.mark_cell_restoring(cell_id.clone()) {
+                return Err(ConductorError::other(format!(
+                    "cell {cell_id:?} is already marked as restoring"
+                )));
+            }
+            Ok(Self { conductor, cell_id })
         }
     }
 
@@ -1979,10 +1984,11 @@ mod cell_impls {
 
         /// Marks the `cell_id` as undergoing source-chain restore. Must be paired with
         /// [`Self::unmark_cell_restoring`] once restore ends for the cell, success or failure.
-        pub(crate) fn mark_cell_restoring(&self, cell_id: CellId) {
-            self.restoring_cells.share_mut(|cells| {
-                cells.insert(cell_id);
-            });
+        ///
+        /// Returns `false` without changing anything if `cell_id` was already marked.
+        pub(crate) fn mark_cell_restoring(&self, cell_id: CellId) -> bool {
+            self.restoring_cells
+                .share_mut(|cells| cells.insert(cell_id))
         }
 
         /// Unmarks the `cell_id` as undergoing source-chain restore due to a successful restore or
