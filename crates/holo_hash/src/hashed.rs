@@ -16,6 +16,124 @@ pub struct HoloHashed<C: HashableContent> {
     pub hash: HoloHashOf<C>,
 }
 
+// `#[derive(ts_rs::TS)]` cannot be used here: `WithoutGenerics` substitutes
+// `ts_rs::Dummy` for `C`, but `Dummy` doesn't implement `HashableContent` as
+// `HoloHashOf<C>` requires. Hand-written instead, declared as a genuine
+// generic type rather than inline-only, so ordinary fields (e.g.
+// `Record::signed_action: SignedHashed<Action>`) still pull in the
+// `HoloHash` import. `WithoutGenerics` reuses `HoloHashTs` rather than
+// `Self`, to avoid leaking a concrete `C` into the shared declaration file.
+#[cfg(feature = "ts_rs")]
+impl<C> ts_rs::TS for HoloHashed<C>
+where
+    C: HashableContent + ts_rs::TS,
+{
+    type WithoutGenerics = crate::ts::HoloHashTs;
+    type OptionInnerType = Self;
+
+    fn name(cfg: &ts_rs::Config) -> String {
+        format!("HoloHashed<{}>", C::name(cfg))
+    }
+
+    fn inline(cfg: &ts_rs::Config) -> String {
+        // Reference `C` by name, not `C::inline(cfg)` — an unadorned field
+        // renders as the field type's name, so inlining here would duplicate
+        // `C`'s body and break the import `visit_dependencies` registers.
+        format!("{{ content: {}, hash: HoloHash }}", C::name(cfg))
+    }
+
+    fn decl(_: &ts_rs::Config) -> String {
+        "type HoloHashed<C> = { content: C, hash: HoloHash };".into()
+    }
+
+    fn decl_concrete(cfg: &ts_rs::Config) -> String {
+        format!("type HoloHashed = {};", <Self as ts_rs::TS>::inline(cfg))
+    }
+
+    fn visit_dependencies(v: &mut impl ts_rs::TypeVisitor)
+    where
+        Self: 'static,
+    {
+        v.visit::<C>();
+        C::visit_dependencies(v);
+        v.visit::<crate::ts::HoloHashTs>();
+    }
+
+    fn visit_generics(v: &mut impl ts_rs::TypeVisitor)
+    where
+        Self: 'static,
+    {
+        C::visit_generics(v);
+        v.visit::<C>();
+    }
+
+    fn output_path() -> Option<std::path::PathBuf> {
+        Some("types.ts".into())
+    }
+}
+
+#[cfg(all(test, feature = "ts_rs"))]
+mod ts_tests {
+    use super::*;
+    use ts_rs::TS;
+
+    #[derive(ts_rs::TS)]
+    #[ts(export, export_to = "types.ts")]
+    struct TestHashedContent {
+        #[expect(
+            dead_code,
+            reason = "field exists only so the TS derive has a non-trivial body to name"
+        )]
+        value: String,
+    }
+
+    impl HashableContent for TestHashedContent {
+        type HashType = crate::hash_type::Action;
+
+        fn hash_type(&self) -> Self::HashType {
+            crate::hash_type::Action
+        }
+
+        fn hashable_content(&self) -> crate::HashableContentBytes {
+            crate::HashableContentBytes::Prehashed39(vec![0; 39])
+        }
+    }
+
+    #[test]
+    fn content_field_references_c_by_name_not_inline() {
+        let cfg = ts_rs::Config::from_env();
+
+        let inline = HoloHashed::<TestHashedContent>::inline(&cfg);
+        assert_eq!(inline, "{ content: TestHashedContent, hash: HoloHash }");
+
+        let deps = HoloHashed::<TestHashedContent>::dependencies(&cfg);
+        assert!(
+            deps.iter().any(|dep| dep.ts_name == "TestHashedContent"),
+            "expected a dependency on TestHashedContent, got {deps:?}"
+        );
+    }
+
+    #[test]
+    fn name_and_decl_are_a_real_generic_declaration() {
+        let cfg = ts_rs::Config::from_env();
+
+        assert_eq!(
+            HoloHashed::<TestHashedContent>::name(&cfg),
+            "HoloHashed<TestHashedContent>"
+        );
+        assert_eq!(
+            HoloHashed::<TestHashedContent>::decl(&cfg),
+            "type HoloHashed<C> = { content: C, hash: HoloHash };"
+        );
+    }
+
+    #[test]
+    fn export_bindings_manual() {
+        let cfg = ts_rs::Config::from_env();
+        HoloHashed::<TestHashedContent>::export_all(&cfg).unwrap();
+    }
+}
+
 impl<C: HashableContent> HasHash for HoloHashed<C> {
     type HashType = C::HashType;
 

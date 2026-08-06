@@ -38,3 +38,31 @@ pub mod zome;
 pub mod zome_io;
 
 pub mod trace;
+
+/// Exports every TypeScript declaration this crate contributes to the
+/// conductor API bindings: this crate's `ts_alias!` markers and hand-written
+/// impls, plus the zome call return types [`record::Record`] and
+/// [`op::AgentActivity`] (unreachable from any conductor request/response —
+/// a zome call carries them as an opaque `ExternIO` the client decodes
+/// itself), and upstream crates' declarations.
+#[cfg(feature = "ts_rs")]
+pub fn export_ts_bindings(cfg: &ts_rs::Config) -> Result<(), ts_rs::ExportError> {
+    use ts_rs::TS;
+
+    holo_hash::ts::export_ts_bindings(cfg)?;
+    crate::action::ActionHashedTs::export_all(cfg)?;
+    crate::action::SignedActionHashedTs::export_all(cfg)?;
+    crate::genesis::MembraneProofTs::export_all(cfg)?;
+    crate::countersigning::CounterSigningAgentsTs::export_all(cfg)?;
+    crate::info::NetworkSeedTs::export_all(cfg)?;
+    crate::prelude::DnaModifiersOpt::<holochain_serialized_bytes::SerializedBytes>::export_all(
+        cfg,
+    )?;
+    crate::capability::GrantedFunctionTs::export_all(cfg)?;
+    crate::capability::CapGrant::export_all(cfg)?;
+    crate::action::ActionType::export_all(cfg)?;
+    crate::countersigning::PreflightResponse::export_all(cfg)?;
+    crate::record::Record::export_all(cfg)?;
+    crate::op::AgentActivity::export_all(cfg)?;
+    Ok(())
+}

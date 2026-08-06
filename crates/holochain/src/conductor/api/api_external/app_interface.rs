@@ -86,6 +86,7 @@ impl AppInterfaceApi {
                 Ok(AppResponse::AgentInfo(items?))
             }
             AppRequest::PeerMetaInfo { url, dna_hashes } => {
+                let url = kitsune2_api::Url::from_str(&url)?;
                 let r = self
                     .conductor_handle
                     .app_peer_meta_info(&installed_app_id, url, dna_hashes)

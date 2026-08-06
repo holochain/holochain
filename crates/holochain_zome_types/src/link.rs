@@ -7,6 +7,7 @@ use holochain_integrity_types::prelude::{LinkTag, LinkType, SignedActionHashed, 
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
 
+/// A link as returned by a link query.
 #[derive(
     Debug,
     PartialOrd,
@@ -19,6 +20,8 @@ use holochain_timestamp::Timestamp;
     Eq,
     SerializedBytes,
 )]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/link.ts"))]
 pub struct Link {
     /// The author of this link
     pub author: holo_hash::AgentPubKey,

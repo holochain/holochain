@@ -39,6 +39,12 @@ num_cpus = "1.17.0"
 nanoid = "0.4"
 serde_with = "3.12.0"
 
+# Optional
+ts-rs = { version = "12.0", features = [
+  "indexmap-impl",
+  "no-serde-warnings",
+], optional = true }
+
 [dev-dependencies]
 holochain_conductor_api = { path = ".", features = ["test-utils", "schema"] }
 
@@ -64,3 +70,11 @@ schema = [
 ]
 
 test-utils = []
+
+ts_rs = [
+  "dep:ts-rs",
+  "holo_hash/ts_rs",
+  "holochain_state_types/ts_rs",
+  "holochain_types/ts_rs",
+  "holochain_zome_types/ts_rs",
+]

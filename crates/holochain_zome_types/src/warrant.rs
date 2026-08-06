@@ -20,6 +20,8 @@ use holochain_timestamp::Timestamp;
     derive_more::From,
     derive_more::Deref,
 )]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/dht-ops.ts"))]
 pub struct Warrant {
     /// The self-proving part of the warrant containing evidence of bad behavior.
     #[deref]
@@ -76,6 +78,8 @@ impl HashableContent for Warrant {
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::From,
 )]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/dht-ops.ts"))]
 pub enum WarrantProof {
     /// Signifies evidence of a breach of chain integrity.
     ChainIntegrity(ChainIntegrityWarrant),
@@ -121,6 +125,8 @@ pub fn truncate_warrant_reason(s: &str) -> String {
 
 /// A warrant which is sent to agent activity authorities.
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/dht-ops.ts"))]
 pub enum ChainIntegrityWarrant {
     /// Something invalid was authored on a chain.
     ///
@@ -130,6 +136,7 @@ pub enum ChainIntegrityWarrant {
         /// The author of the invalid action.
         action_author: AgentPubKey,
         /// The action hash and its signature.
+        #[cfg_attr(feature = "ts_rs", ts(as = "ActionHashAndSigTs"))]
         action: ActionHashAndSig,
         /// The chain op type that was the validation context for this action being judged invalid.
         chain_op_type: ChainOpType,
@@ -145,6 +152,7 @@ pub enum ChainIntegrityWarrant {
         /// Author of the chain which is forked
         chain_author: AgentPubKey,
         /// Two actions of the same seq number which prove the fork
+        #[cfg_attr(feature = "ts_rs", ts(as = "(ActionHashAndSigTs, ActionHashAndSigTs)"))]
         action_pair: (ActionHashAndSig, ActionHashAndSig),
         /// The seq number at which the fork occurs
         seq: u32,
@@ -217,6 +225,15 @@ impl std::hash::Hash for ChainIntegrityWarrant {
 
 /// Action hash with the signature of the action at that hash.
 pub type ActionHashAndSig = (ActionHash, Signature);
+
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    ActionHashAndSigTs,
+    "ActionHashAndSig",
+    "[ActionHash, Signature]",
+    "hdk/dht-ops.ts",
+    deps: [ActionHash, Signature]
+);
 
 impl WarrantProof {
     /// Basis hash where this warrant should be delivered.

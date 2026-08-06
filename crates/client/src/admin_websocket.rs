@@ -592,7 +592,10 @@ impl AdminWebsocket {
         url: Url,
         dna_hashes: Option<Vec<DnaHash>>,
     ) -> ConductorApiResult<BTreeMap<DnaHash, BTreeMap<String, PeerMetaInfo>>> {
-        let msg = AdminRequest::PeerMetaInfo { url, dna_hashes };
+        let msg = AdminRequest::PeerMetaInfo {
+            url: url.to_string(),
+            dna_hashes,
+        };
         let response = self.send(msg).await?;
         match response {
             AdminResponse::PeerMetaInfo(info) => Ok(info),

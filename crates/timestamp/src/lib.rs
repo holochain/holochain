@@ -35,12 +35,16 @@ pub(crate) const MM: i64 = 1_000_000;
 /// -- it is not acceptable for our core Holochain algorithms to panic when accessing DHT Action
 /// information committed by other random Holochain nodes!
 ///
-/// Timestamp implements `Serialize` and `Display` as rfc3339 time strings (if possible).
+/// Timestamp serializes as a bare i64 (microseconds from UNIX Epoch).
+///
+/// `Display` is implemented as an rfc3339 time string when possible (requires the `now` feature).
 ///
 /// Supports +/- `chrono::Duration` directly.  There is no `Timestamp::now()` method, since this is not
 /// supported by WASM; however, `holochain_types` provides a `Timestamp::now()` method.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[cfg_attr(not(feature = "now"), derive(Debug))]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
 pub struct Timestamp(
     /// Microseconds from UNIX Epoch, positive or negative
     pub i64,

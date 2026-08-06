@@ -5,7 +5,9 @@ use holochain_serialized_bytes::prelude::*;
 
 /// A type to allow yaml values to be used as [`derive@SerializedBytes`]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct YamlProperties(yaml_serde::Value);
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
+pub struct YamlProperties(#[cfg_attr(feature = "ts_rs", ts(type = "unknown"))] yaml_serde::Value);
 
 impl YamlProperties {
     /// Create new properties from yaml value
@@ -39,6 +41,23 @@ impl From<yaml_serde::Value> for YamlProperties {
 impl Default for YamlProperties {
     fn default() -> Self {
         Self::empty()
+    }
+}
+
+// `DnaModifiersOpt<P>`'s `TS` impl bounds on `DnaPropertiesTs` rather than
+// `ts_rs::TS` directly (see its doc comment), so `YamlProperties` implements
+// that instead.
+#[cfg(feature = "ts_rs")]
+impl holochain_integrity_types::prelude::DnaPropertiesTs for YamlProperties {
+    fn dna_properties_ts_name(cfg: &ts_rs::Config) -> String {
+        <YamlProperties as ts_rs::TS>::name(cfg)
+    }
+
+    fn visit_dna_properties_ts_dependency(v: &mut impl ts_rs::TypeVisitor)
+    where
+        Self: 'static,
+    {
+        v.visit::<YamlProperties>();
     }
 }
 

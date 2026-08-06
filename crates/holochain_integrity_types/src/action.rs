@@ -32,6 +32,8 @@ pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
     Deserialize,
     SerializedBytes,
 )]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
 pub struct ZomeIndex(pub u8);
 
 impl ZomeIndex {
@@ -53,6 +55,8 @@ impl ZomeIndex {
     Deserialize,
     SerializedBytes,
 )]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
 pub struct EntryDefIndex(pub u8);
 
 /// Description of how to find the previous or next CellId in a migration.
@@ -63,6 +67,8 @@ pub struct EntryDefIndex(pub u8);
 /// When used in CloseChain, this contains the new DNA hash or Agent key.
 /// When used in OpenChain, this contains the previous DNA hash or Agent key.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub enum MigrationTarget {
     /// Represents a DNA migration, and contains the new or previous DNA hash.
     Dna(DnaHash),
@@ -86,6 +92,8 @@ impl From<AgentPubKey> for MigrationTarget {
 /// referencing. Useful for examining Actions without needing to fetch the
 /// corresponding Entries.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/entry.ts"))]
 pub enum EntryType {
     /// An AgentPubKey
     AgentPubKey,
@@ -126,6 +134,8 @@ impl std::fmt::Display for EntryType {
 
 /// Information about a class of Entries provided by the DNA
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/entry.ts"))]
 pub struct AppEntryDef {
     /// A unique u8 identifier within a zome for this
     /// entry type.
@@ -212,6 +222,8 @@ impl ActionSequenceAndHash for (u32, ActionHash) {
 /// Record-level validation outcome.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(i64)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub enum RecordValidity {
     /// The record was accepted.
     Accepted = 1,
@@ -252,6 +264,8 @@ impl TryFrom<i64> for RecordValidity {
 /// Action-type discriminant.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 #[repr(i64)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub enum ActionType {
     /// Genesis DNA action. Always `action_seq == 0` and `prev_action == None`.
     Dna = 1,
@@ -359,6 +373,8 @@ impl TryFrom<i64> for CapAccessType {
 
 /// Common header fields shared by every action variant.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub struct ActionHeader {
     /// The agent who authored this action.
     pub author: AgentPubKey,
@@ -374,6 +390,8 @@ pub struct ActionHeader {
 
 /// Per-variant data for [`ActionType::Dna`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub struct DnaData {
     /// Hash of the DNA that this chain is an instance of.
     pub dna_hash: DnaHash,
@@ -381,8 +399,11 @@ pub struct DnaData {
 
 /// Per-variant data for [`ActionType::AgentValidationPkg`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub struct AgentValidationPkgData {
     /// Optional membrane proof provided when joining the network.
+    #[cfg_attr(feature = "ts_rs", ts(as = "Option<crate::genesis::MembraneProofTs>"))]
     pub membrane_proof: Option<MembraneProof>,
 }
 
@@ -390,10 +411,14 @@ pub struct AgentValidationPkgData {
 ///
 /// Carries no payload — the variant alone signals that all init zomes ran.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub struct InitZomesCompleteData {}
 
 /// Per-variant data for [`ActionType::Create`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub struct CreateData {
     /// Application-defined entry type (including visibility).
     pub entry_type: EntryType,
@@ -403,6 +428,8 @@ pub struct CreateData {
 
 /// Per-variant data for [`ActionType::Update`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub struct UpdateData {
     /// Hash of the action being updated.
     pub original_action_address: ActionHash,
@@ -416,6 +443,8 @@ pub struct UpdateData {
 
 /// Per-variant data for [`ActionType::Delete`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub struct DeleteData {
     /// Hash of the action being deleted.
     pub deletes_address: ActionHash,
@@ -425,6 +454,8 @@ pub struct DeleteData {
 
 /// Per-variant data for [`ActionType::CreateLink`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub struct CreateLinkData {
     /// The hash the link points from.
     pub base_address: AnyLinkableHash,
@@ -440,6 +471,8 @@ pub struct CreateLinkData {
 
 /// Per-variant data for [`ActionType::DeleteLink`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub struct DeleteLinkData {
     /// The base address of the link being removed.
     pub base_address: AnyLinkableHash,
@@ -452,6 +485,8 @@ pub struct DeleteLinkData {
 /// The `author`, `timestamp`, `action_seq`, and `prev_action` fields live on
 /// [`ActionHeader`]; only the chain-close-specific fields go here.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub struct CloseChainData {
     /// Optional migration target the chain closes towards.
     pub new_target: Option<crate::action::MigrationTarget>,
@@ -462,6 +497,8 @@ pub struct CloseChainData {
 /// The `author`, `timestamp`, `action_seq`, and `prev_action` fields live on
 /// [`ActionHeader`]; only the chain-open-specific fields go here.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub struct OpenChainData {
     /// The previous DNA hash or agent key this chain migrated from.
     pub prev_target: crate::action::MigrationTarget,
@@ -473,6 +510,8 @@ pub struct OpenChainData {
 /// BLOB column.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 #[serde(tag = "type")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub enum ActionData {
     /// Genesis DNA action.
     Dna(DnaData),
@@ -529,6 +568,8 @@ impl ActionData {
 /// (or [`crate::record::SignedHashed<Action>`]) at call sites so the hash is
 /// always derived from the content.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub struct Action {
     /// Header fields common to every action variant.
     pub header: ActionHeader,
@@ -687,6 +728,33 @@ pub type ActionHashed = HoloHashed<Action>;
 
 /// An [`Action`] that is both hashed and signed.
 pub type SignedActionHashed = crate::record::SignedHashed<Action>;
+
+// `HoloHashed<C>` and `SignedHashed<T>` are both genuine, declared generic
+// TypeScript types (see `holo_hash::hashed` and `crate::record` respectively)
+// rather than inline-only, so these two aliases can reference their names
+// directly. Both markers list the underlying generic type as a dependency so
+// the recursive exporter is guaranteed to write its declaration at least
+// once (as well as `Action`, though that is exported via other paths too).
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    ActionHashedTs,
+    "ActionHashed",
+    "HoloHashed<Action>",
+    "hdk/action.ts",
+    deps: [crate::action::Action, holo_hash::HoloHashed<crate::action::Action>]
+);
+
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    SignedActionHashedTs,
+    "SignedActionHashed",
+    "SignedHashed<Action>",
+    "hdk/action.ts",
+    deps: [
+        crate::action::Action,
+        crate::record::SignedHashed<crate::action::Action>,
+    ]
+);
 
 impl SignedActionHashed {
     /// The action content.

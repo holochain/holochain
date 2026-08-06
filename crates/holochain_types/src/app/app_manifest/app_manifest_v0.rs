@@ -35,11 +35,14 @@ use std::collections::HashMap;
     derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct AppManifestV0 {
     /// Name of the App. This may be used as the installed_app_id.
     pub name: String,
 
     /// Description of the app, just for context.
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub description: Option<String>,
 
     /// The roles that need to be filled (by DNAs) for this app.
@@ -52,6 +55,7 @@ pub struct AppManifestV0 {
     /// at install time, the app will be installed as normal, without the
     /// special deferred memproof flow.
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     #[builder(default)]
     pub allow_deferred_memproofs: bool,
 
@@ -59,6 +63,7 @@ pub struct AppManifestV0 {
     /// for this app. If not provided here, the bootstrap server
     /// specified in the conductor config file will be used.
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     #[builder(default)]
     pub bootstrap_url: Option<String>,
 
@@ -66,6 +71,7 @@ pub struct AppManifestV0 {
     /// for this app. If not provided here, the relay server
     /// specified in the conductor config file will be used.
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     #[builder(default)]
     pub relay_url: Option<String>,
 }
@@ -75,6 +81,8 @@ pub struct AppManifestV0 {
 /// potential runtime clones.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct AppRoleManifest {
     /// The ID which will be used to refer to:
     /// - this role,
@@ -83,6 +91,7 @@ pub struct AppRoleManifest {
     pub name: RoleName,
 
     /// Determines if, how, and when a Cell will be provisioned.
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub provisioning: Option<CellProvisioning>,
 
     /// Declares where to find the DNA, and options to modify it before
@@ -104,11 +113,14 @@ impl AppRoleManifest {
 /// The DNA portion of an app role
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct AppRoleDnaManifest {
     /// Where to find this DNA.
     ///
     /// The DNA bundle at this path is included in the hApp bundle. The path is resolved relative
     /// to this app manifest file.
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub path: Option<String>,
 
     /// Optional default modifier values.
@@ -118,6 +130,7 @@ pub struct AppRoleDnaManifest {
     /// A set of modifiers completely overrides previously specified default properties,
     /// rather than being interpolated into them.
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub modifiers: DnaModifiersOpt<YamlProperties>,
 
     /// The hash of the DNA to be installed. If specified, will cause installation to
@@ -128,11 +141,14 @@ pub struct AppRoleDnaManifest {
     /// only (no need to include the DNAs, since they are already installed in the conductor).
     /// In this case, `location` does not even need to be set.
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
+    #[cfg_attr(feature = "ts_rs", ts(as = "Option<holo_hash::DnaHashB64Ts>"))]
     pub installed_hash: Option<DnaHashB64>,
 
     /// Allow up to this many "clones" to be created at runtime.
     /// Default: 0
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub clone_limit: u32,
 }
 
@@ -153,6 +169,8 @@ impl AppRoleDnaManifest {
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[serde(tag = "strategy")]
 #[allow(missing_docs)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
     Create { deferred: bool },

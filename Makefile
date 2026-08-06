@@ -12,7 +12,7 @@ UNSTABLE_FEATURES=unstable-sharding,unstable-functions,unstable-migration,$(DEFA
 	test-workspace-wasmer-sys-llvm test-workspace-wasmer-wasmi \
 	build-workspace-wasmer-sys-cranelift-unstable \
 	test-workspace-wasmer-sys-cranelift-unstable \
-	toml-fix
+	toml-fix ts-bindings
 
 # default to running everything (first rule)
 default: build-workspace-wasmer-sys-cranelift \
@@ -123,6 +123,9 @@ test-workspace-wasmer-wasmi:
 		--locked \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer-wasmi
+
+ts-bindings:
+	./scripts/export-ts-bindings.sh $(or $(TS_RS_EXPORT_DIR),./bindings)
 
 clean:
 	cargo clean

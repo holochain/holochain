@@ -2920,6 +2920,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "thiserror 2.0.20",
+ "ts-rs",
 ]
 
 [[package]]
@@ -3198,6 +3199,7 @@ dependencies = [
  "shrinkwraprs",
  "thiserror 2.0.20",
  "tracing",
+ "ts-rs",
  "url2",
  "yaml_serde",
 ]
@@ -3266,6 +3268,7 @@ dependencies = [
  "subtle",
  "subtle-encoding",
  "tracing",
+ "ts-rs",
 ]
 
 [[package]]
@@ -3334,6 +3337,7 @@ dependencies = [
  "holochain_secure_primitive",
  "holochain_timestamp",
  "subtle-encoding",
+ "ts-rs",
 ]
 
 [[package]]
@@ -3466,6 +3470,7 @@ dependencies = [
  "holo_hash",
  "holochain_integrity_types",
  "serde",
+ "ts-rs",
 ]
 
 [[package]]
@@ -3484,6 +3489,7 @@ dependencies = [
  "chrono",
  "holochain_serialized_bytes",
  "serde",
+ "ts-rs",
 ]
 
 [[package]]
@@ -3509,6 +3515,7 @@ version = "0.8.0-dev.1"
 dependencies = [
  "anyhow",
  "backtrace",
+ "base64 0.22.1",
  "bytes",
  "derive_builder",
  "derive_more",
@@ -3531,11 +3538,13 @@ dependencies = [
  "nanoid 0.4.0",
  "parking_lot",
  "proptest",
- "proptest-derive 0.5.1",
+ "proptest-derive 0.8.0",
  "rand 0.9.5",
  "regex",
+ "rmp-serde",
  "schemars 0.9.0",
  "serde",
+ "serde_bytes",
  "serde_derive",
  "serde_json",
  "serde_with",
@@ -3547,6 +3556,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "tracing",
+ "ts-rs",
  "yaml_serde",
 ]
 
@@ -3668,6 +3678,7 @@ dependencies = [
  "subtle",
  "thiserror 2.0.20",
  "tracing",
+ "ts-rs",
  "uuid 1.24.0",
  "yaml_serde",
 ]
@@ -5202,6 +5213,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "ts-rs",
  "yaml_serde",
 ]
 
@@ -8949,6 +8961,29 @@ dependencies = [
  "target-triple",
  "termcolor",
  "toml",
+]
+
+[[package]]
+name = "ts-rs"
+version = "12.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "756050066659291d47a554a9f558125db17428b073c5ffce1daf5dcb0f7231d8"
+dependencies = [
+ "indexmap 2.14.0",
+ "thiserror 2.0.20",
+ "ts-rs-macros",
+]
+
+[[package]]
+name = "ts-rs-macros"
+version = "12.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38d90eea51bc7988ef9e674bf80a85ba6804739e535e9cab48e4bb34a8b652aa"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+ "termcolor",
 ]
 
 [[package]]

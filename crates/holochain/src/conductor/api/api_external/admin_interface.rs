@@ -255,6 +255,7 @@ impl AdminInterfaceApi {
                 Ok(AdminResponse::AgentInfo(encoded))
             }
             PeerMetaInfo { url, dna_hashes } => {
+                let url = kitsune2_api::Url::from_str(&url)?;
                 let r = self
                     .conductor_handle
                     .peer_meta_info(url, dna_hashes)

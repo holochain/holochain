@@ -7,9 +7,15 @@ use holochain_types::op::DhtOp;
 use holochain_types::prelude::{OpValidity, Timestamp};
 use serde::Deserialize;
 use serde::Serialize;
-use std::sync::Arc;
 
+/// The cell state dump returned by the `DumpState` admin call.
+///
+/// The `StateDumped` response carries this as a `serde_json` string rather
+/// than as part of the msgpack response body, so no request or response type
+/// reaches it and the client parses the string itself.
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct JsonDump {
     pub peer_dump: P2pAgentsDump,
     pub source_chain_dump: SourceChainDump,
@@ -17,6 +23,8 @@ pub struct JsonDump {
 }
 
 #[derive(Serialize, Clone, Debug, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct FullStateDump {
     pub peer_dump: P2pAgentsDump,
     pub source_chain_dump: SourceChainDump,
@@ -33,6 +41,8 @@ pub struct IntegrationStateDumps(pub Vec<IntegrationStateDump>);
 /// Ops start in the validation limbo then proceed
 /// to the integration limbo then finally are integrated.
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct IntegrationStateDump {
     /// Ops in validation limbo awaiting sys
     /// or app validation.
@@ -48,6 +58,8 @@ pub struct IntegrationStateDump {
 /// Ops start in the validation limbo then proceed
 /// to the integration limbo then finally are integrated.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct FullIntegrationStateDump {
     /// Ops in validation limbo awaiting sys
     /// or app validation.
@@ -69,6 +81,8 @@ pub struct FullIntegrationStateDump {
 ///
 /// `(when_received, hash)`.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct DhtOpsCursor {
     /// Microsecond received timestamp of the last op selected.
     pub when_received: i64,
@@ -90,6 +104,8 @@ pub struct DhtOpsCursor {
 /// validated by this node, which is why its integration time can equal its
 /// received time.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct OpTimingDump {
     /// Hash of the DHT op these timings describe.
     pub op_hash: DhtOpHash,
@@ -109,6 +125,8 @@ pub struct OpTimingDump {
 
 /// One page of op timings for a DNA, ordered by `(when_received, op_hash)`.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct OpTimingsDump {
     /// Timings for the ops selected by this page, oldest received first.
     pub timings: Vec<OpTimingDump>,
@@ -129,6 +147,8 @@ pub struct OpTimingsDump {
 /// select different op sets and page through them independently, so their
 /// cursors are not interchangeable and must stay separate types.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct OpTimingsCursor {
     /// Microsecond received timestamp of the last op selected.
     pub when_received: i64,
@@ -138,13 +158,15 @@ pub struct OpTimingsCursor {
 
 /// State dump of all the peer info
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct P2pAgentsDump {
     /// The info of this agents cell.
     pub this_agent_info: Option<AgentInfoDump>,
-    /// The dna as a [`DnaHash`] and [`kitsune2_api::SpaceId`].
-    pub this_dna: Option<(DnaHash, kitsune2_api::SpaceId)>,
-    /// The agent as [`AgentPubKey`] and [`kitsune2_api::AgentId`].
-    pub this_agent: Option<(AgentPubKey, kitsune2_api::AgentId)>,
+    /// The dna as a [`DnaHash`] and its Kitsune2 space id (base64url-encoded).
+    pub this_dna: Option<(DnaHash, String)>,
+    /// The agent as [`AgentPubKey`] and its Kitsune2 agent id (base64url-encoded).
+    pub this_agent: Option<(AgentPubKey, String)>,
     /// All other agent info.
     pub peers: Vec<AgentInfoDump>,
 }
@@ -153,9 +175,14 @@ pub struct P2pAgentsDump {
 /// space, signed time, expires in and
 /// urls printed in a pretty way.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct AgentInfoDump {
-    pub kitsune_agent: Arc<kitsune2_api::AgentId>,
-    pub kitsune_space: Arc<kitsune2_api::SpaceId>,
+    /// Kitsune2 agent id (base64url-encoded).
+    pub kitsune_agent: String,
+    /// Kitsune2 space id (base64url-encoded).
+    pub kitsune_space: String,
+    /// Pretty-printed summary of the agent info.
     pub dump: String,
 }
 
@@ -196,8 +223,8 @@ impl std::fmt::Display for IntegrationStateDump {
 
 impl std::fmt::Display for AgentInfoDump {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "space: {:?}", self.kitsune_space)?;
-        writeln!(f, "agent: {:?}", self.kitsune_agent)?;
+        writeln!(f, "space: {}", self.kitsune_space)?;
+        writeln!(f, "agent: {}", self.kitsune_agent)?;
         writeln!(f, "{}", self.dump)
     }
 }

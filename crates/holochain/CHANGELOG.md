@@ -8,8 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Add the source-chain restore workflow and allow installing an app with `InstallAppPayload::restore_from_dht: true`. Doing so skips genesis and reconstructs each cell's chain from the DHT instead, letting an existing agent key resume authoring on a new node. The app sits in `AppStatus::AwaitingRestore` until every cell restores, then requires `enable_app` like a normal install. A validated `ChainIntegrityWarrant` against the agent moves the app to the terminal `AppStatus::Unrecoverable(cell_id, reason)` instead. There is no repair path if an app is marked as `AppStatus::Unrecoverable`, it can only be uninstalled. See `docs/design/source_chain_restore.md`. \#5800
+- Add an opt-in `ts_rs` cargo feature, disabled by default, that generates TypeScript type declarations for the conductor's admin and app API request/response types and for the signals the conductor emits. The generated declarations also cover the countersigning session app API, the `DumpState` admin call's JSON result, and the zome call return types `Link` and `AgentActivity`. \#5930
 
 ## 0.8.0-dev.1
+
+- Network metrics and stats types returned by the admin/app APIs (`DhtArc`, `FetchStateSummary`, `GossipStateSummary`, `TransportStats`, `MessageBlockCount`, and related types) are now holochain-owned mirrors of the equivalent kitsune2 types instead of direct kitsune2 re-exports. Their wire format and field names are unchanged. \#5930
 
 ## 0.8.0-dev.0
 

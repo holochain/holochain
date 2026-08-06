@@ -34,6 +34,7 @@ proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 subtle-encoding = { version = "0.5", optional = true }
 tracing = { version = "0.1", optional = true }
+ts-rs = { version = "12.0", features = ["no-serde-warnings"], optional = true }
 
 [dev-dependencies]
 holochain_integrity_types = { path = ".", features = ["test_utils", "fuzzing"] }
@@ -73,3 +74,5 @@ test_utils = [
   "holo_hash/hashing",
   "holo_hash/test_utils",
 ]
+
+ts_rs = ["dep:ts-rs", "holo_hash/ts_rs", "holochain_timestamp/ts_rs"]

@@ -12,7 +12,11 @@ pub const SIGNATURE_BYTES: usize = 64;
 // For an actually secure thing we wouldn't want to just assume a safe default hashing
 // But that is not what clippy is complaining about here.
 #[allow(clippy::derived_hash_with_manual_eq)]
-pub struct Signature(pub [u8; SIGNATURE_BYTES]);
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
+pub struct Signature(
+    #[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))] pub [u8; SIGNATURE_BYTES],
+);
 
 // This is more for convenience/convention that being worried
 // about things like constant time equality.

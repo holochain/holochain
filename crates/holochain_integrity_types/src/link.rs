@@ -14,6 +14,8 @@ use holochain_serialized_bytes::prelude::*;
     serde::Deserialize,
     SerializedBytes,
 )]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/link.ts"))]
 pub struct LinkType(pub u8);
 
 impl LinkType {
@@ -30,7 +32,13 @@ impl LinkType {
 #[derive(
     Debug, PartialOrd, Ord, Clone, Hash, serde::Serialize, serde::Deserialize, PartialEq, Eq,
 )]
-pub struct LinkTag(#[serde(with = "serde_bytes")] pub Vec<u8>);
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/link.ts"))]
+pub struct LinkTag(
+    #[serde(with = "serde_bytes")]
+    #[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))]
+    pub Vec<u8>,
+);
 
 impl LinkTag {
     /// New tag from bytes

@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
     derive_more::Display,
     strum_macros::EnumString,
 )]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/dht-ops.ts"))]
 pub enum ChainOpType {
     #[display("CreateRecord")]
     CreateRecord,

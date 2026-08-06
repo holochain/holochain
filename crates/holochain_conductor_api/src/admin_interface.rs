@@ -4,7 +4,6 @@ use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::cell::CellId;
-use kitsune2_api::Url;
 use std::collections::{BTreeMap, HashMap};
 
 /// Represents the available conductor functions to call over an admin interface.
@@ -20,6 +19,8 @@ use std::collections::{BTreeMap, HashMap};
 // `{ type: 'enable_app', data: { installed_app_id: 'test_app' } }`
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum AdminRequest {
     /// Set up and register one or more new admin interfaces
     /// as specified by a list of configurations.
@@ -84,6 +85,7 @@ pub enum AdminRequest {
         /// This will generally lead to bad outcomes, and should not be used unless you're
         /// aware of the consequences.
         #[serde(default)]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         force: bool,
     },
 
@@ -119,6 +121,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::AppsListed`]
     ListApps {
         /// An optional status to filter the list of apps by
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         status_filter: Option<AppStatusFilter>,
     },
 
@@ -178,6 +181,7 @@ pub enum AdminRequest {
     /// [`AppRequest`]: super::AppRequest
     AttachAppInterface {
         /// Optional port number
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         port: Option<u16>,
 
         /// An optional address to bind the interface to.
@@ -188,6 +192,7 @@ pub enum AdminRequest {
         /// Holochain has minimal security protections in place for websocket connections. The app
         /// websockets are protected by the admin websocket, but if you expose the admin websocket
         /// to the network, then anyone who can connect to it can control your conductor.
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         danger_bind_addr: Option<String>,
 
         /// Allowed origins for this app interface.
@@ -198,6 +203,10 @@ pub enum AdminRequest {
         /// - Any origin - `*`
         ///
         /// Connections from any origin which is not permitted by this config will be rejected.
+        #[cfg_attr(
+            feature = "ts_rs",
+            ts(as = "holochain_types::websocket::AllowedOriginsTs")
+        )]
         allowed_origins: AllowedOrigins,
 
         /// Optionally bind this app interface to a specific installed app.
@@ -206,6 +215,7 @@ pub enum AdminRequest {
         ///
         /// If this is `Some` then the interface will only accept connections for the specified app.
         /// Those connections will only be able to make calls to and receive signals from that app.
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         installed_app_id: Option<InstalledAppId>,
     },
 
@@ -231,9 +241,11 @@ pub enum AdminRequest {
         cell_id: Box<CellId>,
         /// Last source-chain record seen; the next page starts after it.
         #[serde(default)]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         source_chain_cursor: Option<crate::state_dump::SourceChainCursor>,
         /// Maximum number of source-chain records to return. Must be greater than zero.
         #[serde(default)]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         limit: Option<u32>,
     },
 
@@ -266,10 +278,12 @@ pub enum AdminRequest {
         /// Pagination cursor from a previous `DumpFullState`; only DHT ops
         /// received after it are returned. `None` starts from the beginning.
         #[serde(default)]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         dht_ops_cursor: Option<crate::state_dump::DhtOpsCursor>,
         /// Maximum number of DHT ops across all lifecycle buckets to return.
         /// Must be greater than zero.
         #[serde(default)]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         limit: Option<u32>,
     },
 
@@ -297,9 +311,11 @@ pub enum AdminRequest {
         /// ordered strictly after it are returned. `None` starts from the
         /// beginning.
         #[serde(default)]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         cursor: Option<crate::state_dump::OpTimingsCursor>,
         /// Maximum number of ops to return. Must be greater than zero.
         #[serde(default)]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         limit: Option<u32>,
     },
 
@@ -311,6 +327,7 @@ pub enum AdminRequest {
     DumpNetworkMetrics {
         /// If set, limits the metrics dumped to a single DNA hash space.
         #[serde(default)]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         dna_hash: Option<DnaHash>,
 
         /// Whether to include a DHT summary.
@@ -318,6 +335,7 @@ pub enum AdminRequest {
         /// You need a dump from multiple nodes in order to make a comparison, so this is not
         /// requested by default.
         #[serde(default)]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         include_dht_summary: bool,
     },
 
@@ -359,6 +377,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::AgentInfo`]
     AgentInfo {
         /// Optionally choose the agent infos of a set of Dnas.
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         dna_hashes: Option<Vec<DnaHash>>,
     },
 
@@ -372,7 +391,10 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::PeerMetaInfo`]
     PeerMetaInfo {
-        url: Url,
+        /// The Kitsune2 url of the agent to query, as a string.
+        url: String,
+        /// Optionally limit the results to specific DNA hashes.
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         dna_hashes: Option<Vec<DnaHash>>,
     },
 
@@ -433,7 +455,9 @@ pub enum AdminRequest {
     /// # Returns
     ///
     /// [`AdminResponse::AppAuthenticationTokenRevoked`]
-    RevokeAppAuthenticationToken(AppAuthenticationToken),
+    RevokeAppAuthenticationToken(
+        #[cfg_attr(feature = "ts_rs", ts(as = "AppAuthenticationTokenTs"))] AppAuthenticationToken,
+    ),
 
     /// Find installed cells which use a DNA that's forward-compatible with the given DNA hash.
     /// Namely, this finds cells with DNAs whose manifest lists the given DNA hash in its `lineage` field.
@@ -451,6 +475,8 @@ pub enum AdminRequest {
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[cfg_attr(test, derive(Clone))]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum AdminResponse {
     /// Can occur in response to any [`AdminRequest`].
     ///
@@ -551,7 +577,13 @@ pub enum AdminResponse {
     ConductorStateDumped(String),
 
     /// The successful result of a call to [`AdminRequest::DumpNetworkMetrics`].
-    NetworkMetricsDumped(HashMap<DnaHash, Kitsune2NetworkMetrics>),
+    // `HashMap<DnaHash, _>` renders as an invalid TS mapped type (non-primitive
+    // key), so it's overridden with the `NetworkMetricsMapTs` alias — see its
+    // doc comment.
+    NetworkMetricsDumped(
+        #[cfg_attr(feature = "ts_rs", ts(as = "NetworkMetricsMapTs"))]
+        HashMap<DnaHash, Kitsune2NetworkMetrics>,
+    ),
 
     /// The successful result of a call to [`AdminRequest::DumpNetworkStats`].
     NetworkStatsDumped(HolochainTransportStats),
@@ -569,7 +601,15 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::PeerMetaInfo`].
     ///
     /// A JSON formatted string.
-    PeerMetaInfo(BTreeMap<DnaHash, BTreeMap<String, PeerMetaInfo>>),
+    // `BTreeMap<DnaHash, _>` would render as an invalid TS mapped type keyed
+    // by a non-primitive, so it is overridden with `Record` via the
+    // `PeerMetaInfoMapTs` alias below (same reasoning as
+    // `NetworkMetricsDumped` above — `AppResponse::PeerMetaInfo` shares this
+    // shape and needs the cross-file import).
+    PeerMetaInfo(
+        #[cfg_attr(feature = "ts_rs", ts(as = "PeerMetaInfoMapTs"))]
+        BTreeMap<DnaHash, BTreeMap<String, PeerMetaInfo>>,
+    ),
 
     /// The successful response to an [`AdminRequest::GrantZomeCallCapability`].
     ///
@@ -608,6 +648,8 @@ pub type CompatibleCells =
 /// so it should be readable and relevant
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum ExternalApiWireError {
     // TODO: B-01506 Constrain these errors so they are relevant to
     // application developers and what they would need
@@ -644,6 +686,8 @@ impl ExternalApiWireError {
 /// Apps can be either enabled or disabled, set by the user via the conductor interface.
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum AppStatusFilter {
     /// Filter on apps which are Enabled.
     Enabled,
@@ -659,11 +703,17 @@ pub enum AppStatusFilter {
 
 /// Informational response for listing app interfaces.
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct AppInterfaceInfo {
     /// The port that the app interface is listening on.
     pub port: u16,
 
     /// The allowed origins for this app interface.
+    #[cfg_attr(
+        feature = "ts_rs",
+        ts(as = "holochain_types::websocket::AllowedOriginsTs")
+    )]
     pub allowed_origins: AllowedOrigins,
 
     /// The optional association with a specific installed app.
@@ -672,6 +722,8 @@ pub struct AppInterfaceInfo {
 
 /// Request payload for [AdminRequest::IssueAppAuthenticationToken].
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct IssueAppAuthenticationTokenPayload {
     /// The app ID to issue a connection token for.
     pub installed_app_id: InstalledAppId,
@@ -684,6 +736,7 @@ pub struct IssueAppAuthenticationTokenPayload {
     ///
     /// Set this to 0 to create a token that does not expire.
     #[serde(default = "default_expiry_seconds")]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub expiry_seconds: u64,
 
     /// Whether the token should be single-use. This is `true` by default and will cause the token
@@ -691,6 +744,7 @@ pub struct IssueAppAuthenticationTokenPayload {
     ///
     /// Set this to `false` to allow the token to be used multiple times.
     #[serde(default = "default_single_use")]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub single_use: bool,
 }
 
@@ -737,12 +791,53 @@ impl From<InstalledAppId> for IssueAppAuthenticationTokenPayload {
 /// A token issued by the conductor that can be used to authenticate a connection to an app interface.
 pub type AppAuthenticationToken = Vec<u8>;
 
+// Type aliases can't derive `ts_rs::TS`. Neither field using this type
+// carries `#[serde(with = "serde_bytes")]`, so it serializes as a msgpack
+// array of bytes (`number[]`), not `Uint8Array`.
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    AppAuthenticationTokenTs,
+    "AppAuthenticationToken",
+    "number[]",
+    "api/admin/types.ts",
+    deps: []
+);
+
+// `HashMap<DnaHash, _>` needs a `Record`-shaped override (non-primitive key).
+// Declared as a named `ts_alias!` rather than a bare `ts(type = "...")`
+// string since it's shared by both `api/admin/types.ts` and
+// `api/app/types.ts` and needs the `Kitsune2NetworkMetrics` import. The
+// `string` key reflects holochain-client-js's `holoHashMapKeyConverter`,
+// which decodes the wire's binary `DnaHash` keys into base64 strings.
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    NetworkMetricsMapTs,
+    "NetworkMetricsMap",
+    "Record<string, Kitsune2NetworkMetrics>",
+    "api/admin/types.ts",
+    deps: [Kitsune2NetworkMetrics]
+);
+
+// Same reasoning as `NetworkMetricsMapTs` above, for
+// `AdminResponse::PeerMetaInfo` / `AppResponse::PeerMetaInfo`.
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    PeerMetaInfoMapTs,
+    "PeerMetaInfoMap",
+    "Record<string, Record<string, PeerMetaInfo>>",
+    "api/admin/types.ts",
+    deps: [PeerMetaInfo]
+);
+
 /// Response payload for [AdminResponse::AppAuthenticationTokenIssued].
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct AppAuthenticationTokenIssued {
     /// A token issued by the conductor that can be used to authenticate a connection to an app interface.
     /// This is expected to be passed from the caller of the admin interface to the client that will
     /// use the app interface. It should be treated as secret and kept from other parties.
+    #[cfg_attr(feature = "ts_rs", ts(as = "AppAuthenticationTokenTs"))]
     pub token: AppAuthenticationToken,
 
     /// The timestamp after which Holochain will consider the token invalid. This should be
@@ -892,5 +987,24 @@ mod tests {
             serde_json::from_value::<OpTimingsCursor>(value).unwrap(),
             cursor
         );
+    }
+}
+
+#[cfg(all(test, feature = "ts_rs"))]
+mod ts_rs_smoke_test {
+    use super::AdminRequest;
+    use ts_rs::TS;
+
+    /// Confirms `AdminRequest` exports as an externally/adjacently tagged
+    /// union (`{ "type": ..., "value": ... }`), matching what the JS/TS
+    /// client expects and what `AdminRequest`'s own
+    /// `#[serde(tag = "type", content = "value")]` attribute produces on the
+    /// wire.
+    #[test]
+    fn admin_request_bindings_smoke() {
+        let cfg = ts_rs::Config::default();
+        let ts = AdminRequest::export_to_string(&cfg).unwrap();
+        assert!(ts.contains("\"type\""));
+        assert!(ts.contains("\"value\""));
     }
 }

@@ -6,7 +6,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_keystore::{AgentPubKeyExt, LairResult};
 use holochain_types::prelude::*;
 use indexmap::IndexMap;
-use kitsune2_api::Url;
 use std::collections::{BTreeMap, HashMap};
 
 /// Represents the available conductor functions to call over an app interface
@@ -18,6 +17,8 @@ use std::collections::{BTreeMap, HashMap};
 /// Returns an [`AppResponse::Error`] with a reason why the request failed.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
 pub enum AppRequest {
     /// Get info about the app that you are connected to, including info about each cell installed
     /// by this app.
@@ -36,6 +37,7 @@ pub enum AppRequest {
     /// [`AppResponse::AgentInfo`]
     AgentInfo {
         /// Optionally limit the results to specific DNA hashes
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         dna_hashes: Option<Vec<DnaHash>>,
     },
 
@@ -49,7 +51,10 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::PeerMetaInfo`]
     PeerMetaInfo {
-        url: Url,
+        /// The Kitsune2 url of the agent to query, as a string.
+        url: String,
+        /// Optionally limit the results to specific DNA hashes.
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         dna_hashes: Option<Vec<DnaHash>>,
     },
 
@@ -192,7 +197,16 @@ pub enum AppRequest {
     /// # Returns
     ///
     /// [`AppResponse::CloneCellEnabled`]
-    EnableCloneCell(Box<EnableCloneCellPayload>),
+    // `EnableCloneCellPayload` is a Rust alias for `DisableCloneCellPayload`;
+    // without this override ts-rs would render it under that name instead.
+    // `EnableCloneCellPayloadTs` (in `holochain_types::app`) restores it.
+    EnableCloneCell(
+        #[cfg_attr(
+            feature = "ts_rs",
+            ts(as = "holochain_types::app::EnableCloneCellPayloadTs")
+        )]
+        Box<EnableCloneCellPayload>,
+    ),
 
     /// Dump the lifecycle timings of the DHT ops held by this conductor for
     /// the DNA of one of this app's cells.
@@ -215,9 +229,11 @@ pub enum AppRequest {
         /// ordered strictly after it are returned. `None` starts from the
         /// beginning.
         #[serde(default)]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         cursor: Option<OpTimingsCursor>,
         /// Maximum number of ops to return. Must be greater than zero.
         #[serde(default)]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         limit: Option<u32>,
     },
 
@@ -234,6 +250,7 @@ pub enum AppRequest {
     DumpNetworkMetrics {
         /// If set, limits the metrics dumped to a single DNA hash space.
         #[serde(default)]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         dna_hash: Option<DnaHash>,
 
         /// Whether to include a DHT summary.
@@ -241,6 +258,7 @@ pub enum AppRequest {
         /// You need a dump from multiple nodes in order to make a comparison, so this is not
         /// requested by default.
         #[serde(default)]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         include_dht_summary: bool,
     },
 
@@ -269,7 +287,9 @@ pub enum AppRequest {
     /// # Returns
     ///
     /// [`AppResponse::Ok`]
-    ProvideMemproofs(MemproofMap),
+    ProvideMemproofs(
+        #[cfg_attr(feature = "ts_rs", ts(as = "holochain_types::app::MemproofMapTs"))] MemproofMap,
+    ),
 
     /// Enable the app, only in special circumstances.
     /// Can only be called while the app is in the `Disabled(NotStartedAfterProvidingMemproofs)` state.
@@ -310,6 +330,8 @@ pub enum AppRequest {
 /// Represents the possible responses to an [`AppRequest`].
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
 pub enum AppResponse {
     /// Can occur in response to any [`AppRequest`].
     ///
@@ -327,7 +349,17 @@ pub enum AppResponse {
     /// The successful response to an [`AppRequest::PeerMetaInfo`].
     ///
     /// A JSON formatted string.
-    PeerMetaInfo(BTreeMap<DnaHash, BTreeMap<String, PeerMetaInfo>>),
+    // `BTreeMap<DnaHash, _>` would render as an invalid TS mapped type keyed
+    // by a non-primitive; overridden via the `PeerMetaInfoMapTs` alias,
+    // mirroring `AdminResponse::PeerMetaInfo` (see that alias's doc comment
+    // for why a plain `ts(type = "...")` string override doesn't work here).
+    PeerMetaInfo(
+        #[cfg_attr(
+            feature = "ts_rs",
+            ts(as = "crate::admin_interface::PeerMetaInfoMapTs")
+        )]
+        BTreeMap<DnaHash, BTreeMap<String, PeerMetaInfo>>,
+    ),
 
     /// The successful response to an [`AppRequest::CallZome`].
     ///
@@ -369,7 +401,16 @@ pub enum AppResponse {
     OpTimingsDumped(OpTimingsDump),
 
     /// The successful result of a call to [`AppRequest::DumpNetworkMetrics`].
-    NetworkMetricsDumped(HashMap<DnaHash, Kitsune2NetworkMetrics>),
+    // `HashMap<DnaHash, _>` would render as an invalid TS mapped type keyed by
+    // a non-primitive; overridden via the `NetworkMetricsMapTs` alias,
+    // mirroring `AdminResponse::NetworkMetricsDumped`.
+    NetworkMetricsDumped(
+        #[cfg_attr(
+            feature = "ts_rs",
+            ts(as = "crate::admin_interface::NetworkMetricsMapTs")
+        )]
+        HashMap<DnaHash, Kitsune2NetworkMetrics>,
+    ),
 
     /// The successful result of a call to [`AppRequest::DumpNetworkStats`].
     NetworkStatsDumped(HolochainTransportStats),
@@ -383,6 +424,8 @@ pub enum AppResponse {
 
 /// The data provided over an app interface in order to make a zome call.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
 pub struct ZomeCallParamsSigned {
     /// Bytes of the serialized zome call payload that consists of all fields of the
     /// [`ZomeCallParams`].
@@ -414,6 +457,8 @@ impl ZomeCallParamsSigned {
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
 pub enum CellInfo {
     /// Cells provisioned at app installation as defined in the bundle.
     Provisioned(ProvisionedCell),
@@ -457,6 +502,8 @@ impl CellInfo {
 /// Cell whose instantiation has been deferred.
 /// Not yet implemented.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
 pub struct StemCell {
     /// The hash of the DNA that this cell would be instantiated from
     pub original_dna_hash: DnaHash,
@@ -468,6 +515,8 @@ pub struct StemCell {
 
 /// Provisioned cell, a cell instantiated from a DNA on app installation.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
 pub struct ProvisionedCell {
     /// The cell's identifying data
     pub cell_id: CellId,
@@ -479,6 +528,8 @@ pub struct ProvisionedCell {
 
 /// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
 pub struct AppInfo {
     /// The unique identifier for an installed app in this conductor
     pub installed_app_id: InstalledAppId,
@@ -602,8 +653,14 @@ impl AppInfo {
 
 /// The request payload sent on a Holochain app websocket to authenticate the connection.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
 pub struct AppAuthenticationRequest {
     /// The authentication token that was provided by the conductor when [`crate::admin_interface::AdminRequest::IssueAppAuthenticationToken`] was called.
+    #[cfg_attr(
+        feature = "ts_rs",
+        ts(as = "crate::admin_interface::AppAuthenticationTokenTs")
+    )]
     pub token: AppAuthenticationToken,
 }
 

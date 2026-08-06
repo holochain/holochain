@@ -1393,7 +1393,7 @@ async fn test_target_arcs() {
     let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
 
     let arcs = hc1.target_arcs(dna_hash).await.unwrap();
-    assert_eq!(&[DhtArc::FULL][..], &arcs);
+    assert_eq!(&[kitsune2_api::DhtArc::FULL][..], &arcs);
 }
 
 /// Note that this test does not prevent messages going via the network.
@@ -1408,7 +1408,8 @@ async fn bridged_call_remote() {
     let (_agent1, hc1, lair_client) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
 
     let agent2 = lair_client.new_sign_keypair_random().await.unwrap();
-    let local_agent2 = HolochainP2pLocalAgent::new(agent2.clone(), DhtArc::FULL, 1, lair_client);
+    let local_agent2 =
+        HolochainP2pLocalAgent::new(agent2.clone(), kitsune2_api::DhtArc::FULL, 1, lair_client);
     hc1.test_kitsune()
         .space(dna_hash.to_k2_space(), None)
         .await
@@ -1481,7 +1482,8 @@ async fn bridged_remote_signal() {
     let (_agent1, hc1, lair_client) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
 
     let agent2 = lair_client.new_sign_keypair_random().await.unwrap();
-    let local_agent2 = HolochainP2pLocalAgent::new(agent2.clone(), DhtArc::FULL, 1, lair_client);
+    let local_agent2 =
+        HolochainP2pLocalAgent::new(agent2.clone(), kitsune2_api::DhtArc::FULL, 1, lair_client);
     hc1.test_kitsune()
         .space_if_exists(dna_hash.to_k2_space())
         .await

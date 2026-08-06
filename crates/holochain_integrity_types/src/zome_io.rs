@@ -16,7 +16,13 @@ use holochain_serialized_bytes::prelude::*;
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(transparent)]
 #[repr(transparent)]
-pub struct ExternIO(#[serde(with = "serde_bytes")] pub Vec<u8>);
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
+pub struct ExternIO(
+    #[serde(with = "serde_bytes")]
+    #[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))]
+    pub Vec<u8>,
+);
 
 impl ExternIO {
     pub fn encode<I>(input: I) -> Result<Self, SerializedBytesError>

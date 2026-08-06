@@ -70,3 +70,9 @@ pub use hash_ext::*;
 // provides fixturators for all hash types
 #[cfg(feature = "fixturators")]
 pub mod fixt;
+
+// feature: ts_rs
+// (TypeScript bindings for hash types via ts-rs)
+
+#[cfg(feature = "ts_rs")]
+pub mod ts;

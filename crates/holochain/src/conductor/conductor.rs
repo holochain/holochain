@@ -2625,7 +2625,7 @@ mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
     use holochain_conductor_api::{CellInfo, JsonDump};
     use holochain_zome_types::prelude::Entry;
-    use kitsune2_api::{SpaceId, TransportStats};
+    use kitsune2_api::SpaceId;
     use std::sync::atomic::Ordering;
 
     impl Conductor {
@@ -3065,15 +3065,17 @@ mod misc_impls {
         pub async fn dump_network_stats(&self) -> ConductorApiResult<HolochainTransportStats> {
             let transport_stats = self.holochain_p2p.dump_network_stats().await?;
             Ok(HolochainTransportStats {
-                transport_stats: transport_stats.transport_stats,
+                transport_stats: transport_stats.transport_stats.into(),
                 blocked_message_counts: transport_stats
                     .blocked_message_counts
                     .into_iter()
                     .map(|(k, v)| {
                         (
-                            k,
+                            k.as_str().to_string(),
                             v.into_iter()
-                                .map(|(space, count)| (DnaHash::from_k2_space(&space), count))
+                                .map(|(space, count)| {
+                                    (DnaHash::from_k2_space(&space), count.into())
+                                })
                                 .collect(),
                         )
                     })
@@ -3127,7 +3129,12 @@ mod misc_impls {
                     // Common information, fine to return
                     backend: stats.transport_stats.backend,
                     // These are our peer URLs, always give this back
-                    peer_urls: stats.transport_stats.peer_urls,
+                    peer_urls: stats
+                        .transport_stats
+                        .peer_urls
+                        .into_iter()
+                        .map(|u| u.as_str().to_string())
+                        .collect(),
                     // This contains connections for the whole conductor, filter it down
                     // to only the connections that are relevant to the current app
                     connections: stats
@@ -3135,6 +3142,7 @@ mod misc_impls {
                         .connections
                         .into_iter()
                         .filter(|s| keep_peer_ids.contains(&s.pub_key))
+                        .map(Into::into)
                         .collect(),
                 },
                 blocked_message_counts: stats
@@ -3142,22 +3150,21 @@ mod misc_impls {
                     .into_iter()
                     .filter_map(|(url, space_counts)| {
                         if url.peer_id().is_some_and(|id| keep_peer_ids.contains(id)) {
-                            let filtered: HashMap<DnaHash, kitsune2_api::MessageBlockCount> =
-                                space_counts
-                                    .into_iter()
-                                    .filter_map(|(space, count)| {
-                                        let hash = DnaHash::from_k2_space(&space);
+                            let filtered: HashMap<DnaHash, MessageBlockCount> = space_counts
+                                .into_iter()
+                                .filter_map(|(space, count)| {
+                                    let hash = DnaHash::from_k2_space(&space);
 
-                                        if all_dna_hashes.contains(&hash) {
-                                            Some((hash, count))
-                                        } else {
-                                            None
-                                        }
-                                    })
-                                    .collect();
+                                    if all_dna_hashes.contains(&hash) {
+                                        Some((hash, count.into()))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
 
                             if !filtered.is_empty() {
-                                Some((url, filtered))
+                                Some((url.as_str().to_string(), filtered))
                             } else {
                                 None
                             }
