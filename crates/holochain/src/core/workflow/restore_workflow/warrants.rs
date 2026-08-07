@@ -203,6 +203,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn check_reflects_verdict_reached_after_a_separate_staging_call() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let warrant = build_chain_fork_warrant(9);
+
+        // Stage once, as the caller does before entering its poll loop.
+        stage_warrants(&store, &[warrant.clone()]).await.unwrap();
+        let outcome = check_warrant_status(&store, &[warrant.clone()])
+            .await
+            .unwrap();
+        assert!(matches!(outcome, WarrantOutcome::Pending));
+
+        // Simulate sys validation reaching a verdict in the background, with no re-staging.
+        let warrant_op = WarrantOp::from(warrant.clone());
+        let hashed = DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(warrant_op)));
+        store.test_insert_integrated_warrant(hashed).await.unwrap();
+
+        let outcome = check_warrant_status(&store, &[warrant]).await.unwrap();
+        assert!(matches!(
+            outcome,
+            WarrantOutcome::Warranted(UnrecoverableCellReason::ChainForkWarrant(_))
+        ));
+    }
+
+    #[tokio::test]
     async fn valid_warrant_wins_even_when_listed_after_a_pending_one() {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
 
