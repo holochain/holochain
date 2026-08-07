@@ -97,10 +97,12 @@ async fn restore_from_dht_end_to_end() {
         .await;
     let last_seq_on_a = last_record_on_a.unwrap().action().action_seq();
 
+    // Shut down the original, so it can't act as an authority for the restore of itself
+    conductor_a.shutdown().await;
+
     // `conductor_b` restores the same agent's chain from the DHT on a fresh node. Quorum is set to
     // 1 because `conductor_c` is the only authority for the agent's published chain as
-    // `conductor_a` is never queried directly as it is the original conductor and restore must work
-    // even if the original device is offline.
+    // `conductor_a` is offline and restore must work even if the original device is offline.
     let mut config_b = SweetConductorConfig::rendezvous(true);
     config_b.restore_chain_quorum = 1;
     let mut conductor_b =
