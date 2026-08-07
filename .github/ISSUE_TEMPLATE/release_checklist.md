@@ -18,8 +18,9 @@ already been done.
 
 In the steps below the new holochain version number is referred to as 'X'.
 Steps marked `[optional]` are only needed when starting a new release
-series (e.g. moving from a 0.7.0 release to 0.8.0-dev.0), not for every
-release.
+series (e.g. moving from `0.7.0-rc.5` to `0.7.0`), not for every release.
+When creating a new `main-X` branch, also update `main` to point at the
+upcoming version (e.g. `0.8.0-dev.0`).
 
 ```mermaid
 flowchart TB
@@ -99,6 +100,10 @@ flowchart TB
 ```
 
 ## Releasing npm packages
+
+Holochain's own crates are released with a similar automated workflow; see
+[Release Holochain](https://github.com/holochain/holochain/blob/develop/docs/release/release.md)
+above.
 
 `holochain-client-js`, `hc-spin` and `hc-spin-rust-utils` are released with
 shared automated workflows instead of manual publishing:
@@ -215,13 +220,14 @@ Assigned to @
 - [ ] `dino-adventure`
   - Update nix flake.
   - Update to use new holochain version.
+  - Update npm deps.
   - Bump version.
   - `[optional]` Create new branch `main-X`.
   - Add tag `vY` for new version Y.
   - Manually create a github release at tag with changelog.
 
 - [ ] Documentation (`docs-pages` repo)
-  - Write App Upgrade Guide for new holochain version.
+  - Write or update App Upgrade Guide for new holochain version.
   - Update Compatibility Table to add new tool versions compatible with new holochain version.
     - `[optional]` For major releases, add a new compatibility table file and link from `pages/resources/compatibility/index.md`.
   - Update Developer Portal to use code examples and explanations for new holochain version.
