@@ -161,7 +161,7 @@ pub(super) fn evaluate_responses(
             // An invalid chain head with no valid records.
             ChainStatus::Invalid(_) => None,
 
-            // A fork status means that the peer cannot single out a single chain head, so this is
+            // A fork status means that the peer cannot resolve a unique chain head, so this is
             // treated as a disagreement, prompting the workflow to retry.
             ChainStatus::Forked(_) => {
                 return (
