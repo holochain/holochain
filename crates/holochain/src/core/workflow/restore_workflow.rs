@@ -2,7 +2,7 @@
 //! installed with `restore_from_dht: true`. The workflow itself loops internally, retrying with a
 //! backoff, until it reaches a terminal `RestoreOutcome`.
 //!
-//! Each attempt of the workflow follows these distinct steps:
+//! Each attempt follows two steps:
 //!
 //! * **Step 1**, in `agent_activity`, gets the agent's chain activity from the DHT, aggregates the
 //!   responses, requires unanimous agreement on the chain head from the peers that responded, then
@@ -15,9 +15,6 @@
 //! * **Step 2**, in `chain_reconstruction`, walks the collected records backward from the agreed
 //!   head to genesis, then writes the verified chain directly into the per-DNA database as authored
 //!   state, this bypasses validation limbo.
-//! * **Step 3** hands the cell back to the per-app orchestrator. Reporting completion, emitting
-//!   system signals, and app status transitions are the orchestrator's responsibility, not this
-//!   workflow's.
 
 use std::time::Duration;
 
