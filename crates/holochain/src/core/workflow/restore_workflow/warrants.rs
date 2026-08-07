@@ -220,6 +220,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn pending_warrant_blocks_clearing_even_alongside_a_rejected_one() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+        // Already resolved as rejected
+        let rejected = build_chain_fork_warrant(11);
+        let rejected_op = WarrantOp::from(rejected.clone());
+        let hashed = DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(rejected_op)));
+        store
+            .test_insert_integrated_warrant_with_status(hashed, OpValidity::Rejected)
+            .await
+            .unwrap();
+
+        // Still awaiting a verdict
+        let pending = build_invalid_chain_op_warrant(12);
+
+        let warrants = vec![rejected, pending];
+        stage_warrants(&store, &warrants).await.unwrap();
+        let outcome = check_warrant_status(&store, &warrants).await.unwrap();
+        assert!(matches!(outcome, WarrantOutcome::Pending));
+    }
+
+    #[tokio::test]
     async fn check_reflects_verdict_reached_after_a_separate_staging_call() {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let warrant = build_chain_fork_warrant(9);
