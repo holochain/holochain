@@ -63,18 +63,15 @@ pub(crate) async fn restore_workflow(
             agent_activity::acquire_responses(&cascade, cell_id.agent_pubkey(), quorum).await?;
 
         if !warrants.is_empty() {
+            warrants::stage_warrants(&dht_store, &warrants).await?;
             loop {
-                match warrants::stage_and_check_warrants(
-                    &dht_store,
-                    warrants.clone(),
-                    &sys_validation_trigger,
-                )
-                .await?
-                {
+                sys_validation_trigger.trigger(&"restore_workflow");
+                sleep(retry_delay).await;
+                match warrants::check_warrant_status(&dht_store, &warrants).await? {
                     WarrantOutcome::Warranted(reason) => {
                         return Ok(RestoreOutcome::PermanentFailure(reason));
                     }
-                    WarrantOutcome::Pending => sleep(retry_delay).await,
+                    WarrantOutcome::Pending => {}
                     WarrantOutcome::Cleared => break,
                 }
             }

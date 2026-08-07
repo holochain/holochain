@@ -9,7 +9,6 @@ use holochain_zome_types::prelude::{
     ChainIntegrityWarrant, SignedWarrant, ValidationStatus, WarrantProof,
 };
 
-use crate::core::queue_consumer::TriggerSender;
 use crate::core::workflow::error::WorkflowResult;
 
 /// The result of staging a set of warrants raised against the restoring agent and checking
@@ -26,36 +25,39 @@ pub(super) enum WarrantOutcome {
     Warranted(UnrecoverableCellReason),
 }
 
-/// Stages warrants for local validation, then checks each one's validation status.
+/// Stages a set of warrants raised against the restoring agent for local validation.
 ///
-/// Staging is idempotent: a warrant already in limbo or already integrated is left untouched by the
-/// repeated submission. `sys_validation_trigger` is triggered after staging so the sys-validation
-/// consumer picks up the newly staged warrants. The caller is responsible for making sure that a
+/// Staging is idempotent: a warrant already in limbo or already integrated is left untouched by a
+/// repeated submission. The caller is responsible for triggering sys validation and making sure a
 /// consumer is actually running for this DNA space.
+pub(super) async fn stage_warrants(
+    dht_store: &DhtStore,
+    warrants: &[SignedWarrant],
+) -> WorkflowResult<()> {
+    let warrant_ops: Vec<WarrantOp> = warrants.iter().cloned().map(WarrantOp::from).collect();
+    dht_store.stage_warrants_for_validation(warrant_ops).await?;
+    Ok(())
+}
+
+/// Checks local validation's verdict on a set of previously staged warrants.
 ///
 /// # Returns
 /// * [`WarrantOutcome::Pending`] whilst any warrant lacks a terminal verdict
 /// * [`WarrantOutcome::Warranted`] on the first valid warrant found
 /// * [`WarrantOutcome::Cleared`] only once every warrant has an invalid terminal verdict
-pub(super) async fn stage_and_check_warrants(
+pub(super) async fn check_warrant_status(
     dht_store: &DhtStore,
-    warrants: Vec<SignedWarrant>,
-    sys_validation_trigger: &TriggerSender,
+    warrants: &[SignedWarrant],
 ) -> WorkflowResult<WarrantOutcome> {
-    let warrant_ops: Vec<WarrantOp> = warrants.into_iter().map(WarrantOp::from).collect();
-    dht_store
-        .stage_warrants_for_validation(warrant_ops.clone())
-        .await?;
-    sys_validation_trigger.trigger(&"restore_workflow");
-
     let reader = dht_store.as_read();
     let mut any_pending = false;
-    for op in &warrant_ops {
-        let op_hash = DhtOpHash::with_data_sync(op);
+    for warrant in warrants {
+        let op = WarrantOp::from(warrant.clone());
+        let op_hash = DhtOpHash::with_data_sync(&op);
         match reader.warrant_validation_status(&op_hash).await? {
             None => any_pending = true,
             Some(ValidationStatus::Valid) => {
-                return Ok(WarrantOutcome::Warranted(unrecoverable_reason(op)));
+                return Ok(WarrantOutcome::Warranted(unrecoverable_reason(&op)));
             }
             Some(_) => {}
         }
@@ -101,11 +103,6 @@ mod tests {
         holochain_state::data::Dht::new(std::sync::Arc::new(holo_hash::DnaHash::from_raw_36(
             vec![0u8; 36],
         )))
-    }
-
-    /// A trigger with no consumer behind it, for tests that don't care whether it fires.
-    fn dummy_trigger() -> TriggerSender {
-        TriggerSender::new().0
     }
 
     fn build_chain_fork_warrant(seed: u8) -> SignedWarrant {
@@ -173,9 +170,8 @@ mod tests {
     async fn no_warrants_returns_cleared() {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
 
-        let outcome = stage_and_check_warrants(&store, vec![], &dummy_trigger())
-            .await
-            .unwrap();
+        stage_warrants(&store, &[]).await.unwrap();
+        let outcome = check_warrant_status(&store, &[]).await.unwrap();
         assert!(matches!(outcome, WarrantOutcome::Cleared));
     }
 
@@ -184,9 +180,8 @@ mod tests {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let warrant = build_chain_fork_warrant(5);
 
-        let outcome = stage_and_check_warrants(&store, vec![warrant], &dummy_trigger())
-            .await
-            .unwrap();
+        stage_warrants(&store, &[warrant.clone()]).await.unwrap();
+        let outcome = check_warrant_status(&store, &[warrant]).await.unwrap();
         assert!(matches!(outcome, WarrantOutcome::Pending));
     }
 
@@ -199,9 +194,8 @@ mod tests {
 
         store.test_insert_integrated_warrant(hashed).await.unwrap();
 
-        let outcome = stage_and_check_warrants(&store, vec![warrant], &dummy_trigger())
-            .await
-            .unwrap();
+        stage_warrants(&store, &[warrant.clone()]).await.unwrap();
+        let outcome = check_warrant_status(&store, &[warrant]).await.unwrap();
         assert!(matches!(
             outcome,
             WarrantOutcome::Warranted(UnrecoverableCellReason::ChainForkWarrant(_))
@@ -222,9 +216,9 @@ mod tests {
 
         // The pending warrant is listed first, so a naive first-found scan would return
         // `Pending` without ever looking at the already-validated warrant that follows it.
-        let outcome = stage_and_check_warrants(&store, vec![pending, valid], &dummy_trigger())
-            .await
-            .unwrap();
+        let warrants = vec![pending, valid];
+        stage_warrants(&store, &warrants).await.unwrap();
+        let outcome = check_warrant_status(&store, &warrants).await.unwrap();
         assert!(matches!(
             outcome,
             WarrantOutcome::Warranted(UnrecoverableCellReason::ChainForkWarrant(_))
