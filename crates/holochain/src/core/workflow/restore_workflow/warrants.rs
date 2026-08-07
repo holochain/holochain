@@ -97,7 +97,7 @@ mod tests {
     use holochain_types::op::DhtOp;
     use holochain_types::op::DhtOpHashed;
     use holochain_zome_types::op::ChainOpType;
-    use holochain_zome_types::prelude::{Signature, Timestamp, Warrant};
+    use holochain_zome_types::prelude::{OpValidity, Signature, Timestamp, Warrant};
 
     fn dht_id() -> holochain_state::data::Dht {
         holochain_state::data::Dht::new(std::sync::Arc::new(holo_hash::DnaHash::from_raw_36(
@@ -200,6 +200,23 @@ mod tests {
             outcome,
             WarrantOutcome::Warranted(UnrecoverableCellReason::ChainForkWarrant(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn rejected_warrant_is_cleared() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let warrant = build_chain_fork_warrant(10);
+        let warrant_op = WarrantOp::from(warrant.clone());
+        let hashed = DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(warrant_op)));
+
+        store
+            .test_insert_integrated_warrant_with_status(hashed, OpValidity::Rejected)
+            .await
+            .unwrap();
+
+        stage_warrants(&store, &[warrant.clone()]).await.unwrap();
+        let outcome = check_warrant_status(&store, &[warrant]).await.unwrap();
+        assert!(matches!(outcome, WarrantOutcome::Cleared));
     }
 
     #[tokio::test]
