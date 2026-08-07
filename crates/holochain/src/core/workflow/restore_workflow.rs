@@ -42,11 +42,11 @@ pub(crate) enum RestoreOutcome {
     PermanentFailure(UnrecoverableCellReason),
 }
 
-/// Reconstructs `cell_id`'s source chain from the DHT, retrying with `retry_delay` backoff until
-/// the chain is written or a validated warrant proves it unrecoverable.
+/// Reconstructs `cell_id`'s source chain from the DHT.
 ///
-/// Without a valid `sys_validation_trigger`, any staged warrants won't reach a verdict and
-/// the restore workflow would just loop forever without resolving.
+/// Retries with `retry_delay` backoff until the chain is written or a validated warrant proves it
+/// unrecoverable. Triggers sys validation to validate any warrants received against the agent, and
+/// waits on the outcome before proceeding.
 pub(crate) async fn restore_workflow(
     cell_id: CellId,
     cascade: CascadeImpl,
