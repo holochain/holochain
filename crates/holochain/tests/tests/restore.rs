@@ -2,6 +2,7 @@
 
 use holo_hash::ActionHash;
 use holochain::conductor::api::error::ConductorApiError;
+use holochain::conductor::conductor::InstallAppCommonFlags;
 use holochain::conductor::error::ConductorError;
 use holochain::sweettest::*;
 use holochain_conductor_api::CellInfo;
@@ -11,36 +12,6 @@ use holochain_types::app::{AppStatus, DisabledAppReason};
 use holochain_types::prelude::*;
 use holochain_types::signal::SystemSignal;
 use holochain_wasm_test_utils::TestWasm;
-
-/// Build a single-role [`AppBundle`] wrapping the passed [`DnaFile`], packing it ready for
-/// [`InstallAppPayload::source`].
-fn pack_bundle(dna_file: &DnaFile) -> bytes::Bytes {
-    AppBundle::new(
-        AppManifestCurrentBuilder::default()
-            .name("restored".into())
-            .description(None)
-            .roles(vec![AppRoleManifest {
-                name: "role".into(),
-                dna: AppRoleDnaManifest {
-                    path: Some(format!("{}", dna_file.dna_hash())),
-                    modifiers: DnaModifiersOpt::default(),
-                    installed_hash: None,
-                    clone_limit: 0,
-                },
-                provisioning: Some(CellProvisioning::Create { deferred: false }),
-            }])
-            .build()
-            .unwrap()
-            .into(),
-        vec![(
-            format!("{}", dna_file.dna_hash()),
-            DnaBundle::from_dna_file(dna_file.clone()).unwrap(),
-        )],
-    )
-    .unwrap()
-    .pack()
-    .unwrap()
-}
 
 /// The kitsune2 agent IDs currently joined to the network space of the passed [`DnaHash`].
 async fn joined_agents(
@@ -132,7 +103,7 @@ async fn restore_from_dht_end_to_end() {
     // even if the original device is offline.
     let mut config_b = SweetConductorConfig::rendezvous(true);
     config_b.restore_chain_quorum = 1;
-    let conductor_b =
+    let mut conductor_b =
         SweetConductor::create_with_defaults(config_b, Some(keystore.clone()), Some(rendezvous))
             .await;
 
@@ -140,17 +111,15 @@ async fn restore_from_dht_end_to_end() {
     let mut signal_rx = conductor_b.subscribe_to_app_signals(app_id.clone());
 
     conductor_b
-        .raw_handle()
-        .clone()
-        .install_app_bundle(InstallAppPayload {
-            agent_key: Some(agent.clone()),
-            source: AppBundleSource::Bytes(pack_bundle(&dna_file)),
-            installed_app_id: Some(app_id.clone()),
-            network_seed: None,
-            roles_settings: None,
-            ignore_genesis_failure: false,
-            restore_from_dht: true,
-        })
+        .install_app(
+            &app_id,
+            Some(agent.clone()),
+            std::slice::from_ref(&dna_file),
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
         .await
         .unwrap();
 
@@ -162,7 +131,8 @@ async fn restore_from_dht_end_to_end() {
         .unwrap();
     assert_eq!(app_info.status, AppStatus::AwaitingRestore);
 
-    let restore_cell_id = match app_info.cell_info["role"].first().unwrap() {
+    let role = dna_file.dna_hash().to_string();
+    let restore_cell_id = match app_info.cell_info[&role].first().unwrap() {
         CellInfo::Provisioned(c) => c.cell_id.clone(),
         other => panic!("Expected a provisioned cell, got: {other:?}"),
     };
@@ -301,7 +271,8 @@ async fn restore_from_dht_chain_fork_warrant_transitions_to_unrecoverable() {
 
     let mut config_d = SweetConductorConfig::rendezvous(true);
     config_d.restore_chain_quorum = 1;
-    let conductor_d = SweetConductor::from_config_rendezvous(config_d, rendezvous.clone()).await;
+    let mut conductor_d =
+        SweetConductor::from_config_rendezvous(config_d, rendezvous.clone()).await;
     let keystore = conductor_d.keystore();
     let agent = SweetAgents::one(keystore.clone()).await;
 
@@ -336,17 +307,15 @@ async fn restore_from_dht_chain_fork_warrant_transitions_to_unrecoverable() {
     let mut signal_rx = conductor_d.subscribe_to_app_signals(app_id.clone());
 
     conductor_d
-        .raw_handle()
-        .clone()
-        .install_app_bundle(InstallAppPayload {
-            agent_key: Some(agent.clone()),
-            source: AppBundleSource::Bytes(pack_bundle(&dna_file)),
-            installed_app_id: Some(app_id.clone()),
-            network_seed: None,
-            roles_settings: None,
-            ignore_genesis_failure: false,
-            restore_from_dht: true,
-        })
+        .install_app(
+            &app_id,
+            Some(agent.clone()),
+            std::slice::from_ref(&dna_file),
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
         .await
         .unwrap();
 
