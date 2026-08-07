@@ -92,7 +92,7 @@ pub(crate) struct SpaceValidationTriggers {
 ///
 /// # Notes
 ///
-/// `trigger_publish` is forwarded into the app/sys validation consumers as their downstream publish
+/// `tx_publish` is forwarded into the app/sys validation consumers as their downstream publish
 /// trigger. Callers that have not spawned a publish consumer like the restore workflow can pass a
 /// trigger with no consumer behind it, since firing an unconsumed trigger is a no-op.
 pub(crate) fn spawn_space_validation_consumers(
@@ -100,7 +100,7 @@ pub(crate) fn spawn_space_validation_consumers(
     network: DynHolochainP2pDna,
     space: &Space,
     conductor: ConductorHandle,
-    trigger_publish: TriggerSender,
+    tx_publish: TriggerSender,
 ) -> SpaceValidationTriggers {
     let keystore = conductor.keystore().clone();
     let queue_consumer_map = conductor.get_queue_consumer_workflows();
@@ -136,7 +136,7 @@ pub(crate) fn spawn_space_validation_consumers(
             AppValidationWorkspace::new(space.dht_store.clone(), keystore.clone()),
             conductor.clone(),
             tx_integration.clone(),
-            trigger_publish.clone(),
+            tx_publish.clone(),
             network.clone(),
         )
     });
@@ -157,7 +157,7 @@ pub(crate) fn spawn_space_validation_consumers(
             conductor.clone(),
             tx_app.clone(),
             tx_integration.clone(),
-            trigger_publish,
+            tx_publish,
             network.clone(),
             conductor.keystore().clone(),
         )
