@@ -165,9 +165,15 @@ async fn restore_from_dht_end_to_end() {
         "expected CellDisabled while awaiting restore, got: {err:?}"
     );
 
+    // Each cell emits `RestoreComplete` as it finishes, before the app-level `AppRestoreComplete`,
+    // so collect the per-cell signals seen while waiting for the app-level one.
+    let mut restored_cells = Vec::new();
     let signal = tokio::time::timeout(std::time::Duration::from_secs(60), async {
         loop {
             match signal_rx.recv().await.unwrap() {
+                Signal::System(SystemSignal::RestoreComplete { cell_id }) => {
+                    restored_cells.push(cell_id)
+                }
                 signal @ Signal::System(SystemSignal::AppRestoreComplete { .. }) => break signal,
                 Signal::System(SystemSignal::RestoreFailed { cell_id, reason }) => {
                     panic!("Restore failed unexpectedly for {cell_id:?}: {reason:?}");
@@ -182,6 +188,11 @@ async fn restore_from_dht_end_to_end() {
         signal,
         Signal::System(SystemSignal::AppRestoreComplete { installed_app_id }) if installed_app_id == app_id
     ));
+    assert_eq!(
+        restored_cells,
+        vec![restore_cell.cell_id().clone()],
+        "expected a RestoreComplete for the app's only cell before AppRestoreComplete"
+    );
 
     let app_info = conductor_b
         .raw_handle()
@@ -330,6 +341,9 @@ async fn restore_from_dht_chain_fork_warrant_transitions_to_unrecoverable() {
                     }
                     signal @ Signal::System(SystemSignal::AppRestoreComplete { .. }) => {
                         panic!("Restore unexpectedly succeeded: {signal:?}");
+                    }
+                    signal @ Signal::System(SystemSignal::RestoreComplete { .. }) => {
+                        panic!("A permanently failed cell must not report completion: {signal:?}");
                     }
                     _ => continue,
                 }
