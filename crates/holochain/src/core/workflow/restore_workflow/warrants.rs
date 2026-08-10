@@ -180,7 +180,9 @@ mod tests {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let warrant = build_chain_fork_warrant(5);
 
-        stage_warrants(&store, &[warrant.clone()]).await.unwrap();
+        stage_warrants(&store, std::slice::from_ref(&warrant))
+            .await
+            .unwrap();
         let outcome = check_warrant_status(&store, &[warrant]).await.unwrap();
         assert!(matches!(outcome, WarrantOutcome::Pending));
     }
@@ -194,7 +196,9 @@ mod tests {
 
         store.test_insert_integrated_warrant(hashed).await.unwrap();
 
-        stage_warrants(&store, &[warrant.clone()]).await.unwrap();
+        stage_warrants(&store, std::slice::from_ref(&warrant))
+            .await
+            .unwrap();
         let outcome = check_warrant_status(&store, &[warrant]).await.unwrap();
         assert!(matches!(
             outcome,
@@ -214,7 +218,9 @@ mod tests {
             .await
             .unwrap();
 
-        stage_warrants(&store, &[warrant.clone()]).await.unwrap();
+        stage_warrants(&store, std::slice::from_ref(&warrant))
+            .await
+            .unwrap();
         let outcome = check_warrant_status(&store, &[warrant]).await.unwrap();
         assert!(matches!(outcome, WarrantOutcome::Cleared));
     }
@@ -247,8 +253,10 @@ mod tests {
         let warrant = build_chain_fork_warrant(9);
 
         // Stage once, as the caller does before entering its poll loop.
-        stage_warrants(&store, &[warrant.clone()]).await.unwrap();
-        let outcome = check_warrant_status(&store, &[warrant.clone()])
+        stage_warrants(&store, std::slice::from_ref(&warrant))
+            .await
+            .unwrap();
+        let outcome = check_warrant_status(&store, std::slice::from_ref(&warrant))
             .await
             .unwrap();
         assert!(matches!(outcome, WarrantOutcome::Pending));

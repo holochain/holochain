@@ -120,6 +120,7 @@ pub(super) async fn acquire_responses(
 /// `agent`. The warrants must be validated locally but any confirmed warrant is grounds for
 /// permanent failure even if a chain head was agreed upon. No signature filtering is applied on the
 /// returned records so this should be done by the caller.
+// TODO This should be relocated into `holochain_p2p` as part of https://github.com/holochain/holochain/issues/5382
 pub(super) fn evaluate_responses(
     agent: &AgentPubKey,
     responses: Vec<AgentActivityResponse>,
