@@ -93,7 +93,7 @@ Failure modes that must be explicit (no silent corruption):
 
 Restore is a new cell instantiation workflow that replaces `genesis_workflow` for installs flagged as restoring. It runs against the same empty per-DNA database that genesis would have run against, but the database it produces is one in which the authored chain has been reconstructed from the DHT instead of freshly created.
 
-The app stays in `AppStatus::AwaitingRestore` for the duration of the workflow (new variant, see [App status](#app-status) below). Zome calls — including any that would author new chain actions — are rejected while in this state. Network activity that supports the restore itself proceeds normally: incoming gossip, op validation, and integration must run so that records fetched as part of restore can land in the DHT side of the database, so writes performed by those workflows are not blocked by the app status. What is blocked is application-driven chain authoring.
+The app stays in `AppStatus::AwaitingRestore` for the duration of the workflow (new variant, see [App status](#app-status) below). Zome calls — including any that would author new chain actions — are rejected while in this state, with `ConductorError::CellNotRunning(cell_id, CellUnavailableReason::AppAwaitingRestore)` so the caller can tell a restore in progress from an app that is merely disabled. Network activity that supports the restore itself proceeds normally: incoming gossip, op validation, and integration must run so that records fetched as part of restore can land in the DHT side of the database, so writes performed by those workflows are not blocked by the app status. What is blocked is application-driven chain authoring.
 
 ### Per-app orchestration
 
@@ -346,6 +346,7 @@ Applications that rely on the lost categories must accept degraded post-restore 
 |---------|-----------|
 | `agent_key == None` with `restore_from_dht == true` | Reject the install at admit time. |
 | `agent_key` not present in local Lair | Reject the install at admit time. |
+| Zome call attempted while the app is in `AwaitingRestore` | Rejected with `ConductorError::CellNotRunning(cell_id, CellUnavailableReason::AppAwaitingRestore)`. Gossip, validation and integration are unaffected. |
 | Fewer than `restore_chain_quorum` peers respond | Internal retry (see [Retry behaviour](#retry-behaviour)). App stays in `AwaitingRestore`. |
 | Responding peers disagree on `ChainHead` | Internal retry. App stays in `AwaitingRestore`. |
 | Incomplete chain (gap in `0..=H`) | Internal retry. Re-runs Step 1 from scratch. App stays in `AwaitingRestore`. |

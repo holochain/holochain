@@ -13,6 +13,38 @@ use thiserror::Error;
 /// Custom result type for conductor errors with [`ConductorError`] as the error type.
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
+/// Why a referenced cell is not currently running.
+///
+/// A cell can be registered in the conductor's state without being callable,
+/// either because the app that owns it is not in a state that runs cells, or
+/// because the cell itself is disabled or has not finished starting.
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum CellUnavailableReason {
+    /// The app that owns the cell is disabled.
+    #[error("the app is disabled: {0:?}")]
+    AppDisabled(DisabledAppReason),
+
+    /// The app that owns the cell is still awaiting its membrane proofs.
+    #[error("the app is awaiting membrane proofs")]
+    AppAwaitingMemproofs,
+
+    /// The app that owns the cell is restoring its source chains from the DHT.
+    #[error("the app is restoring its source chains from the DHT")]
+    AppAwaitingRestore,
+
+    /// The app that owns the cell failed to restore a source chain and cannot be enabled.
+    #[error("the app's source chain restore failed permanently: {0:?}")]
+    AppUnrecoverable(UnrecoverableCellReason),
+
+    /// The cell is a clone cell which has been disabled.
+    #[error("the clone cell is disabled")]
+    CloneCellDisabled,
+
+    /// The app that owns the cell is enabled but the cell has not finished starting.
+    #[error("the cell has not finished starting")]
+    NotStarted,
+}
+
 #[allow(missing_docs)]
 #[derive(Error, Debug)]
 pub enum ConductorError {
@@ -34,8 +66,8 @@ pub enum ConductorError {
     #[error("Cell already exists. CellId: {0:?}")]
     CellAlreadyExists(CellId),
 
-    #[error("Cell was referenced, but is currently disabled. CellId: {0:?}")]
-    CellDisabled(CellId),
+    #[error("Cell was referenced, but is not running. CellId: {0:?} Reason: {1}")]
+    CellNotRunning(CellId, CellUnavailableReason),
 
     #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
     CellMissing(CellId),

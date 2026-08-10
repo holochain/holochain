@@ -3,7 +3,7 @@
 use holo_hash::ActionHash;
 use holochain::conductor::api::error::ConductorApiError;
 use holochain::conductor::conductor::InstallAppCommonFlags;
-use holochain::conductor::error::ConductorError;
+use holochain::conductor::error::{CellUnavailableReason, ConductorError};
 use holochain::sweettest::*;
 use holochain_conductor_api::CellInfo;
 use holochain_keystore::{AgentPubKeyExt, WarrantOpExt};
@@ -152,7 +152,8 @@ async fn restore_from_dht_end_to_end() {
         }
     });
 
-    // `enable_app` has not been called yet, so the cell must not be callable.
+    // `enable_app` has not been called yet, so the cell must not be callable. The restore may
+    // already have finished, which leaves the app disabled rather than awaiting restore.
     let err = conductor_b
         .call_fallible::<_, ActionHash>(&restore_cell.zome(TestWasm::Create), "create_entry", ())
         .await
@@ -160,9 +161,13 @@ async fn restore_from_dht_end_to_end() {
     assert!(
         matches!(
             err,
-            ConductorApiError::ConductorError(ConductorError::CellDisabled(_))
+            ConductorApiError::ConductorError(ConductorError::CellNotRunning(
+                _,
+                CellUnavailableReason::AppAwaitingRestore
+                    | CellUnavailableReason::AppDisabled(DisabledAppReason::NeverStarted)
+            ))
         ),
-        "expected CellDisabled while awaiting restore, got: {err:?}"
+        "expected the cell to not be callable before enable_app, got: {err:?}"
     );
 
     // Each cell emits `RestoreComplete` as it finishes, before the app-level `AppRestoreComplete`,
@@ -215,6 +220,66 @@ async fn restore_from_dht_end_to_end() {
         .call(&restore_cell.zome(TestWasm::Create), "get_post", new_hash)
         .await;
     assert_eq!(new_record.unwrap().action().action_seq(), last_seq_on_a + 1);
+}
+
+/// Installs a restoring app on a conductor with no peers to restore from, so the restore keeps
+/// retrying and the app stays in [`AppStatus::AwaitingRestore`]. Confirms a zome call in that state
+/// is rejected with a reason naming the restore, rather than looking like a plain disabled app.
+#[tokio::test(flavor = "multi_thread")]
+async fn zome_call_while_awaiting_restore_is_rejected() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+    let mut conductor =
+        SweetConductor::from_config_rendezvous(SweetConductorConfig::rendezvous(true), rendezvous)
+            .await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+
+    let app_id = "restored".to_string();
+    conductor
+        .install_app(
+            &app_id,
+            Some(agent),
+            std::slice::from_ref(&dna_file),
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    let app_info = conductor
+        .raw_handle()
+        .get_app_info(&app_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(app_info.status, AppStatus::AwaitingRestore);
+
+    let role = dna_file.dna_hash().to_string();
+    let restore_cell_id = match app_info.cell_info[&role].first().unwrap() {
+        CellInfo::Provisioned(c) => c.cell_id.clone(),
+        other => panic!("Expected a provisioned cell, got: {other:?}"),
+    };
+    let restore_cell = conductor.get_sweet_cell(restore_cell_id).unwrap();
+
+    let err = conductor
+        .call_fallible::<_, ActionHash>(&restore_cell.zome(TestWasm::Create), "create_entry", ())
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(
+            err,
+            ConductorApiError::ConductorError(ConductorError::CellNotRunning(
+                _,
+                CellUnavailableReason::AppAwaitingRestore
+            ))
+        ),
+        "expected AppAwaitingRestore, got: {err:?}"
+    );
 }
 
 async fn build_fork_pair(
