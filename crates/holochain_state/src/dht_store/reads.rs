@@ -3328,6 +3328,34 @@ mod tests {
     use std::sync::Arc;
     use EntryType;
 
+    #[test]
+    fn invalid_status_carries_the_rejected_actions_own_head_not_the_valid_tip() {
+        use holochain_zome_types::prelude::{ChainHead, ChainStatus};
+
+        let valid_tip_hash = ActionHash::from_raw_36(vec![3; 36]);
+        let rejected_hash = ActionHash::from_raw_36(vec![4; 36]);
+        let valid = vec![
+            (0u32, ActionHash::from_raw_36(vec![0; 36])),
+            (3, valid_tip_hash.clone()),
+        ];
+        let rejected = vec![(4u32, rejected_hash.clone())];
+
+        let (status, valid_out, rejected_out) =
+            compute_chain_status(valid.into_iter(), rejected.into_iter());
+
+        //  The chain head inside `Invalid` should be the first rejected action and not the valid
+        //  chain head.
+        assert_eq!(
+            status,
+            ChainStatus::Invalid(ChainHead {
+                action_seq: 4,
+                hash: rejected_hash,
+            })
+        );
+        assert_eq!(valid_out.last().unwrap().1, valid_tip_hash);
+        assert_eq!(rejected_out.len(), 1);
+    }
+
     fn make_fork_op(author: &AgentPubKey, prev: &ActionHash, seq: u32, seed: u8) -> DhtOpHashed {
         let action = Action {
             header: ActionHeader {

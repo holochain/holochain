@@ -95,6 +95,9 @@ pub enum ConductorError {
     #[error("App status could not be changed: {0}")]
     AppStatusError(String),
 
+    #[error("Invalid combination of app install options in the payload: {0}")]
+    InvalidInstallAppPayload(String),
+
     #[error("Init properties error: {0}")]
     InitPropertiesError(String),
 

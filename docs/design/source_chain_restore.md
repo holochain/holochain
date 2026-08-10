@@ -153,7 +153,7 @@ State transitions during restore (driven by the per-app orchestrator; see [Per-a
 ```text
 install_app(restore_from_dht: true)
     └─> AppStatus::AwaitingRestore
-            ├─(every cell's chain integrity check passes)─> AppStatus::Disabled(NeverStarted)
+            ├─(every cell's chain is reconstructed and written)─> AppStatus::Disabled(NeverStarted)
             │                                                     └─(enable_app)─> AppStatus::Enabled
             └─(any cell fails permanently)───────────────> AppStatus::Unrecoverable(cell_id, reason)
 ```
@@ -230,34 +230,27 @@ Other warrant variants beyond `ChainIntegrityWarrant` (none exist today, but the
 
 #### Step 2 — Write the authored state
 
-The aim of Step 2 is to recreate the authored state that would otherwise be missing on this node. There is no separate validation and integration flow: instead, as records arrive from `get_agent_activity_multi` and pass their signature check, the workflow writes them directly into the per-DNA database in the same shape that authoring would have produced, modulo the missing private data.
+The aim of Step 2 is to recreate the authored state that would otherwise be missing on this node. There is no separate validation and integration flow, and no separate integrity gate afterward: the workflow reconstructs the chain in memory first, and only writes to the per-DNA database once that reconstruction is known to be a complete, gap-free, fork-free chain terminating at the agreed head.
 
-For each signature-verified record `(action, entry?)` belonging to the target chain, the workflow writes:
+Matching heads across peers (Step 1) does not by itself guarantee a fork-free chain — a peer may have returned records where some sequence numbers belong to a different fork. To rule this out, the workflow builds a map from action hash to record for every signature-verified record collected in Step 1, then walks backward from the quorum-agreed `head_hash`, following each action's `prev_action` link, until it reaches seq 0. Only records reachable by this walk are part of the target chain; anything else (including any fork records a misbehaving or lagging peer supplied) is silently excluded — it was never on the path from `head_hash` and is discarded without treating its presence as an error.
+
+If the walk cannot resolve a `prev_action` link before reaching seq 0, the chain is incomplete: the workflow does not write anything, and returns to Step 1 to retrieve fresh responses (see [Retry behaviour](#retry-behaviour)). Because the walk both discovers and verifies the chain before any write happens, gaplessness, hash-matching, and `prev_action` linkage are established as preconditions of writing, not properties checked afterward — there is nothing left to re-verify once the write completes. This is the implementation of the guarantee in [Problem statement](#problem-statement) that a complete, gap-free, fork-free chain is in place before the cell may be used.
+
+Once the walk produces a complete chain from seq 0 to `head_hash`, the workflow writes it directly into the per-DNA database in the same shape that authoring would have produced, except that private entry content cannot be written as the author never shares private entries with peers in the first place, so they don't have them to pass on, see [Scope and assumptions](#scope-and-assumptions). Therefore, a record whose action declares a private entry restores with the action present but no corresponding row in `PrivateEntry`.
+
+For each signature-verified record `(action, entry?)` belonging to the reconstructed chain, the workflow writes:
 
 - The `Action` row (referenced by both authored-chain queries and DHT op rows).
-- The public `Entry` row, where the record carries one. Private entries are not present in the response and are simply absent on the restored node.
+- The public `Entry` row, where the record carries one. Private entries are never present in the response and are simply absent on the restored node.
 - The full set of `ChainOp` rows that the action would produce per [`data_model.md`](./data_model.md) (e.g. `AgentActivity`, `CreateRecord`, plus type-specific ops). These are flagged as accepted by virtue of being part of an authored chain trusted by signature; they do not pass through the limbo or validation tables.
 - `ChainOpPublish` entries for each generated op. **Republishing is intentional.** Although the ops already exist on the DHT, the restoring node needs to gather its own validation receipts to reconstruct that portion of local state, and the publish path is the mechanism by which receipts are collected.
 - Auxiliary index rows that the action type requires (e.g. `CapGrant` rows for `CapGrant`-typed entries whose entry body is private but whose action is present).
 
 The exact set of tables written to is governed by the data model and state model documents and may need to be revisited if those documents change.
 
-The workflow proceeds as records arrive; ordering is not required because each record is self-validating via its signature and the chain's hash linkage is established by the action contents themselves, not by write order. The watch ends when the chain-integrity check (below) succeeds.
-
-Records claimed to be in the target chain that fail their signature check, or that hash to a value other than the quorum-agreed candidate for their sequence, are discarded. The discarded records are never written to the authored state. Restore relies on at least one honest peer per sequence supplying a record that passes both checks; until that holds for every `seq` in `0..=H`, the workflow keeps requesting and waits.
-
-**Chain-integrity check (gate to Step 3).** Before transitioning out of restoring, the workflow verifies that the authored state contains a single linear chain for `A`:
-
-- Every sequence number in `0..=H` is present, no gaps.
-- The action hash written at each sequence matches the candidate hash pinned by Step 1's quorum response.
-- The action at seq `H` has hash equal to the `head_hash` agreed by all queried peers in Step 1 (terminates the check on the agreed tip, not just any tip).
-- Each action at seq `n > 0` has `prev_action` equal to the action hash at seq `n - 1` (sanity check; the hashes already encode this, but the load step verifies it explicitly).
-
-This check loads the chain from the local store. Any failure means restore is not yet complete and the workflow returns to waiting/requesting. The check is the implementation of the guarantee in [Problem statement](#problem-statement) that a complete, gap-free, fork-free chain is in place before the cell may be used.
-
 #### Step 3 — Hand the cell back to the orchestrator
 
-When the chain-integrity check succeeds for this cell, the workflow reports completion to the per-app orchestrator and a `SystemSignal::RestoreComplete { cell_id }` is emitted so subscribers learn this cell is done without polling. The cell's reconstructed chain is now on disk; nothing further happens to it until the app is enabled.
+When the reconstructed chain has been written for this cell, the workflow reports completion to the per-app orchestrator and a `SystemSignal::RestoreComplete { cell_id }` is emitted so subscribers learn this cell is done without polling. The cell's reconstructed chain is now on disk; nothing further happens to it until the app is enabled.
 
 App-level status does **not** change on a single cell completing. The orchestrator advances to the next provisioned cell (see [Per-app orchestration](#per-app-orchestration)). Only once **every** cell of the app has reached this point does the app transition out of `AppStatus::AwaitingRestore` into `AppStatus::Disabled(DisabledAppReason::NeverStarted)` — the same state a non-restoring install lands in after genesis — and emit `SystemSignal::AppRestoreComplete { installed_app_id }`. The app is **not** enabled automatically; the caller must invoke `enable_app`, matching existing install semantics where installation and activation are separate admin operations. After `enable_app`, new actions authored on this node publish through the normal publish workflow on top of each cell's restored tip.
 
@@ -270,7 +263,7 @@ Failures classified as retryable in this design are handled inside the workflow:
 - Zero peers respond.
 - Fewer than `restore_chain_quorum` peers respond.
 - Responding peers disagree on `ChainHead`.
-- Incomplete chain returned (gaps in `0..=H`): keep requesting missing sequences from peers that might hold them.
+- Incomplete chain returned (gaps in `0..=H`): the walk cannot resolve back to seq 0, so nothing is written. Instead, the workflow returns to Step 1 and re-issues `get_agent_activity_multi` from scratch, in case other peers can now supply the missing records.
 - Warrants returned by peers are pending local validation: wait for the validation pipeline's verdict before advancing.
 - Individual records arrive with bad signatures or hashes that do not match the Step 1 candidate. These are discarded record-by-record; restore keeps requesting until at least one honest peer per `seq` has been heard from.
 
@@ -355,7 +348,7 @@ Applications that rely on the lost categories must accept degraded post-restore 
 | `agent_key` not present in local Lair | Reject the install at admit time. |
 | Fewer than `restore_chain_quorum` peers respond | Internal retry (see [Retry behaviour](#retry-behaviour)). App stays in `AwaitingRestore`. |
 | Responding peers disagree on `ChainHead` | Internal retry. App stays in `AwaitingRestore`. |
-| Incomplete chain (gap in `0..=H`) | Internal retry. Re-request missing sequences. App stays in `AwaitingRestore`. |
+| Incomplete chain (gap in `0..=H`) | Internal retry. Re-runs Step 1 from scratch. App stays in `AwaitingRestore`. |
 | Restored record fails signature check against `A` | Record discarded. Restore continues with responses from other peers. |
 | Restored record's hash does not match the Step 1 candidate for its sequence | Record discarded. Restore continues with responses from other peers. |
 | Warrant returned by a peer for `A` | Submitted to local validation. App stays in `AwaitingRestore` until validation completes; outcome below. |
