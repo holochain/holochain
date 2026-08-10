@@ -45,7 +45,10 @@
 //! A [`WarrantOp`] is produced as a proof that an agent broke the rules of the DHT. That may be the
 //! rules of this workflow or the rules set by the application and checked in the app validation
 //! workflow.
-//! Warrant validation is performed entirely by sys validation, and the steps performed are:
+//! Checking a [`WarrantOp`] is triggered from this workflow, but it waits on the validation status
+//! of the warranted [`Action`], which is only settled once that action has gone through the full
+//! validation pipeline, including app validation. The steps performed once that status is
+//! available are:
 //! - For a [`WarrantOpType::ChainIntegrityWarrant`]:
 //!   - The warranted [`Action`] must be found locally. If it is not found, then it will be fetched.
 //!   - The warranted [`Action`] will be completely validated, including app validation.
@@ -1567,10 +1570,15 @@ impl SysValidationWorkspace {
 /// Gets an arbitrary agent with a cell running the given DNA, needed for processes
 /// which require an agent signature but happen at the DNA level, i.e. not bound to any
 /// particular cell.
+///
+/// A restoring cell's agent is also accepted as representative for its DNA because even though it
+/// is deliberately kept out of `running_cell_ids` until the app is enabled, its DNA space still
+/// needs sys/app validation to run so that encountered warrants can reach a verdict.
 pub fn get_representative_agent(conductor: &Conductor, dna_hash: &DnaHash) -> Option<AgentPubKey> {
     conductor
         .running_cell_ids()
         .into_iter()
+        .chain(conductor.restoring_cell_ids())
         .find(|id| id.dna_hash() == dna_hash)
         .map(|id| id.agent_pubkey().clone())
 }

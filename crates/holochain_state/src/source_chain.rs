@@ -1161,7 +1161,7 @@ pub async fn dump_state_paginated(
 }
 
 // ---------------------------------------------------------------------------
-// Private helpers for the new-DB writes in `flush` and `genesis`
+// Helpers for the new-DB writes used by flush, genesis, and restore.
 // ---------------------------------------------------------------------------
 
 /// Return the `(cap_access_i64, Option<tag>)` parameters needed for
@@ -1170,7 +1170,7 @@ pub async fn dump_state_paginated(
 ///
 /// The entry content is needed to extract the tag; entries are looked up by
 /// the entry hash carried by the action.
-fn cap_grant_index_params(
+pub(crate) fn cap_grant_index_params(
     shh: &SignedActionHashed,
     entries: &[EntryHashed],
 ) -> Option<(i64, Option<String>)> {

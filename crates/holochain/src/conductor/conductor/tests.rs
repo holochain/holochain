@@ -2,6 +2,7 @@ use super::Conductor;
 use super::*;
 use crate::conductor::api::error::ConductorApiError;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
+use crate::core::workflow::sys_validation_workflow::get_representative_agent;
 use crate::sweettest::*;
 use crate::test_utils::inline_zomes::simple_crud_zome;
 use crate::{
@@ -19,6 +20,7 @@ use matches::assert_matches;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
+use tokio::sync::mpsc;
 
 mod add_agent_infos;
 mod app_state;
@@ -34,8 +36,7 @@ async fn app_ids_are_unique() {
     let db_dir = test_db_dir();
     let ribosome_store = RibosomeStore::new();
     let holochain_p2p = holochain_p2p::stub_network().await;
-    let (post_commit_sender, _post_commit_receiver) =
-        tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+    let (post_commit_sender, _post_commit_receiver) = mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let config = ConductorConfig {
@@ -89,6 +90,62 @@ async fn app_ids_are_unique() {
     assert_matches!(
         conductor.add_disabled_app_to_db(app.clone(), InitPropertiesMap::new()).await,
         Err(ConductorError::AppAlreadyInstalled(id)) if id == app_id
+    );
+}
+
+/// `get_representative_agent` must also recognise cells marked for restoring and not just running
+#[tokio::test(flavor = "multi_thread")]
+async fn representative_agent_recognises_a_restoring_cell() {
+    let db_dir = test_db_dir();
+    let ribosome_store = RibosomeStore::new();
+    let holochain_p2p = holochain_p2p::stub_network().await;
+    let (post_commit_sender, _post_commit_receiver) = mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+
+    let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
+    let config = ConductorConfig {
+        data_root_path: Some(db_dir.path().to_path_buf().into()),
+        ..Default::default()
+    };
+    let spaces = Spaces::new(
+        config.clone().into(),
+        Arc::new(Mutex::new(sodoken::LockedArray::from(
+            b"passphrase".to_vec(),
+        ))),
+    )
+    .await
+    .unwrap();
+    let conductor = Conductor::new(
+        config.into(),
+        ribosome_store,
+        test_keystore(),
+        holochain_p2p,
+        spaces,
+        post_commit_sender,
+        outcome_tx,
+        Default::default(),
+    );
+
+    let dna_hash = fixt!(DnaHash);
+    let cell_id = CellId::new(dna_hash.clone(), fixt!(AgentPubKey));
+
+    assert_eq!(
+        get_representative_agent(&conductor, &dna_hash),
+        None,
+        "no cell running or restoring for this DNA yet"
+    );
+
+    conductor.mark_cell_restoring(cell_id.clone());
+    assert_eq!(
+        get_representative_agent(&conductor, &dna_hash),
+        Some(cell_id.agent_pubkey().clone()),
+        "a restoring cell should count as representative for its DNA"
+    );
+
+    conductor.unmark_cell_restoring(&cell_id);
+    assert_eq!(
+        get_representative_agent(&conductor, &dna_hash),
+        None,
+        "unmarking should stop the cell counting as representative"
     );
 }
 
