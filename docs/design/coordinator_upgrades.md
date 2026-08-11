@@ -31,8 +31,7 @@ user's choice, never automatic or developer-forced.
 - A **coordinator set** is the collection of coordinator zomes bound to one role
   of an installed app. A cell runs exactly **one** coordinator set at a time —
   the latest installed.
-- A **coordinator upgrade** replaces one or more of an installed app's coordinator
-  sets — an app may have several roles, each with its own set — with new ones.
+- An app may have several roles, each with its own set. A **coordinator upgrade** replaces one or more of an installed app's coordinator set with new ones.
   Integrity code, network, agent key, and source chain are untouched.
 
 ## Motivation
