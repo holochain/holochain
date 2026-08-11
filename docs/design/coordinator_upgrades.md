@@ -13,7 +13,7 @@ the current system (the unified per-DNA database, the v2 model types, and the
 Coordinator upgrades are designed to **compose with, but not depend on**, chain
 continuation. They are intended to ship first. An app release will often carry
 *both* a new coordinator set and a new integrity version, so `update_app` leaves
-a clean **seam** for an integrity-version change to be delegated to chain
+a clean seam for an integrity-version change to be delegated to chain
 continuation rather than forbidding it. Applying an app update is always the
 user's choice, never automatic or developer-forced.
 
