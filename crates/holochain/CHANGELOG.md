@@ -12,8 +12,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.8.0-dev.1
 
-- Network metrics and stats types returned by the admin/app APIs (`DhtArc`, `FetchStateSummary`, `GossipStateSummary`, `TransportStats`, `MessageBlockCount`, and related types) are now holochain-owned mirrors of the equivalent kitsune2 types instead of direct kitsune2 re-exports. Their wire format and field names are unchanged. \#5930
-
 ## 0.8.0-dev.0
 
 ## 0.7.0
