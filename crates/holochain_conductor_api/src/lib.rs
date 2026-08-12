@@ -48,9 +48,9 @@ pub use storage_info::*;
 
 /// Exports the complete TypeScript binding tree for the conductor API.
 ///
-/// Single entry point behind `scripts/export-ts-bindings.sh` / `make
-/// ts-bindings`. Exports the wire roots ([`AdminRequest`], [`AdminResponse`],
-/// [`AppRequest`], [`AppResponse`], `holochain_types::signal::Signal`),
+/// Single entry point behind `make ts-bindings`. Exports the wire roots
+/// ([`AdminRequest`], [`AdminResponse`], [`AppRequest`], [`AppResponse`],
+/// `holochain_types::signal::Signal`),
 /// [`JsonDump`] (carried as a JSON string by [`AdminResponse::StateDumped`],
 /// not part of the msgpack body), and every upstream crate's `ts_alias!`
 /// markers and hand-written impls — all from one process, since ts-rs only
@@ -128,10 +128,54 @@ fn tag_exports_public(source: &str) -> String {
 
 #[cfg(all(test, feature = "ts_rs"))]
 mod ts_export {
+    /// Removes its directory on drop, so a staging directory is cleaned up
+    /// even if the export panics before the happy path removes it.
+    struct StagingDir(std::path::PathBuf);
+
+    impl Drop for StagingDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+        std::fs::create_dir_all(dst)?;
+        for entry in std::fs::read_dir(src)? {
+            let entry = entry?;
+            let dst_path = dst.join(entry.file_name());
+            if entry.file_type()?.is_dir() {
+                copy_dir_all(&entry.path(), &dst_path)?;
+            } else {
+                std::fs::copy(entry.path(), dst_path)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Exports into a staging directory first, so the real output directory
+    /// (`TS_RS_EXPORT_DIR`, default `./bindings`) is never left in a
+    /// half-written state if the export fails partway through, and is only
+    /// touched once the full tree has exported successfully.
     #[test]
     fn export_bindings_aggregate() {
-        let cfg = ts_rs::Config::from_env();
+        let final_dir = ts_rs::Config::from_env().out_dir().to_path_buf();
+
+        let staging = StagingDir(
+            std::env::temp_dir().join(format!("holochain-ts-bindings-{}", std::process::id())),
+        );
+        let _ = std::fs::remove_dir_all(&staging.0);
+        std::fs::create_dir_all(&staging.0).expect("failed to create staging directory");
+
+        let cfg = ts_rs::Config::from_env().with_out_dir(staging.0.clone());
         super::export_ts_bindings(&cfg).unwrap();
+
+        if final_dir.exists() {
+            std::fs::remove_dir_all(&final_dir).expect("failed to clear previous export");
+        }
+        if let Some(parent) = final_dir.parent() {
+            std::fs::create_dir_all(parent).expect("failed to create export directory");
+        }
+        copy_dir_all(&staging.0, &final_dir).expect("failed to move bindings into place");
     }
 
     #[test]
