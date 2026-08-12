@@ -124,6 +124,46 @@ cargo fmt --all              # format Rust code
 `scripts/format-toml.sh` runs `taplo` through `nix-shell`, so it needs Nix installed. If you don't use Nix, `make
 static-toml` (check) and `make toml-fix` (fix) do the same job with a Cargo-installed `taplo`.
 
+### Regenerating the TypeScript client bindings
+
+The conductor's wire API is mirrored as TypeScript types for
+[holochain-client-js](https://github.com/holochain/holochain-client-js). The types are generated from the Rust
+definitions with [ts-rs](https://github.com/Aleph-Alpha/ts-rs), behind an opt-in `ts_rs` Cargo feature that ordinary
+builds and `make test-workspace` never enable.
+
+Regenerate them whenever you add or change a field on an admin or app request, response, or signal type:
+
+```shell
+make ts-bindings
+```
+
+The tree is written to `./bindings`, which is git-ignored and not committed; set `TS_RS_EXPORT_DIR` to write elsewhere.
+Under the hood this runs the `export-ts-bindings` binary in the `hc` crate, which is gated on `required-features =
+["ts_rs"]` and so is skipped by every build that does not ask for the feature.
+
+Types are pulled in by the compiler rather than by a hand-maintained list, so a newly reachable type that has no
+TypeScript export fails the build:
+
+```shell
+cargo build -p holochain_conductor_api --features ts_rs
+```
+
+A `trait 'ts_rs::TS' is not implemented` error names exactly what still needs handling. `make ts-bindings-test`
+additionally runs the `ts_rs`-gated tests, and is the target CI uses.
+
+A consumer that wants to generate the types itself, rather than take them from a release, can build this binary from
+its own Nix flake against the Holochain revision that flake pins. Holonix exposes `packages.hc` as an overridable
+derivation, so the feature and the extra binary can be appended to its build arguments:
+
+```nix
+inputs'.holonix.packages.hc.override {
+  cargoExtraArgs = "--features ts_rs,unstable-countersigning --bin export-ts-bindings";
+}
+```
+
+Each `nix flake update` on the consumer side then moves the pinned revision forward, and re-running the binary picks up
+any type changes that came with it.
+
 ### Verifying changes and reproducing issues
 
 If you are able to create a [sweettest](https://github.com/holochain/holochain/tree/develop/crates/holochain/src/sweettest) 

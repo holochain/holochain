@@ -115,18 +115,30 @@ need a TS export even if they resemble an exported type.
 - Manual/alias impls are exported by each crate's
   `ts_rs`-gated `export_ts_bindings` function (crate root or `ts` module),
   which chains its in-set deps' functions; when adding one, register it
-  there. The whole tree is written by the single aggregate test in
-  `holochain_conductor_api` (`make ts-bindings`, which runs `cargo test -p
-  holochain_conductor_api --features ts_rs,unstable-countersigning
-  export_bindings_aggregate`) because ts-rs only merges declarations sharing
-  an output file within one process — never run the export through nextest
-  (process per test) or per-crate loops. The test stages the tree in a temp
-  directory and only replaces `TS_RS_EXPORT_DIR` once the export succeeds, so
-  a failed export never leaves it half-written. `make ts-bindings-test` also
-  runs the ts_rs-gated tests that the `export_bindings_aggregate` name
-  filter excludes (the wire-format smoke test and the tag-injection helper's
-  unit tests) — CI runs this target since ordinary `make test-workspace`
-  never enables the `ts_rs` feature.
+  there. The whole tree is written by the `export-ts-bindings` binary in the
+  `hc` crate (`make ts-bindings`, which runs `cargo run -p holochain_cli
+  --features ts_rs,unstable-countersigning --bin export-ts-bindings`) because
+  ts-rs only merges declarations sharing an output file within one process —
+  never split the export across per-crate loops. The binary is gated on
+  `required-features = ["ts_rs"]`, so builds that don't enable the feature
+  skip it. It stages the tree in a temp directory and only replaces
+  `TS_RS_EXPORT_DIR` once the export succeeds, so a failed export never
+  leaves it half-written. `make ts-bindings-test` also runs the
+  `holochain_conductor_api` ts_rs-gated tests (the wire-format smoke test and
+  the tag-injection helper's unit tests) — CI runs this target since ordinary
+  `make test-workspace` never enables the `ts_rs` feature.
+- The binary lives in `hc` rather than `holochain_conductor_api` so that
+  holochain-client-js can build it from a pinned revision through Holonix,
+  whose `hc` package appends overridden arguments to a hard-wired
+  `--manifest-path crates/hc/Cargo.toml --bin hc`; a bin in another crate
+  cannot be reached that way. `hc` also pulls in neither the `holochain`
+  crate nor a wasmer backend, so the export does not compile a WASM engine.
+- The binary sets the TypeScript dialect (`number` for 64-bit integers, `.js`
+  import extensions) in code, taking only the output directory from
+  `TS_RS_EXPORT_DIR`. The matching `TS_RS_*` entries in `.cargo/config.toml`
+  reach only processes Cargo spawns from this workspace, which the binary is
+  not when the client builds and runs it from its own flake; keep the two in
+  sync.
 - The export build enables `unstable-countersigning` on top of `ts_rs`, so
   the countersigning app API and its session state types both reach the
   bindings. Types and fields gated behind the remaining `unstable-*`

@@ -3053,10 +3053,12 @@ dependencies = [
  "holochain_cli_bundle",
  "holochain_cli_client",
  "holochain_cli_sandbox",
+ "holochain_conductor_api",
  "holochain_trace",
  "lazy_static",
  "predicates",
  "tokio",
+ "ts-rs",
 ]
 
 [[package]]
