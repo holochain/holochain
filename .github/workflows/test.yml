@@ -79,6 +79,22 @@ jobs:
           target: ${{ matrix.target }}
           influx-token: ${{ secrets.INFLUX_TOKEN }}
 
+  ts-bindings:
+    name: ts-bindings
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v5
+
+      - name: "Common Test Setup Actions"
+        uses: ./.github/actions/common-pre
+
+      - name: ts-bindings-test
+        run: make ts-bindings-test
+
+      - name: "Common Test Teardown Actions"
+        uses: ./.github/actions/common-post
+
   # The `wasmer-wasmi` tests are split out into a separate job so we can ignore its failures in the `ci-pass` job.
   # This allows the workflow to pass, while still showing the `test-wasmer-wasmi` job as failed in the UI.
   test-wasmer-wasmi:
@@ -108,6 +124,7 @@ jobs:
       - static
       - test-wasmer-sys-cranelift
       - test-wasmer-wasmi
+      - ts-bindings
     steps:
       - name: check status
         uses: re-actors/alls-green@release/v1
