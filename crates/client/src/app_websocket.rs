@@ -512,7 +512,10 @@ impl AppWebsocket {
         url: Url,
         dna_hashes: Option<Vec<DnaHash>>,
     ) -> ConductorApiResult<BTreeMap<DnaHash, BTreeMap<String, PeerMetaInfo>>> {
-        let msg = AppRequest::PeerMetaInfo { url, dna_hashes };
+        let msg = AppRequest::PeerMetaInfo {
+            url: url.to_string(),
+            dna_hashes,
+        };
         let response = self.inner.send(msg).await?;
         match response {
             AppResponse::PeerMetaInfo(info) => Ok(info),

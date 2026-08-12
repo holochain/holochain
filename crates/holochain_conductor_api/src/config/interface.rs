@@ -6,6 +6,8 @@ use serde::Serialize;
 /// Information neeeded to spawn an admin interface
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct AdminInterfaceConfig {
     /// By what means the interface will be exposed.
     ///
@@ -24,6 +26,8 @@ pub struct AdminInterfaceConfig {
 /// [`ConductorState`]: https://docs.rs/holochain/latest/holochain/conductor/state/struct.ConductorState.html
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum InterfaceDriver {
     /// An interface implemented via websockets
     Websocket {
@@ -38,6 +42,7 @@ pub enum InterfaceDriver {
         /// Holochain has minimal security protections in place for websocket connections. The app
         /// websockets are protected by the admin websocket, but if you expose the admin websocket
         /// to the network, then anyone who can connect to it can control your conductor.
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         danger_bind_addr: Option<String>,
 
         /// Allowed origins for this interface.
@@ -48,6 +53,10 @@ pub enum InterfaceDriver {
         /// - Any origin - `*`
         ///
         /// Connections from any origin which is not permitted by this config will be rejected.
+        #[cfg_attr(
+            feature = "ts_rs",
+            ts(as = "holochain_types::websocket::AllowedOriginsTs")
+        )]
         allowed_origins: AllowedOrigins,
     },
 }

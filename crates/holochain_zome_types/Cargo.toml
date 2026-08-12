@@ -37,6 +37,9 @@ derive_more = { version = "2.0", features = [
   "into",
 ] }
 
+# Optional
+ts-rs = { version = "12.0", features = ["no-serde-warnings"], optional = true }
+
 # fixturator dependencies
 fixt = { version = "^0.8.0-dev.0", path = "../fixt", optional = true }
 rand = { version = "0.9", optional = true }
@@ -118,3 +121,12 @@ unstable-countersigning = []
 unstable-migration = []
 
 schema = ["dep:schemars"]
+
+ts_rs = [
+  "dep:ts-rs",
+  "holo_hash/ts_rs",
+  "holochain_integrity_types/ts_rs",
+  "holochain_nonce/ts_rs",
+  "holochain_timestamp/ts_rs",
+  "properties",
+]

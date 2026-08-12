@@ -1701,7 +1701,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let local_agent: DynLocalAgent = Arc::new(HolochainP2pLocalAgent::new(
                 agent_pub_key,
-                DhtArc::FULL,
+                kitsune2_api::DhtArc::FULL,
                 self.target_arc_factor,
                 self.lair_client.clone(),
             ));
@@ -2759,16 +2759,16 @@ impl actor::HcP2p for HolochainP2pActor {
                             .into_iter()
                             .map(|a| LocalAgentSummary {
                                 agent: AgentPubKey::from_k2_agent(a.agent()),
-                                storage_arc: a.get_cur_storage_arc(),
-                                target_arc: a.get_tgt_storage_arc(),
+                                storage_arc: a.get_cur_storage_arc().into(),
+                                target_arc: a.get_tgt_storage_arc().into(),
                             })
                             .collect();
 
                         Ok((
                             DnaHash::from_k2_space(&space_id),
                             Kitsune2NetworkMetrics {
-                                fetch_state_summary,
-                                gossip_state_summary,
+                                fetch_state_summary: fetch_state_summary.into(),
+                                gossip_state_summary: gossip_state_summary.into(),
                                 local_agents,
                             },
                         ))

@@ -12,7 +12,7 @@ UNSTABLE_FEATURES=unstable-sharding,unstable-functions,unstable-migration,$(DEFA
 	test-workspace-wasmer-sys-llvm test-workspace-wasmer-wasmi \
 	build-workspace-wasmer-sys-cranelift-unstable \
 	test-workspace-wasmer-sys-cranelift-unstable \
-	toml-fix
+	toml-fix ts-bindings ts-bindings-test
 
 # default to running everything (first rule)
 default: build-workspace-wasmer-sys-cranelift \
@@ -123,6 +123,20 @@ test-workspace-wasmer-wasmi:
 		--locked \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer-wasmi
+
+# Runs the `export-ts-bindings` binary in the hc crate, which stages the whole
+# binding tree in one process (ts-rs only merges declarations sharing an output
+# file within a single process) before atomically replacing TS_RS_EXPORT_DIR.
+# See holochain_conductor_api::export_ts_bindings.
+ts-bindings:
+	TS_RS_EXPORT_DIR=$(or $(TS_RS_EXPORT_DIR),./bindings) \
+		cargo run -p holochain_cli --features ts_rs,unstable-countersigning --bin export-ts-bindings
+
+# The ts_rs-gated tests in holochain_conductor_api: the wire-format smoke test
+# and the tag-injection helper's unit tests.
+ts-bindings-test: ts-bindings
+	cargo test -p holochain_conductor_api --features ts_rs,unstable-countersigning admin_request_bindings_smoke
+	cargo test -p holochain_conductor_api --features ts_rs,unstable-countersigning tag_exports_public
 
 clean:
 	cargo clean

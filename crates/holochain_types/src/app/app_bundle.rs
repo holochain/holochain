@@ -17,6 +17,8 @@ mod tests;
 
 /// A bundle of an AppManifest and collection of DNAs
 #[derive(Debug, Serialize, Deserialize, Clone, derive_more::From, shrinkwraprs::Shrinkwrap)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct AppBundle(Bundle<AppManifest>);
 
 impl AppBundle {

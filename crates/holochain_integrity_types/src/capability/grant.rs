@@ -16,6 +16,8 @@ use std::collections::{BTreeSet, HashSet};
 /// See `.is_valid()`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
 pub enum CapGrant {
     /// Grants the capability of calling every extern to the calling agent, provided the calling
     /// agent is the local chain author.
@@ -40,6 +42,8 @@ impl From<holo_hash::AgentPubKey> for CapGrant {
 /// The remote calling agent must provide a secret and we source their pubkey from the active
 /// network connection. This must match the strictness of the CapAccess.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
 pub struct ZomeCallCapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
@@ -53,6 +57,8 @@ pub struct ZomeCallCapGrant {
 /// The outbound DTO of a ZomeCall capability grant info request.
 /// CapAccess secrets are omitted, Access types and assignees are provided under CapAccessInfo.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
 pub struct DesensitizedZomeCallCapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
@@ -150,6 +156,8 @@ impl CapGrant {
 /// Represents access requirements for capability grants.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
 pub enum CapAccess {
     /// No restriction: callable by anyone.
     Unrestricted,
@@ -211,6 +219,8 @@ impl CapAccess {
 
 /// Represents access info for capability grants .
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
 pub struct CapAccessInfo {
     /// The access type.
     access_type: String,
@@ -221,14 +231,31 @@ pub struct CapAccessInfo {
 /// a single zome/function pair
 pub type GrantedFunction = (ZomeName, FunctionName);
 
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    GrantedFunctionTs,
+    "GrantedFunction",
+    "[ZomeName, FunctionName]",
+    "hdk/capabilities.ts",
+    deps: [ZomeName, FunctionName]
+);
+
 /// A collection of zome/function pairs
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
 pub enum GrantedFunctions {
     /// grant all zomes all functions
     All,
     /// grant to specified zomes and functions
-    Listed(HashSet<GrantedFunction>),
+    Listed(
+        #[cfg_attr(
+            feature = "ts_rs",
+            ts(as = "std::collections::HashSet<GrantedFunctionTs>")
+        )]
+        HashSet<GrantedFunction>,
+    ),
 }
 
 #[cfg(test)]

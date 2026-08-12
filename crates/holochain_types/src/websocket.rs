@@ -90,6 +90,18 @@ impl AllowedOrigins {
     }
 }
 
+// `AllowedOrigins`'s hand-written `Serialize`/`Deserialize` collapses it to a
+// plain string, so `#[derive(ts_rs::TS)]` can't reflect its Rust enum shape.
+// Declare it as a manual alias instead.
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    AllowedOriginsTs,
+    "AllowedOrigins",
+    "string",
+    "api/admin/types.ts",
+    deps: []
+);
+
 #[cfg(test)]
 mod tests {
     use super::AllowedOrigins;

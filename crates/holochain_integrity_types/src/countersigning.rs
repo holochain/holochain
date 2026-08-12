@@ -29,6 +29,8 @@ pub use error::CounterSigningError;
 
 /// Every countersigning session must complete a full set of actions between the start and end times to be valid.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/countersigning.ts"))]
 pub struct CounterSigningSessionTimes {
     /// The earliest allowable time for countersigning session responses to be valid.
     pub start: Timestamp,
@@ -85,11 +87,19 @@ impl CounterSigningSessionTimes {
 
 /// Every preflight request can have optional arbitrary bytes that can be agreed to.
 #[derive(Clone, serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
-pub struct PreflightBytes(#[serde(with = "serde_bytes")] pub Vec<u8>);
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/countersigning.ts"))]
+pub struct PreflightBytes(
+    #[serde(with = "serde_bytes")]
+    #[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))]
+    pub Vec<u8>,
+);
 
 /// Agents can have a role specific to each countersigning session.
 /// The role is app defined and opaque to the subconscious.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/countersigning.ts"))]
 pub struct Role(pub u8);
 
 impl Role {
@@ -102,20 +112,33 @@ impl Role {
 /// Alias for a list of agents and their roles.
 pub type CounterSigningAgents = Vec<(AgentPubKey, Vec<Role>)>;
 
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    CounterSigningAgentsTs,
+    "CounterSigningAgents",
+    "Array<[AgentPubKey, Role[]]>",
+    "hdk/countersigning.ts",
+    deps: [AgentPubKey, Role]
+);
+
 /// The same PreflightRequest is sent to every agent.
 /// Each agent signs this data as part of their PreflightResponse.
 /// Every preflight must be identical and signed by every agent for a session to be valid.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/countersigning.ts"))]
 pub struct PreflightRequest {
     /// The hash of the app entry, as if it were not countersigned.
     /// The final entry hash will include the countersigning session.
     pub app_entry_hash: EntryHash,
     /// The agents that are participating in this countersignature session.
+    #[cfg_attr(feature = "ts_rs", ts(as = "CounterSigningAgentsTs"))]
     pub signing_agents: CounterSigningAgents,
     /// The optional additional M of N signers.
     /// If there are additional signers then M MUST be the majority of N.
     /// If there are additional signers then the enzyme MUST be used and is the
     /// first signer in BOTH signing_agents and optional_signing_agents.
+    #[cfg_attr(feature = "ts_rs", ts(as = "CounterSigningAgentsTs"))]
     pub optional_signing_agents: CounterSigningAgents,
     /// The M in the M of N signers.
     /// M MUST be strictly greater than N / 2 and NOT larger than N.
@@ -254,6 +277,8 @@ impl PreflightRequest {
 /// Every agent must send back a preflight response.
 /// All the preflight response data is signed by each agent and included in the session data.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/countersigning.ts"))]
 pub struct PreflightResponse {
     /// The request this is a response to.
     pub request: PreflightRequest,
@@ -338,6 +363,8 @@ pub enum PreflightRequestAcceptance {
 /// Every countersigning agent must sign against their chain state.
 /// The chain must be frozen until each agent decides to sign or exit the session.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/countersigning.ts"))]
 pub struct CounterSigningAgentState {
     /// The index of the agent in the preflight request agent vector.
     agent_index: u8,
@@ -394,6 +421,8 @@ impl CounterSigningAgentState {
 /// Enum to mirror Action for all the shared data required to build session actions.
 /// Does NOT hold any agent specific information.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/countersigning.ts"))]
 pub enum ActionBase {
     /// Mirrors Action::Create.
     Create(CreateBase),
@@ -407,6 +436,8 @@ pub enum ActionBase {
 
 /// Base data for Create actions.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/countersigning.ts"))]
 pub struct CreateBase {
     /// The entry type of the create.
     pub entry_type: EntryType,
@@ -421,6 +452,8 @@ impl CreateBase {
 
 /// Base data for Update actions.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/countersigning.ts"))]
 pub struct UpdateBase {
     /// The original action being updated.
     pub original_action_address: ActionHash,
@@ -432,6 +465,8 @@ pub struct UpdateBase {
 
 /// All the data required for a countersigning session.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/countersigning.ts"))]
 pub struct CounterSigningSessionData {
     /// The preflight request that was agreed upon by all parties for the session.
     pub preflight_request: PreflightRequest,

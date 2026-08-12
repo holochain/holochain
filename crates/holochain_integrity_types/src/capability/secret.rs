@@ -18,7 +18,9 @@ pub type CapSecretBytes = [u8; CAP_SECRET_BYTES];
 // The PartialEq impl by subtle *should* be compatible with default Hash impl
 #[allow(clippy::derived_hash_with_manual_eq)]
 #[derive(Clone, Copy, Hash, SerializedBytes)]
-pub struct CapSecret(CapSecretBytes);
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
+pub struct CapSecret(#[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))] CapSecretBytes);
 
 // Capability secrets are not cryptographic secrets.
 // They aren't used in any cryptographic algorithm.

@@ -11,6 +11,19 @@ use thiserror::Error;
 /// An [`Action`] with its [`Signature`](holochain_integrity_types::signature::Signature) (no hash).
 pub type SignedAction = Signed<Action>;
 
+// `Signed<T>` is a genuine, declared generic TypeScript type (see
+// `crate::signature`), so this alias can reference its name directly. Lists
+// `Action`/`Signed<Action>` as deps so the exporter writes their
+// declarations at least once.
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    SignedActionTs,
+    "SignedAction",
+    "Signed<Action>",
+    "hdk/action.ts",
+    deps: [Action, crate::signature::Signed<Action>]
+);
+
 #[derive(Error, Debug)]
 pub enum ActionError {
     #[error(

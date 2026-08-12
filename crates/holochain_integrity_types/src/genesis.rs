@@ -12,6 +12,15 @@ use holochain_serialized_bytes::prelude::*;
 /// App-specific payload for proving membership in the membrane of the app
 pub type MembraneProof = std::sync::Arc<SerializedBytes>;
 
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    MembraneProofTs,
+    "MembraneProof",
+    "Uint8Array",
+    "types.ts",
+    deps: []
+);
+
 /// Data passed into the genesis_self_check callback for verifying the initial
 /// chain entries
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]

@@ -12,6 +12,8 @@ use std::borrow::Cow;
 /// ZomeName as a String.
 #[derive(Clone, Debug, Serialize, Hash, Deserialize, Ord, Eq, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
 #[repr(transparent)]
 pub struct ZomeName(pub Cow<'static, str>);
 
@@ -48,6 +50,8 @@ impl From<String> for ZomeName {
 /// A single function name.
 #[repr(transparent)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq, Hash)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
 pub struct FunctionName(pub String);
 
 impl FunctionName {

@@ -2,6 +2,7 @@ use super::Conductor;
 use crate::conductor::api::error::{ConductorApiError, ConductorApiResult};
 use chrono::{DateTime, Utc};
 use holochain_conductor_api::{AgentInfoDump, P2pAgentsDump};
+use holochain_types::network::kitsune_id_to_base64url;
 use holochain_zome_types::cell::CellId;
 use kitsune2_api::AgentInfoSigned;
 use std::sync::Arc;
@@ -24,8 +25,8 @@ pub async fn peer_store_dump(
     Ok(P2pAgentsDump {
         peers: all_peers.into_iter().map(agent_info_dump).collect(),
         this_agent_info: this_agent_info.map(agent_info_dump),
-        this_agent: Some((agent_pub_key, agent_id)),
-        this_dna: Some((dna_hash, space_id)),
+        this_agent: Some((agent_pub_key, kitsune_id_to_base64url(&agent_id))),
+        this_dna: Some((dna_hash, kitsune_id_to_base64url(&space_id))),
     })
 }
 
@@ -46,7 +47,7 @@ url: {:?}"#,
     );
     AgentInfoDump {
         dump,
-        kitsune_agent: Arc::new(peer.agent.clone()),
-        kitsune_space: Arc::new(peer.space.clone()),
+        kitsune_agent: kitsune_id_to_base64url(&peer.agent),
+        kitsune_space: kitsune_id_to_base64url(&peer.space),
     }
 }

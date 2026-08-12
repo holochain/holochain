@@ -8,6 +8,8 @@ use holochain_serialized_bytes::prelude::*;
 /// EntryHash returns an Entry.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 #[serde(tag = "type", content = "content")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/details.ts"))]
 pub enum Details {
     /// Variant holding a specific record. Returned when an action hash was passed.
     Record(RecordDetails),
@@ -18,6 +20,8 @@ pub enum Details {
 /// A specific Record with any updates and deletes.
 /// This is all the metadata available for a record.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/details.ts"))]
 pub struct RecordDetails {
     /// The specific record.
     /// Either a Create or an Update.
@@ -32,6 +36,8 @@ pub struct RecordDetails {
 
 /// An Entry with all its metadata.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/details.ts"))]
 pub struct EntryDetails {
     /// The data
     pub entry: Entry,
@@ -71,6 +77,8 @@ pub struct EntryDetails {
 
 /// The status of an [`Entry`] in the Dht
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/details.ts"))]
 pub enum EntryDhtStatus {
     /// This [`Entry`] has active actions
     Live,

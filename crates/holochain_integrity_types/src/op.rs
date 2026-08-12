@@ -108,6 +108,8 @@ pub struct Delete {
 
 /// See [`Op::AgentActivity`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/action.ts"))]
 pub struct AgentActivity {
     /// The signed action being registered.
     pub action: SignedHashed<Action>,

@@ -36,6 +36,8 @@ pub type InstalledAppId = String;
 /// The source of the DNA to be installed, either as binary data, or from a path
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum DnaSource {
     /// register the dna loaded from a bundle file on disk
     Path(PathBuf),
@@ -48,6 +50,8 @@ pub enum DnaSource {
 /// The source of coordinators to be installed, either as binary data, or from a path
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum CoordinatorSource {
     /// Coordinators loaded from a bundle file on disk
     Path(PathBuf),
@@ -57,6 +61,8 @@ pub enum CoordinatorSource {
 
 /// The instructions on how to update coordinators for a cell.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct UpdateCoordinatorsPayload {
     /// The cell id of the cell to swap coordinators for.
     pub cell_id: CellId,
@@ -66,6 +72,8 @@ pub struct UpdateCoordinatorsPayload {
 
 /// The parameters to create a clone of an existing cell.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
 pub struct CreateCloneCellPayload {
     /// The DNA's role name to clone
     pub role_name: RoleName,
@@ -74,13 +82,18 @@ pub struct CreateCloneCellPayload {
     /// the clone cell's DNA.
     pub modifiers: DnaModifiersOpt<YamlProperties>,
     /// Optionally set a proof of membership for the clone cell
+    #[cfg_attr(feature = "ts_rs", ts(as = "Option<MembraneProofTs>"))]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub membrane_proof: Option<MembraneProof>,
     /// Optionally a name for the DNA clone
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub name: Option<String>,
 }
 
 /// Parameters to specify the clone cell to be disabled.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
 pub struct DisableCloneCellPayload {
     /// The clone id or cell id of the clone cell
     pub clone_cell_id: CloneCellId,
@@ -89,8 +102,23 @@ pub struct DisableCloneCellPayload {
 /// Parameters to specify the clone cell to be enabled.
 pub type EnableCloneCellPayload = DisableCloneCellPayload;
 
+// `EnableCloneCellPayload` is a plain type alias for `DisableCloneCellPayload`
+// (both requests carry identical data), so it has no distinct Rust shape to
+// derive `ts_rs::TS` on. Declare it as a named alias in the same file
+// `DisableCloneCellPayload` exports to, mirroring `MemproofMapTs`'s pattern.
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    EnableCloneCellPayloadTs,
+    "EnableCloneCellPayload",
+    "DisableCloneCellPayload",
+    "api/app/types.ts",
+    deps: [DisableCloneCellPayload]
+);
+
 /// Parameters to delete a disabled clone cell of an app.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct DeleteCloneCellPayload {
     /// The app id that the DNA to clone belongs to
     pub app_id: InstalledAppId,
@@ -101,6 +129,8 @@ pub struct DeleteCloneCellPayload {
 
 /// All the information necessary to install an app
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct InstallAppPayload {
     /// Where to obtain the AppBundle, which contains the app manifest and DNA bundles
     /// to be installed. This is the main payload of app installation.
@@ -110,11 +140,13 @@ pub struct InstallAppPayload {
     ///
     /// If None, a new agent key will be generated.
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub agent_key: Option<AgentPubKey>,
 
     /// The unique identifier for an installed app in this conductor.
     /// If not specified, it will be derived from the app name in the bundle manifest.
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub installed_app_id: Option<InstalledAppId>,
 
     /// Optional: Overwrites all network seeds for all DNAs of Cells created by this app.
@@ -123,28 +155,44 @@ pub struct InstallAppPayload {
     /// The app can still use existing Cells, i.e. this does not require that
     /// all Cells have DNAs with the same overridden DNA.
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
+    #[cfg_attr(feature = "ts_rs", ts(as = "Option<NetworkSeedTs>"))]
     pub network_seed: Option<NetworkSeed>,
 
     /// Specify role specific settings or modifiers that will override any settings in
     /// the dna manifets.
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
+    #[cfg_attr(feature = "ts_rs", ts(as = "Option<RoleSettingsMapTs>"))]
     pub roles_settings: Option<RoleSettingsMap>,
 
     /// Optional: If app installation fails due to genesis failure, normally the app will be
     /// immediately uninstalled. When this flag is set, the app is left installed with empty cells intact.
     /// This can be useful for diagnostics.
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub ignore_genesis_failure: bool,
 
     /// If true, suppress genesis for all cells in this app and instead reconstruct each cell's
     /// source chain by fetching the agent's prior chain from the DHT.
     /// Requires `agent_key` to be `Some`.
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub restore_from_dht: bool,
 }
 
 /// Alias
 pub type MemproofMap = HashMap<RoleName, MembraneProof>;
+
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    MemproofMapTs,
+    "MemproofMap",
+    "Record<string, MembraneProof>",
+    "api/admin/types.ts",
+    deps: [MembraneProofTs]
+);
+
 /// Alias
 pub type ModifiersMap = HashMap<RoleName, DnaModifiersOpt<YamlProperties>>;
 /// Alias
@@ -153,12 +201,24 @@ pub type ExistingCellsMap = HashMap<RoleName, CellId>;
 pub type InitPropertiesMap = HashMap<RoleName, InitProperties>;
 /// Alias
 pub type RoleSettingsMap = HashMap<RoleName, RoleSettings>;
+
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    RoleSettingsMapTs,
+    "RoleSettingsMap",
+    "Record<string, RoleSettings>",
+    "api/admin/types.ts",
+    deps: [RoleSettings]
+);
+
 /// Alias
 pub type RoleSettingsMapYaml = HashMap<RoleName, RoleSettingsYaml>;
 
 /// Settings for a Role that may be passed on installation of an app
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum RoleSettings {
     #[deprecated(
         since = "0.6.0-dev.17",
@@ -177,15 +237,19 @@ pub enum RoleSettings {
         /// the "deferred membrane proofs" state, so that memproofs can be provided later.
         /// If `Some` is used here, whatever memproofs are
         /// provided will be used, and the app will be installed as normal.
+        #[cfg_attr(feature = "ts_rs", ts(as = "Option<MembraneProofTs>"))]
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         membrane_proof: Option<MembraneProof>,
         /// Overwrites the dna modifiers from the dna manifest. Only
         /// modifier fields for which `Some(T)` is provided will be overwritten.
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         modifiers: Option<DnaModifiersOpt<YamlProperties>>,
         /// Opaque, app-defined bytes made available to the cell during `init`.
         ///
         /// Not interpreted by the conductor and never written to the DHT. The bytes are persisted
         /// by the conductor alongside the app at install time and read back during `init` via the
         /// `hdk::migrate::get_init_properties` host function.
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         init_properties: Option<InitProperties>,
     },
 }
@@ -255,9 +319,11 @@ pub enum RoleSettingsYaml {
 /// The possible locations of an AppBundle
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum AppBundleSource {
     /// The raw bytes of an app bundle
-    Bytes(bytes::Bytes),
+    Bytes(#[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))] bytes::Bytes),
     /// A local file path
     Path(PathBuf),
 }
@@ -769,6 +835,8 @@ impl InstalledAppCommon {
 /// Carries just enough to identify the warrant for debugging;
 /// the variant of [`UnrecoverableCellReason`] tells the operator what kind it is.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct WarrantSummary {
     /// The peer that authored and signed the warrant.
     pub author: AgentPubKey,
@@ -792,6 +860,8 @@ impl From<SignedWarrant> for WarrantSummary {
 /// Reason a cell's source chain is unrecoverable via restore.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum UnrecoverableCellReason {
     /// Two or more conflicting actions at the same sequence position (proven chain fork).
     ChainForkWarrant(Box<WarrantSummary>),
@@ -804,6 +874,8 @@ pub enum UnrecoverableCellReason {
 /// Either Enabled or Disabled, set by the user via the conductor admin interface.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum AppStatus {
     /// The app is enabled.
     Enabled,
@@ -825,6 +897,8 @@ pub enum AppStatus {
 /// The reason for an app being in a Disabled state.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum DisabledAppReason {
     /// The app is freshly installed, and never started
     NeverStarted,

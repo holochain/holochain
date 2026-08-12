@@ -131,3 +131,90 @@ where
         &self.signature
     }
 }
+
+// Same failure mode as `HoloHashed<C>` (`holo_hash::hashed`) and
+// `SignedHashed<T>` (`holochain_integrity_types::record`): `WithoutGenerics`
+// substitutes `Dummy` for `T`, which doesn't implement
+// `Serialize`/`DeserializeOwned`. Hand-written instead, declared as a
+// genuine generic type so ordinary fields naming `Signed<T>` resolve their
+// `Signature` import correctly.
+#[cfg(feature = "ts_rs")]
+impl<T> ts_rs::TS for Signed<T>
+where
+    T: serde::Serialize + serde::de::DeserializeOwned + ts_rs::TS,
+{
+    type WithoutGenerics = SignedWithoutGenerics;
+    type OptionInnerType = Self;
+
+    fn name(cfg: &ts_rs::Config) -> String {
+        format!("Signed<{}>", T::name(cfg))
+    }
+
+    fn inline(cfg: &ts_rs::Config) -> String {
+        format!(
+            "{{ data: {}, signature: {} }}",
+            T::name(cfg),
+            <Signature as ts_rs::TS>::name(cfg)
+        )
+    }
+
+    fn decl(_: &ts_rs::Config) -> String {
+        "type Signed<T> = { data: T, signature: Signature };".into()
+    }
+
+    fn decl_concrete(cfg: &ts_rs::Config) -> String {
+        format!("type Signed = {};", <Self as ts_rs::TS>::inline(cfg))
+    }
+
+    fn visit_dependencies(v: &mut impl ts_rs::TypeVisitor)
+    where
+        Self: 'static,
+    {
+        v.visit::<T>();
+        T::visit_dependencies(v);
+        v.visit::<Signature>();
+    }
+
+    fn visit_generics(v: &mut impl ts_rs::TypeVisitor)
+    where
+        Self: 'static,
+    {
+        T::visit_generics(v);
+        v.visit::<T>();
+    }
+
+    fn output_path() -> Option<std::path::PathBuf> {
+        Some("hdk/action.ts".into())
+    }
+}
+
+/// [`Signed`]'s [`ts_rs::TS::WithoutGenerics`] — just the imports its fixed
+/// declaration text references (`Signature`), unrelated to any concrete `T`.
+#[cfg(feature = "ts_rs")]
+#[doc(hidden)]
+pub struct SignedWithoutGenerics;
+
+#[cfg(feature = "ts_rs")]
+impl ts_rs::TS for SignedWithoutGenerics {
+    type WithoutGenerics = Self;
+    type OptionInnerType = Self;
+
+    fn name(_: &ts_rs::Config) -> String {
+        "Signed".into()
+    }
+
+    fn inline(_: &ts_rs::Config) -> String {
+        panic!("SignedWithoutGenerics is a type-level placeholder and cannot be inlined")
+    }
+
+    fn visit_dependencies(v: &mut impl ts_rs::TypeVisitor)
+    where
+        Self: 'static,
+    {
+        v.visit::<Signature>();
+    }
+
+    fn output_path() -> Option<std::path::PathBuf> {
+        Some("hdk/action.ts".into())
+    }
+}

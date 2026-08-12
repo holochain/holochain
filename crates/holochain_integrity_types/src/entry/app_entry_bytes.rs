@@ -4,7 +4,11 @@ use holochain_serialized_bytes::prelude::*;
 
 /// Newtype for the bytes comprising an App entry
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct AppEntryBytes(pub SerializedBytes);
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/entry.ts"))]
+pub struct AppEntryBytes(
+    #[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))] pub SerializedBytes,
+);
 
 impl std::fmt::Debug for AppEntryBytes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

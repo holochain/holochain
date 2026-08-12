@@ -15,7 +15,17 @@ use std::borrow::Borrow;
 
 /// Represents the different ways the entry_address reference within an action
 /// can be interpreted
+// Plain `#[derive(ts_rs::TS)]` fails here: `WithoutGenerics` substitutes
+// `Dummy` for `E`, which doesn't implement the enum's `E: Borrow<Entry>`
+// bound. `#[ts(concrete(E = Entry))]` substitutes `Entry` instead (satisfies
+// the bound via `impl<T> Borrow<T> for T`), matching the only instantiation
+// that appears in the wire format (see `Record::entry` below).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts_rs",
+    ts(export, export_to = "hdk/record.ts", concrete(E = Entry))
+)]
 pub enum RecordEntry<E: Borrow<Entry> = Entry> {
     /// The Action has an entry_address reference, and the Entry is accessible.
     Present(E),
@@ -240,8 +250,99 @@ where
     }
 }
 
+// Same failure mode as `HoloHashed<C>` (see `holo_hash::hashed`):
+// `WithoutGenerics` substitutes `Dummy` for `T`, which doesn't implement
+// `HashableContent`. Hand-written instead, declared as a genuine generic
+// type so ordinary fields like `Record::signed_action` resolve imports
+// correctly.
+#[cfg(feature = "ts_rs")]
+impl<T> ts_rs::TS for SignedHashed<T>
+where
+    T: HashableContent + ts_rs::TS,
+{
+    type WithoutGenerics = SignedHashedWithoutGenerics;
+    type OptionInnerType = Self;
+
+    fn name(cfg: &ts_rs::Config) -> String {
+        format!("SignedHashed<{}>", T::name(cfg))
+    }
+
+    fn inline(cfg: &ts_rs::Config) -> String {
+        format!(
+            "{{ hashed: {}, signature: {} }}",
+            HoloHashed::<T>::name(cfg),
+            <crate::signature::Signature as ts_rs::TS>::name(cfg)
+        )
+    }
+
+    fn decl(_: &ts_rs::Config) -> String {
+        "type SignedHashed<T> = { hashed: HoloHashed<T>, signature: Signature };".into()
+    }
+
+    fn decl_concrete(cfg: &ts_rs::Config) -> String {
+        format!("type SignedHashed = {};", <Self as ts_rs::TS>::inline(cfg))
+    }
+
+    fn visit_dependencies(v: &mut impl ts_rs::TypeVisitor)
+    where
+        Self: 'static,
+    {
+        v.visit::<T>();
+        T::visit_dependencies(v);
+        v.visit::<HoloHashed<T>>();
+        v.visit::<crate::signature::Signature>();
+    }
+
+    fn visit_generics(v: &mut impl ts_rs::TypeVisitor)
+    where
+        Self: 'static,
+    {
+        T::visit_generics(v);
+        v.visit::<T>();
+    }
+
+    fn output_path() -> Option<std::path::PathBuf> {
+        Some("hdk/action.ts".into())
+    }
+}
+
+/// [`SignedHashed`]'s [`ts_rs::TS::WithoutGenerics`] — just the imports its
+/// fixed declaration text references (`HoloHashed`, `Signature`), unrelated
+/// to any concrete `T`.
+#[cfg(feature = "ts_rs")]
+#[doc(hidden)]
+pub struct SignedHashedWithoutGenerics;
+
+#[cfg(feature = "ts_rs")]
+impl ts_rs::TS for SignedHashedWithoutGenerics {
+    type WithoutGenerics = Self;
+    type OptionInnerType = Self;
+
+    fn name(_: &ts_rs::Config) -> String {
+        "SignedHashed".into()
+    }
+
+    fn inline(_: &ts_rs::Config) -> String {
+        panic!("SignedHashedWithoutGenerics is a type-level placeholder and cannot be inlined")
+    }
+
+    fn visit_dependencies(v: &mut impl ts_rs::TypeVisitor)
+    where
+        Self: 'static,
+    {
+        v.visit::<HoloHashed<Action>>();
+        v.visit::<crate::signature::Signature>();
+    }
+
+    fn output_path() -> Option<std::path::PathBuf> {
+        Some("hdk/action.ts".into())
+    }
+}
+
 /// A chain record: a signed action plus its entry, if the action has one.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/record.ts"))]
 pub struct Record {
     /// The signed, hashed action for this record.
     pub signed_action: SignedHashed<Action>,

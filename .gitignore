@@ -1,5 +1,6 @@
 target/
 .cargo/*
+!.cargo/config.toml
 *.log
 *~
 .wasm_cache
@@ -15,6 +16,7 @@ perf.data.old
 .env
 *.folded
 *.svg
+bindings/
 
 .todo.md
 result

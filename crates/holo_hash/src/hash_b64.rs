@@ -118,3 +118,22 @@ impl From<ActionHashB64> for AnyDhtHash {
         ActionHash::from(h).into()
     }
 }
+
+#[cfg(feature = "ts_rs")]
+crate::ts_alias!(DnaHashB64Ts, "DnaHashB64", "string", "types.ts", deps: []);
+
+#[cfg(feature = "ts_rs")]
+crate::ts_alias!(WasmHashB64Ts, "WasmHashB64", "string", "types.ts", deps: []);
+
+#[cfg(all(test, feature = "ts_rs"))]
+mod ts_export {
+    use super::*;
+    use ts_rs::TS;
+
+    #[test]
+    fn decls_are_plain_string_aliases() {
+        let cfg = ts_rs::Config::from_env();
+        assert_eq!(DnaHashB64Ts::decl(&cfg), "type DnaHashB64 = string;");
+        assert_eq!(WasmHashB64Ts::decl(&cfg), "type WasmHashB64 = string;");
+    }
+}

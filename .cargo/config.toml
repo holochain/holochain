@@ -1,0 +1,15 @@
+# ts-rs export configuration (issue #5930). Read at export time only;
+# no effect on ordinary builds.
+#
+# These cover the per-type export tests that the `#[ts(export)]` derive
+# generates, which read the dialect from the environment. Cargo injects this
+# block only into processes it spawns from this workspace, so the
+# `export-ts-bindings` binary sets the same dialect in code rather than relying
+# on it; keep the two in sync.
+[env]
+# The conductor clients use plain `number` for 64-bit integers
+# (timestamps, counters), not `bigint`.
+TS_RS_LARGE_INT = "number"
+# holochain-client-js is an ES module package with NodeNext resolution:
+# import paths must carry a `.js` extension.
+TS_RS_IMPORT_EXTENSION = "js"

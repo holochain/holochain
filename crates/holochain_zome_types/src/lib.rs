@@ -61,3 +61,23 @@ pub mod fixt;
 
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
+
+/// Exports every TypeScript declaration this crate contributes to the
+/// conductor API bindings: this crate's `ts_alias!` markers, the zome call
+/// return types [`metadata::Details`] and [`link::Link`] (unreachable from
+/// any conductor request/response — a zome call carries them as an opaque
+/// `ExternIO` the client decodes itself), and upstream crates' declarations.
+#[cfg(feature = "ts_rs")]
+pub fn export_ts_bindings(cfg: &ts_rs::Config) -> Result<(), ts_rs::ExportError> {
+    use ts_rs::TS;
+
+    holochain_integrity_types::export_ts_bindings(cfg)?;
+    holochain_nonce::export_ts_bindings(cfg)?;
+    crate::action::SignedActionTs::export_all(cfg)?;
+    crate::warrant::ActionHashAndSigTs::export_all(cfg)?;
+    crate::zome::IntegrityZomeTs::export_all(cfg)?;
+    crate::zome::CoordinatorZomeTs::export_all(cfg)?;
+    crate::metadata::Details::export_all(cfg)?;
+    crate::link::Link::export_all(cfg)?;
+    Ok(())
+}

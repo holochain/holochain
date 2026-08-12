@@ -21,6 +21,8 @@ use inline_zome::InlineIntegrityZome;
 /// A Holochain Zome. Includes the ZomeDef as well as the name of the Zome.
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "full-dna-def", derive(shrinkwraprs::Shrinkwrap))]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct Zome<T: Send + Sync = ZomeDef> {
     pub name: ZomeName,
     #[cfg_attr(feature = "full-dna-def", shrinkwrap(main_field))]
@@ -30,6 +32,24 @@ pub struct Zome<T: Send + Sync = ZomeDef> {
 pub type IntegrityZome = Zome<IntegrityZomeDef>;
 
 pub type CoordinatorZome = Zome<CoordinatorZomeDef>;
+
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    IntegrityZomeTs,
+    "IntegrityZome",
+    "Zome<IntegrityZomeDef>",
+    "api/admin/types.ts",
+    deps: [IntegrityZomeDef, Zome<IntegrityZomeDef>]
+);
+
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(
+    CoordinatorZomeTs,
+    "CoordinatorZome",
+    "Zome<CoordinatorZomeDef>",
+    "api/admin/types.ts",
+    deps: [CoordinatorZomeDef, Zome<CoordinatorZomeDef>]
+);
 
 // Use an integrity zome as a coordinator zome,
 // for cases where integrity zomes define zome functions
@@ -140,6 +160,8 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
 /// A zome defined by Wasm bytecode
 // TODO: move to `holochain_types`
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct WasmZomeDef {
     /// The WasmHash representing the WASM byte code for this zome.
     pub wasm_hash: holo_hash::WasmHash,
@@ -151,6 +173,8 @@ pub struct WasmZomeDef {
 /// A zome defined by inline Rust code
 #[cfg(feature = "full-dna-def")]
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct InlineZomeDef {
     pub inline_hash: holo_hash::InlineHash,
 
@@ -170,6 +194,8 @@ pub struct InlineZomeDef {
 /// In particular, a real-world DnaFile should only ever contain Wasm zomes!
 // TODO: move to `holochain_types`
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub enum ZomeDef {
     /// A zome defined by Wasm bytecode
     Wasm(WasmZomeDef),
@@ -180,9 +206,13 @@ pub enum ZomeDef {
 }
 
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct IntegrityZomeDef(ZomeDef);
 
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct CoordinatorZomeDef(ZomeDef);
 
 impl IntegrityZomeDef {

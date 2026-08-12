@@ -40,6 +40,7 @@ serde_bytes = { version = "0.11", optional = true }
 sha2 = { version = "0.10", optional = true }
 holochain_wasmer_common = { version = "=0.0.103", optional = true }
 schemars = { version = "0.9", optional = true }
+ts-rs = { version = "12.0", features = ["no-serde-warnings"], optional = true }
 
 [dev-dependencies]
 serde_json = { version = "1.0", features = ["preserve_order"] }
@@ -74,3 +75,4 @@ serialization = [
 encoding = ["dep:base64", "dep:blake2b_simd", "dep:derive_more", "dep:sha2"]
 holochain-wasmer = ["dep:holochain_wasmer_common"]
 schema = ["dep:schemars"]
+ts_rs = ["dep:ts-rs"]

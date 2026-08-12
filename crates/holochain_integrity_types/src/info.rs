@@ -49,6 +49,9 @@ impl ZomeInfo {
 /// Placeholder for a real network seed type. See [`DnaModifiers`].
 pub type NetworkSeed = String;
 
+#[cfg(feature = "ts_rs")]
+holo_hash::ts_alias!(NetworkSeedTs, "NetworkSeed", "string", "types.ts", deps: []);
+
 /// Information about the current DNA.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DnaInfoV1 {

@@ -10,9 +10,13 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-holochain_integrity_types = { version = "^0.8.0-dev.0", path = "../holochain_integrity_types", default-features = false }
 holo_hash = { version = "^0.8.0-dev.0", path = "../holo_hash" }
+holochain_integrity_types = { version = "^0.8.0-dev.0", path = "../holochain_integrity_types", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+ts-rs = { version = "12.0", features = ["no-serde-warnings"], optional = true }
 
 [lints]
 workspace = true
+
+[features]
+ts_rs = ["dep:ts-rs", "holo_hash/ts_rs", "holochain_integrity_types/ts_rs"]

@@ -70,6 +70,8 @@ use serde_with::serde_as;
     derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct DnaManifestV0 {
     /// The friendly "name" of a Holochain DNA.
     pub name: String,
@@ -83,6 +85,7 @@ pub struct DnaManifestV0 {
     ///
     /// Does not affect the [`DnaHash`].
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     #[builder(default)]
     pub coordinator: CoordinatorManifest,
 
@@ -105,7 +108,9 @@ pub struct DnaManifestV0 {
     /// the app developer to make the necessary guarantees.
     #[cfg(feature = "unstable-migration")]
     #[serde(default)]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     #[builder(default)]
+    #[cfg_attr(feature = "ts_rs", ts(as = "Vec<holo_hash::DnaHashB64Ts>"))]
     pub lineage: Vec<DnaHashB64>,
 }
 
@@ -141,11 +146,15 @@ impl DnaManifestV0 {
     derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct IntegrityManifest {
     /// A network seed for uniquifying this DNA. See [`DnaDef`].
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub network_seed: Option<String>,
 
     /// Any arbitrary application properties can be included in this object.
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub properties: Option<YamlProperties>,
 
     /// An array of zomes associated with your DNA.
@@ -157,6 +166,8 @@ pub struct IntegrityManifest {
 /// Coordinator zomes.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct CoordinatorManifest {
     /// Coordinator zomes to install with this dna.
     pub zomes: Vec<ZomeManifest>,
@@ -165,11 +176,15 @@ pub struct CoordinatorManifest {
 /// Manifest for an individual Zome
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct ZomeManifest {
     /// Just a friendly name, no semantic meaning.
     pub name: ZomeName,
 
     /// The hash of the wasm which defines this zome
+    #[cfg_attr(feature = "ts_rs", ts(as = "Option<holo_hash::WasmHashB64Ts>"))]
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub hash: Option<WasmHashB64>,
 
     /// The location of the WASM for this zome, relative to the manifest.
@@ -179,6 +194,7 @@ pub struct ZomeManifest {
     /// Integrity zomes should have no dependencies; leave this field `null`.
     /// Coordinator zomes may depend on zero or exactly 1 integrity zome.
     /// Currently, a coordinator zome should have **at most one dependency**.
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub dependencies: Option<Vec<ZomeDependency>>,
 }
 
@@ -193,6 +209,8 @@ impl ZomeManifest {
 /// depends on.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct ZomeDependency {
     /// The name of the integrity zome this zome depends on.
     pub name: ZomeName,

@@ -9,6 +9,11 @@ use holochain_wasmer_common::*;
     Clone, Copy, Hash, serde::Serialize, serde::Deserialize, PartialOrd, Ord, Debug, Eq, PartialEq,
 )]
 #[cfg_attr(feature = "full", repr(i32))]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts_rs",
+    ts(export, export_to = "hdk/validation-receipts.ts")
+)]
 pub enum ValidationStatus {
     /// All dependencies were found and validation passed
     Valid = 0,

@@ -144,6 +144,9 @@ pub mod error;
 mod fs;
 mod manifest;
 mod pack;
+#[cfg(feature = "ts_rs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ts_rs")))]
+pub mod ts;
 
 pub use bundle::{resource::ResourceBytes, Bundle, ResourceMap};
 #[cfg(feature = "fs")]

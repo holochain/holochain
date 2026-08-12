@@ -43,3 +43,34 @@ pub mod network;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 pub mod websocket;
+
+/// Exports every TypeScript declaration this crate contributes to the
+/// conductor API bindings: this crate's `ts_alias!` markers, the
+/// countersigning session types (exported unconditionally, independent of
+/// `unstable-countersigning`), [`op::DhtOp`] (unreachable from any request
+/// or response), and upstream crates' declarations.
+///
+/// Items gated behind other `unstable-*` features (e.g.
+/// `unstable-migration`'s `DnaManifestV0::lineage`) are compiled out of the
+/// export build and absent from the bindings.
+#[cfg(feature = "ts_rs")]
+pub fn export_ts_bindings(cfg: &ts_rs::Config) -> Result<(), ts_rs::ExportError> {
+    use ts_rs::TS;
+
+    holochain_zome_types::export_ts_bindings(cfg)?;
+    mr_bundle::ts::export_ts_bindings(cfg)?;
+    crate::websocket::AllowedOriginsTs::export_all(cfg)?;
+    crate::network::BlockedMessageCountsMapTs::export_all(cfg)?;
+    crate::app::MemproofMapTs::export_all(cfg)?;
+    crate::app::RoleSettingsMapTs::export_all(cfg)?;
+    crate::app::EnableCloneCellPayloadTs::export_all(cfg)?;
+    crate::countersigning::CountersigningSessionState::export_all(cfg)?;
+    crate::op::DhtOp::export_all(cfg)?;
+    crate::signal::Signal::export_all(cfg)?;
+    crate::app::AppBundle::export_all(cfg)?;
+    crate::dna::DnaBundle::export_all(cfg)?;
+    crate::prelude::DnaSource::export_all(cfg)?;
+    crate::dna::ValidatedDnaManifest::export_all(cfg)?;
+    crate::validation_receipt::SignedValidationReceipt::export_all(cfg)?;
+    Ok(())
+}

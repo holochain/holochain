@@ -65,6 +65,89 @@ where
     }
 }
 
+// Same failure mode as `HoloHashed<C>` (`holo_hash::hashed`):
+// `WithoutGenerics` substitutes `Dummy` for `M`, which doesn't implement
+// `Serialize`/`DeserializeOwned`. Hand-written instead, declared as a
+// genuine generic type so ordinary fields like `AppBundle(Bundle<AppManifest>)`
+// resolve their `ResourceMap` import correctly.
+#[cfg(feature = "ts_rs")]
+impl<M> ts_rs::TS for Bundle<M>
+where
+    M: Debug + Serialize + DeserializeOwned + ts_rs::TS,
+{
+    type WithoutGenerics = crate::ts::BundleWithoutGenerics;
+    type OptionInnerType = Self;
+
+    fn name(cfg: &ts_rs::Config) -> String {
+        format!("Bundle<{}>", M::name(cfg))
+    }
+
+    fn inline(cfg: &ts_rs::Config) -> String {
+        format!("{{ manifest: {}, resources: ResourceMap }}", M::name(cfg))
+    }
+
+    fn decl(_: &ts_rs::Config) -> String {
+        "type Bundle<M> = { manifest: M, resources: ResourceMap };".into()
+    }
+
+    fn decl_concrete(cfg: &ts_rs::Config) -> String {
+        format!("type Bundle = {};", <Self as ts_rs::TS>::inline(cfg))
+    }
+
+    fn visit_dependencies(v: &mut impl ts_rs::TypeVisitor)
+    where
+        Self: 'static,
+    {
+        v.visit::<M>();
+        M::visit_dependencies(v);
+        v.visit::<crate::ts::ResourceMapTs>();
+    }
+
+    fn visit_generics(v: &mut impl ts_rs::TypeVisitor)
+    where
+        Self: 'static,
+    {
+        M::visit_generics(v);
+        v.visit::<M>();
+    }
+
+    fn output_path() -> Option<std::path::PathBuf> {
+        Some("api/admin/types.ts".into())
+    }
+}
+
+#[cfg(all(test, feature = "ts_rs"))]
+mod ts_tests {
+    use super::*;
+    use ts_rs::TS;
+
+    #[derive(Debug, Serialize, Deserialize, ts_rs::TS)]
+    #[ts(export, export_to = "api/admin/types.ts")]
+    struct TestManifestTs {
+        value: String,
+    }
+
+    #[test]
+    fn name_and_decl_are_a_real_generic_declaration() {
+        let cfg = ts_rs::Config::from_env();
+
+        assert_eq!(
+            Bundle::<TestManifestTs>::name(&cfg),
+            "Bundle<TestManifestTs>"
+        );
+        assert_eq!(
+            Bundle::<TestManifestTs>::decl(&cfg),
+            "type Bundle<M> = { manifest: M, resources: ResourceMap };"
+        );
+    }
+
+    #[test]
+    fn export_bindings_manual() {
+        let cfg = ts_rs::Config::from_env();
+        Bundle::<TestManifestTs>::export_all(&cfg).unwrap();
+    }
+}
+
 impl<M> Bundle<M>
 where
     M: Manifest,

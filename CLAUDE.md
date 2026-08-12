@@ -60,6 +60,101 @@ Design references: `docs/design/state_model.md` and `docs/design/data_model.md` 
   impact.
 - **PRs**: branch off `develop`; changes are squash merged into `develop`; changes go from `develop` → `main` at release time and `main` should always be ignored for development.
 
+### ts_rs client export
+
+Some crates (`holo_hash`, `holochain_timestamp`, `holochain_nonce`,
+`mr_bundle`, `holochain_integrity_types`, `holochain_state_types`,
+`holochain_zome_types`, `holochain_types`, `holochain_conductor_api`) carry
+an opt-in `ts_rs` cargo feature that derives TypeScript bindings
+(`ts_rs::TS`) for the conductor's wire API, consumed by
+`holochain-client-js`. It is off by default; ordinary builds and
+`make test-workspace` never enable it.
+
+**Criterion — does a type need a TS export?** Only if it is reachable from
+the wire surface: transitively referenced (directly or via a field, enum
+variant, generic parameter, or type alias) from `AdminRequest`,
+`AdminResponse`, `AppRequest`, `AppResponse`, or `Signal`
+(`holochain_conductor_api`, `holochain_zome_types`). This is not a
+hand-maintained list — the compiler enforces it. Deriving `TS` on the four
+entry points (plus `Signal`) forces every type they transitively reference
+to implement `TS` too, so `cargo build -p holochain_conductor_api --features
+ts_rs` fails on any newly reachable type that hasn't been given one yet.
+Run that build after adding or changing a field on any admin/app
+request/response/signal type; a "trait `ts_rs::TS` is not implemented"
+error names exactly what still needs handling. Types outside this closure
+(workflow-internal state, DB row types, other host-only structures) do not
+need a TS export even if they resemble an exported type.
+
+**How to add the derive**, once a type is in scope:
+
+- Plain structs/enums:
+  `#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]` +
+  `#[cfg_attr(feature = "ts_rs", ts(export, export_to = "…"))]`, file chosen
+  to match the type's interface (`api/admin/types.ts`, `api/app/types.ts`,
+  `hdk/*.ts`, or the shared `types.ts`).
+- Byte fields (`serde_bytes`, `bytes::Bytes`, `serialize_bytes`):
+  `#[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))]`.
+- Opaque JSON/YAML payloads: `#[cfg_attr(feature = "ts_rs", ts(type =
+  "unknown"))]`.
+- Types with a manual/hand-written `serde` impl (hashes, newtype wrappers,
+  Rust `type` aliases) cannot derive `TS` — give them a hand-written impl
+  (see `holo_hash/src/ts.rs`) or the `ts_alias!` macro instead of guessing
+  at an override.
+- Client→conductor fields the wire lets a caller omit — any `Option` field
+  (serde's derive treats a missing `Option` as `None`) and any field with
+  `#[serde(default)]` — carry
+  `#[cfg_attr(feature = "ts_rs", ts(optional = nullable))]` so the generated
+  TS marks them `field?: …`. This also applies to types that appear in both
+  requests and responses (e.g. the app/DNA manifests): response readers then
+  see `?` on fields the conductor always serializes, an accepted trade-off —
+  do not remove the annotation to "fix" the response side. Response-only
+  types keep required fields.
+- Each crate forwards `ts_rs` to the in-set deps it needs;
+  never enable `ts_rs` in a crate's own dev-dependency self-reference, or
+  export tests run during normal `make test-workspace`.
+- Manual/alias impls are exported by each crate's
+  `ts_rs`-gated `export_ts_bindings` function (crate root or `ts` module),
+  which chains its in-set deps' functions; when adding one, register it
+  there. The whole tree is written by the `export-ts-bindings` binary in the
+  `hc` crate (`make ts-bindings`, which runs `cargo run -p holochain_cli
+  --features ts_rs,unstable-countersigning --bin export-ts-bindings`) because
+  ts-rs only merges declarations sharing an output file within one process —
+  never split the export across per-crate loops. The binary is gated on
+  `required-features = ["ts_rs"]`, so builds that don't enable the feature
+  skip it. It stages the tree in a temp directory and only replaces
+  `TS_RS_EXPORT_DIR` once the export succeeds, so a failed export never
+  leaves it half-written. `make ts-bindings-test` also runs the
+  `holochain_conductor_api` ts_rs-gated tests (the wire-format smoke test and
+  the tag-injection helper's unit tests) — CI runs this target since ordinary
+  `make test-workspace` never enables the `ts_rs` feature.
+- The binary lives in `hc` rather than `holochain_conductor_api` so that
+  holochain-client-js can build it from a pinned revision through Holonix,
+  whose `hc` package appends overridden arguments to a hard-wired
+  `--manifest-path crates/hc/Cargo.toml --bin hc`; a bin in another crate
+  cannot be reached that way. `hc` also pulls in neither the `holochain`
+  crate nor a wasmer backend, so the export does not compile a WASM engine.
+- The binary sets the TypeScript dialect (`number` for 64-bit integers, `.js`
+  import extensions) in code, taking only the output directory from
+  `TS_RS_EXPORT_DIR`. The matching `TS_RS_*` entries in `.cargo/config.toml`
+  reach only processes Cargo spawns from this workspace, which the binary is
+  not when the client builds and runs it from its own flake; keep the two in
+  sync.
+- The export build enables `unstable-countersigning` on top of `ts_rs`, so
+  the countersigning app API and its session state types both reach the
+  bindings. Types and fields gated behind the remaining `unstable-*`
+  features are compiled out of the export build and absent from the
+  bindings.
+- Zome call return types (`Record`, `Details`, `Link`, `AgentActivity`) are
+  outside the wire closure — a zome call carries them as an opaque
+  `ExternIO` the client decodes itself — but are exported anyway, because
+  the client needs them to type zome call results. Register them in the
+  owning crate's `export_ts_bindings` like any other unreachable type.
+- After the export, `holochain_conductor_api` rewrites every generated file
+  so each exported declaration carries a TSDoc `@public` release tag
+  (appended to an existing doc block, or added as a minimal block) — the
+  holochain-client-js documentation build (api-extractor) errors on
+  exports without one.
+
 ## Project principles
 
 ### Offline friendly

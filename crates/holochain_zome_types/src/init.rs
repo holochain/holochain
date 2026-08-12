@@ -63,4 +63,8 @@ impl CallbackResult for InitCallbackResult {
 /// chain it migrated from.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[serde(transparent)]
-pub struct InitProperties(pub SerializedBytes);
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+pub struct InitProperties(
+    #[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))] pub SerializedBytes,
+);
