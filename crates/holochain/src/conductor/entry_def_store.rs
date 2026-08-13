@@ -120,6 +120,7 @@ mod tests {
         let db_dir = test_db_dir();
         let handle = Conductor::builder()
             .with_data_root_path(db_dir.path().to_path_buf().into())
+            .with_unreachable_network()
             .test()
             .await
             .unwrap();
@@ -178,6 +179,7 @@ mod tests {
         // Restart conductor and check defs are still here
         let handle = Conductor::builder()
             .with_data_root_path(db_dir.path().to_path_buf().into())
+            .with_unreachable_network()
             .test()
             .await
             .unwrap();

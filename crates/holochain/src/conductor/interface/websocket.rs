@@ -614,6 +614,7 @@ mod test {
         let db_dir = test_db_dir();
         let conductor_handle = ConductorBuilder::new()
             .with_data_root_path(db_dir.path().to_path_buf().into())
+            .with_unreachable_network()
             .test()
             .await
             .unwrap();
@@ -742,6 +743,7 @@ mod test {
         let db_dir = test_db_dir();
         let conductor_handle = Conductor::builder()
             .with_data_root_path(db_dir.path().to_path_buf().into())
+            .with_unreachable_network()
             .test()
             .await
             .unwrap();
@@ -761,6 +763,7 @@ mod test {
         let conductor_handle = ConductorBuilder::new()
             .config(config)
             .with_data_root_path(db_dir.path().to_path_buf().into())
+            .with_unreachable_network()
             .test()
             .await
             .unwrap();
@@ -895,6 +898,7 @@ mod test {
         let handle = ConductorBuilder::new()
             .config(ConductorConfig::default())
             .with_data_root_path(db_dir.path().to_path_buf().into())
+            .with_unreachable_network()
             .test()
             .await
             .unwrap();
