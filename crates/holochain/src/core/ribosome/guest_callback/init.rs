@@ -442,7 +442,12 @@ mod slow_tests {
 
             match create_post_result {
                 Err(crate::conductor::api::error::ConductorApiError::ConductorError(
-                    crate::conductor::error::ConductorError::CellDisabled(_),
+                    crate::conductor::error::ConductorError::CellNotRunning(
+                        _,
+                        // Which of the two is seen depends on where the enable race lands.
+                        crate::conductor::error::CellUnavailableReason::CloneCellDisabled
+                        | crate::conductor::error::CellUnavailableReason::NotStarted,
+                    ),
                 )) => {
                     // Expected errors
                 }

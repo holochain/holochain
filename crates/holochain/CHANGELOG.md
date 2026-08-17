@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Errors for zome calls against a cell that is not running now state why. `ConductorError::CellDisabled` is replaced by `ConductorError::CellNotRunning(cell_id, reason)`, where the reason distinguishes an app that is disabled, awaiting membrane proofs, restoring its source chains, or permanently unrecoverable, from a disabled clone cell or a cell that has not finished starting.
 - Add the source-chain restore workflow and allow installing an app with `InstallAppPayload::restore_from_dht: true`. Doing so skips genesis and reconstructs each cell's chain from the DHT instead, letting an existing agent key resume authoring on a new node. The app sits in `AppStatus::AwaitingRestore` until every cell restores, then requires `enable_app` like a normal install. A validated `ChainIntegrityWarrant` against the agent moves the app to the terminal `AppStatus::Unrecoverable(cell_id, reason)` instead. There is no repair path if an app is marked as `AppStatus::Unrecoverable`, it can only be uninstalled. See `docs/design/source_chain_restore.md`. \#5800
 
 ## 0.7.0

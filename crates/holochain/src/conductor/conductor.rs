@@ -38,7 +38,7 @@ use super::api::AppInterfaceApi;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
 use super::entry_def_store::get_entry_defs;
-use super::error::ConductorError;
+use super::error::{CellUnavailableReason, ConductorError};
 use super::interface::error::InterfaceResult;
 use super::interface::websocket::spawn_admin_interface_tasks;
 use super::interface::websocket::spawn_app_interface_task;
@@ -1943,25 +1943,45 @@ mod restore_impls {
 mod cell_impls {
     use super::*;
 
+    /// Classifies why a cell belonging to `app` is registered but not running.
+    fn cell_unavailable_reason(app: &InstalledApp, cell_id: &CellId) -> CellUnavailableReason {
+        match &app.status {
+            AppStatus::Disabled(reason) => CellUnavailableReason::AppDisabled(reason.clone()),
+            AppStatus::AwaitingMemproofs => CellUnavailableReason::AppAwaitingMemproofs,
+            AppStatus::AwaitingRestore => CellUnavailableReason::AppAwaitingRestore,
+            AppStatus::Unrecoverable(_, reason) => {
+                CellUnavailableReason::AppUnrecoverable(reason.clone())
+            }
+            // The app runs its cells, so the cell is either a disabled clone or still starting.
+            AppStatus::Enabled => {
+                if app.disabled_clone_cell_ids().any(|id| id == *cell_id) {
+                    CellUnavailableReason::CloneCellDisabled
+                } else {
+                    CellUnavailableReason::NotStarted
+                }
+            }
+        }
+    }
+
     impl Conductor {
         pub(crate) async fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
             // Can only get a cell from the running_cells list
             if let Some(cell) = self.running_cells.share_ref(|c| c.get(cell_id).cloned()) {
                 Ok(cell)
             } else {
-                // If not in running_cells list, check if the cell id is registered at all,
-                // to give a different error message for disabled vs missing.
-                let present = self
-                    .get_state()
-                    .await?
+                // If not in running_cells list, find the app that owns the cell so the caller
+                // learns why it isn't callable, or that it isn't registered at all.
+                let state = self.get_state().await?;
+                let owning_app = state
                     .installed_apps()
                     .values()
-                    .flat_map(|app| app.all_cells())
-                    .any(|id| id == *cell_id);
-                if present {
-                    Err(ConductorError::CellDisabled(cell_id.clone()))
-                } else {
-                    Err(ConductorError::CellMissing(cell_id.clone()))
+                    .find(|app| app.all_cells().any(|id| id == *cell_id));
+                match owning_app {
+                    Some(app) => Err(ConductorError::CellNotRunning(
+                        cell_id.clone(),
+                        cell_unavailable_reason(app, cell_id),
+                    )),
+                    None => Err(ConductorError::CellMissing(cell_id.clone())),
                 }
             }
         }
@@ -2044,6 +2064,126 @@ mod cell_impls {
                     }
                 })
                 .collect())
+        }
+    }
+
+    #[cfg(test)]
+    mod cell_unavailable_reason_tests {
+        use super::*;
+        use ::fixt::prelude::*;
+        use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
+
+        /// Builds an app with one provisioned cell and one disabled clone, returning both cell IDs.
+        fn app_with_status(status: AppStatus) -> (InstalledApp, CellId, CellId) {
+            let agent = fixt!(AgentPubKey);
+            let base_dna_hash = fixt!(DnaHash);
+            let clone_dna_hash = fixt!(DnaHash);
+            let role_name: RoleName = "role".into();
+
+            let manifest = AppManifestCurrentBuilder::default()
+                .name("test".into())
+                .description(None)
+                .roles(vec![AppRoleManifest {
+                    name: role_name.clone(),
+                    dna: AppRoleDnaManifest {
+                        path: None,
+                        modifiers: DnaModifiersOpt::none(),
+                        installed_hash: Some(base_dna_hash.clone().into()),
+                        clone_limit: 1,
+                    },
+                    provisioning: Some(CellProvisioning::Create { deferred: false }),
+                }])
+                .allow_deferred_memproofs(false)
+                .build()
+                .unwrap()
+                .into();
+
+            let mut primary = AppRolePrimary::new(base_dna_hash.clone(), true, 1);
+            primary
+                .disabled_clones
+                .insert(CloneId::new(&role_name, 0), clone_dna_hash.clone());
+
+            let app = InstalledApp::new(
+                InstalledAppCommon::new(
+                    "app".to_string(),
+                    agent.clone(),
+                    [(role_name, AppRoleAssignment::Primary(primary))],
+                    manifest,
+                    Timestamp::now(),
+                )
+                .unwrap(),
+                status,
+            );
+
+            (
+                app,
+                CellId::new(base_dna_hash, agent.clone()),
+                CellId::new(clone_dna_hash, agent),
+            )
+        }
+
+        #[test]
+        fn disabled_app_reports_the_disabled_reason() {
+            let (app, cell_id, _) =
+                app_with_status(AppStatus::Disabled(DisabledAppReason::NeverStarted));
+            assert_eq!(
+                cell_unavailable_reason(&app, &cell_id),
+                CellUnavailableReason::AppDisabled(DisabledAppReason::NeverStarted)
+            );
+        }
+
+        #[test]
+        fn app_awaiting_memproofs_is_distinguished() {
+            let (app, cell_id, _) = app_with_status(AppStatus::AwaitingMemproofs);
+            assert_eq!(
+                cell_unavailable_reason(&app, &cell_id),
+                CellUnavailableReason::AppAwaitingMemproofs
+            );
+        }
+
+        #[test]
+        fn app_awaiting_restore_is_distinguished() {
+            let (app, cell_id, _) = app_with_status(AppStatus::AwaitingRestore);
+            assert_eq!(
+                cell_unavailable_reason(&app, &cell_id),
+                CellUnavailableReason::AppAwaitingRestore
+            );
+        }
+
+        #[test]
+        fn unrecoverable_app_carries_the_failure_reason() {
+            let summary = WarrantSummary {
+                author: fixt!(AgentPubKey),
+                warrantee: fixt!(AgentPubKey),
+                timestamp: Timestamp::from_micros(1_000_000),
+            };
+            let reason = UnrecoverableCellReason::ChainForkWarrant(Box::new(summary));
+            let (app, cell_id, _) = app_with_status(AppStatus::Unrecoverable(
+                CellId::new(fixt!(DnaHash), fixt!(AgentPubKey)),
+                reason.clone(),
+            ));
+            assert_eq!(
+                cell_unavailable_reason(&app, &cell_id),
+                CellUnavailableReason::AppUnrecoverable(reason)
+            );
+        }
+
+        #[test]
+        fn disabled_clone_of_an_enabled_app_is_not_reported_as_an_app_problem() {
+            let (app, _, clone_cell_id) = app_with_status(AppStatus::Enabled);
+            assert_eq!(
+                cell_unavailable_reason(&app, &clone_cell_id),
+                CellUnavailableReason::CloneCellDisabled
+            );
+        }
+
+        #[test]
+        fn enabled_app_with_a_cell_yet_to_start_reports_not_started() {
+            let (app, cell_id, _) = app_with_status(AppStatus::Enabled);
+            assert_eq!(
+                cell_unavailable_reason(&app, &cell_id),
+                CellUnavailableReason::NotStarted
+            );
         }
     }
 }

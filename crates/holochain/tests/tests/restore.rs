@@ -3,7 +3,7 @@
 use holo_hash::ActionHash;
 use holochain::conductor::api::error::ConductorApiError;
 use holochain::conductor::conductor::InstallAppCommonFlags;
-use holochain::conductor::error::ConductorError;
+use holochain::conductor::error::{CellUnavailableReason, ConductorError};
 use holochain::sweettest::*;
 use holochain_conductor_api::CellInfo;
 use holochain_keystore::{AgentPubKeyExt, WarrantOpExt};
@@ -12,6 +12,7 @@ use holochain_types::app::{AppStatus, DisabledAppReason};
 use holochain_types::prelude::*;
 use holochain_types::signal::SystemSignal;
 use holochain_wasm_test_utils::TestWasm;
+use tokio::sync::broadcast;
 
 /// The kitsune2 agent IDs currently joined to the network space of the passed [`DnaHash`].
 async fn joined_agents(
@@ -32,6 +33,35 @@ async fn joined_agents(
         .into_iter()
         .map(|agent| agent.agent().clone())
         .collect()
+}
+
+/// Waits for the next restore signal on `signal_rx`, ignoring any other signals.
+async fn next_restore_signal(signal_rx: &mut broadcast::Receiver<Signal>) -> SystemSignal {
+    tokio::time::timeout(std::time::Duration::from_secs(60), async {
+        loop {
+            if let Signal::System(
+                signal @ (SystemSignal::RestoreComplete { .. }
+                | SystemSignal::AppRestoreComplete { .. }
+                | SystemSignal::RestoreFailed { .. }),
+            ) = signal_rx.recv().await.unwrap()
+            {
+                break signal;
+            }
+        }
+    })
+    .await
+    .expect("timed out waiting for a restore signal")
+}
+
+/// The current status of the `app_id` app on `conductor`.
+async fn app_status(conductor: &SweetConductor, app_id: &InstalledAppId) -> AppStatus {
+    conductor
+        .raw_handle()
+        .get_app_info(app_id)
+        .await
+        .unwrap()
+        .unwrap()
+        .status
 }
 
 /// Installs an app for an `agent` on a fresh conductor via the restore workflow.
@@ -152,7 +182,8 @@ async fn restore_from_dht_end_to_end() {
         }
     });
 
-    // `enable_app` has not been called yet, so the cell must not be callable.
+    // `enable_app` has not been called yet, so the cell must not be callable. The restore may
+    // already have finished, which leaves the app disabled rather than awaiting restore.
     let err = conductor_b
         .call_fallible::<_, ActionHash>(&restore_cell.zome(TestWasm::Create), "create_entry", ())
         .await
@@ -160,37 +191,32 @@ async fn restore_from_dht_end_to_end() {
     assert!(
         matches!(
             err,
-            ConductorApiError::ConductorError(ConductorError::CellDisabled(_))
+            ConductorApiError::ConductorError(ConductorError::CellNotRunning(
+                _,
+                CellUnavailableReason::AppAwaitingRestore
+                    | CellUnavailableReason::AppDisabled(DisabledAppReason::NeverStarted)
+            ))
         ),
-        "expected CellDisabled while awaiting restore, got: {err:?}"
+        "expected the cell to not be callable before enable_app, got: {err:?}"
     );
 
-    let signal = tokio::time::timeout(std::time::Duration::from_secs(60), async {
-        loop {
-            match signal_rx.recv().await.unwrap() {
-                signal @ Signal::System(SystemSignal::AppRestoreComplete { .. }) => break signal,
-                Signal::System(SystemSignal::RestoreFailed { cell_id, reason }) => {
-                    panic!("Restore failed unexpectedly for {cell_id:?}: {reason:?}");
-                }
-                _ => continue,
-            }
-        }
-    })
-    .await
-    .expect("timed out waiting for AppRestoreComplete");
-    assert!(matches!(
-        signal,
-        Signal::System(SystemSignal::AppRestoreComplete { installed_app_id }) if installed_app_id == app_id
-    ));
-
-    let app_info = conductor_b
-        .raw_handle()
-        .get_app_info(&app_id)
-        .await
-        .unwrap()
-        .unwrap();
+    // The cell reports its own completion first, then the app-level signal follows once every cell
+    // is done.
     assert_eq!(
-        app_info.status,
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: restore_cell.cell_id().clone()
+        }
+    );
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::AppRestoreComplete {
+            installed_app_id: app_id.clone()
+        }
+    );
+
+    assert_eq!(
+        app_status(&conductor_b, &app_id).await,
         AppStatus::Disabled(DisabledAppReason::NeverStarted)
     );
 
@@ -204,6 +230,253 @@ async fn restore_from_dht_end_to_end() {
         .call(&restore_cell.zome(TestWasm::Create), "get_post", new_hash)
         .await;
     assert_eq!(new_record.unwrap().action().action_seq(), last_seq_on_a + 1);
+}
+
+/// Installs a restoring app on a conductor with no peers to restore from, so the restore keeps
+/// retrying and the app stays in [`AppStatus::AwaitingRestore`]. Confirms a zome call in that state
+/// is rejected with a reason naming the restore, rather than looking like a plain disabled app.
+#[tokio::test(flavor = "multi_thread")]
+async fn zome_call_while_awaiting_restore_is_rejected() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+    let mut conductor =
+        SweetConductor::from_config_rendezvous(SweetConductorConfig::rendezvous(true), rendezvous)
+            .await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+
+    let app_id = "restored".to_string();
+    conductor
+        .install_app(
+            &app_id,
+            Some(agent),
+            std::slice::from_ref(&dna_file),
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    let app_info = conductor
+        .raw_handle()
+        .get_app_info(&app_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(app_info.status, AppStatus::AwaitingRestore);
+
+    let role = dna_file.dna_hash().to_string();
+    let restore_cell_id = match app_info.cell_info[&role].first().unwrap() {
+        CellInfo::Provisioned(c) => c.cell_id.clone(),
+        other => panic!("Expected a provisioned cell, got: {other:?}"),
+    };
+    let restore_cell = conductor.get_sweet_cell(restore_cell_id).unwrap();
+
+    let err = conductor
+        .call_fallible::<_, ActionHash>(&restore_cell.zome(TestWasm::Create), "create_entry", ())
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(
+            err,
+            ConductorApiError::ConductorError(ConductorError::CellNotRunning(
+                _,
+                CellUnavailableReason::AppAwaitingRestore
+            ))
+        ),
+        "expected AppAwaitingRestore, got: {err:?}"
+    );
+}
+
+/// Authors a chain for a fresh agent in each of `dnas`, on a conductor which is then shut down so
+/// that it can't serve the restore of its own chains. A second conductor is a full-arc peer for each
+/// DNA in `authority_dnas` and stays up as the authority restore queries.
+///
+/// Returns the keystore holding the agent's key, the agent, and the authority conductor, which the
+/// caller must keep alive for as long as the restore needs it.
+async fn author_chains_to_restore(
+    rendezvous: DynSweetRendezvous,
+    dnas: &[DnaFile],
+    authority_dnas: &[DnaFile],
+) -> (
+    holochain_keystore::MetaLairClient,
+    AgentPubKey,
+    SweetConductor,
+) {
+    let mut conductor_a = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let keystore = conductor_a.keystore();
+    let agent = SweetAgents::one(keystore.clone()).await;
+    let cells_a = conductor_a
+        .setup_app_for_agent("app", agent.clone(), dnas)
+        .await
+        .unwrap()
+        .into_cells();
+
+    let mut conductor_c =
+        SweetConductor::from_config_rendezvous(SweetConductorConfig::rendezvous(true), rendezvous)
+            .await;
+    let mut cells_c = Vec::new();
+    for dna in authority_dnas {
+        let app = conductor_c
+            .setup_app(
+                &format!("authority-{}", dna.dna_hash()),
+                std::slice::from_ref(dna),
+            )
+            .await
+            .unwrap();
+        cells_c.push(app.into_cells().remove(0));
+    }
+
+    for dna in dnas {
+        conductor_a.declare_full_storage_arcs(dna.dna_hash()).await;
+    }
+    for dna in authority_dnas {
+        conductor_c.declare_full_storage_arcs(dna.dna_hash()).await;
+    }
+
+    for cell in &cells_a {
+        let _: ActionHash = conductor_a
+            .call(&cell.zome(TestWasm::Create), "create_entry", ())
+            .await;
+    }
+
+    for cell_c in &cells_c {
+        let cell_a = cells_a
+            .iter()
+            .find(|cell| cell.dna_hash() == cell_c.dna_hash())
+            .unwrap();
+        await_consistency([cell_a, cell_c]).await.unwrap();
+    }
+
+    // Shut down the original, so it can't act as an authority for the restore of itself
+    conductor_a.shutdown().await;
+
+    (keystore, agent, conductor_c)
+}
+
+/// Restores an app with two provisioned cells, both with an authority to restore from. Confirms
+/// that the cells complete one at a time in the app's role order, and that the app settles into
+/// [`DisabledAppReason::NeverStarted`] once the last of them is done.
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_multi_cell_app_completes_cells_in_order() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_first, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let (dna_second, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let dnas = [dna_first.clone(), dna_second.clone()];
+
+    let (keystore, agent, _authority) =
+        author_chains_to_restore(rendezvous.clone(), &dnas, &dnas).await;
+
+    let mut config_b = SweetConductorConfig::rendezvous(true);
+    config_b.restore_chain_quorum = 1;
+    // The first query a newly joined space makes goes unanswered, so cap how long the restore
+    // workflow waits before retrying it.
+    config_b.network.request_timeout_s = 10;
+    let mut conductor_b =
+        SweetConductor::create_with_defaults(config_b, Some(keystore), Some(rendezvous)).await;
+
+    let app_id = "restored".to_string();
+    let mut signal_rx = conductor_b.subscribe_to_app_signals(app_id.clone());
+
+    conductor_b
+        .install_app(
+            &app_id,
+            Some(agent.clone()),
+            &dnas,
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    // Cells restore in the app's role order, which here is the order the DNAs were installed in.
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: CellId::new(dna_first.dna_hash().clone(), agent.clone())
+        }
+    );
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: CellId::new(dna_second.dna_hash().clone(), agent.clone())
+        }
+    );
+
+    // Only with every cell restored does the app settle and become enableable.
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::AppRestoreComplete {
+            installed_app_id: app_id.clone()
+        }
+    );
+    assert_eq!(
+        app_status(&conductor_b, &app_id).await,
+        AppStatus::Disabled(DisabledAppReason::NeverStarted)
+    );
+}
+
+/// Restores an app with two provisioned cells where only the first has an authority to restore
+/// from. Confirms that the first cell still completes, and that the app stays in
+/// [`AppStatus::AwaitingRestore`] rather than settling while the last cell is outstanding.
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_multi_cell_app_does_not_settle_until_the_last_cell_completes() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_first, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let (dna_second, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let dnas = [dna_first.clone(), dna_second.clone()];
+
+    let (keystore, agent, _authority) =
+        author_chains_to_restore(rendezvous.clone(), &dnas, std::slice::from_ref(&dna_first)).await;
+
+    let mut config_b = SweetConductorConfig::rendezvous(true);
+    config_b.restore_chain_quorum = 1;
+    let mut conductor_b =
+        SweetConductor::create_with_defaults(config_b, Some(keystore), Some(rendezvous)).await;
+
+    let app_id = "restored".to_string();
+    let mut signal_rx = conductor_b.subscribe_to_app_signals(app_id.clone());
+
+    conductor_b
+        .install_app(
+            &app_id,
+            Some(agent.clone()),
+            &dnas,
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: CellId::new(dna_first.dna_hash().clone(), agent.clone())
+        }
+    );
+
+    // The second cell has no authority to restore from, so it can never complete and the app can
+    // never settle, no matter how long the orchestrator is given.
+    assert_eq!(
+        app_status(&conductor_b, &app_id).await,
+        AppStatus::AwaitingRestore
+    );
 }
 
 async fn build_fork_pair(
@@ -321,36 +594,19 @@ async fn restore_from_dht_chain_fork_warrant_transitions_to_unrecoverable() {
         .await
         .unwrap();
 
-    let (restore_cell_id, reason) =
-        tokio::time::timeout(std::time::Duration::from_secs(60), async {
-            loop {
-                match signal_rx.recv().await.unwrap() {
-                    Signal::System(SystemSignal::RestoreFailed { cell_id, reason }) => {
-                        break (cell_id, reason);
-                    }
-                    signal @ Signal::System(SystemSignal::AppRestoreComplete { .. }) => {
-                        panic!("Restore unexpectedly succeeded: {signal:?}");
-                    }
-                    _ => continue,
-                }
-            }
-        })
-        .await
-        .expect("timed out waiting for RestoreFailed");
+    // A permanently failed cell must report the failure rather than any form of completion.
+    let (restore_cell_id, reason) = match next_restore_signal(&mut signal_rx).await {
+        SystemSignal::RestoreFailed { cell_id, reason } => (cell_id, reason),
+        signal => panic!("expected RestoreFailed, got: {signal:?}"),
+    };
 
     assert!(
         matches!(reason, UnrecoverableCellReason::ChainForkWarrant(_)),
         "expected a ChainForkWarrant reason, got: {reason:?}"
     );
 
-    let app_info = conductor_d
-        .raw_handle()
-        .get_app_info(&app_id)
-        .await
-        .unwrap()
-        .unwrap();
     assert_eq!(
-        app_info.status,
+        app_status(&conductor_d, &app_id).await,
         AppStatus::Unrecoverable(restore_cell_id, reason)
     );
 

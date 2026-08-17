@@ -521,13 +521,12 @@ async fn test_deferred_memproof_provisioning() {
 
     let cell = conductor.get_sweet_cell(cell_id.clone()).unwrap();
 
-    //- Can't make zome calls, error returned is CellDisabled
-    //  (which isn't ideal, but gets the message across well enough)
+    //- Can't make zome calls while the app is awaiting its memproofs
     let result: Result<String, _> = conductor.call_fallible(&cell.zome("foo"), "foo", ()).await;
     assert_matches!(
         result,
         Err(ConductorApiError::ConductorError(
-            ConductorError::CellDisabled(_)
+            ConductorError::CellNotRunning(_, CellUnavailableReason::AppAwaitingMemproofs)
         ))
     );
 
