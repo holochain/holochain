@@ -59,17 +59,22 @@ async fn send_direct_signal(
     .unwrap()
 }
 
-/// Wait for the next direct (`Signal::AppDirect`) signal on this socket, returning the target cell
-/// and payload. Other signal kinds are ignored. Returns `None` if `timeout` elapses first.
+/// Wait for the next direct (`Signal::AppDirect`) signal on this socket, returning the target cell,
+/// sending agent, and payload. Other signal kinds are ignored. Returns `None` if `timeout` elapses
+/// first.
 async fn try_recv_direct_signal(
     rx: &mut WebsocketReceiver,
     timeout: Duration,
-) -> Option<(CellId, Vec<u8>)> {
+) -> Option<(CellId, AgentPubKey, Vec<u8>)> {
     tokio::time::timeout(timeout, async {
         loop {
             match rx.recv::<AppResponse>().await.unwrap() {
                 ReceiveMessage::Signal(bytes) => match Signal::try_from_vec(bytes).unwrap() {
-                    Signal::AppDirect { cell_id, signal } => return (cell_id, signal),
+                    Signal::AppDirect {
+                        cell_id,
+                        from_agent,
+                        signal,
+                    } => return (cell_id, from_agent, signal),
                     _ => continue,
                 },
                 _ => panic!("expected a signal on the app socket"),
@@ -157,10 +162,12 @@ async fn direct_signal_to_another_conductor() {
         "unexpected response: {response:?}"
     );
 
-    let (cell_id, signal) = try_recv_direct_signal(&mut bob_rx, Duration::from_secs(60))
-        .await
-        .expect("Bob did not receive the direct signal");
+    let (cell_id, from_agent, signal) =
+        try_recv_direct_signal(&mut bob_rx, Duration::from_secs(60))
+            .await
+            .expect("Bob did not receive the direct signal");
     assert_eq!(cell_id, *bob.cell_id());
+    assert_eq!(from_agent, *alice.agent_pubkey());
     assert_eq!(signal, payload);
 }
 
@@ -171,7 +178,7 @@ async fn direct_signal_to_agent_on_same_conductor() {
     let mut conductor = SweetConductor::standard().await;
     let dna = SweetDnaFile::unique_empty().await;
 
-    let _alice_app = conductor
+    let alice_app = conductor
         .setup_app("alice-app", std::slice::from_ref(&dna))
         .await
         .unwrap();
@@ -200,10 +207,12 @@ async fn direct_signal_to_agent_on_same_conductor() {
         "unexpected response: {response:?}"
     );
 
-    let (cell_id, signal) = try_recv_direct_signal(&mut bob_rx, Duration::from_secs(30))
-        .await
-        .expect("Bob did not receive the direct signal");
+    let (cell_id, from_agent, signal) =
+        try_recv_direct_signal(&mut bob_rx, Duration::from_secs(30))
+            .await
+            .expect("Bob did not receive the direct signal");
     assert_eq!(cell_id, bob_cell_id);
+    assert_eq!(&from_agent, alice_app.agent());
     assert_eq!(signal, payload);
 }
 
@@ -250,17 +259,20 @@ async fn direct_signal_to_multiple_agents() {
         "unexpected response: {response:?}"
     );
 
-    let (bob_cell_id, bob_signal) = try_recv_direct_signal(&mut bob_rx, Duration::from_secs(60))
-        .await
-        .expect("Bob did not receive the direct signal");
+    let (bob_cell_id, bobs_from_agent, bob_signal) =
+        try_recv_direct_signal(&mut bob_rx, Duration::from_secs(60))
+            .await
+            .expect("Bob did not receive the direct signal");
     assert_eq!(bob_cell_id, *bob.cell_id());
+    assert_eq!(bobs_from_agent, *alice.agent_pubkey());
     assert_eq!(bob_signal, payload);
 
-    let (carol_cell_id, carol_signal) =
+    let (carol_cell_id, carols_from_agent, carol_signal) =
         try_recv_direct_signal(&mut carol_rx, Duration::from_secs(60))
             .await
             .expect("Carol did not receive the direct signal");
     assert_eq!(carol_cell_id, *carol.cell_id());
+    assert_eq!(carols_from_agent, *alice.agent_pubkey());
     assert_eq!(carol_signal, payload);
 }
 

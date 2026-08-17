@@ -459,6 +459,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
 
             if let Err(e) = self.signal_tx.send(Signal::AppDirect {
                 cell_id: CellId::new(dna_hash, to_agent),
+                from_agent,
                 signal: signal.0,
             }) {
                 info!(?e, "Failed to relay direct signal to app")
