@@ -5,10 +5,11 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
+use crate::action::{EntryDefIndex, ZomeIndex};
+use crate::capability::CapAccess;
 use crate::capability::CapClaim;
-use crate::capability::CapGrant;
-use crate::capability::ZomeCallCapGrant;
 use crate::countersigning::CounterSigningSessionData;
+use crate::prelude::CapGrant;
 use holo_hash::hash_type;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -21,20 +22,19 @@ mod app_entry_bytes;
 pub use app_entry_bytes::*;
 
 mod error;
-use crate::action::{AppEntryDef, EntryDefIndex, EntryType, ZomeIndex};
 pub use error::*;
 
 /// Entries larger than this number of bytes cannot be created
 pub const ENTRY_SIZE_LIMIT: usize = 4 * 1000 * 1000; // 4MB
 
 /// The data type written to the source chain when explicitly granting a capability.
-/// NB: this is not simply `CapGrant`, because the `CapGrant::ChainAuthor`
-/// grant is already implied by `Entry::Agent`, so that should not be committed
-/// to a chain. This is a type alias because if we add other capability types
-/// in the future, we may want to include them
-pub type CapGrantEntry = ZomeCallCapGrant;
+///
+/// NB: this is not simply [`CapGrant`], because the [`CapGrant::ChainAuthor`]
+/// grant is already implied by [`Entry::Agent`], so that should not be committed
+/// to a chain.
+pub type CapGrantEntry = CapGrant;
 
-/// The data type written to the source chain to denote a capability claim
+/// The data type written to the source chain to denote a capability claim.
 pub type CapClaimEntry = CapClaim;
 
 /// An Entry paired with its EntryHash
@@ -103,16 +103,16 @@ pub enum Entry {
 }
 
 impl Entry {
-    /// If this entry represents a capability grant, return a `CapGrant`.
-    pub fn as_cap_grant(&self) -> Option<CapGrant> {
+    /// If this entry represents a capability grant, return the corresponding [`CapAccess`].
+    pub fn as_cap_access(&self) -> Option<CapAccess> {
         match self {
-            Entry::Agent(key) => Some(CapGrant::ChainAuthor(key.clone())),
-            Entry::CapGrant(data) => Some(CapGrant::RemoteAgent(data.clone())),
+            Entry::Agent(key) => Some(CapAccess::ChainAuthor(key.clone())),
+            Entry::CapGrant(data) => Some(CapAccess::RemoteAgent(data.clone())),
             _ => None,
         }
     }
 
-    /// If this entry represents a capability claim, return a `CapClaim`.
+    /// If this entry represents a capability claim, return a [`CapClaim`].
     pub fn as_cap_claim(&self) -> Option<&CapClaim> {
         match self {
             Entry::CapClaim(claim) => Some(claim),
@@ -128,30 +128,9 @@ impl Entry {
         }
     }
 
-    /// Create an Entry::App from SerializedBytes
+    /// Create an [`Entry::App`] from [`SerializedBytes`].
     pub fn app(sb: SerializedBytes) -> Result<Self, EntryError> {
         Ok(Entry::App(AppEntryBytes::try_from(sb)?))
-    }
-
-    /// Create an Entry::App from SerializedBytes
-    pub fn app_fancy<SB: TryInto<SerializedBytes, Error = SerializedBytesError>>(
-        sb: SB,
-    ) -> Result<Self, EntryError> {
-        Ok(Entry::App(AppEntryBytes::try_from(sb.try_into()?)?))
-    }
-
-    /// Get an EntryType based on the type of this Entry.
-    /// If the entry type is Entry, and no entry def is specified, return None
-    pub fn entry_type(&self, entry_def: Option<AppEntryDef>) -> Option<EntryType> {
-        match (self, entry_def) {
-            (Entry::Agent(_), _) => Some(EntryType::AgentPubKey),
-            (Entry::CapClaim(_), _) => Some(EntryType::CapClaim),
-            (Entry::CapGrant(_), _) => Some(EntryType::CapGrant),
-            (Entry::App(_), Some(aed)) | (Entry::CounterSign(_, _), Some(aed)) => {
-                Some(EntryType::App(aed))
-            }
-            _ => None,
-        }
     }
 }
 

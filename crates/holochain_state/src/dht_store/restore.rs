@@ -112,7 +112,7 @@ mod tests {
     use holo_hash::{ActionHash, DnaHash, EntryHash};
     use holochain_serialized_bytes::UnsafeBytes;
     use holochain_types::prelude::{
-        AppEntryBytes, AppEntryDef, CapAccess, EntryType, GrantedFunctions, ZomeCallCapGrant,
+        AppEntryBytes, AppEntryDef, EntryType, GrantConstraint, GrantedFunctions,
     };
     use holochain_zome_types::prelude::*;
     use std::sync::Arc;
@@ -371,8 +371,11 @@ mod tests {
         let author = fixt!(AgentPubKey);
 
         let dna = dna_record(&author);
-        let grant =
-            ZomeCallCapGrant::new("tag".into(), CapAccess::Unrestricted, GrantedFunctions::All);
+        let grant = CapGrant::new_zome_call_grant(
+            "tag".into(),
+            GrantConstraint::Unrestricted,
+            GrantedFunctions::All,
+        );
         let create = create_record(
             &author,
             dna.action_address().clone(),

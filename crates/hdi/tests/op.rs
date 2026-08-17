@@ -190,8 +190,8 @@ fn cap_claim() -> CapClaim {
     CapClaim::new("tag".into(), ak(9), [1u8; CAP_SECRET_BYTES].into())
 }
 
-fn cap_grant() -> ZomeCallCapGrant {
-    ZomeCallCapGrant::new("tag".into(), ().into(), GrantedFunctions::All)
+fn cap_grant() -> CapGrant {
+    CapGrant::new_zome_call_grant("tag".into(), ().into(), GrantedFunctions::All)
 }
 
 fn store_record(data: ActionData, entry: RecordEntry) -> Op {

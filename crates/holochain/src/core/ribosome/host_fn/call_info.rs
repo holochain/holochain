@@ -56,7 +56,7 @@ pub fn call_info(
                             .expect("Must have source chain if bindings access is given")
                             .agent_pubkey()
                             .clone();
-                        (author.clone(), CapGrant::ChainAuthor(author))
+                        (author.clone(), CapAccess::ChainAuthor(author))
                     }
                 }
             };

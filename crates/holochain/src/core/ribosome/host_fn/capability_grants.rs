@@ -48,8 +48,8 @@ pub mod wasm_test {
         let entry_secret: CapSecret = maybe_record
             .and_then(|record| {
                 let cap_grant_entry = record.entry().to_grant_option().unwrap();
-                match cap_grant_entry.access {
-                    CapAccess::Transferable { secret, .. } => Some(secret),
+                match cap_grant_entry.constraint {
+                    GrantConstraint::Transferable { secret, .. } => Some(secret),
                     _ => None,
                 }
             })
@@ -119,8 +119,8 @@ pub mod wasm_test {
 
         let new_secret: CapSecret = match output {
             Some(record) => match record.entry().to_grant_option() {
-                Some(zome_call_cap_grant) => match zome_call_cap_grant.access {
-                    CapAccess::Transferable { secret, .. } => secret,
+                Some(zome_call_cap_grant) => match zome_call_cap_grant.constraint {
+                    GrantConstraint::Transferable { secret, .. } => secret,
                     _ => unreachable!(),
                 },
                 _ => unreachable!(),

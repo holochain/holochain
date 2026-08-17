@@ -26,7 +26,7 @@
 
 use crate::cell::CellId;
 use holo_hash::ActionHash;
-use holochain_integrity_types::prelude::{DesensitizedZomeCallCapGrant, ZomeCallCapGrant};
+use holochain_integrity_types::prelude::{CapGrant, DesensitizedCapGrant};
 use holochain_timestamp::Timestamp;
 use serde::{Deserialize, Serialize};
 
@@ -42,7 +42,7 @@ pub struct GrantZomeCallCapabilityPayload {
     pub cell_id: CellId,
     /// Specifies the capability, consisting of zomes and functions to allow
     /// signing for as well as access level, secret and assignees.
-    pub cap_grant: ZomeCallCapGrant,
+    pub cap_grant: CapGrant,
 }
 
 /// A list which map a cell ID to their capability grant information.
@@ -61,7 +61,7 @@ pub struct AppCapGrantInfo(pub Vec<(CellId, Vec<CapGrantInfo>)>);
 pub struct CapGrantInfo {
     /// Specifies the capability, consisting of zomes and functions to allow
     /// signing for as well as access level, secret and assignees.
-    pub cap_grant: DesensitizedZomeCallCapGrant,
+    pub cap_grant: DesensitizedCapGrant,
     /// The action hash of the grant.
     pub action_hash: ActionHash,
     /// Time the capability grant was created.

@@ -13,9 +13,11 @@ fn set_access(_: ()) -> ExternResult<()> {
 
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
-        // empty access converts to unrestricted
-        access: ().into(),
-        functions,
+        // empty constraint converts to unrestricted
+        constraint: ().into(),
+        capability: Capability::ZomeCall(ZomeCallGrant {
+            functions,
+        })
     })?;
 
     Ok(())

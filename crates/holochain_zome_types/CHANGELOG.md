@@ -391,7 +391,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - `ZomeDef` now holds dependencies for the zome.
-- `EntryDefLocation` is either an `EntryDefIndex` or a `CapClaim` or a `CapGrant`.
+- `EntryDefLocation` is either an `EntryDefIndex` or a `CapClaim` or a `CapAccess`.
 
 ### Changed
 

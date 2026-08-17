@@ -22,7 +22,7 @@ use holochain_types::prelude::{
 };
 use holochain_types::warrant::WarrantOp;
 use holochain_zome_types::prelude::{
-    Action, ActionData, CapGrant, CapSecret, ChainFilter, ChainFork, ChainHead, ChainQueryFilter,
+    Action, ActionData, CapAccess, CapSecret, ChainFilter, ChainFork, ChainHead, ChainQueryFilter,
     ChainStatus, EntryType, EntryVisibility, HighestObserved, LimitConditions, LinkTag,
     LinkTypeFilter, Record, RecordEntry, RecordValidity, SignedActionHashed, SignedWarrant,
     ValidationReceiptSet,
@@ -2299,7 +2299,7 @@ impl DhtStore<DbRead<Dht>> {
     ///
     /// - When `check_secret` is `Some`, only grants that carry a secret
     ///   (`Transferable` / `Assigned`) are considered. The exact-secret match is
-    ///   left to the caller's [`CapGrant::is_valid`], which is equivalent
+    ///   left to the caller's [`CapAccess::is_valid`], which is equivalent
     ///   because `is_valid` requires `secret == given` for both secret-bearing
     ///   variants (a secret-bearing check therefore never matches an
     ///   `Unrestricted` grant).
@@ -2313,7 +2313,7 @@ impl DhtStore<DbRead<Dht>> {
         &self,
         author: &AgentPubKey,
         check_secret: Option<&CapSecret>,
-    ) -> StateQueryResult<Vec<CapGrant>> {
+    ) -> StateQueryResult<Vec<CapAccess>> {
         // `CapAccess` integer encoding (see the DHT schema): 0=Unrestricted,
         // 1=Transferable, 2=Assigned. A secret-bearing check looks only at the
         // grants that carry a secret; an unrestricted check only at unrestricted
@@ -2367,7 +2367,7 @@ impl DhtStore<DbRead<Dht>> {
                 let Some(entry) = entries.get(&entry_hash) else {
                     continue;
                 };
-                if let Some(grant) = entry.as_cap_grant() {
+                if let Some(grant) = entry.as_cap_access() {
                     grants.push(grant);
                 }
             }

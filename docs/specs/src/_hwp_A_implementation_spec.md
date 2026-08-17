@@ -313,7 +313,7 @@ enum Entry {
     }
     ```
 
-* `CapGrant` indicates that the entry data contains the details of a capability grant in the following enum and the types upon which it depends:
+* `CapAccess` indicates that the entry data contains the details of a capability grant in the following enum and the types upon which it depends:
 
     ```rust
     struct ZomeCallCapGrant {

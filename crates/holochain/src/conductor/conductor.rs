@@ -2945,9 +2945,7 @@ mod misc_impls {
                             .map(|time| time.to_owned())
                     }
                     let zome_cap_grant = match grant_record.entry.to_grant_option() {
-                        Some(zome_cap_grant) => {
-                            DesensitizedZomeCallCapGrant::from(zome_cap_grant.clone())
-                        }
+                        Some(zome_cap_grant) => DesensitizedCapGrant::from(zome_cap_grant.clone()),
                         None => continue,
                     };
 

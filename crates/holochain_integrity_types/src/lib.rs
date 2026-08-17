@@ -59,7 +59,7 @@ pub fn export_ts_bindings(cfg: &ts_rs::Config) -> Result<(), ts_rs::ExportError>
         cfg,
     )?;
     crate::capability::GrantedFunctionTs::export_all(cfg)?;
-    crate::capability::CapGrant::export_all(cfg)?;
+    crate::capability::CapAccess::export_all(cfg)?;
     crate::action::ActionType::export_all(cfg)?;
     crate::countersigning::PreflightResponse::export_all(cfg)?;
     crate::record::Record::export_all(cfg)?;
