@@ -2776,6 +2776,17 @@ mod misc_impls {
         ) -> ConductorApiResult<ActionHash> {
             let GrantZomeCallCapabilityPayload { cell_id, cap_grant } = payload;
 
+            // This call only issues zome call grants. Committing any other capability here
+            // would produce a grant that never authorizes a zome call, and the caller would
+            // see `Unauthorized` on every subsequent call with no indication why.
+            if !matches!(cap_grant.capability, Capability::ZomeCall(_)) {
+                return Err(ConductorError::NotAZomeCallGrant(format!(
+                    "{:?}",
+                    cap_grant.capability
+                ))
+                .into());
+            }
+
             // Must init before committing a grant
             let cell = self.cell_by_id(&cell_id).await?;
             cell.check_or_run_zome_init().await?;

@@ -130,6 +130,9 @@ pub enum ConductorError {
     #[error("Invalid combination of app install options in the payload: {0}")]
     InvalidInstallAppPayload(String),
 
+    #[error("GrantZomeCallCapability requires a zome call capability, but the grant was for {0}")]
+    NotAZomeCallGrant(String),
+
     #[error("Init properties error: {0}")]
     InitPropertiesError(String),
 
