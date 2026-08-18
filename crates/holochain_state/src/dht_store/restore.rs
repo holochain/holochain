@@ -260,6 +260,140 @@ mod tests {
         );
     }
 
+    /// Crash recovery for a cell whose chain was partially written before the crash.
+    #[tokio::test]
+    async fn write_restored_chain_is_idempotent_when_replayed() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let author = fixt!(AgentPubKey);
+
+        let dna = dna_record(&author);
+        let create = create_record(
+            &author,
+            dna.action_address().clone(),
+            EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            app_entry(1),
+        );
+        let create_action = create.action().clone();
+        let create_entry_hash = create.action().entry_hash().unwrap().clone();
+
+        let action1_entry = app_entry(2);
+        let action1 = make_record(
+            Action {
+                header: ActionHeader {
+                    author: author.clone(),
+                    timestamp: Timestamp::from_micros(2000),
+                    action_seq: 2,
+                    prev_action: Some(create.action_address().clone()),
+                },
+                data: ActionData::Create(CreateData {
+                    entry_type: EntryType::App(AppEntryDef::new(
+                        0.into(),
+                        0.into(),
+                        EntryVisibility::Public,
+                    )),
+                    entry_hash: EntryHash::with_data_sync(&action1_entry),
+                }),
+            },
+            Some(action1_entry),
+        );
+        let action1_entry_hash = action1.action().entry_hash().unwrap().clone();
+
+        let action2_entry = app_entry(3);
+        let action2 = make_record(
+            Action {
+                header: ActionHeader {
+                    author: author.clone(),
+                    timestamp: Timestamp::from_micros(3000),
+                    action_seq: 3,
+                    prev_action: Some(action1.action_address().clone()),
+                },
+                data: ActionData::Create(CreateData {
+                    entry_type: EntryType::App(AppEntryDef::new(
+                        0.into(),
+                        0.into(),
+                        EntryVisibility::Public,
+                    )),
+                    entry_hash: EntryHash::with_data_sync(&action2_entry),
+                }),
+            },
+            Some(action2_entry),
+        );
+
+        // Simulate a crash by writing part of the chain
+        store
+            .write_restored_chain(&author, vec![dna.clone(), create.clone(), action1.clone()])
+            .await
+            .unwrap();
+
+        // Only the first 3 actions are in the DB
+        let by_author = store
+            .db()
+            .as_ref()
+            .get_actions_by_author(author.clone())
+            .await
+            .unwrap();
+        assert_eq!(by_author.len(), 3);
+
+        // Simulate a resume by now writing the full chain
+        store
+            .write_restored_chain(&author, vec![dna, create, action1, action2])
+            .await
+            .unwrap();
+
+        // No duplicate action rows and the new record was appended
+        let by_author = store
+            .db()
+            .as_ref()
+            .get_actions_by_author(author)
+            .await
+            .unwrap();
+        assert_eq!(by_author.len(), 4);
+
+        // The replayed entries are still readable after being written twice
+        for hash in [&create_entry_hash, &action1_entry_hash] {
+            assert!(
+                store
+                    .db()
+                    .as_ref()
+                    .get_entry(hash.clone(), None)
+                    .await
+                    .unwrap()
+                    .is_some(),
+                "replayed entry should still be readable"
+            );
+        }
+
+        // No duplicate chain op or publish rows for the replayed op
+        let op_hash = {
+            use holochain_types::op::ChainOpUniqueForm;
+            use holochain_zome_types::op::ChainOpType;
+            ChainOpUniqueForm::op_hash(ChainOpType::CreateRecord, &create_action)
+        };
+        let row = store
+            .db()
+            .as_ref()
+            .get_chain_op(op_hash.clone())
+            .await
+            .unwrap()
+            .expect("chain op row should still exist after replay");
+        assert_eq!(row.validation_status, i64::from(RecordValidity::Accepted));
+
+        let publish_row = store
+            .db()
+            .as_ref()
+            .get_chain_op_publish(op_hash)
+            .await
+            .unwrap();
+        assert!(
+            publish_row.is_some(),
+            "the ChainOpPublish row should still exist after replay"
+        );
+    }
+
     #[tokio::test]
     async fn identical_entry_content_with_different_visibility_is_written_to_both_tables() {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
