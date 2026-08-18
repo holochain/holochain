@@ -224,6 +224,53 @@ impl From<(CapSecret, AgentPubKey)> for GrantConstraint {
     }
 }
 
+/// The [`GrantConstraint`] variant, without its payload.
+///
+/// This is the discriminant stored in the `CapGrant.cap_access` INTEGER column, so the
+/// numbering is part of the DHT schema and must not be changed.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[repr(i64)]
+pub enum GrantConstraintType {
+    /// No restrictions; any caller may invoke the granted capability.
+    Unrestricted = 0,
+    /// Caller must present a matching secret token.
+    Transferable = 1,
+    /// Caller must be on the agent allow-list and present the secret.
+    Assigned = 2,
+}
+
+impl From<&GrantConstraint> for GrantConstraintType {
+    fn from(constraint: &GrantConstraint) -> Self {
+        match constraint {
+            GrantConstraint::Unrestricted => GrantConstraintType::Unrestricted,
+            GrantConstraint::Transferable { .. } => GrantConstraintType::Transferable,
+            GrantConstraint::Assigned { .. } => GrantConstraintType::Assigned,
+        }
+    }
+}
+
+/// Maps [`GrantConstraintType`] onto the `CapGrant.cap_access` INTEGER column
+/// (`0..=2`). All three variants are valid, including `0`.
+impl From<GrantConstraintType> for i64 {
+    fn from(t: GrantConstraintType) -> Self {
+        t as i64
+    }
+}
+
+/// Inverse of [`From<GrantConstraintType> for i64`]. Returns `Err(v)` for any value
+/// outside `0..=2`.
+impl TryFrom<i64> for GrantConstraintType {
+    type Error = i64;
+    fn try_from(v: i64) -> Result<Self, Self::Error> {
+        match v {
+            0 => Ok(GrantConstraintType::Unrestricted),
+            1 => Ok(GrantConstraintType::Transferable),
+            2 => Ok(GrantConstraintType::Assigned),
+            other => Err(other),
+        }
+    }
+}
+
 impl GrantConstraint {
     /// Return variant denominator as string slice
     pub fn as_variant_string(&self) -> &str {
@@ -357,5 +404,145 @@ mod tests {
             &agent1,
             Some(&secret_wrong),
         ));
+    }
+
+    /// A grant issued for direct signals must never authorize a zome call, however
+    /// permissive its constraint.
+    #[test]
+    fn direct_signal_grant_does_not_authorize_zome_call() {
+        let agent = AgentPubKey::from_raw_36(vec![1; 36]);
+        let secret: CapSecret = [1; 64].into();
+        let function = (ZomeName("zome".into()), FunctionName("fn".into()));
+
+        for constraint in [
+            GrantConstraint::Unrestricted,
+            GrantConstraint::Transferable { secret },
+            GrantConstraint::Assigned {
+                secret,
+                assignees: [agent.clone()].into_iter().collect(),
+            },
+        ] {
+            let access: CapAccess = CapGrant {
+                tag: "tag".to_string(),
+                constraint: constraint.clone(),
+                capability: Capability::DirectSignal,
+            }
+            .into();
+
+            assert!(
+                !access.is_valid_for_zome_call(&function, &agent, Some(&secret)),
+                "{constraint:?} direct-signal grant authorized a zome call with a secret"
+            );
+            assert!(
+                !access.is_valid_for_zome_call(&function, &agent, None),
+                "{constraint:?} direct-signal grant authorized a zome call without a secret"
+            );
+        }
+    }
+
+    /// The mirror of the above: a zome call grant must never authorize a direct signal.
+    #[test]
+    fn zome_call_grant_does_not_authorize_direct_signal() {
+        let agent = AgentPubKey::from_raw_36(vec![1; 36]);
+        let secret: CapSecret = [1; 64].into();
+
+        let access: CapAccess = CapGrant::new_zome_call_grant(
+            "tag".to_string(),
+            GrantConstraint::Unrestricted,
+            GrantedFunctions::All,
+        )
+        .into();
+
+        assert!(!access.is_valid_for_direct_signal(&agent, Some(&secret)));
+        assert!(!access.is_valid_for_direct_signal(&agent, None));
+    }
+
+    /// The chain author has implicit zome call access but, deliberately, no implicit
+    /// direct signal access.
+    #[test]
+    fn chain_author_has_no_implicit_direct_signal_access() {
+        let agent = AgentPubKey::from_raw_36(vec![1; 36]);
+        let access = CapAccess::ChainAuthor(agent.clone());
+
+        assert!(access.is_valid_for_zome_call(
+            &(ZomeName("zome".into()), FunctionName("fn".into())),
+            &agent,
+            None,
+        ));
+        assert!(!access.is_valid_for_direct_signal(&agent, None));
+    }
+
+    #[test]
+    fn direct_signal_grant_honours_its_constraint() {
+        let assignee = AgentPubKey::from_raw_36(vec![1; 36]);
+        let stranger = AgentPubKey::from_raw_36(vec![2; 36]);
+        let secret: CapSecret = [1; 64].into();
+        let secret_wrong: CapSecret = [2; 64].into();
+
+        let unrestricted: CapAccess = CapGrant {
+            tag: "tag".to_string(),
+            constraint: GrantConstraint::Unrestricted,
+            capability: Capability::DirectSignal,
+        }
+        .into();
+        assert!(unrestricted.is_valid_for_direct_signal(&stranger, None));
+
+        let transferable: CapAccess = CapGrant {
+            tag: "tag".to_string(),
+            constraint: GrantConstraint::Transferable { secret },
+            capability: Capability::DirectSignal,
+        }
+        .into();
+        assert!(transferable.is_valid_for_direct_signal(&stranger, Some(&secret)));
+        assert!(!transferable.is_valid_for_direct_signal(&stranger, Some(&secret_wrong)));
+        assert!(!transferable.is_valid_for_direct_signal(&stranger, None));
+
+        let assigned: CapAccess = CapGrant {
+            tag: "tag".to_string(),
+            constraint: GrantConstraint::Assigned {
+                secret,
+                assignees: [assignee.clone()].into_iter().collect(),
+            },
+            capability: Capability::DirectSignal,
+        }
+        .into();
+        assert!(assigned.is_valid_for_direct_signal(&assignee, Some(&secret)));
+        assert!(!assigned.is_valid_for_direct_signal(&stranger, Some(&secret)));
+        assert!(!assigned.is_valid_for_direct_signal(&assignee, Some(&secret_wrong)));
+    }
+
+    #[test]
+    fn grant_constraint_type_i64_roundtrip() {
+        for v in [
+            GrantConstraintType::Unrestricted,
+            GrantConstraintType::Transferable,
+            GrantConstraintType::Assigned,
+        ] {
+            let n: i64 = v.into();
+            assert_eq!(GrantConstraintType::try_from(n).unwrap(), v);
+        }
+        assert!(GrantConstraintType::try_from(-1).is_err());
+        assert!(GrantConstraintType::try_from(3).is_err());
+    }
+
+    /// The discriminant is persisted in the `CapGrant.cap_access` column, so the
+    /// mapping from a constraint to its stored integer is pinned here.
+    #[test]
+    fn grant_constraint_maps_to_stored_discriminant() {
+        let secret: CapSecret = [1; 64].into();
+        let cases = [
+            (GrantConstraint::Unrestricted, 0_i64),
+            (GrantConstraint::Transferable { secret }, 1),
+            (
+                GrantConstraint::Assigned {
+                    secret,
+                    assignees: BTreeSet::new(),
+                },
+                2,
+            ),
+        ];
+        for (constraint, expected) in cases {
+            assert_eq!(i64::from(GrantConstraintType::from(&constraint)), expected);
+        }
     }
 }

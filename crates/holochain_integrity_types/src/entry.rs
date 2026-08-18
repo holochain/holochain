@@ -8,8 +8,8 @@
 use crate::action::{EntryDefIndex, ZomeIndex};
 use crate::capability::CapAccess;
 use crate::capability::CapClaim;
+use crate::capability::CapGrant;
 use crate::countersigning::CounterSigningSessionData;
-use crate::prelude::CapGrant;
 use holo_hash::hash_type;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;

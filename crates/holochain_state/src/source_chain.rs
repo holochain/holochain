@@ -1200,11 +1200,7 @@ pub(crate) fn cap_grant_index_params(
         _ => return None,
     };
 
-    let cap_access_i64 = match &cap_grant.constraint {
-        GrantConstraint::Unrestricted => 0_i64,
-        GrantConstraint::Transferable { .. } => 1_i64,
-        GrantConstraint::Assigned { .. } => 2_i64,
-    };
+    let cap_access_i64 = i64::from(GrantConstraintType::from(&cap_grant.constraint));
     // Deliberate empty→NULL normalisation: the schema stores an absent tag as
     // NULL rather than an empty string.
     let tag = if cap_grant.tag.is_empty() {

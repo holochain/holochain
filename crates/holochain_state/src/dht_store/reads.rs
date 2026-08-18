@@ -23,9 +23,9 @@ use holochain_types::prelude::{
 use holochain_types::warrant::WarrantOp;
 use holochain_zome_types::prelude::{
     Action, ActionData, CapAccess, CapSecret, ChainFilter, ChainFork, ChainHead, ChainQueryFilter,
-    ChainStatus, EntryType, EntryVisibility, HighestObserved, LimitConditions, LinkTag,
-    LinkTypeFilter, Record, RecordEntry, RecordValidity, SignedActionHashed, SignedWarrant,
-    ValidationReceiptSet,
+    ChainStatus, EntryType, EntryVisibility, GrantConstraintType, HighestObserved, LimitConditions,
+    LinkTag, LinkTypeFilter, Record, RecordEntry, RecordValidity, SignedActionHashed,
+    SignedWarrant, ValidationReceiptSet,
 };
 use holochain_zome_types::validate::ValidationStatus;
 use std::collections::{HashMap, HashSet};
@@ -2318,21 +2318,22 @@ impl DhtStore<DbRead<Dht>> {
         author: &AgentPubKey,
         check_secret: Option<&CapSecret>,
     ) -> StateQueryResult<Vec<CapAccess>> {
-        // `CapAccess` integer encoding (see the DHT schema): 0=Unrestricted,
-        // 1=Transferable, 2=Assigned. A secret-bearing check looks only at the
-        // grants that carry a secret; an unrestricted check only at unrestricted
-        // grants.
-        let access_types: &[i64] = if check_secret.is_some() {
-            &[1, 2]
+        // A secret-bearing check looks only at the grants that carry a secret; an
+        // unrestricted check only at unrestricted grants.
+        let constraint_types: &[GrantConstraintType] = if check_secret.is_some() {
+            &[
+                GrantConstraintType::Transferable,
+                GrantConstraintType::Assigned,
+            ]
         } else {
-            &[0]
+            &[GrantConstraintType::Unrestricted]
         };
 
         let mut grants = Vec::new();
-        for &access in access_types {
+        for &constraint_type in constraint_types {
             let rows = self
                 .db()
-                .get_cap_grants_by_access(author.clone(), access)
+                .get_cap_grants_by_access(author.clone(), constraint_type.into())
                 .await?;
 
             // Resolve each grant's entry hash (from its create/update action)

@@ -337,40 +337,6 @@ impl core::fmt::Display for ActionType {
     }
 }
 
-/// Capability-grant access type.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[repr(i64)]
-pub enum CapAccessType {
-    /// No restrictions; any caller may invoke the granted function.
-    Unrestricted = 0,
-    /// Caller must present a matching secret token.
-    Transferable = 1,
-    /// Caller must be on the agent allow-list and present the secret.
-    Assigned = 2,
-}
-
-/// Maps [`CapAccessType`] onto the `CapGrant.cap_access` INTEGER column
-/// (`0..=2`). All three variants are valid, including `0`.
-impl From<CapAccessType> for i64 {
-    fn from(a: CapAccessType) -> Self {
-        a as i64
-    }
-}
-
-/// Inverse of [`From<CapAccess> for i64`]. Returns `Err(v)` for any value
-/// outside `0..=2`.
-impl TryFrom<i64> for CapAccessType {
-    type Error = i64;
-    fn try_from(v: i64) -> Result<Self, Self::Error> {
-        match v {
-            0 => Ok(CapAccessType::Unrestricted),
-            1 => Ok(CapAccessType::Transferable),
-            2 => Ok(CapAccessType::Assigned),
-            other => Err(other),
-        }
-    }
-}
-
 /// Common header fields shared by every action variant.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
@@ -822,20 +788,6 @@ mod tests {
         }
         assert!(ActionType::try_from(0).is_err());
         assert!(ActionType::try_from(11).is_err());
-    }
-
-    #[test]
-    fn cap_access_i64_roundtrip() {
-        for v in [
-            CapAccessType::Unrestricted,
-            CapAccessType::Transferable,
-            CapAccessType::Assigned,
-        ] {
-            let n: i64 = v.into();
-            assert_eq!(CapAccessType::try_from(n).unwrap(), v);
-        }
-        assert!(CapAccessType::try_from(-1).is_err());
-        assert!(CapAccessType::try_from(3).is_err());
     }
 
     #[test]
