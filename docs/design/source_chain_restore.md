@@ -244,7 +244,7 @@ For each signature-verified record `(action, entry?)` belonging to the reconstru
 - The public `Entry` row, where the record carries one. Private entries are never present in the response and are simply absent on the restored node.
 - The full set of `ChainOp` rows that the action would produce per [`data_model.md`](./data_model.md) (e.g. `AgentActivity`, `CreateRecord`, plus type-specific ops). These are flagged as accepted by virtue of being part of an authored chain trusted by signature; they do not pass through the limbo or validation tables.
 - `ChainOpPublish` entries for each generated op. **Republishing is intentional.** Although the ops already exist on the DHT, the restoring node needs to gather its own validation receipts to reconstruct that portion of local state, and the publish path is the mechanism by which receipts are collected.
-- Auxiliary index rows that the action type requires (e.g. `CapAccess` rows for `CapAccess`-typed entries whose entry body is private but whose action is present).
+- Auxiliary index rows that the action type requires (e.g. `CapGrant` rows for `CapGrant`-typed entries whose entry body is private but whose action is present).
 
 The exact set of tables written to is governed by the data model and state model documents and may need to be revisited if those documents change.
 
@@ -334,7 +334,7 @@ The authority-side handler (`crates/holochain_cascade/src/authority.rs`) needs n
 |------|---------|------------------|
 | Private entries | `PrivateEntry` table | Never distributed on DHT; only the authoring node ever held them. |
 | Cap claims | `CapClaim` table | Local-only index of grants received from other agents; not chain data. |
-| Cap grants (entry body) | Action restored, entry body not | `CapAccess` entries are private; the action restores but the entry body cannot be retrieved. The agent loses the ability to exercise prior grants. |
+| Cap grants (entry body) | Action restored, entry body not | `CapGrant` entries are private; the action restores but the entry body cannot be retrieved. The agent loses the ability to exercise prior grants. |
 | Received validation receipts | Validation receipt store | Receipts other peers issued for this agent's authored ops; not part of the chain itself. These are rebuilt over time after restore by republishing — see Step 2. |
 | Pending counter-signing sessions | `ChainLock` | Transient. Any session in flight on the original node is lost. |
 

@@ -5,10 +5,11 @@ use holo_hash::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashSet};
 
-/// The entry for the ZomeCall capability grant.
-/// This data is committed to the callee's source chain as a private entry.
-/// The remote calling agent must provide a secret and we source their pubkey from the active
-/// network connection. This must match the strictness of the CapAccess.
+/// The entry for a capability grant.
+///
+/// This data is committed to the callee's source chain as a private entry. The remote calling
+/// agent must provide a secret and we source their pubkey from the active network connection.
+/// This must match the strictness of the [`GrantConstraint`].
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
@@ -56,23 +57,22 @@ pub struct DesensitizedCapGrant {
     pub tag: String,
     /// Equivalent to the [`GrantConstraint`] type but with secrets removed.
     pub constraint: GrantConstraintInfo,
-    /// Set of functions to which this capability grants ZomeCall access
+    /// The capability that is granted.
     pub capability: Capability,
 }
 
 impl From<CapGrant> for DesensitizedCapGrant {
-    /// Create a new Desensitized ZomeCall capability grant
-    fn from(zccg: CapGrant) -> Self {
+    fn from(grant: CapGrant) -> Self {
         DesensitizedCapGrant {
-            tag: zccg.tag,
+            tag: grant.tag,
             constraint: GrantConstraintInfo {
-                access_type: zccg.constraint.as_variant_string().to_string(),
-                assignees: match &zccg.constraint {
+                access_type: grant.constraint.as_variant_string().to_string(),
+                assignees: match &grant.constraint {
                     GrantConstraint::Assigned { assignees, .. } => Some(assignees.clone()),
                     _ => None,
                 },
             },
-            capability: zccg.capability,
+            capability: grant.capability,
         }
     }
 }
@@ -93,9 +93,8 @@ impl CapGrant {
 }
 
 impl From<CapGrant> for CapAccess {
-    /// Create a new ZomeCall capability grant
-    fn from(zccg: CapGrant) -> Self {
-        CapAccess::RemoteAgent(zccg)
+    fn from(grant: CapGrant) -> Self {
+        CapAccess::RemoteAgent(grant)
     }
 }
 
@@ -132,13 +131,17 @@ impl CapAccess {
     }
 
     /// Given a grant, is it valid for a direct signal?
-    pub fn is_valid_for_direct_signal(&self, given_agent: &AgentPubKey, given_secret: Option<&CapSecret>) -> bool {
+    pub fn is_valid_for_direct_signal(
+        &self,
+        given_agent: &AgentPubKey,
+        given_secret: Option<&CapSecret>,
+    ) -> bool {
         match self {
             CapAccess::RemoteAgent(CapGrant {
-                                       constraint,
-                                       capability: Capability::DirectSignal,
-                                       ..
-                                   }) => constraint.permits(given_agent, given_secret),
+                constraint,
+                capability: Capability::DirectSignal,
+                ..
+            }) => constraint.permits(given_agent, given_secret),
             _ => false,
         }
     }
@@ -232,7 +235,7 @@ impl GrantConstraint {
     }
 }
 
-/// Represents access info for capability grants .
+/// Represents [`GrantConstraint`] info for capability grants, with secrets removed.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]

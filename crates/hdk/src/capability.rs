@@ -9,7 +9,7 @@ use crate::prelude::*;
 /// The grant entry is never sent, only the associated secret.
 /// The claim should be created on the local source chain so that it can be retrieved for later use.
 ///
-/// Grantees of [`CapAccess`] secrets use [`CapClaim`] entries to save the secret.
+/// Grantees of [`CapGrant`] secrets use [`CapClaim`] entries to save the secret.
 ///
 /// The [`CapClaim`] contains the secret, tag and issuing agent.
 /// Only the secret should ever be sent back to the issuing agent, everything else is only for local
@@ -21,7 +21,7 @@ use crate::prelude::*;
 /// Any [`crate::p2p::call_remote`] will return a [`ZomeCallResponse::Unauthorized`] when the grantor considers the
 /// secret invalid for the call. The caller is expected to handle this gracefully.
 ///
-/// If the author of the [`CapAccess`] is reachable on the network and has not revoked the grant they will allow any
+/// If the author of the [`CapGrant`] is reachable on the network and has not revoked the grant they will allow any
 /// agent with a valid secret and pubkey to [`crate::p2p::call_remote`] externs on the grant author's machine.
 ///
 /// Commits to the grantor's source chain will be signed by the grantor, even if initiated.
@@ -47,13 +47,16 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<ActionHa
 /// When an agent wants to expose zome functions to be called remotely by other agents they need to select
 /// a security model and probably generate a secret.
 ///
-/// The input needs to evalute to a [`CapAccess`] struct which defines the tag, access and
-/// granted zome/function pairs. The access is a [`GrantConstraint`] enum with variants [`GrantConstraint::Unrestricted`],
-/// [`GrantConstraint::Transferable`], and [`GrantConstraint::Assigned`].
+/// The input needs to evaluate to a [`CapGrantEntry`] struct, which defines the tag, the
+/// constraint under which the grant may be used, and the capability being granted. The constraint
+/// is a [`GrantConstraint`] enum with variants [`GrantConstraint::Unrestricted`],
+/// [`GrantConstraint::Transferable`], and [`GrantConstraint::Assigned`]. The capability is a
+/// [`Capability`] enum; use [`Capability::ZomeCall`] with a [`ZomeCallGrant`] to grant access to a
+/// set of zome/function pairs.
 ///
 /// The tag is an arbitrary [`String`] that developers or users can use to categorise and administer
 /// grants committed to the chain. The tag should also match the [`CapClaim`] tags committed on the
-/// recipient chain when a [`CapAccess`] is committed and shared. The tags are not checked or compared
+/// recipient chain when a [`CapGrant`] is committed and shared. The tags are not checked or compared
 /// in any security sensitive contexts.
 ///
 /// Provided the grant author agent is reachable on the network:
@@ -75,8 +78,8 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<ActionHa
 /// The happ developer needs to plan carefully to ensure auditability and accountability is
 /// maintained for all writes and network calls if this is important to the integrity of the happ.
 ///
-/// Multiple [`CapAccess`] entries can be relevant to a single attempted zome call invocation.
-/// The most specific and strict [`CapAccess`] that validates will be used. For example, if a user
+/// Multiple [`CapGrant`] entries can be relevant to a single attempted zome call invocation.
+/// The most specific and strict [`CapGrant`] that validates will be used. For example, if a user
 /// provided a valid transferable secret to a function that is currently unrestricted, the zome
 /// call will be executed with the stricter transferable access.
 //
@@ -84,8 +87,8 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<ActionHa
 // @todo predictably disambiguate multiple CapGrants of the same specificity
 ///       (also potentially not needed when we enforce uniqueness - see below)
 ///
-/// [`CapAccess`] entries can be updated and deleted in the same way as standard app entries.
-/// The CRUD model for [`CapAccess`] is much simpler than app entries:
+/// [`CapGrant`] entries can be updated and deleted in the same way as standard app entries.
+/// The CRUD model for [`CapGrant`] is much simpler than app entries:
 ///
 /// - versions are always local to a single source chain so partitions can never happen
 /// - updates function like delete+create so that old grants are immediately revoked by a new grant
@@ -100,7 +103,7 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<ActionHa
 //
 // @todo ensure uniqueness of secrets in sys validation
 ///
-/// If _any_ [`CapAccess`] is valid for a zome call invocation it will execute. Given that secrets must
+/// If _any_ [`CapGrant`] is valid for a zome call invocation it will execute. Given that secrets must
 /// be unique across all grants and claims this is easy to ensure for assigned and transferable
 /// access. Special care is required for Unrestricted grants as several may apply to a single
 /// extern at one time, or may apply in addition to a stricter grant. In this case, revoking a
@@ -108,14 +111,14 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<ActionHa
 //
 // @todo administration functions to query active grants
 ///
-/// There is an apparent "chicken or the egg" situation where [`CapAccess`] are required for remote
+/// There is an apparent "chicken or the egg" situation where [`CapGrant`] are required for remote
 /// agents to call externs, so how does an agent request a grant in the first place?
 /// The simplest pattern is for agents to create an extern dedicated to assess incoming grant
 /// requests and to apply [`GrantConstraint::Unrestricted`] access to it during the zome's `init` callback.
 /// If Alice wants access to Bob's `foo` function she first grants Bob `Assigned` access to her own
 /// `accept_foo_grant` extern and sends her grant's secret to Bob's `issue_foo_grant` function. Bob
 /// receives Alice's request and, if he is willing to grant Alice access, he commits Alice's secret
-/// as a [`CapClaim`] to his chain. Bob then generates a new secret and commits it in a [`CapAccess`]
+/// as a [`CapClaim`] to his chain. Bob then generates a new secret and commits it in a [`CapGrant`]
 /// for `foo`, most likely explicitly `Assigned` to Alice, and sends his secret and Alice's secret
 /// to Alice's `accept_foo_grant` extern. Alice checks her grant, which matches Bob's public key
 /// and the secret Bob received from her, then she commits a new CapClaim including the secret that
@@ -142,10 +145,10 @@ pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> ExternResult<ActionHa
 /// There is no `undo` for deletes, a new grant must be created and distributed to reinstate access after a grant deletion.
 /// Immediately means after the wasm successfully completes with no errors or rollbacks as extern calls are transactional/atomic.
 ///
-/// The input to [`delete_cap_grant`] is the [`ActionHash`] of the [`CapAccess`] record to delete and optionally an argument to
+/// The input to [`delete_cap_grant`] is the [`ActionHash`] of the [`CapGrant`] record to delete and optionally an argument to
 /// specify the [`ChainTopOrdering`]. Refer to [`DeleteInput`] for details.
 ///
-/// Deletes can reference both [`CapAccess`] creates and updates.
+/// Deletes can reference both [`CapGrant`] creates and updates.
 pub fn delete_cap_grant<I, E>(delete_input: I) -> ExternResult<ActionHash>
 where
     DeleteInput: TryFrom<I, Error = E>,

@@ -2294,13 +2294,13 @@ impl DhtStore<DbRead<Dht>> {
         Ok(Some(create))
     }
 
-    /// The author's candidate capability grants for the `is_valid` loop in
+    /// The author's candidate capability grants for the validity loop in
     /// [`SourceChain::valid_cap_grant`](crate::source_chain::SourceChain::valid_cap_grant).
     ///
     /// - When `check_secret` is `Some`, only grants that carry a secret
     ///   (`Transferable` / `Assigned`) are considered. The exact-secret match is
-    ///   left to the caller's [`CapAccess::is_valid_for_zome_call`], which is equivalent
-    ///   because `is_valid` requires `secret == given` for both secret-bearing
+    ///   left to the caller's [`CapAccess::is_valid_for_zome_call`], which is
+    ///   equivalent because it requires `secret == given` for both secret-bearing
     ///   variants (a secret-bearing check therefore never matches an
     ///   `Unrestricted` grant).
     /// - When `check_secret` is `None`, only `Unrestricted` grants are
@@ -2309,6 +2309,10 @@ impl DhtStore<DbRead<Dht>> {
     /// Candidates are restricted to grants authored by `author` (the `CapGrant`
     /// index join filters on `Action.author`) and dropped when their entry has
     /// been updated or deleted by the author.
+    ///
+    /// The granted [`Capability`](holochain_zome_types::prelude::Capability) is not
+    /// part of the index, so candidates of every capability kind are returned;
+    /// matching the requested capability is the caller's job.
     pub async fn valid_cap_grants(
         &self,
         author: &AgentPubKey,

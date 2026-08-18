@@ -15,9 +15,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
         tag: "".into(),
         // empty constraint converts to unrestricted
         constraint: ().into(),
-        capability: Capability::ZomeCall(ZomeCallGrant {
-            functions,
-        })
+        capability: Capability::ZomeCall(ZomeCallGrant { functions }),
     })?;
 
     Ok(InitCallbackResult::Pass)
@@ -36,9 +34,7 @@ fn cap_grant_entry(secret: CapSecret) -> ExternResult<CapGrantEntry> {
     Ok(CapGrantEntry {
         tag: "".into(),
         constraint: secret.into(),
-        capability: Capability::ZomeCall(ZomeCallGrant {
-            functions,
-        })
+        capability: Capability::ZomeCall(ZomeCallGrant { functions }),
     })
 }
 
@@ -106,9 +102,7 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
     create_cap_grant(CapGrantEntry {
         tag: tag.clone(),
         constraint: (secret, agent.clone()).into(),
-        capability: Capability::ZomeCall(ZomeCallGrant {
-            functions,
-        })
+        capability: Capability::ZomeCall(ZomeCallGrant { functions }),
     })?;
 
     // send the assigned cap token

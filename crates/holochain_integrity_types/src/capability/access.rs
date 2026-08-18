@@ -4,7 +4,7 @@ use holochain_serialized_bytes::prelude::{Deserialize, Serialize};
 
 /// Represents an attempt to access capabilities.
 ///
-/// Either an local agent is claiming to be the author of a source chain, and therefore gets
+/// Either a local agent is claiming to be the author of a source chain, and therefore gets
 /// unrestricted access implicitly. Or a remote agent is attempting an operation with a
 /// [`CapGrant`].
 ///

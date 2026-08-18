@@ -40,8 +40,8 @@ pub use grant::*;
 pub struct GrantZomeCallCapabilityPayload {
     /// Cell for which to authorize the capability.
     pub cell_id: CellId,
-    /// Specifies the capability, consisting of zomes and functions to allow
-    /// signing for as well as access level, secret and assignees.
+    /// The grant to commit, specifying the capability to grant and the constraint
+    /// under which it may be used.
     pub cap_grant: CapGrant,
 }
 
@@ -59,8 +59,7 @@ pub struct AppCapGrantInfo(pub Vec<(CellId, Vec<CapGrantInfo>)>);
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
 pub struct CapGrantInfo {
-    /// Specifies the capability, consisting of zomes and functions to allow
-    /// signing for as well as access level, secret and assignees.
+    /// The granted capability and its constraint, with secrets removed.
     pub cap_grant: DesensitizedCapGrant,
     /// The action hash of the grant.
     pub action_hash: ActionHash,

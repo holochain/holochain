@@ -819,7 +819,8 @@ where
         check_secret: Option<CapSecret>,
     ) -> SourceChainResult<Option<CapAccess>> {
         let author_grant = CapAccess::from(self.agent_pubkey().clone());
-        if author_grant.is_valid_for_zome_call(&check_function, &check_agent, check_secret.as_ref()) {
+        if author_grant.is_valid_for_zome_call(&check_function, &check_agent, check_secret.as_ref())
+        {
             // caller is source chain author
             return Ok(Some(author_grant));
         }
@@ -827,7 +828,7 @@ where
         // Remote caller. The candidate grants are read from the DhtStore, which
         // applies the access-type pre-filter and "not updated/deleted"
         // exclusion; the exact secret/assignee/function match remains the
-        // authority of `CapGrant::is_valid` below.
+        // authority of `CapAccess::is_valid_for_zome_call` below.
         let cap_grants = self
             .dht_store
             .as_read()
@@ -836,7 +837,11 @@ where
         // Loop over all found cap grants and check if one of them is valid for
         // assignee and function.
         for cap_grant in cap_grants {
-            if cap_grant.is_valid_for_zome_call(&check_function, &check_agent, check_secret.as_ref()) {
+            if cap_grant.is_valid_for_zome_call(
+                &check_function,
+                &check_agent,
+                check_secret.as_ref(),
+            ) {
                 return Ok(Some(cap_grant));
             }
         }

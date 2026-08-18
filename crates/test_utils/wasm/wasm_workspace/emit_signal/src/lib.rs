@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use hdk::prelude::*;
+use std::collections::HashSet;
 
 #[hdk_extern]
 fn emit(_: ()) -> ExternResult<()> {
@@ -26,9 +26,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
         tag: "".into(),
         // empty constraint converts to unrestricted
         constraint: ().into(),
-        capability: Capability::ZomeCall(ZomeCallGrant {
-            functions,
-        })
+        capability: Capability::ZomeCall(ZomeCallGrant { functions }),
     })?;
 
     Ok(InitCallbackResult::Pass)
