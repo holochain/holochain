@@ -12,7 +12,7 @@ use holochain_serialized_bytes::prelude::{Deserialize, Serialize};
 /// [`CapAccess`] instance to determine whether to allow access. If access is denied, an
 /// unauthorized response is expected.
 ///
-/// See [`CapAccess::is_valid`] to see how these checks are made.
+/// See [`CapAccess::is_valid_for_zome_call`] to see how these checks are made.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]

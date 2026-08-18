@@ -24,6 +24,9 @@ pub struct CapGrant {
 
 /// The capability to grant in a [`CapGrant`].
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
 pub enum Capability {
     /// Grant access to zome calls with a [`ZomeCallGrant`].
     ZomeCall(ZomeCallGrant),
@@ -33,6 +36,8 @@ pub enum Capability {
 
 /// The inner properties of a [`Capability::ZomeCall`].
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
 pub struct ZomeCallGrant {
     /// Set of functions to which this capability grants ZomeCall access
     pub functions: GrantedFunctions,
@@ -95,10 +100,11 @@ impl From<CapGrant> for CapAccess {
 }
 
 impl CapAccess {
-    /// Given a grant, is it valid in isolation?
+    /// Given a grant, is it valid in isolation for a zome call?
+    ///
     /// In a world of CRUD, some new entry might update or delete an existing one, but we can check
     /// if a grant is valid in a standalone way.
-    pub fn is_valid(
+    pub fn is_valid_for_zome_call(
         &self,
         given_function: &GrantedFunction,
         given_agent: &AgentPubKey,
@@ -121,11 +127,19 @@ impl CapAccess {
 
                 granted && constraint.permits(given_agent, given_secret)
             }
+            _ => false,
+        }
+    }
+
+    /// Given a grant, is it valid for a direct signal?
+    pub fn is_valid_for_direct_signal(&self, given_agent: &AgentPubKey, given_secret: Option<&CapSecret>) -> bool {
+        match self {
             CapAccess::RemoteAgent(CapGrant {
-                constraint,
-                capability: Capability::DirectSignal,
-                ..
-            }) => constraint.permits(given_agent, given_secret),
+                                       constraint,
+                                       capability: Capability::DirectSignal,
+                                       ..
+                                   }) => constraint.permits(given_agent, given_secret),
+            _ => false,
         }
     }
 }
@@ -198,7 +212,7 @@ impl From<(CapSecret, BTreeSet<AgentPubKey>)> for GrantConstraint {
     }
 }
 
-/// Implements (secret, agent_pub_key).into() shorthand for [`CapAccess::Assigned`].
+/// Implements (secret, agent_pub_key).into() shorthand for [`GrantConstraint::Assigned`].
 impl From<(CapSecret, AgentPubKey)> for GrantConstraint {
     fn from((secret, assignee): (CapSecret, AgentPubKey)) -> Self {
         let mut assignees = BTreeSet::new();
@@ -293,49 +307,49 @@ mod tests {
         }
         .into();
 
-        assert!(g1.is_valid(
+        assert!(g1.is_valid_for_zome_call(
             &(ZomeName("zome".into()), FunctionName("fn".into())),
             &agent1,
             Some(&secret),
         ));
 
-        assert!(g1.is_valid(
+        assert!(g1.is_valid_for_zome_call(
             &(ZomeName("zome".into()), FunctionName("fn".into())),
             &agent2,
             Some(&secret),
         ));
 
-        assert!(!g1.is_valid(
+        assert!(!g1.is_valid_for_zome_call(
             &(ZomeName("zome".into()), FunctionName("fn".into())),
             &agent1,
             Some(&secret_wrong),
         ));
 
-        assert!(!g1.is_valid(
+        assert!(!g1.is_valid_for_zome_call(
             &(ZomeName("zome".into()), FunctionName("fn".into())),
             &agent1,
             None,
         ));
 
-        assert!(g2.is_valid(
+        assert!(g2.is_valid_for_zome_call(
             &(ZomeName("zome".into()), FunctionName("fn".into())),
             &agent1,
             Some(&secret),
         ));
 
-        assert!(!g2.is_valid(
+        assert!(!g2.is_valid_for_zome_call(
             &(ZomeName("zome".into()), FunctionName("fn".into())),
             &agent2,
             Some(&secret),
         ));
 
-        assert!(!g2.is_valid(
+        assert!(!g2.is_valid_for_zome_call(
             &(ZomeName("zome".into()), FunctionName("fn".into())),
             &agent1,
             None,
         ));
 
-        assert!(!g2.is_valid(
+        assert!(!g2.is_valid_for_zome_call(
             &(ZomeName("zome".into()), FunctionName("fn".into())),
             &agent1,
             Some(&secret_wrong),

@@ -29,7 +29,7 @@ pub const ENTRY_SIZE_LIMIT: usize = 4 * 1000 * 1000; // 4MB
 
 /// The data type written to the source chain when explicitly granting a capability.
 ///
-/// NB: this is not simply [`CapGrant`], because the [`CapGrant::ChainAuthor`]
+/// NB: this is not simply [`CapAccess`], because the [`CapAccess::ChainAuthor`]
 /// grant is already implied by [`Entry::Agent`], so that should not be committed
 /// to a chain.
 pub type CapGrantEntry = CapGrant;
@@ -128,7 +128,7 @@ impl Entry {
         }
     }
 
-    /// Create an [`Entry::App`] from [`SerializedBytes`].
+    /// Create an [`Entry::App`] from [`struct@SerializedBytes`].
     pub fn app(sb: SerializedBytes) -> Result<Self, EntryError> {
         Ok(Entry::App(AppEntryBytes::try_from(sb)?))
     }

@@ -2299,7 +2299,7 @@ impl DhtStore<DbRead<Dht>> {
     ///
     /// - When `check_secret` is `Some`, only grants that carry a secret
     ///   (`Transferable` / `Assigned`) are considered. The exact-secret match is
-    ///   left to the caller's [`CapAccess::is_valid`], which is equivalent
+    ///   left to the caller's [`CapAccess::is_valid_for_zome_call`], which is equivalent
     ///   because `is_valid` requires `secret == given` for both secret-bearing
     ///   variants (a secret-bearing check therefore never matches an
     ///   `Unrestricted` grant).
