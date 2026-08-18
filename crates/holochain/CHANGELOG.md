@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: `Signal::AppDirect`, delivered to an app when another agent sends it a direct signal via `SendDirectSignal`, now includes the sending agent's public key as `from_agent`. \#5938
 - Verify validation receipt signatures before storing and counting receipts, preventing forged receipts from stopping publication of authored DHT ops. \#5781
 - **BREAKING CHANGE**: Fix a `CloseChain` action with an agent migration target
   being signed and verified with the target key instead of the chain author's
