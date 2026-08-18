@@ -257,20 +257,6 @@ impl From<GrantConstraintType> for i64 {
     }
 }
 
-/// Inverse of [`From<GrantConstraintType> for i64`]. Returns `Err(v)` for any value
-/// outside `0..=2`.
-impl TryFrom<i64> for GrantConstraintType {
-    type Error = i64;
-    fn try_from(v: i64) -> Result<Self, Self::Error> {
-        match v {
-            0 => Ok(GrantConstraintType::Unrestricted),
-            1 => Ok(GrantConstraintType::Transferable),
-            2 => Ok(GrantConstraintType::Assigned),
-            other => Err(other),
-        }
-    }
-}
-
 impl GrantConstraint {
     /// Return variant denominator as string slice
     pub fn as_variant_string(&self) -> &str {
@@ -509,20 +495,6 @@ mod tests {
         assert!(assigned.is_valid_for_direct_signal(&assignee, Some(&secret)));
         assert!(!assigned.is_valid_for_direct_signal(&stranger, Some(&secret)));
         assert!(!assigned.is_valid_for_direct_signal(&assignee, Some(&secret_wrong)));
-    }
-
-    #[test]
-    fn grant_constraint_type_i64_roundtrip() {
-        for v in [
-            GrantConstraintType::Unrestricted,
-            GrantConstraintType::Transferable,
-            GrantConstraintType::Assigned,
-        ] {
-            let n: i64 = v.into();
-            assert_eq!(GrantConstraintType::try_from(n).unwrap(), v);
-        }
-        assert!(GrantConstraintType::try_from(-1).is_err());
-        assert!(GrantConstraintType::try_from(3).is_err());
     }
 
     /// The discriminant is persisted in the `CapGrant.cap_access` column, so the

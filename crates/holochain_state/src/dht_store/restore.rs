@@ -112,7 +112,8 @@ mod tests {
     use holo_hash::{ActionHash, DnaHash, EntryHash};
     use holochain_serialized_bytes::UnsafeBytes;
     use holochain_types::prelude::{
-        AppEntryBytes, AppEntryDef, EntryType, GrantConstraint, GrantedFunctions,
+        AppEntryBytes, AppEntryDef, EntryType, GrantConstraint, GrantConstraintType,
+        GrantedFunctions,
     };
     use holochain_zome_types::prelude::*;
     use std::sync::Arc;
@@ -391,7 +392,7 @@ mod tests {
         let rows = store
             .db()
             .as_ref()
-            .get_cap_grants_by_access(author, 0)
+            .get_cap_grants_by_access(author, GrantConstraintType::Unrestricted.into())
             .await
             .unwrap();
         assert_eq!(rows.len(), 1);
