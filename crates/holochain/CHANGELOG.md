@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: `Signal::AppDirect`, delivered to an app when another agent sends it a direct signal via `SendDirectSignal`, now includes the sending agent's public key as `from_agent`. \#5938
 - **BREAKING CHANGE**: Errors for zome calls against a cell that is not running now state why. `ConductorError::CellDisabled` is replaced by `ConductorError::CellNotRunning(cell_id, reason)`, where the reason distinguishes an app that is disabled, awaiting membrane proofs, restoring its source chains, or permanently unrecoverable, from a disabled clone cell or a cell that has not finished starting.
 
 ## 0.8.0-dev.2

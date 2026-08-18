@@ -29,6 +29,9 @@ pub enum Signal {
         /// The receiving `CellId`.
         cell_id: CellId,
 
+        /// The agent who sent the signal.
+        from_agent: AgentPubKey,
+
         /// The payload sent by the remote agent.
         signal: Vec<u8>,
     },
