@@ -3316,7 +3316,12 @@ mod misc_impls {
             })
         }
 
-        /// Add signed agent info to the conductor
+        /// Add signed agent info to the conductor.
+        ///
+        /// If `allowed_dna_hashes` is `Some`, every agent info must belong to one of
+        /// those DNAs; otherwise the whole request is rejected and no peer store is
+        /// modified. `None` allows agent info for any DNA and is used by the admin
+        /// interface.
         pub async fn add_agent_infos(
             &self,
             agent_infos: Vec<String>,

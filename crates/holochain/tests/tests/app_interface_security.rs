@@ -331,13 +331,14 @@ async fn app_interface_add_agent_info_respects_app_boundaries() {
 
     // Agent info belonging to another app's DNA must be rejected by the
     // app interface, and the rejected request must not modify the peer store.
-    let app_2_agent_info = agent_info_for_cell(&conductor, app_2.cells()[0].cell_id()).await;
-    let peer_store = conductor
+    let app_2_cell_id = app_2.cells()[0].cell_id();
+    let app_2_agent_info = agent_info_for_cell(&conductor, app_2_cell_id).await;
+    let app_2_peer_store = conductor
         .holochain_p2p()
-        .peer_store(app_1.cells()[0].cell_id().dna_hash().clone())
+        .peer_store(app_2_cell_id.dna_hash().clone())
         .await
         .unwrap();
-    let before = peer_store.get_all().await.unwrap().len();
+    let before = app_2_peer_store.get_all().await.unwrap().len();
     let err_response: AppResponse = app_1_tx
         .request(AppRequest::AddAgentInfo {
             agent_infos: vec![app_2_agent_info.clone()],
@@ -345,7 +346,7 @@ async fn app_interface_add_agent_info_respects_app_boundaries() {
         .await
         .unwrap();
     assert!(matches!(err_response, AppResponse::Error(_)));
-    assert_eq!(peer_store.get_all().await.unwrap().len(), before);
+    assert_eq!(app_2_peer_store.get_all().await.unwrap().len(), before);
 
     // The admin interface is unrestricted and may add agent info for any DNA.
     let (admin_tx, _admin_rx) = conductor.admin_ws_client::<AdminResponse>().await;
@@ -725,10 +726,14 @@ async fn agent_info_for_cell(
         .peer_store(cell_id.dna_hash().clone())
         .await
         .unwrap();
-    let agent_info = peer_store
-        .get(cell_id.agent_pubkey().to_k2_agent())
-        .await
-        .unwrap()
-        .unwrap();
+    let agent = cell_id.agent_pubkey().to_k2_agent();
+    // The cell's own agent info is published asynchronously, so wait until it
+    // lands in the peer store before encoding it.
+    holochain::retry_until_timeout!(10_000, 100, {
+        if peer_store.get(agent.clone()).await.unwrap().is_some() {
+            break;
+        }
+    });
+    let agent_info = peer_store.get(agent).await.unwrap().unwrap();
     agent_info.encode().unwrap()
 }
