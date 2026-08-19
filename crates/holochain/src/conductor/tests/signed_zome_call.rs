@@ -596,20 +596,19 @@ async fn revoke_zome_call_capability_call() {
         .expect("Failed to get state dump");
 
     // if we get WITHOUT REVOKED, we should not find the cap grant
-
     let cap_info = conductor
         .capability_grant_info(&cell_set, false)
         .await
         .expect("Failed to get capability grant info");
-    // should have the cap grant
     let cap_cell_info = cap_info
         .0
         .iter()
         .find_map(|(k, v)| if k == cell_id { Some(v) } else { None })
-        .unwrap()
-        .first();
+        .unwrap();
     assert!(
-        cap_cell_info.is_none(),
+        !cap_cell_info
+            .iter()
+            .any(|grant| grant.action_hash == grant_action_hash),
         "Cap grant should not be found after revocation"
     );
 
@@ -695,4 +694,102 @@ async fn revoke_zome_call_capability_call_ensures_zome_initialization() {
         2
     );
     assert_eq!(after_state_dump.integration_dump.integration_limbo.len(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "test_utils")]
+async fn cap_grant_info_excludes_only_revoked_grants() {
+    let zome = TestWasm::Create;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
+    let mut conductor = SweetConductor::standard().await;
+    let app = conductor.setup_app("app", [&dna]).await.unwrap();
+    let cell_id = app.cells()[0].cell_id();
+
+    // set up functions to grant access to
+    let mut functions = HashSet::new();
+    let granted_function: GrantedFunction = ("create_entry".into(), "get_entry".into());
+    functions.insert(granted_function);
+    let granted_functions = GrantedFunctions::Listed(functions);
+    // set up assignees which is only the cap access key
+    let mut assignees = BTreeSet::new();
+    assignees.insert(fixt!(AgentPubKey, ::fixt::Predictable, 1));
+
+    let cap_grant = |tag: &str, secret: CapSecret| ZomeCallCapGrant {
+        tag: tag.into(),
+        functions: granted_functions.clone(),
+        access: CapAccess::Assigned {
+            secret,
+            assignees: assignees.clone(),
+        },
+    };
+
+    // create two cap grants, one of which is revoked below
+    let revoked_grant_hash = conductor
+        .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
+            cell_id: cell_id.clone(),
+            cap_grant: cap_grant("revoked_signing_key", [0; 64].into()),
+        })
+        .await
+        .unwrap();
+    let live_grant_hash = conductor
+        .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
+            cell_id: cell_id.clone(),
+            cap_grant: cap_grant("live_signing_key", [1; 64].into()),
+        })
+        .await
+        .unwrap();
+
+    // both grants are listed while neither is revoked
+    let grants = cap_grants_for_cell(&conductor, cell_id, false).await;
+    assert!(grants.iter().any(|g| g.action_hash == revoked_grant_hash));
+    assert!(grants.iter().any(|g| g.action_hash == live_grant_hash));
+    assert!(grants.iter().all(|g| g.revoked_at.is_none()));
+
+    conductor
+        .revoke_zome_call_capability(cell_id.clone(), revoked_grant_hash.clone())
+        .await
+        .expect("Failed to revoke zome call capability");
+
+    // only the revoked grant is filtered out
+    let grants = cap_grants_for_cell(&conductor, cell_id, false).await;
+    assert!(
+        !grants.iter().any(|g| g.action_hash == revoked_grant_hash),
+        "revoked grant should not be listed"
+    );
+    assert!(
+        grants.iter().any(|g| g.action_hash == live_grant_hash),
+        "grant that was not revoked should still be listed"
+    );
+    assert!(grants.iter().all(|g| g.revoked_at.is_none()));
+
+    // including revoked grants lists both, and only the revoked one has a revocation time
+    let grants = cap_grants_for_cell(&conductor, cell_id, true).await;
+    let revoked_grant = grants
+        .iter()
+        .find(|g| g.action_hash == revoked_grant_hash)
+        .expect("revoked grant should be listed");
+    assert!(revoked_grant.revoked_at.is_some());
+    let live_grant = grants
+        .iter()
+        .find(|g| g.action_hash == live_grant_hash)
+        .expect("grant that was not revoked should be listed");
+    assert!(live_grant.revoked_at.is_none());
+}
+
+/// Get the capability grants a conductor reports for a single cell.
+#[cfg(feature = "test_utils")]
+async fn cap_grants_for_cell(
+    conductor: &SweetConductor,
+    cell_id: &CellId,
+    include_revoked: bool,
+) -> Vec<CapGrantInfo> {
+    let cell_set = HashSet::from([cell_id.clone()]);
+    conductor
+        .capability_grant_info(&cell_set, include_revoked)
+        .await
+        .expect("Failed to get capability grant info")
+        .0
+        .into_iter()
+        .find_map(|(k, v)| if &k == cell_id { Some(v) } else { None })
+        .expect("no capability grant info for cell")
 }
