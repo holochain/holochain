@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// (peer_url, meta_key) pair
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct PeerMetaInfo {
     /// The value stored for this meta key, an arbitrary JSON value.
     #[cfg_attr(feature = "ts_rs", ts(type = "unknown"))]

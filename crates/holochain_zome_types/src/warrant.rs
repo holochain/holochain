@@ -21,7 +21,7 @@ use holochain_timestamp::Timestamp;
     derive_more::Deref,
 )]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/dht-ops.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/dht-ops.ts"))]
 pub struct Warrant {
     /// The self-proving part of the warrant containing evidence of bad behavior.
     #[deref]
@@ -79,7 +79,7 @@ impl HashableContent for Warrant {
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::From,
 )]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/dht-ops.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/dht-ops.ts"))]
 pub enum WarrantProof {
     /// Signifies evidence of a breach of chain integrity.
     ChainIntegrity(ChainIntegrityWarrant),
@@ -126,7 +126,7 @@ pub fn truncate_warrant_reason(s: &str) -> String {
 /// A warrant which is sent to agent activity authorities.
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/dht-ops.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/dht-ops.ts"))]
 pub enum ChainIntegrityWarrant {
     /// Something invalid was authored on a chain.
     ///

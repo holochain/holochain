@@ -24,6 +24,7 @@ use holochain_cli_sandbox as hc_sandbox;
 use lazy_static::lazy_static;
 use std::process::Command;
 
+pub mod export_ts_bindings;
 mod external_subcommands;
 
 // TODO: change this so it inherits clap's formatting.
@@ -62,10 +63,17 @@ Work with DNA, hApp and web-hApp bundle files, set up sandbox environments for t
 }
 
 fn builtin_commands() -> Vec<String> {
-    ["hc-web-app", "hc-dna", "hc-app", "hc-sandbox", "hc-client"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect()
+    [
+        "hc-web-app",
+        "hc-dna",
+        "hc-app",
+        "hc-sandbox",
+        "hc-client",
+        "hc-export-ts-bindings",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect()
 }
 
 /// The main entry-point for the command.
@@ -92,6 +100,8 @@ pub enum CliSubcommand {
     Sandbox(hc_sandbox::HcSandbox),
     /// Connect to and interact with running Holochain conductors.
     Client(hc_client::HcClient),
+    /// Export the conductor API's TypeScript bindings (for holochain-client-js).
+    ExportTsBindings(export_ts_bindings::HcExportTsBindings),
     /// Allow redirect of external subcommands (like `hc-scaffold` and `hc-launch`).
     #[command(external_subcommand)]
     External(Vec<String>),
@@ -106,6 +116,7 @@ impl CliSubcommand {
             CliSubcommand::WebApp(cmd) => cmd.run().await?,
             CliSubcommand::Sandbox(cmd) => cmd.run().await?,
             CliSubcommand::Client(cmd) => cmd.run().await?,
+            CliSubcommand::ExportTsBindings(cmd) => cmd.run()?,
             CliSubcommand::External(args) => {
                 let command_suffix = args.first().expect("Missing subcommand name");
                 let exe_name = format!("hc-{command_suffix}");

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 // show if the database is corrupted and doesn't have a record
 #[derive(Serialize, Debug, Clone, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct SourceChainDump {
     pub records: Vec<SourceChainDumpRecord>,
     pub published_ops_count: usize,
@@ -14,7 +14,7 @@ pub struct SourceChainDump {
 
 #[derive(Serialize, Debug, Clone, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct SourceChainDumpRecord {
     pub signature: Signature,
     pub action_address: ActionHash,
@@ -27,7 +27,7 @@ pub struct SourceChainDumpRecord {
 /// The next page starts strictly after the identified record.
 #[derive(Serialize, Debug, Clone, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum SourceChainCursor {
     /// Resume after this action sequence number.
     Sequence(u32),

@@ -6,7 +6,7 @@ use holochain_serialized_bytes::prelude::*;
 /// A type to allow yaml values to be used as [`derive@SerializedBytes`]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "types.ts"))]
 pub struct YamlProperties(#[cfg_attr(feature = "ts_rs", ts(type = "unknown"))] yaml_serde::Value);
 
 impl YamlProperties {

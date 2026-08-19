@@ -19,7 +19,7 @@ pub type CapSecretBytes = [u8; CAP_SECRET_BYTES];
 #[allow(clippy::derived_hash_with_manual_eq)]
 #[derive(Clone, Copy, Hash, SerializedBytes)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/capabilities.ts"))]
 pub struct CapSecret(#[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))] CapSecretBytes);
 
 // Capability secrets are not cryptographic secrets.

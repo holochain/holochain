@@ -185,7 +185,7 @@ mod ts_export {
 
     #[test]
     fn hash_decls_have_expected_shape() {
-        let cfg = ts_rs::Config::from_env();
+        let cfg = ts_rs::Config::default();
         assert_eq!(HoloHashTs::decl(&cfg), "type HoloHash = Uint8Array;");
         assert_eq!(
             crate::AgentPubKey::decl(&cfg),

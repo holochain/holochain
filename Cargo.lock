@@ -3057,6 +3057,7 @@ dependencies = [
  "holochain_trace",
  "lazy_static",
  "predicates",
+ "tempfile",
  "tokio",
  "ts-rs",
 ]

@@ -22,7 +22,7 @@ pub use dna_manifest_v0::{
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum DnaManifest {
     #[serde(rename = "0")]
     V0(DnaManifestV0),
@@ -34,7 +34,7 @@ pub enum DnaManifest {
 )]
 #[serde(try_from = "DnaManifest")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct ValidatedDnaManifest(pub DnaManifest);
 
 impl mr_bundle::Manifest for ValidatedDnaManifest {

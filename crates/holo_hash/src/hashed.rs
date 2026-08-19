@@ -78,7 +78,7 @@ mod ts_tests {
     use ts_rs::TS;
 
     #[derive(ts_rs::TS)]
-    #[ts(export, export_to = "types.ts")]
+    #[ts(export_to = "types.ts")]
     struct TestHashedContent {
         #[expect(
             dead_code,
@@ -101,7 +101,7 @@ mod ts_tests {
 
     #[test]
     fn content_field_references_c_by_name_not_inline() {
-        let cfg = ts_rs::Config::from_env();
+        let cfg = ts_rs::Config::default();
 
         let inline = HoloHashed::<TestHashedContent>::inline(&cfg);
         assert_eq!(inline, "{ content: TestHashedContent, hash: HoloHash }");
@@ -115,7 +115,7 @@ mod ts_tests {
 
     #[test]
     fn name_and_decl_are_a_real_generic_declaration() {
-        let cfg = ts_rs::Config::from_env();
+        let cfg = ts_rs::Config::default();
 
         assert_eq!(
             HoloHashed::<TestHashedContent>::name(&cfg),
@@ -125,12 +125,6 @@ mod ts_tests {
             HoloHashed::<TestHashedContent>::decl(&cfg),
             "type HoloHashed<C> = { content: C, hash: HoloHash };"
         );
-    }
-
-    #[test]
-    fn export_bindings_manual() {
-        let cfg = ts_rs::Config::from_env();
-        HoloHashed::<TestHashedContent>::export_all(&cfg).unwrap();
     }
 }
 

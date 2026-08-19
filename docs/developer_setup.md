@@ -128,41 +128,46 @@ static-toml` (check) and `make toml-fix` (fix) do the same job with a Cargo-inst
 
 The conductor's wire API is mirrored as TypeScript types for
 [holochain-client-js](https://github.com/holochain/holochain-client-js). The types are generated from the Rust
-definitions with [ts-rs](https://github.com/Aleph-Alpha/ts-rs), behind an opt-in `ts_rs` Cargo feature that ordinary
-builds and `make test-workspace` never enable.
-
-Regenerate them whenever you add or change a field on an admin or app request, response, or signal type:
+definitions with [ts-rs](https://github.com/Aleph-Alpha/ts-rs), behind an opt-in `ts_rs` Cargo feature on the type
+crates. The `hc` binary enables that feature and writes the whole tree with a built-in subcommand. Because Cargo's
+resolver unifies features across a workspace build, `hc` enabling `ts_rs` unconditionally also means `cargo build
+--workspace` (and similar whole-workspace commands) now compile the type crates with `ts_rs` on, not just an `hc`
+build:
 
 ```shell
-make ts-bindings
+hc export-ts-bindings --out-dir ./bindings
 ```
 
-The tree is written to `./bindings`, which is git-ignored and not committed; set `TS_RS_EXPORT_DIR` to write elsewhere.
-Under the hood this runs the `export-ts-bindings` binary in the `hc` crate, which is gated on `required-features =
-["ts_rs"]` and so is skipped by every build that does not ask for the feature.
+The output directory defaults to `./bindings`, is git-ignored, and is swapped into place with same-filesystem renames
+on success (a failed export leaves it untouched; the command refuses to write over the working directory or one of
+its ancestors).
+If it already holds something other than a previously generated binding tree, the command refuses to replace it
+unless `--force` is given. From a checkout, `make ts-bindings` runs the same thing with `unstable-countersigning`
+enabled, so the countersigning app API is part of the output; `TS_BINDINGS_DIR` overrides the directory.
 
-Types are pulled in by the compiler rather than by a hand-maintained list, so a newly reachable type that has no
-TypeScript export fails the build:
+Regenerate them whenever you add or change a field on an admin or app request, response, or signal type. Types are
+pulled in by the compiler rather than by a hand-maintained list, so a newly reachable type that has no TypeScript
+export fails the build:
 
 ```shell
 cargo build -p holochain_conductor_api --features ts_rs
 ```
 
 A `trait 'ts_rs::TS' is not implemented` error names exactly what still needs handling. `make ts-bindings-test`
-additionally runs the `ts_rs`-gated tests, and is the target CI uses.
+runs the export plus the `hc` tests that check the written tree, and is the target CI uses.
 
-A consumer that wants to generate the types itself, rather than take them from a release, can build this binary from
-its own Nix flake against the Holochain revision that flake pins. Holonix exposes `packages.hc` as an overridable
-derivation, so the feature and the extra binary can be appended to its build arguments:
+A consumer that wants to generate the types itself, rather than take them from a release, runs the subcommand from
+the `hc` that Holonix builds against the Holochain revision its flake pins — `inputs'.holonix.packages.hc` as is.
+To include the countersigning app API, build it with the feature:
 
 ```nix
 inputs'.holonix.packages.hc.override {
-  cargoExtraArgs = "--features ts_rs,unstable-countersigning --bin export-ts-bindings";
+  cargoExtraArgs = "--features unstable-countersigning";
 }
 ```
 
-Each `nix flake update` on the consumer side then moves the pinned revision forward, and re-running the binary picks up
-any type changes that came with it.
+Each `nix flake update` on the consumer side then moves the pinned revision forward, and re-running
+`hc export-ts-bindings` picks up any type changes that came with it.
 
 ### Verifying changes and reproducing issues
 

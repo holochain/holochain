@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add `AddAgentInfo` to the app interface, allowing apps to add signed agent info to the conductor's peer store. \#5016
 - **BREAKING CHANGE**: `Signal::AppDirect`, delivered to an app when another agent sends it a direct signal via `SendDirectSignal`, now includes the sending agent's public key as `from_agent`. \#5938
 - **BREAKING CHANGE**: Errors for zome calls against a cell that is not running now state why. `ConductorError::CellDisabled` is replaced by `ConductorError::CellNotRunning(cell_id, reason)`, where the reason distinguishes an app that is disabled, awaiting membrane proofs, restoring its source chains, or permanently unrecoverable, from a disabled clone cell or a cell that has not finished starting.
+- Add `hc export-ts-bindings`, a built-in `hc` subcommand that writes the TypeScript type declarations for the conductor’s admin and app API and signals to a directory (`./bindings` by default, `--out-dir` to choose another). The directory is replaced atomically on success; if it already holds something other than a previously generated binding tree, the command refuses to replace it unless `--force` is given. Building `hc` with `--features unstable-countersigning` additionally includes the countersigning app API. The `ts_rs`-gated `export-ts-bindings` binary and the `ts_rs` feature of the `holochain_cli` crate are removed; the `ts_rs` feature on the type crates is unchanged. \#5214
 
 ## 0.8.0-dev.2
 

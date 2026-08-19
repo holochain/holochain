@@ -36,7 +36,7 @@ pub use grant::*;
 /// Parameters for granting a zome call capability.
 #[derive(Debug, Deserialize, Serialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct GrantZomeCallCapabilityPayload {
     /// Cell for which to authorize the capability.
     pub cell_id: CellId,
@@ -51,13 +51,13 @@ pub struct GrantZomeCallCapabilityPayload {
 /// because it is problematic with msgpack encoding.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct AppCapGrantInfo(pub Vec<(CellId, Vec<CapGrantInfo>)>);
 
 /// Information about a capability grant.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/capabilities.ts"))]
 pub struct CapGrantInfo {
     /// Specifies the capability, consisting of zomes and functions to allow
     /// signing for as well as access level, secret and assignees.

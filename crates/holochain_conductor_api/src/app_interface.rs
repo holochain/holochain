@@ -18,7 +18,7 @@ use std::collections::{BTreeMap, HashMap};
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub enum AppRequest {
     /// Get info about the app that you are connected to, including info about each cell installed
     /// by this app.
@@ -344,7 +344,7 @@ pub enum AppRequest {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub enum AppResponse {
     /// Can occur in response to any [`AppRequest`].
     ///
@@ -441,7 +441,7 @@ pub enum AppResponse {
 /// The data provided over an app interface in order to make a zome call.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct ZomeCallParamsSigned {
     /// Bytes of the serialized zome call payload that consists of all fields of the
     /// [`ZomeCallParams`].
@@ -474,7 +474,7 @@ impl ZomeCallParamsSigned {
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub enum CellInfo {
     /// Cells provisioned at app installation as defined in the bundle.
     Provisioned(ProvisionedCell),
@@ -519,7 +519,7 @@ impl CellInfo {
 /// Not yet implemented.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct StemCell {
     /// The hash of the DNA that this cell would be instantiated from
     pub original_dna_hash: DnaHash,
@@ -532,7 +532,7 @@ pub struct StemCell {
 /// Provisioned cell, a cell instantiated from a DNA on app installation.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct ProvisionedCell {
     /// The cell's identifying data
     pub cell_id: CellId,
@@ -545,7 +545,7 @@ pub struct ProvisionedCell {
 /// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct AppInfo {
     /// The unique identifier for an installed app in this conductor
     pub installed_app_id: InstalledAppId,
@@ -670,7 +670,7 @@ impl AppInfo {
 /// The request payload sent on a Holochain app websocket to authenticate the connection.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct AppAuthenticationRequest {
     /// The authentication token that was provided by the conductor when [`crate::admin_interface::AdminRequest::IssueAppAuthenticationToken`] was called.
     #[cfg_attr(

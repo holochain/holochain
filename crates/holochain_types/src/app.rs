@@ -37,7 +37,7 @@ pub type InstalledAppId = String;
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum DnaSource {
     /// register the dna loaded from a bundle file on disk
     Path(PathBuf),
@@ -51,7 +51,7 @@ pub enum DnaSource {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum CoordinatorSource {
     /// Coordinators loaded from a bundle file on disk
     Path(PathBuf),
@@ -62,7 +62,7 @@ pub enum CoordinatorSource {
 /// The instructions on how to update coordinators for a cell.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct UpdateCoordinatorsPayload {
     /// The cell id of the cell to swap coordinators for.
     pub cell_id: CellId,
@@ -73,7 +73,7 @@ pub struct UpdateCoordinatorsPayload {
 /// The parameters to create a clone of an existing cell.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct CreateCloneCellPayload {
     /// The DNA's role name to clone
     pub role_name: RoleName,
@@ -93,7 +93,7 @@ pub struct CreateCloneCellPayload {
 /// Parameters to specify the clone cell to be disabled.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct DisableCloneCellPayload {
     /// The clone id or cell id of the clone cell
     pub clone_cell_id: CloneCellId,
@@ -118,7 +118,7 @@ holo_hash::ts_alias!(
 /// Parameters to delete a disabled clone cell of an app.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct DeleteCloneCellPayload {
     /// The app id that the DNA to clone belongs to
     pub app_id: InstalledAppId,
@@ -130,7 +130,7 @@ pub struct DeleteCloneCellPayload {
 /// All the information necessary to install an app
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct InstallAppPayload {
     /// Where to obtain the AppBundle, which contains the app manifest and DNA bundles
     /// to be installed. This is the main payload of app installation.
@@ -218,7 +218,7 @@ pub type RoleSettingsMapYaml = HashMap<RoleName, RoleSettingsYaml>;
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum RoleSettings {
     #[deprecated(
         since = "0.6.0-dev.17",
@@ -320,7 +320,7 @@ pub enum RoleSettingsYaml {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum AppBundleSource {
     /// The raw bytes of an app bundle
     Bytes(#[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))] bytes::Bytes),
@@ -836,7 +836,7 @@ impl InstalledAppCommon {
 /// the variant of [`UnrecoverableCellReason`] tells the operator what kind it is.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct WarrantSummary {
     /// The peer that authored and signed the warrant.
     pub author: AgentPubKey,
@@ -861,7 +861,7 @@ impl From<SignedWarrant> for WarrantSummary {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum UnrecoverableCellReason {
     /// Two or more conflicting actions at the same sequence position (proven chain fork).
     ChainForkWarrant(Box<WarrantSummary>),
@@ -875,7 +875,7 @@ pub enum UnrecoverableCellReason {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum AppStatus {
     /// The app is enabled.
     Enabled,
@@ -898,7 +898,7 @@ pub enum AppStatus {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum DisabledAppReason {
     /// The app is freshly installed, and never started
     NeverStarted,

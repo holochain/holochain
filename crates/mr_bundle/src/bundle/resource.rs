@@ -1,7 +1,7 @@
 /// Opaque bytes representing a Resource in a [`Bundle`](crate::Bundle)
 #[derive(Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct ResourceBytes(#[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))] bytes::Bytes);
 
 impl std::fmt::Debug for ResourceBytes {

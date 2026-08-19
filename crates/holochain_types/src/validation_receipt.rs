@@ -20,10 +20,7 @@ use std::vec::IntoIter;
     SerializedBytes,
 )]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts_rs",
-    ts(export, export_to = "hdk/validation-receipts.ts")
-)]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/validation-receipts.ts"))]
 pub struct ValidationReceipt {
     /// the op this validation receipt is for.
     pub dht_op_hash: DhtOpHash,
@@ -52,10 +49,7 @@ pub struct ValidationReceipt {
     SerializedBytes,
 )]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts_rs",
-    ts(export, export_to = "hdk/validation-receipts.ts")
-)]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/validation-receipts.ts"))]
 pub struct SignedValidationReceipt {
     /// the content of the validation receipt.
     pub receipt: ValidationReceipt,

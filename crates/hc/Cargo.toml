@@ -18,13 +18,6 @@ description = "Provides the `hc` binary, a helpful CLI tool for working with Hol
 name = "hc"
 path = "src/bin/hc.rs"
 
-# Writes the TypeScript binding tree. Skipped by builds that don't enable
-# `ts_rs`, including `cargo build --workspace`.
-[[bin]]
-name = "export-ts-bindings"
-path = "src/bin/export-ts-bindings.rs"
-required-features = ["ts_rs"]
-
 [lib]
 name = "holochain_cli"
 path = "src/lib.rs"
@@ -37,12 +30,14 @@ lazy_static = "1.4"
 holochain_cli_bundle = { path = "../hc_bundle", version = "^0.8.0-dev.2", default-features = false }
 holochain_cli_sandbox = { path = "../hc_sandbox", version = "^0.8.0-dev.2", default-features = false }
 holochain_cli_client = { path = "../hc_client", version = "^0.8.0-dev.2", default-features = false }
+# `ts_rs` is always on: `hc export-ts-bindings` is a built-in subcommand.
+holochain_conductor_api = { version = "^0.8.0-dev.2", path = "../holochain_conductor_api", default-features = false, features = [
+  "ts_rs",
+] }
 holochain_trace = { version = "^0.8.0-dev.0", path = "../holochain_trace" }
+tempfile = "3.0"
 tokio = { version = "1.36.0", features = ["full"] }
-
-# Optional, for the `export-ts-bindings` binary only
-holochain_conductor_api = { version = "^0.8.0-dev.2", path = "../holochain_conductor_api", default-features = false, optional = true }
-ts-rs = { version = "12.0", optional = true }
+ts-rs = "12.0"
 
 [dev-dependencies]
 assert_cmd = "2.2"
@@ -64,13 +59,8 @@ wasmer-wasmi = [
   "holochain_cli_client/wasmer-wasmi",
 ]
 
-# Builds the `export-ts-bindings` binary, which writes the TypeScript
-# bindings for the conductor's wire API.
-ts_rs = [
-  "dep:holochain_conductor_api",
-  "dep:ts-rs",
-  "holochain_conductor_api/ts_rs",
-]
-
-# Includes the countersigning app API in the exported TypeScript bindings.
-unstable-countersigning = ["holochain_conductor_api?/unstable-countersigning"]
+# Includes the countersigning app API in the `hc export-ts-bindings` output.
+# Not on by default: a workspace build would unify it into `holochain`'s
+# `holochain_conductor_api` while `holochain`'s own matching feature is off,
+# and its exhaustive match on `AppRequest` would no longer compile.
+unstable-countersigning = ["holochain_conductor_api/unstable-countersigning"]
