@@ -1770,11 +1770,14 @@ mod restore_impls {
         installed_app_id: InstalledAppId,
     ) -> ConductorResult<()> {
         let state = conductor.get_state().await?;
-        let cell_ids: Vec<CellId> = state
-            .get_app(&installed_app_id)?
+        let app = state.get_app(&installed_app_id)?;
+        let cell_ids: Vec<CellId> = app
             .provisioned_cells()
             .map(|(_, cell_id)| cell_id)
             .collect();
+
+        // Required for gossip received during restore, otherwise it fails validation as DnaMissing
+        conductor.load_wasms_into_ribosome_for_app(app).await?;
 
         let quorum = conductor.config.restore_chain_quorum;
 
