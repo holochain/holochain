@@ -85,6 +85,10 @@ impl AppInterfaceApi {
                     agent_infos.into_iter().map(|info| info.encode()).collect();
                 Ok(AppResponse::AgentInfo(items?))
             }
+            AppRequest::AddAgentInfo { agent_infos } => {
+                self.conductor_handle.add_agent_infos(agent_infos).await?;
+                Ok(AppResponse::AgentInfoAdded)
+            }
             AppRequest::PeerMetaInfo { url, dna_hashes } => {
                 let url = kitsune2_api::Url::from_str(&url)?;
                 let r = self

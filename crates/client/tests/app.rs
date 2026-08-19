@@ -586,9 +586,20 @@ async fn agent_info() {
         .await
         .unwrap();
     let dna = DnaHash::from_k2_space(&space);
-    let agent_infos = app_ws.agent_info(Some(vec![dna])).await.unwrap();
+    let agent_infos = app_ws.agent_info(Some(vec![dna.clone()])).await.unwrap();
     assert_eq!(agent_infos.len(), 2);
     assert!(agent_infos.contains(&other_agent));
+
+    // Adding agent info through the app interface must also land in the
+    // peer store (enables "stealth networks" without a bootstrap server).
+    let app_added_agent = make_agent(&space);
+    app_ws
+        .add_agent_info(vec![app_added_agent.clone()])
+        .await
+        .unwrap();
+    let agent_infos = app_ws.agent_info(Some(vec![dna])).await.unwrap();
+    assert_eq!(agent_infos.len(), 3);
+    assert!(agent_infos.contains(&app_added_agent));
 }
 
 #[tokio::test(flavor = "multi_thread")]

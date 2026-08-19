@@ -41,6 +41,20 @@ pub enum AppRequest {
         dna_hashes: Option<Vec<DnaHash>>,
     },
 
+    /// Add signed agent info to the Conductor's peer store.
+    ///
+    /// This enables apps to share agent info through mechanisms other than
+    /// a bootstrap server, e.g. by exchanging it over an open network and
+    /// adding it locally for "stealth networks" without a bootstrap server.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::AgentInfoAdded`]
+    AddAgentInfo {
+        /// The signed agent info, as produced by `kitsune2_api::AgentInfoSigned::encode`.
+        agent_infos: Vec<String>,
+    },
+
     /// Request the contents of the peer meta store(s) related to
     /// the given dna hashes for the agent at the given Url.
     ///
@@ -345,6 +359,9 @@ pub enum AppResponse {
 
     /// The successful response to an [`AppRequest::AgentInfo`].
     AgentInfo(Vec<String>),
+
+    /// The successful response to an [`AppRequest::AddAgentInfo`].
+    AgentInfoAdded,
 
     /// The successful response to an [`AppRequest::PeerMetaInfo`].
     ///
