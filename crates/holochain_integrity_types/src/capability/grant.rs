@@ -94,7 +94,7 @@ impl CapGrant {
 
 impl From<CapGrant> for CapAccess {
     fn from(grant: CapGrant) -> Self {
-        CapAccess::RemoteAgent(grant)
+        CapAccess::RemoteAgent(Box::new(grant))
     }
 }
 
@@ -113,20 +113,22 @@ impl CapAccess {
             // Grant is always valid if the author matches the check agent.
             CapAccess::ChainAuthor(author) => author == given_agent,
             // Otherwise we need to do more work…
-            CapAccess::RemoteAgent(CapGrant {
-                constraint,
-                capability: Capability::ZomeCall(ZomeCallGrant { functions }),
-                ..
-            }) => {
-                // The checked function needs to be in the grant…
-                let granted = match functions {
-                    GrantedFunctions::All => true,
-                    GrantedFunctions::Listed(fns) => fns.contains(given_function),
-                };
+            CapAccess::RemoteAgent(cap_grant) => match &**cap_grant {
+                CapGrant {
+                    constraint,
+                    capability: Capability::ZomeCall(ZomeCallGrant { functions }),
+                    ..
+                } => {
+                    // The checked function needs to be in the grant…
+                    let granted = match functions {
+                        GrantedFunctions::All => true,
+                        GrantedFunctions::Listed(fns) => fns.contains(given_function),
+                    };
 
-                granted && constraint.permits(given_agent, given_secret)
-            }
-            _ => false,
+                    granted && constraint.permits(given_agent, given_secret)
+                }
+                _ => false,
+            },
         }
     }
 
@@ -137,11 +139,14 @@ impl CapAccess {
         given_secret: Option<&CapSecret>,
     ) -> bool {
         match self {
-            CapAccess::RemoteAgent(CapGrant {
-                constraint,
-                capability: Capability::DirectSignal,
-                ..
-            }) => constraint.permits(given_agent, given_secret),
+            CapAccess::RemoteAgent(cap_grant) => match &**cap_grant {
+                CapGrant {
+                    constraint,
+                    capability: Capability::DirectSignal,
+                    ..
+                } => constraint.permits(given_agent, given_secret),
+                _ => false,
+            },
             _ => false,
         }
     }

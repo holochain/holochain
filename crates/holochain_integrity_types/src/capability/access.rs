@@ -14,7 +14,6 @@ use holochain_serialized_bytes::prelude::{Deserialize, Serialize};
 ///
 /// See [`CapAccess::is_valid_for_zome_call`] to see how these checks are made.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[allow(clippy::large_enum_variant)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
 pub enum CapAccess {
@@ -29,7 +28,7 @@ pub enum CapAccess {
     /// The pubkey of the calling agent is secured by the cryptographic handshake at the network
     /// layer and the caller must provide a secret that we check for in a private entry in the
     /// local chain.
-    RemoteAgent(CapGrant),
+    RemoteAgent(Box<CapGrant>),
 }
 
 impl From<holo_hash::AgentPubKey> for CapAccess {

@@ -107,7 +107,7 @@ impl Entry {
     pub fn as_cap_access(&self) -> Option<CapAccess> {
         match self {
             Entry::Agent(key) => Some(CapAccess::ChainAuthor(key.clone())),
-            Entry::CapGrant(data) => Some(CapAccess::RemoteAgent(data.clone())),
+            Entry::CapGrant(data) => Some(CapAccess::RemoteAgent(Box::new(data.clone()))),
             _ => None,
         }
     }
