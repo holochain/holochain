@@ -8,7 +8,7 @@ use holochain::sweettest::*;
 use holochain_conductor_api::CellInfo;
 use holochain_keystore::{AgentPubKeyExt, WarrantOpExt};
 use holochain_state::dht_store::DhtStore;
-use holochain_types::app::{AppStatus, DisabledAppReason};
+use holochain_types::app::{AppManifest, AppManifestV0, AppStatus, DisabledAppReason};
 use holochain_types::prelude::*;
 use holochain_types::signal::SystemSignal;
 use holochain_wasm_test_utils::TestWasm;
@@ -230,6 +230,104 @@ async fn restore_from_dht_end_to_end() {
         .call(&restore_cell.zome(TestWasm::Create), "get_post", new_hash)
         .await;
     assert_eq!(new_record.unwrap().action().action_seq(), last_seq_on_a + 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_from_dht_respects_manifest_p2p_config_overrides() {
+    holochain_trace::test_run();
+
+    let dedicated_bootstrap = kitsune2_test_utils::bootstrap::TestBootstrapSrv::new(false).await;
+    let dedicated_bootstrap_url = dedicated_bootstrap.addr().to_string();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+    let mut config_a = SweetConductorConfig::rendezvous(true);
+    config_a.network.bootstrap_url = url2::url2!("{dedicated_bootstrap_url}");
+    let mut conductor_a =
+        SweetConductor::from_config_rendezvous(config_a, rendezvous.clone()).await;
+    let keystore = conductor_a.keystore();
+    let agent = SweetAgents::one(keystore.clone()).await;
+    let cell_a = conductor_a
+        .setup_app_for_agent("app", agent.clone(), std::slice::from_ref(&dna_file))
+        .await
+        .unwrap()
+        .into_cells()
+        .remove(0);
+    conductor_a
+        .declare_full_storage_arcs(cell_a.dna_hash())
+        .await;
+    let _: ActionHash = conductor_a
+        .call(&cell_a.zome(TestWasm::Create), "create_entry", ())
+        .await;
+
+    let mut config_c = SweetConductorConfig::rendezvous(true);
+    config_c.network.bootstrap_url = url2::url2!("{dedicated_bootstrap_url}");
+    let mut conductor_c =
+        SweetConductor::from_config_rendezvous(config_c, rendezvous.clone()).await;
+    let cell_c = conductor_c
+        .setup_app("app", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap()
+        .into_cells()
+        .remove(0);
+    conductor_c
+        .declare_full_storage_arcs(cell_c.dna_hash())
+        .await;
+
+    await_consistency([&cell_a, &cell_c]).await.unwrap();
+    conductor_a.shutdown().await;
+
+    // Conductor B's own default bootstrap is the shared rendezvous, which never heard of conductor C,
+    // so restore can only succeed via the manifest's bootstrap_url override.
+    let mut config_b = SweetConductorConfig::rendezvous(true);
+    config_b.restore_chain_quorum = 1;
+    let mut conductor_b =
+        SweetConductor::create_with_defaults(config_b, Some(keystore), Some(rendezvous)).await;
+
+    let app_id = "restored".to_string();
+    let mut signal_rx = conductor_b.subscribe_to_app_signals(app_id.clone());
+    let restore_cell_id = CellId::new(dna_file.dna_hash().clone(), agent.clone());
+
+    let manifest = AppManifest::V0(AppManifestV0 {
+        allow_deferred_memproofs: false,
+        description: None,
+        name: "restored".to_string(),
+        roles: vec![],
+        bootstrap_url: Some(dedicated_bootstrap_url),
+        relay_url: None,
+    });
+
+    conductor_b
+        .install_app_with_manifest(
+            &app_id,
+            Some(agent.clone()),
+            [&("role".to_string(), dna_file.clone())],
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+            manifest,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: restore_cell_id
+        }
+    );
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::AppRestoreComplete {
+            installed_app_id: app_id.clone()
+        }
+    );
+    assert_eq!(
+        app_status(&conductor_b, &app_id).await,
+        AppStatus::Disabled(DisabledAppReason::NeverStarted)
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
