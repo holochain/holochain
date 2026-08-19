@@ -610,6 +610,175 @@ async fn restore_multi_cell_app_does_not_settle_until_the_last_cell_completes() 
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_resumes_multi_cell_app_after_conductor_restart() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_first, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let (dna_second, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let dnas = [dna_first.clone(), dna_second.clone()];
+
+    let mut conductor_a = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let keystore = conductor_a.keystore();
+    let agent = SweetAgents::one(keystore.clone()).await;
+    let cells_a = conductor_a
+        .setup_app_for_agent("app", agent.clone(), &dnas)
+        .await
+        .unwrap()
+        .into_cells();
+    for dna in &dnas {
+        conductor_a.declare_full_storage_arcs(dna.dna_hash()).await;
+    }
+    for cell in &cells_a {
+        let _: ActionHash = conductor_a
+            .call(&cell.zome(TestWasm::Create), "create_entry", ())
+            .await;
+    }
+    let cell_a_first = cells_a
+        .iter()
+        .find(|c| c.dna_hash() == dna_first.dna_hash())
+        .unwrap();
+    let cell_a_second = cells_a
+        .iter()
+        .find(|c| c.dna_hash() == dna_second.dna_hash())
+        .unwrap();
+
+    // Conductor C is the authority for the first DNA and stays up throughout
+    let mut conductor_c = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let cell_c = conductor_c
+        .setup_app("authority-first", std::slice::from_ref(&dna_first))
+        .await
+        .unwrap()
+        .into_cells()
+        .remove(0);
+    conductor_c
+        .declare_full_storage_arcs(dna_first.dna_hash())
+        .await;
+
+    // Conductor D is the authority for the second DNA. It gossips with A, then is shut down so the
+    // second cell has no authority until it is deliberately started back up.
+    let mut conductor_d = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let cell_d = conductor_d
+        .setup_app("authority-second", std::slice::from_ref(&dna_second))
+        .await
+        .unwrap()
+        .into_cells()
+        .remove(0);
+    conductor_d
+        .declare_full_storage_arcs(dna_second.dna_hash())
+        .await;
+
+    await_consistency([cell_a_first, &cell_c]).await.unwrap();
+    await_consistency([cell_a_second, &cell_d]).await.unwrap();
+
+    conductor_a.shutdown().await;
+    conductor_d.shutdown().await;
+
+    let mut config_b = SweetConductorConfig::rendezvous(true);
+    config_b.restore_chain_quorum = 1;
+    config_b.network.request_timeout_s = 10;
+    let mut conductor_b =
+        SweetConductor::create_with_defaults(config_b, Some(keystore), Some(rendezvous)).await;
+
+    let app_id = "restored".to_string();
+    let mut signal_rx = conductor_b.subscribe_to_app_signals(app_id.clone());
+    let cell_id_first = CellId::new(dna_first.dna_hash().clone(), agent.clone());
+    let cell_id_second = CellId::new(dna_second.dna_hash().clone(), agent.clone());
+
+    conductor_b
+        .install_app(
+            &app_id,
+            Some(agent.clone()),
+            &dnas,
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: cell_id_first.clone()
+        }
+    );
+    let first_pass_dump = conductor_b
+        .raw_handle()
+        .dump_full_cell_state(&cell_id_first, None, None)
+        .await
+        .unwrap();
+
+    // The second cell has no authority yet, so the app is certain to still be awaiting restore
+    assert_eq!(
+        app_status(&conductor_b, &app_id).await,
+        AppStatus::AwaitingRestore
+    );
+
+    conductor_b.shutdown().await;
+    conductor_b.startup().await;
+
+    let mut signal_rx = conductor_b.subscribe_to_app_signals(app_id.clone());
+
+    // The orchestrator re-walks from cell 0, so the first cell is re-processed, but unchanged,
+    // before the second cell is attempted again
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: cell_id_first.clone()
+        }
+    );
+    assert_eq!(
+        app_status(&conductor_b, &app_id).await,
+        AppStatus::AwaitingRestore
+    );
+
+    conductor_d.startup().await;
+    SweetConductor::exchange_peer_info([&conductor_b, &conductor_d]).await;
+
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: cell_id_second.clone()
+        }
+    );
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::AppRestoreComplete {
+            installed_app_id: app_id.clone()
+        }
+    );
+    assert_eq!(
+        app_status(&conductor_b, &app_id).await,
+        AppStatus::Disabled(DisabledAppReason::NeverStarted)
+    );
+
+    // Re-processing the first cell did not duplicate or lose any of its rows
+    let final_dump = conductor_b
+        .raw_handle()
+        .dump_full_cell_state(&cell_id_first, None, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        first_pass_dump.source_chain_dump.records.len(),
+        final_dump.source_chain_dump.records.len()
+    );
+}
+
 async fn build_fork_pair(
     keystore: &holochain_keystore::MetaLairClient,
     agent: &AgentPubKey,
