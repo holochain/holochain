@@ -50,7 +50,7 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::AgentInfoAdded`]
     AddAgentInfo {
-        /// The signed agent info, as produced by `kitsune2_api::AgentInfoSigned::encode`.
+        /// The signed agent info, as produced by [`kitsune2_api::AgentInfoSigned::encode`].
         agent_infos: Vec<String>,
     },
 
