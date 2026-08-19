@@ -86,7 +86,13 @@ impl AppInterfaceApi {
                 Ok(AppResponse::AgentInfo(items?))
             }
             AppRequest::AddAgentInfo { agent_infos } => {
-                self.conductor_handle.add_agent_infos(agent_infos).await?;
+                let app_dnas = self
+                    .conductor_handle
+                    .get_dna_hashes_for_app(&installed_app_id)
+                    .await?;
+                self.conductor_handle
+                    .add_agent_infos(agent_infos, Some(app_dnas))
+                    .await?;
                 Ok(AppResponse::AgentInfoAdded)
             }
             AppRequest::PeerMetaInfo { url, dna_hashes } => {

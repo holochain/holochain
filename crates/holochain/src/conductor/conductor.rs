@@ -3317,14 +3317,27 @@ mod misc_impls {
         }
 
         /// Add signed agent info to the conductor
-        pub async fn add_agent_infos(&self, agent_infos: Vec<String>) -> ConductorApiResult<()> {
+        pub async fn add_agent_infos(
+            &self,
+            agent_infos: Vec<String>,
+            allowed_dna_hashes: Option<Vec<DnaHash>>,
+        ) -> ConductorApiResult<()> {
             let mut parsed_by_space: HashMap<SpaceId, Vec<Arc<AgentInfoSigned>>> = HashMap::new();
+            let allowed_dna_hashes = allowed_dna_hashes.as_ref();
             // Parse agent infos and add them to a map indexed by space id.
             for info in agent_infos {
                 let parsed_info = kitsune2_api::AgentInfoSigned::decode(
                     &kitsune2_core::Ed25519Verifier,
                     info.as_bytes(),
                 )?;
+                let dna_hash = DnaHash::from_k2_space(&parsed_info.space);
+                if let Some(allowed_dna_hashes) = allowed_dna_hashes {
+                    if !allowed_dna_hashes.contains(&dna_hash) {
+                        return Err(ConductorApiError::other(format!(
+                            "Agent info space {dna_hash} is not part of app"
+                        )));
+                    }
+                }
                 let space_id = parsed_info.space.clone();
                 parsed_by_space
                     .entry(space_id)

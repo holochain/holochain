@@ -91,7 +91,7 @@ async fn add_agent_infos_to_peer_store() {
 
     // Add the agent info from the first conductor
     conductor
-        .add_agent_infos(vec![expected_agent_info.clone().encode().unwrap()])
+        .add_agent_infos(vec![expected_agent_info.clone().encode().unwrap()], None)
         .await
         .unwrap();
 
