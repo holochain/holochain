@@ -591,7 +591,7 @@ async fn agent_info() {
     assert!(agent_infos.contains(&other_agent));
 
     // Adding agent info through the app interface must also land in the
-    // peer store (enables "stealth networks" without a bootstrap server).
+    // peer store.
     let app_added_agent = make_agent(&space);
     app_ws
         .add_agent_info(vec![app_added_agent.clone()])
