@@ -69,6 +69,7 @@ async fn network_seed_regression() {
             network_seed: None,
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -82,6 +83,7 @@ async fn network_seed_regression() {
             network_seed: Some("seed".into()),
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -261,6 +263,7 @@ impl TestCase {
                 network_seed,
                 roles_settings: Default::default(),
                 ignore_genesis_failure: false,
+                restore_from_dht: false,
             })
             .await
             .unwrap();

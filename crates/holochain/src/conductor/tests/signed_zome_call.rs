@@ -4,7 +4,6 @@ use crate::test_utils::retry_fn_until_timeout;
 use ::fixt::fixt;
 use holochain_nonce::fresh_nonce;
 use holochain_nonce::Nonce256Bits;
-use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::*;
 use matches::assert_matches;
@@ -54,13 +53,10 @@ async fn signed_zome_call() {
         .unwrap();
 
     // create a source chain read to query for the cap grant
-    let chain = SourceChainRead::new(
-        conductor.get_dht_store(cell_id.dna_hash()).unwrap(),
-        conductor.keystore(),
-        agent_pub_key.clone(),
-    )
-    .await
-    .unwrap();
+    let chain = conductor
+        .get_agent_source_chain(&agent_pub_key, cell_id.dna_hash())
+        .await
+        .as_read();
 
     let head = chain.chain_head_nonempty().unwrap();
     let dump = chain.dump().await.unwrap();
@@ -178,13 +174,10 @@ async fn signed_zome_call_wildcard() {
         .unwrap();
 
     // create a source chain read to query for the cap grant
-    let source_chain_read = SourceChainRead::new(
-        conductor.get_dht_store(cell_id.dna_hash()).unwrap(),
-        conductor.keystore(),
-        agent_pub_key.clone(),
-    )
-    .await
-    .unwrap();
+    let source_chain_read = conductor
+        .get_agent_source_chain(&agent_pub_key, cell_id.dna_hash())
+        .await
+        .as_read();
 
     let called_function: GrantedFunction = ("create_entry".into(), "get_entry".into());
 
@@ -288,13 +281,10 @@ async fn cap_grant_info_call() {
     // println!("deletehash: {:?}\n", _deletehash);
 
     // create a source chain read to query for the deleted cap grant
-    let chain = SourceChainRead::new(
-        conductor.get_dht_store(cell_id.dna_hash()).unwrap(),
-        conductor.keystore(),
-        agent_pub_key.clone(),
-    )
-    .await
-    .unwrap();
+    let chain = conductor
+        .get_agent_source_chain(&agent_pub_key, cell_id.dna_hash())
+        .await
+        .as_read();
 
     let delete_query: ChainQueryFilter = ChainQueryFilter::new()
         .include_entries(true)
@@ -427,11 +417,11 @@ async fn grant_zome_call_capability_call() {
         .await
         .expect("Failed to get state dump");
 
-    // 2 new DhtOps for cap grant are integrated into the source chain
+    // 3 new DhtOps for the cap grant are integrated into the source chain
     assert_eq!(
         after_state_dump.integration_dump.integrated.len()
             - before_state_dump.integration_dump.integrated.len(),
-        2
+        3
     );
     assert_eq!(after_state_dump.integration_dump.integration_limbo.len(), 0);
 }
@@ -507,13 +497,13 @@ async fn grant_zome_call_capability_call_ensures_zome_initialization() {
         .await
         .expect("Failed to get state dump");
 
-    // 4 new DhtOps are integrated into the source chain:
+    // 5 new DhtOps are integrated into the source chain:
     // - 2 from the zome initialization workflow
-    // - 2 for the newly created cap grant
+    // - 3 for the newly created cap grant
     assert_eq!(
         after_state_dump.integration_dump.integrated.len()
             - before_state_dump.integration_dump.integrated.len(),
-        4
+        5
     );
     assert_eq!(after_state_dump.integration_dump.integration_limbo.len(), 0);
 }

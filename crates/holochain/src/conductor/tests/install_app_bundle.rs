@@ -1,8 +1,6 @@
 use crate::{conductor::error::ConductorError, sweettest::*};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-#[cfg(feature = "unstable-migration")]
-use maplit::btreeset;
 use matches::assert_matches;
 #[cfg(feature = "unstable-migration")]
 use std::collections::BTreeSet;
@@ -53,6 +51,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             network_seed: None,
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         }
     }
 
@@ -172,6 +171,7 @@ async fn reject_duplicate_app_for_same_agent() {
             network_seed: None,
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -190,6 +190,7 @@ async fn reject_duplicate_app_for_same_agent() {
             installed_app_id: Some("app_2".into()),
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
             network_seed: None,
         })
         .await;
@@ -212,6 +213,7 @@ async fn reject_duplicate_app_for_same_agent() {
             installed_app_id: Some("app_2".into()),
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
             network_seed: None,
         })
         .await;
@@ -231,6 +233,7 @@ async fn reject_duplicate_app_for_same_agent() {
             installed_app_id: Some("app_2".into()),
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
             network_seed: Some("network".into()),
         })
         .await;
@@ -296,38 +299,38 @@ async fn cells_by_dna_lineage() {
 
     pretty_assertions::assert_eq!(
         lin1,
-        btreeset![
+        BTreeSet::from([
             app_cells(&app1, &[0]),
             app_cells(&app2, &[0]),
             app_cells(&app3, &[0]),
             // no dna4: dna1 was "removed"
-        ]
+        ])
     );
     pretty_assertions::assert_eq!(
         lin2,
-        btreeset![
+        BTreeSet::from([
             // no dna1: it's in the past
             app_cells(&app2, &[0]),
             app_cells(&app3, &[0]),
             app_cells(&app4, &[0]),
-        ]
+        ])
     );
     pretty_assertions::assert_eq!(
         lin3,
-        btreeset![
+        BTreeSet::from([
             // no dna1 or dna2: they're in the past
             app_cells(&app3, &[0]),
             app_cells(&app4, &[0]),
-        ]
+        ])
     );
     pretty_assertions::assert_eq!(
         lin4,
-        btreeset![
+        BTreeSet::from([
             // all other dnas are in the past
             app_cells(&app4, &[0]),
-        ]
+        ])
     );
-    pretty_assertions::assert_eq!(linx, btreeset![app_cells(&app1, &[1]),]);
+    pretty_assertions::assert_eq!(linx, BTreeSet::from([app_cells(&app1, &[1])]));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -430,6 +433,7 @@ async fn use_existing_integration() {
             network_seed: None,
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -445,6 +449,7 @@ async fn use_existing_integration() {
                 network_seed: None,
                 roles_settings: Default::default(),
                 ignore_genesis_failure: false,
+                restore_from_dht: false,
             })
             .await
             .unwrap_err();
@@ -465,6 +470,7 @@ async fn use_existing_integration() {
                 network_seed: None,
                 roles_settings: Default::default(),
                 ignore_genesis_failure: false,
+                restore_from_dht: false,
             })
             .await
             .unwrap_err();
@@ -494,6 +500,7 @@ async fn use_existing_integration() {
             network_seed: None,
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
