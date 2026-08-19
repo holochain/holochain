@@ -916,3 +916,186 @@ async fn restore_from_dht_chain_fork_warrant_transitions_to_unrecoverable() {
         "expected AppStatusError, got: {err:?}"
     );
 }
+
+/// Number of accepted actions authored by `agent` in `dna_hash`'s per-DNA database. Reads the DB
+/// directly rather than via `dump_full_cell_state`, which also pulls peer info and so requires the
+/// DNA's network space to already exist.
+async fn authored_action_count(
+    conductor: &SweetConductor,
+    dna_hash: &DnaHash,
+    agent: &AgentPubKey,
+) -> usize {
+    let store = conductor.get_dht_store(dna_hash).unwrap();
+    holochain_state::source_chain::dump_state(&store.as_read(), agent.clone())
+        .await
+        .unwrap()
+        .records
+        .len()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_multi_cell_app_permanent_failure_discovered_after_restart() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_first, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let (dna_second, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let dnas = [dna_first.clone(), dna_second.clone()];
+
+    let mut conductor_a = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let keystore = conductor_a.keystore();
+    let agent = SweetAgents::one(keystore.clone()).await;
+    let cell_a_first = conductor_a
+        .setup_app_for_agent("app", agent.clone(), std::slice::from_ref(&dna_first))
+        .await
+        .unwrap()
+        .into_cells()
+        .remove(0);
+    conductor_a
+        .declare_full_storage_arcs(dna_first.dna_hash())
+        .await;
+    let _: ActionHash = conductor_a
+        .call(&cell_a_first.zome(TestWasm::Create), "create_entry", ())
+        .await;
+
+    // Conductor C is the authority for the first DNA and stays up throughout.
+    let mut conductor_c = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let cell_c = conductor_c
+        .setup_app("authority-first", std::slice::from_ref(&dna_first))
+        .await
+        .unwrap()
+        .into_cells()
+        .remove(0);
+    conductor_c
+        .declare_full_storage_arcs(dna_first.dna_hash())
+        .await;
+
+    await_consistency([&cell_a_first, &cell_c]).await.unwrap();
+    conductor_a.shutdown().await;
+
+    // Conductor W holds a fabricated fork and matching warrant for the second DNA, but is shut down
+    // until after the restart, so the app is still awaiting restore at the crash.
+    let mut conductor_w = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let cell_w = conductor_w
+        .setup_app("authority-second", std::slice::from_ref(&dna_second))
+        .await
+        .unwrap()
+        .into_cells()
+        .remove(0);
+    conductor_w
+        .declare_full_storage_arcs(dna_second.dna_hash())
+        .await;
+
+    let (a1, a2) = build_fork_pair(&keystore, &agent, dna_second.dna_hash()).await;
+    let store_w = conductor_w.get_dht_store(dna_second.dna_hash()).unwrap();
+    insert_fetchable_action(&store_w, &a1).await;
+    insert_fetchable_action(&store_w, &a2).await;
+
+    let warrant = Warrant::new(
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+            chain_author: agent.clone(),
+            action_pair: (
+                (a1.as_hash().clone(), a1.signature.clone()),
+                (a2.as_hash().clone(), a2.signature.clone()),
+            ),
+            seq: 0,
+        }),
+        cell_w.agent_pubkey().clone(),
+        Timestamp::now(),
+        agent.clone(),
+    );
+    let warrant_op = WarrantOp::sign(&conductor_w.keystore(), warrant)
+        .await
+        .unwrap();
+    let warrant_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from((*warrant_op).clone()));
+    store_w
+        .test_insert_integrated_warrant(warrant_op_hashed)
+        .await
+        .unwrap();
+
+    conductor_w.shutdown().await;
+
+    let mut config_b = SweetConductorConfig::rendezvous(true);
+    config_b.restore_chain_quorum = 1;
+    config_b.network.request_timeout_s = 10;
+    let mut conductor_b =
+        SweetConductor::create_with_defaults(config_b, Some(keystore), Some(rendezvous)).await;
+
+    let app_id = "restored".to_string();
+    let mut signal_rx = conductor_b.subscribe_to_app_signals(app_id.clone());
+    let cell_id_first = CellId::new(dna_first.dna_hash().clone(), agent.clone());
+    let cell_id_second = CellId::new(dna_second.dna_hash().clone(), agent.clone());
+
+    conductor_b
+        .install_app(
+            &app_id,
+            Some(agent.clone()),
+            &dnas,
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: cell_id_first.clone()
+        }
+    );
+    let first_pass_count = authored_action_count(&conductor_b, dna_first.dna_hash(), &agent).await;
+
+    // The second cell has no authority yet, so the app is certain to still be awaiting restore.
+    assert_eq!(
+        app_status(&conductor_b, &app_id).await,
+        AppStatus::AwaitingRestore
+    );
+
+    conductor_b.shutdown().await;
+    conductor_b.startup().await;
+
+    let mut signal_rx = conductor_b.subscribe_to_app_signals(app_id.clone());
+
+    // The orchestrator re-walks from cell 0, re-processing it before reattempting cell 1.
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: cell_id_first.clone()
+        }
+    );
+
+    conductor_w.startup().await;
+    SweetConductor::exchange_peer_info([&conductor_b, &conductor_w]).await;
+
+    let (failed_cell_id, reason) = match next_restore_signal(&mut signal_rx).await {
+        SystemSignal::RestoreFailed { cell_id, reason } => (cell_id, reason),
+        signal => panic!("expected RestoreFailed, got: {signal:?}"),
+    };
+    assert_eq!(failed_cell_id, cell_id_second);
+    assert!(
+        matches!(reason, UnrecoverableCellReason::ChainForkWarrant(_)),
+        "expected a ChainForkWarrant reason, got: {reason:?}"
+    );
+    assert_eq!(
+        app_status(&conductor_b, &app_id).await,
+        AppStatus::Unrecoverable(cell_id_second, reason)
+    );
+
+    // Cell 0's already-restored chain survives the restart and the second cell's failure.
+    let final_count = authored_action_count(&conductor_b, dna_first.dna_hash(), &agent).await;
+    assert_eq!(first_pass_count, final_count);
+}
