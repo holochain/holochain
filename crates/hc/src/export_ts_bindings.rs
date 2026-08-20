@@ -15,7 +15,7 @@
 
 use std::path::{Component, Path, PathBuf};
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{bail, Context};
 use clap::Parser;
 
 /// Export the conductor API's TypeScript bindings.
@@ -23,57 +23,31 @@ use clap::Parser;
 pub struct HcExportTsBindings {
     /// Directory the binding tree is written to.
     ///
-    /// Its previous contents are replaced by renaming a freshly exported
-    /// tree into place: a failed export leaves it untouched, and if the
-    /// swap itself fails partway through, the previous tree is restored on
-    /// a best-effort basis. Must not be the current directory or one of its
-    /// ancestors. If it already holds content that doesn't look like a
-    /// previously generated binding tree (only directories and `.ts`
-    /// files), the command refuses to replace it unless `--force` is given.
+    /// If it already exists, its contents are removed first. Must not be
+    /// the current directory, one of its ancestors, or the root directory.
     #[arg(long, short = 'o', default_value = "bindings")]
     pub out_dir: PathBuf,
-
-    /// Replace `out_dir` even if its contents don't look like a previously
-    /// generated TypeScript binding tree.
-    ///
-    /// Never bypasses the refusal to replace the current directory or one
-    /// of its ancestors; that guard is always on.
-    #[arg(long, short = 'f')]
-    pub force: bool,
 }
 
 impl HcExportTsBindings {
     /// Run this command.
     pub fn run(self) -> anyhow::Result<()> {
         let final_dir = resolve_out_dir(&self.out_dir)?;
-        refuse_if_cwd_or_ancestor(&final_dir)?;
-        refuse_unrecognized_contents(&final_dir, self.force)?;
+        refuse_dangerous_out_dir(&final_dir)?;
 
-        let parent = final_dir
-            .parent()
-            .ok_or_else(|| anyhow!("{} has no parent directory", final_dir.display()))?;
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("creating {}", parent.display()))?;
-
-        // A sibling of `final_dir`, so the swap below is a same-filesystem
-        // rename rather than a copy, and `tempdir_in` creates it securely
-        // (no predictable path, no symlink-race window).
-        let staging_dir = tempfile::Builder::new()
-            .prefix(".hc-ts-bindings-")
-            .tempdir_in(parent)
-            .with_context(|| format!("creating a staging directory in {}", parent.display()))?;
+        if final_dir.exists() {
+            std::fs::remove_dir_all(&final_dir)
+                .with_context(|| format!("removing {}", final_dir.display()))?;
+        }
+        std::fs::create_dir_all(&final_dir)
+            .with_context(|| format!("creating {}", final_dir.display()))?;
 
         let cfg = ts_rs::Config::new()
             .with_large_int("number")
             .with_import_extension(Some("js"))
-            .with_out_dir(staging_dir.path().to_path_buf());
+            .with_out_dir(final_dir.clone());
         holochain_conductor_api::export_ts_bindings(&cfg)
             .context("exporting the TypeScript bindings")?;
-
-        // Take ownership of the path so `TempDir::drop` doesn't try to clean
-        // up a directory that `swap_into_place` is about to rename away.
-        let staging_path = staging_dir.keep();
-        swap_into_place(&staging_path, &final_dir)?;
 
         println!(
             "TypeScript bindings written to {path}",
@@ -138,9 +112,16 @@ fn resolve_out_dir(out_dir: &Path) -> anyhow::Result<PathBuf> {
     Ok(resolved)
 }
 
-/// Refuses to replace `final_dir` when it is the current directory or one of
-/// its ancestors. This guard is always on, regardless of `--force`.
-fn refuse_if_cwd_or_ancestor(final_dir: &Path) -> anyhow::Result<()> {
+/// Refuses to replace `final_dir` when it is the root directory, the current
+/// directory, or one of the current directory's ancestors. This guard is
+/// always on: there's no `--force` to bypass it.
+fn refuse_dangerous_out_dir(final_dir: &Path) -> anyhow::Result<()> {
+    if final_dir.parent().is_none() {
+        bail!(
+            "refusing to replace {}: it is the root directory",
+            final_dir.display()
+        );
+    }
     let cwd = std::env::current_dir()
         .and_then(|d| d.canonicalize())
         .context("reading the current directory")?;
@@ -153,105 +134,9 @@ fn refuse_if_cwd_or_ancestor(final_dir: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Refuses to replace `final_dir` if it holds content that doesn't look like
-/// a previously generated binding tree, unless `force` is set. This is a
-/// content-safety check, layered on top of (but distinct from) the
-/// cwd/ancestor guard.
-fn refuse_unrecognized_contents(final_dir: &Path, force: bool) -> anyhow::Result<()> {
-    if force || !final_dir.exists() {
-        return Ok(());
-    }
-    if looks_like_binding_tree(final_dir)
-        .with_context(|| format!("reading {}", final_dir.display()))?
-    {
-        return Ok(());
-    }
-    bail!(
-        "refusing to replace {}: it does not look like a previously generated TypeScript \
-         binding tree (expected only directories and files ending in \".ts\"); pass --force \
-         to replace it anyway",
-        final_dir.display()
-    );
-}
-
-/// Returns whether every top-level entry of `dir` is a directory or a file
-/// whose name ends in `.ts`, i.e. whether `dir` looks like a tree this
-/// command generated, and so is safe to replace without `--force`.
-fn looks_like_binding_tree(dir: &Path) -> std::io::Result<bool> {
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        if entry.file_type()?.is_dir() {
-            continue;
-        }
-        if entry
-            .file_name()
-            .to_str()
-            .is_some_and(|name| name.ends_with(".ts"))
-        {
-            continue;
-        }
-        return Ok(false);
-    }
-    Ok(true)
-}
-
-/// Replaces `final_dir`'s contents with the freshly exported tree at
-/// `staging_path`, which must be a sibling of `final_dir` (i.e. on the same
-/// filesystem) so the swap is a rename rather than a copy.
-///
-/// If `final_dir` already exists, it is renamed aside first and only
-/// removed once the new tree is safely in place, so a failure partway
-/// through leaves the on-disk outcome as either "old tree intact" or "new
-/// tree in place" -- never neither.
-fn swap_into_place(staging_path: &Path, final_dir: &Path) -> anyhow::Result<()> {
-    if !final_dir.exists() {
-        return std::fs::rename(staging_path, final_dir)
-            .with_context(|| format!("writing {}", final_dir.display()));
-    }
-
-    let trash = PathBuf::from(format!(
-        "{final_dir}.hc-ts-bindings-trash",
-        final_dir = final_dir.display()
-    ));
-    let _ = std::fs::remove_dir_all(&trash);
-    std::fs::rename(final_dir, &trash)
-        .with_context(|| format!("moving aside the previous {}", final_dir.display()))?;
-
-    if let Err(err) = std::fs::rename(staging_path, final_dir) {
-        // Best-effort restore: the on-disk outcome must be either "old tree
-        // intact" or "new tree in place", never neither.
-        let _ = std::fs::rename(&trash, final_dir);
-        return Err(err).with_context(|| format!("writing {}", final_dir.display()));
-    }
-
-    let _ = std::fs::remove_dir_all(&trash);
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{resolve_out_dir, swap_into_place};
-
-    #[test]
-    fn swap_into_place_restores_the_previous_tree_if_the_final_rename_fails() {
-        let tmp = tempfile::tempdir().unwrap();
-        let final_dir = tmp.path().join("final");
-        std::fs::create_dir_all(&final_dir).unwrap();
-        std::fs::write(final_dir.join("keep.ts"), "export type Keep = never;\n").unwrap();
-
-        // A staging path that doesn't exist forces the second rename
-        // (staging into final_dir) to fail after the first rename
-        // (final_dir moved aside to trash) has already succeeded.
-        let bogus_staging = tmp.path().join("does-not-exist");
-
-        let result = swap_into_place(&bogus_staging, &final_dir);
-
-        assert!(result.is_err());
-        assert!(
-            final_dir.join("keep.ts").exists(),
-            "the previous tree must be restored when the swap fails partway through"
-        );
-    }
+    use super::resolve_out_dir;
 
     #[test]
     fn resolve_out_dir_canonicalizes_an_existing_path() {

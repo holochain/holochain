@@ -35,13 +35,13 @@ holochain_conductor_api = { version = "^0.8.0-dev.2", path = "../holochain_condu
   "ts_rs",
 ] }
 holochain_trace = { version = "^0.8.0-dev.0", path = "../holochain_trace" }
-tempfile = "3.0"
 tokio = { version = "1.36.0", features = ["full"] }
 ts-rs = "12.0"
 
 [dev-dependencies]
 assert_cmd = "2.2"
 predicates = "3.1"
+tempfile = "3.0"
 
 [lints]
 workspace = true

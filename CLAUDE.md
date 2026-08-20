@@ -67,16 +67,15 @@ Some crates (`holo_hash`, `holochain_timestamp`, `holochain_nonce`,
 `holochain_zome_types`, `holochain_types`, `holochain_conductor_api`) carry
 an opt-in `ts_rs` cargo feature that derives TypeScript bindings
 (`ts_rs::TS`) for the conductor's wire API, consumed by
-`holochain-client-js`. It is off by default; ordinary builds and
-`make test-workspace` never enable it. The `hc` crate is the exception: it
-depends on `holochain_conductor_api` with `ts_rs` always on, because `hc
-export-ts-bindings` is a built-in subcommand. Through feature unification
-(resolver 2) that means every cargo invocation whose package set includes
-`holochain_cli` — in particular `make build-workspace`, `make
+`holochain-client-js`. It is off by default. The `hc` crate is the
+exception: it depends on `holochain_conductor_api` with `ts_rs` always on,
+because `hc export-ts-bindings` is a built-in subcommand. Through feature
+unification (resolver 2) that means every cargo invocation whose package
+set includes `holochain_cli` — in particular `make build-workspace`, `make
 test-workspace`, `static-clippy` and `static-doc` — compiles the type
 crates with `ts_rs`, so `ts_rs`-gated code must be warning-free and its
 tests must be cheap and side-effect free. `cargo test -p <type crate>`
-alone still has it off.
+alone, without `holochain_cli` in the package set, still has it off.
 
 **Criterion — does a type need a TS export?** Only if it is reachable from
 the wire surface: transitively referenced (directly or via a field, enum
@@ -133,14 +132,10 @@ need a TS export even if they resemble an exported type.
   `cargo run -p holochain_cli --features unstable-countersigning --
   export-ts-bindings --out-dir ./bindings`) because ts-rs only merges
   declarations sharing an output file within one process — never split the
-  export across per-crate loops. It stages the tree in a securely-created
-  temp directory that is a sibling of `--out-dir`, then swaps it into place
-  with same-filesystem renames, so a failed export never leaves `--out-dir`
-  half-written and a failure partway through the swap restores the previous
-  tree on a best-effort basis. It refuses an `--out-dir` that is the working
-  directory or an ancestor of it (always, not bypassable), and refuses one
-  that already holds something other than a previously generated binding
-  tree unless `--force` is given. `make ts-bindings-test` runs the export
+  export across per-crate loops. If `--out-dir` already exists, its contents
+  are removed before generating; it refuses to do so when `--out-dir` is the
+  root directory, or the working directory or an ancestor of it (always, not
+  bypassable). `make ts-bindings-test` runs the export
   and the `hc` integration tests under `crates/hc/tests/` that check the
   written tree (file layout, `@public` tags, `number`/`.js` dialect,
   countersigning API presence) — CI runs this target; the type crates'

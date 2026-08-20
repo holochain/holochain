@@ -49,9 +49,9 @@ fn export_ts_bindings_replaces_a_stale_tree() {
     std::fs::create_dir_all(&out).unwrap();
     let stale = out.join("stale.ts");
     std::fs::write(&stale, "export type Stale = never;\n").unwrap();
+    let random_file = out.join("random-file.bin");
+    std::fs::write(&random_file, [0u8, 1, 2, 3]).unwrap();
 
-    // A directory holding only `.ts` files looks like a binding tree, so
-    // this must succeed without `--force`.
     Command::cargo_bin("hc")
         .unwrap()
         .args(["export-ts-bindings", "-o"])
@@ -60,6 +60,7 @@ fn export_ts_bindings_replaces_a_stale_tree() {
         .success();
 
     assert!(!stale.exists(), "previous contents must be replaced");
+    assert!(!random_file.exists(), "previous contents must be replaced");
     assert!(out.join("types.ts").exists());
 }
 
@@ -96,48 +97,13 @@ fn export_ts_bindings_refuses_to_replace_the_working_directory() {
 }
 
 #[test]
-fn export_ts_bindings_refuses_unrecognized_contents_without_force() {
-    let tmp = tempfile::tempdir().unwrap();
-    let out = tmp.path().join("bindings");
-    std::fs::create_dir_all(&out).unwrap();
-    let random_file = out.join("random-file.bin");
-    std::fs::write(&random_file, [0u8, 1, 2, 3]).unwrap();
-    std::fs::create_dir_all(out.join(".git")).unwrap();
-
+fn export_ts_bindings_refuses_to_replace_the_root_directory() {
     Command::cargo_bin("hc")
         .unwrap()
-        .args(["export-ts-bindings", "--out-dir"])
-        .arg(&out)
+        .args(["export-ts-bindings", "--out-dir", "/"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("refusing"))
-        .stderr(predicate::str::contains("--force"));
-
-    assert!(
-        random_file.exists(),
-        "an out-dir that isn't a binding tree must be left untouched without --force"
-    );
-    assert!(!out.join("types.ts").exists());
-}
-
-#[test]
-fn export_ts_bindings_force_replaces_unrecognized_contents() {
-    let tmp = tempfile::tempdir().unwrap();
-    let out = tmp.path().join("bindings");
-    std::fs::create_dir_all(&out).unwrap();
-    let random_file = out.join("random-file.bin");
-    std::fs::write(&random_file, [0u8, 1, 2, 3]).unwrap();
-
-    Command::cargo_bin("hc")
-        .unwrap()
-        .args(["export-ts-bindings", "--out-dir"])
-        .arg(&out)
-        .arg("--force")
-        .assert()
-        .success();
-
-    assert!(!random_file.exists(), "--force must replace the contents");
-    assert!(out.join("types.ts").exists());
+        .stderr(predicate::str::contains("refusing"));
 }
 
 #[cfg(feature = "unstable-countersigning")]
