@@ -7,10 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.8.0-dev.3
+
 - **BREAKING CHANGE**: Fix `SendDirectSignal` failing with `FrameOverflow` for payloads over 8 KiB. Payloads up to the documented 1 MiB limit are now delivered. The signature scheme and wire encoding changed, so direct signals sent between conductors with and without this fix are dropped by the receiver — upgrade both ends. \#5937
 - Add `hc export-ts-bindings`, a built-in `hc` subcommand that writes the TypeScript type declarations for the conductor’s admin and app API and signals to a directory (`./bindings` by default, `--out-dir` to choose another). If the directory already exists, its contents are replaced; the command refuses to do so when the directory is the root directory, or the working directory or an ancestor of it. Building `hc` with `--features unstable-countersigning` additionally includes the countersigning app API. \#5214
-- Add `AddAgentInfo` to the app interface, allowing apps to add signed agent info to the conductor's peer store. \#5016
-- **BREAKING CHANGE**: `Signal::AppDirect`, delivered to an app when another agent sends it a direct signal via `SendDirectSignal`, now includes the sending agent's public key as `from_agent`. \#5938
+- Add `AddAgentInfo` to the app interface, allowing apps to add signed agent info to the conductor’s peer store. \#5016
+- **BREAKING CHANGE**: `Signal::AppDirect`, delivered to an app when another agent sends it a direct signal via `SendDirectSignal`, now includes the sending agent’s public key as `from_agent`. \#5938
 - **BREAKING CHANGE**: Errors for zome calls against a cell that is not running now state why. `ConductorError::CellDisabled` is replaced by `ConductorError::CellNotRunning(cell_id, reason)`, where the reason distinguishes an app that is disabled, awaiting membrane proofs, restoring its source chains, or permanently unrecoverable, from a disabled clone cell or a cell that has not finished starting.
 
 ## 0.8.0-dev.2

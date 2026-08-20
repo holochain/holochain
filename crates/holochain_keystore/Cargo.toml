@@ -1,6 +1,6 @@
 [package]
 name = "holochain_keystore"
-version = "0.8.0-dev.2"
+version = "0.8.0-dev.3"
 description = "keystore for libsodium keypairs"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -16,12 +16,12 @@ async-trait = "0.1"
 base64 = "0.22"
 derive_more = { version = "2.0", features = ["from"] }
 futures = "0.3"
-holo_hash = { version = "^0.8.0-dev.1", path = "../holo_hash", features = [
+holo_hash = { version = "^0.8.0-dev.2", path = "../holo_hash", features = [
   "full",
 ] }
 holochain_serialized_bytes = "=0.0.57"
-holochain_types = { version = "^0.8.0-dev.2", path = "../holochain_types" }
-holochain_zome_types = { version = "^0.8.0-dev.1", path = "../holochain_zome_types" }
+holochain_types = { version = "^0.8.0-dev.3", path = "../holochain_types" }
+holochain_zome_types = { version = "^0.8.0-dev.2", path = "../holochain_zome_types" }
 holochain_secure_primitive = { version = "^0.8.0-dev.0", path = "../holochain_secure_primitive" }
 holochain_util = { version = "^0.8.0-dev.0", path = "../holochain_util" }
 lair_keystore = { version = "0.7.1", default-features = false, features = [
@@ -42,7 +42,7 @@ tracing = "0.1"
 url2 = "0.0.6"
 
 [dev-dependencies]
-holochain_timestamp = { version = "^0.8.0-dev.1", path = "../timestamp" }
+holochain_timestamp = { version = "^0.8.0-dev.2", path = "../timestamp" }
 assert_cmd = "2.0.4"
 yaml_serde = "0.10"
 tempfile = "3.23"
