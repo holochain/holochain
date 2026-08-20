@@ -10,6 +10,7 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::{
     connect, ConnectRequest, ReceiveMessage, WebsocketConfig, WebsocketError,
 };
+use kitsune2_api::LocalAgent;
 use matches::assert_matches;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
@@ -278,6 +279,115 @@ async fn app_interfaces_can_be_bound_to_apps() {
         .await
         .unwrap();
     assert!(matches!(response, AppResponse::ListWasmHostFunctions(_)));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_interface_add_agent_info_respects_app_boundaries() {
+    holochain_trace::test_run();
+
+    let mut conductor = SweetConductor::standard().await;
+
+    let (dna_file_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd]).await;
+    let (dna_file_2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd]).await;
+
+    let app_1 = conductor
+        .setup_app("test-app-1", std::slice::from_ref(&dna_file_1))
+        .await
+        .unwrap();
+    let app_2 = conductor
+        .setup_app("test-app-2", std::slice::from_ref(&dna_file_2))
+        .await
+        .unwrap();
+
+    let app_1_port = conductor
+        .clone()
+        .add_app_interface(
+            Either::Left(0),
+            None,
+            AllowedOrigins::Any,
+            Some("test-app-1".to_string()),
+        )
+        .await
+        .unwrap();
+
+    let token_1 = create_token(&conductor, "test-app-1".into()).await;
+
+    let (app_1_tx, app_1_rx) = websocket_client_by_port(app_1_port).await.unwrap();
+    let _app_1_rx = WsPollRecv::new::<AppResponse>(app_1_rx);
+    app_1_tx
+        .authenticate(AppAuthenticationRequest {
+            token: token_1.clone(),
+        })
+        .await
+        .unwrap();
+
+    let app_1_agent_info = agent_info_for_cell(&conductor, app_1.cells()[0].cell_id()).await;
+    let ok_response: AppResponse = app_1_tx
+        .request(AppRequest::AddAgentInfo {
+            agent_infos: vec![app_1_agent_info],
+        })
+        .await
+        .unwrap();
+    assert!(matches!(ok_response, AppResponse::AgentInfoAdded));
+
+    // Agent info belonging to another app's DNA must be rejected by the
+    // app interface, and the rejected request must not modify the peer
+    // store. Sign with a fresh agent key so any write would be a new
+    // record, not an idempotent re-add of an existing one.
+    let app_2_cell_id = app_2.cells()[0].cell_id();
+    let app_2_agent_info = agent_info_for_cell(&conductor, app_2_cell_id).await;
+    let fresh_agent = kitsune2_core::Ed25519LocalAgent::from_seed(&[0xAB; 32]);
+    let fresh_agent_id = fresh_agent.agent().clone();
+    let fresh_agent_info = kitsune2_api::AgentInfo {
+        agent: fresh_agent_id.clone(),
+        space: app_2_cell_id.dna_hash().clone().to_k2_space(),
+        created_at: kitsune2_api::Timestamp::now(),
+        expires_at: kitsune2_api::Timestamp::from_micros(i64::MAX),
+        is_tombstone: false,
+        url: Some(kitsune2_api::Url::from_str("ws://localhost:0").unwrap()),
+        storage_arc: kitsune2_api::DhtArc::default(),
+    };
+    let fresh_signed = kitsune2_api::AgentInfoSigned::sign(&fresh_agent, fresh_agent_info)
+        .await
+        .unwrap();
+    let app_2_peer_store = conductor
+        .holochain_p2p()
+        .peer_store(app_2_cell_id.dna_hash().clone())
+        .await
+        .unwrap();
+    assert!(
+        app_2_peer_store
+            .get(fresh_agent_id.clone())
+            .await
+            .unwrap()
+            .is_none(),
+        "fresh agent key must not already be known to app 2's peer store"
+    );
+    let err_response: AppResponse = app_1_tx
+        .request(AppRequest::AddAgentInfo {
+            agent_infos: vec![fresh_signed.encode().unwrap()],
+        })
+        .await
+        .unwrap();
+    assert!(matches!(err_response, AppResponse::Error(_)));
+    assert!(
+        app_2_peer_store
+            .get(fresh_agent_id)
+            .await
+            .unwrap()
+            .is_none(),
+        "rejected agent info must not be added to app 2's peer store"
+    );
+
+    // The admin interface is unrestricted and may add agent info for any DNA.
+    let (admin_tx, _admin_rx) = conductor.admin_ws_client::<AdminResponse>().await;
+    let admin_response: AdminResponse = admin_tx
+        .request(AdminRequest::AddAgentInfo {
+            agent_infos: vec![app_2_agent_info],
+        })
+        .await
+        .unwrap();
+    assert!(matches!(admin_response, AdminResponse::AgentInfoAdded));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -636,4 +746,25 @@ async fn revoke_token(conductor: &SweetConductor, token: AppAuthenticationToken)
         AdminResponse::AppAuthenticationTokenRevoked => (),
         _ => panic!("unexpected response"),
     };
+}
+
+async fn agent_info_for_cell(
+    conductor: &SweetConductor,
+    cell_id: &holochain_zome_types::cell::CellId,
+) -> String {
+    let peer_store = conductor
+        .holochain_p2p()
+        .peer_store(cell_id.dna_hash().clone())
+        .await
+        .unwrap();
+    let agent = cell_id.agent_pubkey().to_k2_agent();
+    // The cell's own agent info is published asynchronously, so wait until it
+    // lands in the peer store before encoding it.
+    holochain::retry_until_timeout!(10_000, 100, {
+        if peer_store.get(agent.clone()).await.unwrap().is_some() {
+            break;
+        }
+    });
+    let agent_info = peer_store.get(agent).await.unwrap().unwrap();
+    agent_info.encode().unwrap()
 }

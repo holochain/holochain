@@ -502,6 +502,19 @@ impl AppWebsocket {
         }
     }
 
+    /// Add signed agent info to the Conductor's peer store.
+    ///
+    /// This enables apps to share agent info through mechanisms other than
+    /// a bootstrap server.
+    pub async fn add_agent_info(&self, agent_infos: Vec<String>) -> ConductorApiResult<()> {
+        let msg = AppRequest::AddAgentInfo { agent_infos };
+        let response = self.inner.send(msg).await?;
+        match response {
+            AppResponse::AgentInfoAdded => Ok(()),
+            _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
+
     /// Returns the contents of the peer meta store(s) related to the given
     /// dna hashes for the agent at the given Url.
     ///
