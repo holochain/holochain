@@ -2764,6 +2764,7 @@ mod scheduler_impls {
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
     use holochain_conductor_api::{CellInfo, JsonDump};
+    use holochain_keystore::AgentPubKeyExt;
     use holochain_zome_types::prelude::Entry;
     use kitsune2_api::SpaceId;
     use std::sync::atomic::Ordering;
@@ -3470,9 +3471,13 @@ mod misc_impls {
 
             let signal_bytes = holochain_serialized_bytes::encode(&DirectSignal(signal))?;
 
-            let sig = self
-                .keystore()
-                .sign(app_info.agent_pub_key.clone(), signal_bytes.clone().into())
+            // Sign the hash, not the bytes: lair signing frames are capped at 8 KiB while
+            // payloads go up to `DIRECT_SIGNAL_MAX_SIZE`. The receiver verifies through
+            // `is_valid_signature`, which hashes the received bytes the same way.
+            let hash = holo_hash::sha2_512(&signal_bytes);
+            let sig = app_info
+                .agent_pub_key
+                .sign_raw(self.keystore(), hash.into())
                 .await?;
 
             self.holochain_p2p()
