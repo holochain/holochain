@@ -23,7 +23,7 @@ use std::fmt;
     PartialOrd,
 )]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "types.ts"))]
 pub struct CellId(DnaHash, AgentPubKey);
 
 /// Delimiter in a clone id that separates the base cell's role name from the
@@ -36,7 +36,7 @@ pub const CLONE_ID_DELIMITER: &str = ".";
 /// Example: `profiles.0`
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "types.ts"))]
 pub struct CloneId(pub String);
 
 impl CloneId {

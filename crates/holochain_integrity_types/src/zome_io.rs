@@ -17,7 +17,7 @@ use holochain_serialized_bytes::prelude::*;
 #[serde(transparent)]
 #[repr(transparent)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "types.ts"))]
 pub struct ExternIO(
     #[serde(with = "serde_bytes")]
     #[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))]

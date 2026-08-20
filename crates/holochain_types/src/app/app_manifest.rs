@@ -60,7 +60,7 @@ pub use error::*;
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum AppManifest {
     #[serde(rename = "0")]
     V0(AppManifestV0),

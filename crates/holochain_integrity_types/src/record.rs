@@ -24,7 +24,7 @@ use std::borrow::Borrow;
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
 #[cfg_attr(
     feature = "ts_rs",
-    ts(export, export_to = "hdk/record.ts", concrete(E = Entry))
+    ts(export_to = "hdk/record.ts", concrete(E = Entry))
 )]
 pub enum RecordEntry<E: Borrow<Entry> = Entry> {
     /// The Action has an entry_address reference, and the Entry is accessible.
@@ -342,7 +342,7 @@ impl ts_rs::TS for SignedHashedWithoutGenerics {
 /// A chain record: a signed action plus its entry, if the action has one.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/record.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/record.ts"))]
 pub struct Record {
     /// The signed, hashed action for this record.
     pub signed_action: SignedHashed<Action>,

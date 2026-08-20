@@ -85,7 +85,7 @@ impl From<EntryHashed> for Entry {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 #[serde(tag = "entry_type", content = "entry")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/entry.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/entry.ts"))]
 pub enum Entry {
     /// The `Agent` system entry, the third entry of every source chain,
     /// which grants authoring capability for this agent.

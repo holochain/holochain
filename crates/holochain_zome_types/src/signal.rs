@@ -9,7 +9,7 @@ use holochain_serialized_bytes::prelude::*;
 #[repr(transparent)]
 #[serde(transparent)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct AppSignal(ExternIO);
 
 impl AppSignal {

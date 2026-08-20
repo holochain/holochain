@@ -35,7 +35,7 @@ pub struct Kitsune2NetworkMetricsRequest {
 /// Network metrics from Kitsune2.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct Kitsune2NetworkMetrics {
     /// A summary of the fetch queue.
     ///
@@ -55,7 +55,7 @@ pub struct Kitsune2NetworkMetrics {
 /// Summary of a local agent's network state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct LocalAgentSummary {
     /// The agent's public key.
     pub agent: holo_hash::AgentPubKey,
@@ -78,7 +78,7 @@ pub struct LocalAgentSummary {
 /// There is a [`DnaHash`] instead of a [`Space`](kitsune2_api::Space) in the `blocked_message_counts` field.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct HolochainTransportStats {
     /// Stats for a transport connection.
     pub transport_stats: TransportStats,
@@ -102,7 +102,7 @@ pub struct HolochainTransportStats {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(untagged)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum DhtArc {
     /// No DHT locations are contained within this arc.
     #[default]
@@ -128,7 +128,7 @@ impl From<kitsune2_api::DhtArc> for DhtArc {
 /// url strings respectively.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct FetchStateSummary {
     /// The op ids that are currently being fetched, each mapped to the peer urls
     /// they could be requested from.
@@ -153,7 +153,7 @@ impl From<kitsune2_api::FetchStateSummary> for FetchStateSummary {
 /// Mirror of `kitsune2_api::GossipRoundStateSummary`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct GossipRoundStateSummary {
     /// The URL of the peer with which the round is initiated.
     pub session_with_peer: String,
@@ -170,7 +170,7 @@ impl From<kitsune2_api::GossipRoundStateSummary> for GossipRoundStateSummary {
 /// Mirror of `kitsune2_api::DhtSegmentState`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct DhtSegmentState {
     /// The top hash of the DHT ring segment.
     #[serde(with = "serde_bytes")]
@@ -200,7 +200,7 @@ impl From<kitsune2_api::DhtSegmentState> for DhtSegmentState {
 /// Mirror of `kitsune2_api::PeerMeta`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct PeerMeta {
     /// The timestamp of the last gossip round.
     pub last_gossip_timestamp: Option<Timestamp>,
@@ -253,7 +253,7 @@ impl From<kitsune2_api::PeerMeta> for PeerMeta {
 /// Mirror of `kitsune2_api::GossipStateSummary`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct GossipStateSummary {
     /// The current initiated round summary.
     pub initiated_round: Option<GossipRoundStateSummary>,
@@ -290,7 +290,7 @@ impl From<kitsune2_api::GossipStateSummary> for GossipStateSummary {
 /// Mirror of `kitsune2_api::TransportConnectionStats`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct TransportConnectionStats {
     /// The public key of the remote peer.
     pub pub_key: String,
@@ -325,7 +325,7 @@ impl From<kitsune2_api::TransportConnectionStats> for TransportConnectionStats {
 /// Mirror of `kitsune2_api::TransportStats`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct TransportStats {
     /// The networking backend that is in use.
     pub backend: String,
@@ -352,7 +352,7 @@ impl From<kitsune2_api::TransportStats> for TransportStats {
 /// Mirror of `kitsune2_api::MessageBlockCount`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct MessageBlockCount {
     /// Count of incoming messages that have been blocked and dropped.
     pub incoming: u32,
@@ -571,7 +571,7 @@ mod ts_export {
         // `DhtArc` is `#[serde(untagged)]`: `Empty` -> null, `Arc(a, b)` -> [a,
         // b]. Assert ts-rs's serde-compat produces that exact shape rather
         // than assuming it handles untagged enums correctly.
-        let cfg = ts_rs::Config::from_env();
+        let cfg = ts_rs::Config::default();
         assert_eq!(DhtArc::inline(&cfg), "null | [number, number]");
     }
 }

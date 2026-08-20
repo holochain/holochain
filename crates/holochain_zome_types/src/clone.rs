@@ -25,7 +25,7 @@ pub struct CreateCloneCellInput {
 /// Cloned cell that was created from a provisioned cell at runtime.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "types.ts"))]
 pub struct ClonedCell {
     /// The cell's identifying data
     pub cell_id: CellId,
@@ -45,7 +45,7 @@ pub struct ClonedCell {
 #[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "types.ts"))]
 pub enum CloneCellId {
     /// Clone id consisting of role name and clone index.
     CloneId(CloneId),

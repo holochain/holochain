@@ -44,7 +44,7 @@ pub(crate) const MM: i64 = 1_000_000;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[cfg_attr(not(feature = "now"), derive(Debug))]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "types.ts"))]
 pub struct Timestamp(
     /// Microseconds from UNIX Epoch, positive or negative
     pub i64,

@@ -71,7 +71,7 @@ use serde_with::serde_as;
 )]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct DnaManifestV0 {
     /// The friendly "name" of a Holochain DNA.
     pub name: String,
@@ -147,7 +147,7 @@ impl DnaManifestV0 {
 )]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct IntegrityManifest {
     /// A network seed for uniquifying this DNA. See [`DnaDef`].
     #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
@@ -167,7 +167,7 @@ pub struct IntegrityManifest {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct CoordinatorManifest {
     /// Coordinator zomes to install with this dna.
     pub zomes: Vec<ZomeManifest>,
@@ -177,7 +177,7 @@ pub struct CoordinatorManifest {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct ZomeManifest {
     /// Just a friendly name, no semantic meaning.
     pub name: ZomeName,
@@ -210,7 +210,7 @@ impl ZomeManifest {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct ZomeDependency {
     /// The name of the integrity zome this zome depends on.
     pub name: ZomeName,

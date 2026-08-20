@@ -10,7 +10,7 @@ use thiserror::Error;
 /// State and data of an ongoing countersigning session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub enum CountersigningSessionState {
     /// This is the entry state. Accepting a countersigning session through the HDK will immediately
     /// register the countersigning session in this state, for management by the countersigning workflow.
@@ -116,7 +116,7 @@ impl CountersigningSessionState {
 /// This tracks the numbers of attempts and the outcome of the most recent attempt.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct SessionResolutionSummary {
     /// The reason why session resolution is required.
     pub required_reason: ResolutionRequiredReason,
@@ -145,7 +145,7 @@ impl Default for SessionResolutionSummary {
 /// The reason why a countersigning session can not be resolved automatically and requires manual resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub enum ResolutionRequiredReason {
     /// The session has timed out, so we should try to resolve its state before abandoning.
     Timeout,
@@ -159,7 +159,7 @@ pub enum ResolutionRequiredReason {
 /// and the decisions are collected into [SessionResolutionOutcome::decisions].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct SessionResolutionOutcome {
     /// The agent who participated in the countersigning session and is the subject of this
     /// resolution outcome.
@@ -179,7 +179,7 @@ pub const NUM_AUTHORITIES_TO_QUERY: usize = 3;
 /// Decision about an incomplete countersigning session.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub enum SessionCompletionDecision {
     /// Evidence found on the network that this session completed successfully.
     Complete(Box<SignedActionHashed>),

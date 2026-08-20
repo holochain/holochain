@@ -22,7 +22,7 @@ use inline_zome::InlineIntegrityZome;
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "full-dna-def", derive(shrinkwraprs::Shrinkwrap))]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct Zome<T: Send + Sync = ZomeDef> {
     pub name: ZomeName,
     #[cfg_attr(feature = "full-dna-def", shrinkwrap(main_field))]
@@ -161,7 +161,7 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
 // TODO: move to `holochain_types`
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct WasmZomeDef {
     /// The WasmHash representing the WASM byte code for this zome.
     pub wasm_hash: holo_hash::WasmHash,
@@ -174,7 +174,7 @@ pub struct WasmZomeDef {
 #[cfg(feature = "full-dna-def")]
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct InlineZomeDef {
     pub inline_hash: holo_hash::InlineHash,
 
@@ -195,7 +195,7 @@ pub struct InlineZomeDef {
 // TODO: move to `holochain_types`
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum ZomeDef {
     /// A zome defined by Wasm bytecode
     Wasm(WasmZomeDef),
@@ -207,12 +207,12 @@ pub enum ZomeDef {
 
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct IntegrityZomeDef(ZomeDef);
 
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct CoordinatorZomeDef(ZomeDef);
 
 impl IntegrityZomeDef {

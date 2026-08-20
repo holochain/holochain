@@ -21,7 +21,7 @@ mod test;
     derive_more::From,
 )]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct DnaBundle(Bundle<ValidatedDnaManifest>);
 
 impl DnaBundle {

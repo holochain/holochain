@@ -122,14 +122,14 @@ mod ts_tests {
     use ts_rs::TS;
 
     #[derive(Debug, Serialize, Deserialize, ts_rs::TS)]
-    #[ts(export, export_to = "api/admin/types.ts")]
+    #[ts(export_to = "api/admin/types.ts")]
     struct TestManifestTs {
         value: String,
     }
 
     #[test]
     fn name_and_decl_are_a_real_generic_declaration() {
-        let cfg = ts_rs::Config::from_env();
+        let cfg = ts_rs::Config::default();
 
         assert_eq!(
             Bundle::<TestManifestTs>::name(&cfg),
@@ -139,12 +139,6 @@ mod ts_tests {
             Bundle::<TestManifestTs>::decl(&cfg),
             "type Bundle<M> = { manifest: M, resources: ResourceMap };"
         );
-    }
-
-    #[test]
-    fn export_bindings_manual() {
-        let cfg = ts_rs::Config::from_env();
-        Bundle::<TestManifestTs>::export_all(&cfg).unwrap();
     }
 }
 

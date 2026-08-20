@@ -48,7 +48,8 @@ pub use storage_info::*;
 
 /// Exports the complete TypeScript binding tree for the conductor API.
 ///
-/// Single entry point behind `make ts-bindings`. Exports the wire roots
+/// Single entry point behind `hc export-ts-bindings` (and `make
+/// ts-bindings`). Exports the wire roots
 /// ([`AdminRequest`], [`AdminResponse`], [`AppRequest`], [`AppResponse`],
 /// `holochain_types::signal::Signal`),
 /// [`JsonDump`] (carried as a JSON string by [`AdminResponse::StateDumped`],

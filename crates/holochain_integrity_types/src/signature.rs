@@ -13,7 +13,7 @@ pub const SIGNATURE_BYTES: usize = 64;
 // But that is not what clippy is complaining about here.
 #[allow(clippy::derived_hash_with_manual_eq)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "types.ts"))]
 pub struct Signature(
     #[cfg_attr(feature = "ts_rs", ts(type = "Uint8Array"))] pub [u8; SIGNATURE_BYTES],
 );

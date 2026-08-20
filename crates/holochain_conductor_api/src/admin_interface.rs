@@ -20,7 +20,7 @@ use std::collections::{BTreeMap, HashMap};
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum AdminRequest {
     /// Set up and register one or more new admin interfaces
     /// as specified by a list of configurations.
@@ -476,7 +476,7 @@ pub enum AdminRequest {
 #[cfg_attr(test, derive(Clone))]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum AdminResponse {
     /// Can occur in response to any [`AdminRequest`].
     ///
@@ -649,7 +649,7 @@ pub type CompatibleCells =
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum ExternalApiWireError {
     // TODO: B-01506 Constrain these errors so they are relevant to
     // application developers and what they would need
@@ -687,7 +687,7 @@ impl ExternalApiWireError {
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum AppStatusFilter {
     /// Filter on apps which are Enabled.
     Enabled,
@@ -704,7 +704,7 @@ pub enum AppStatusFilter {
 /// Informational response for listing app interfaces.
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct AppInterfaceInfo {
     /// The port that the app interface is listening on.
     pub port: u16,
@@ -723,7 +723,7 @@ pub struct AppInterfaceInfo {
 /// Request payload for [AdminRequest::IssueAppAuthenticationToken].
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct IssueAppAuthenticationTokenPayload {
     /// The app ID to issue a connection token for.
     pub installed_app_id: InstalledAppId,
@@ -832,7 +832,7 @@ holo_hash::ts_alias!(
 /// Response payload for [AdminResponse::AppAuthenticationTokenIssued].
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct AppAuthenticationTokenIssued {
     /// A token issued by the conductor that can be used to authenticate a connection to an app interface.
     /// This is expected to be passed from the caller of the admin interface to the client that will
