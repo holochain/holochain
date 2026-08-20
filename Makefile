@@ -127,8 +127,10 @@ test-workspace-wasmer-wasmi:
 # Writes the TypeScript binding tree with `hc export-ts-bindings`, which
 # stages the whole tree in one process (ts-rs only merges declarations sharing
 # an output file within a single process) before replacing the output
-# directory. `unstable-countersigning` adds the countersigning app API.
-# See holochain_conductor_api::export_ts_bindings.
+# directory. `hc`'s `ts_rs` feature builds in the subcommand; it is off by
+# default so ordinary workspace builds don't compile the type crates with
+# `ts_rs`. `unstable-countersigning` implies `ts_rs` and additionally adds the
+# countersigning app API. See holochain_conductor_api::export_ts_bindings.
 ts-bindings:
 	cargo run -p holochain_cli --locked --features unstable-countersigning -- \
 		export-ts-bindings --out-dir $(or $(TS_BINDINGS_DIR),./bindings)
@@ -137,8 +139,8 @@ ts-bindings:
 # API enabled. The ts-bindings prerequisite's real purpose here is to build
 # hc with the right features first, so the tests under crates/hc/tests/ pick
 # up that binary via CARGO_BIN_EXE_hc instead of a stale one. The ts_rs-gated
-# tests of the type crates run in test-workspace already, because hc enables
-# ts_rs unconditionally.
+# tests of the type crates only run here, not in test-workspace: hc's ts_rs
+# feature is off by default there, so the type crates compile without it.
 ts-bindings-test: ts-bindings
 	cargo test -p holochain_cli --features unstable-countersigning
 

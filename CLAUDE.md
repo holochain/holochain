@@ -67,15 +67,20 @@ Some crates (`holo_hash`, `holochain_timestamp`, `holochain_nonce`,
 `holochain_zome_types`, `holochain_types`, `holochain_conductor_api`) carry
 an opt-in `ts_rs` cargo feature that derives TypeScript bindings
 (`ts_rs::TS`) for the conductor's wire API, consumed by
-`holochain-client-js`. It is off by default. The `hc` crate is the
-exception: it depends on `holochain_conductor_api` with `ts_rs` always on,
-because `hc export-ts-bindings` is a built-in subcommand. Through feature
-unification (resolver 2) that means every cargo invocation whose package
-set includes `holochain_cli` — in particular `make build-workspace`, `make
-test-workspace`, `static-clippy` and `static-doc` — compiles the type
-crates with `ts_rs`, so `ts_rs`-gated code must be warning-free and its
-tests must be cheap and side-effect free. `cargo test -p <type crate>`
-alone, without `holochain_cli` in the package set, still has it off.
+`holochain-client-js`. It is off by default everywhere, including in `hc`:
+`hc export-ts-bindings` is a built-in subcommand, but it only compiles in
+when `hc` is built with its own opt-in `ts_rs` feature (`holochain_cli/ts_rs`).
+Ordinary workspace builds — `make build-workspace`, `make test-workspace`,
+`static-clippy`, `static-doc` — build `holochain_cli` with its default
+features, which don't include `ts_rs`, so the type crates compile without
+`ts_rs` there too. Through feature unification (resolver 2), only an
+invocation that explicitly turns on `holochain_cli/ts_rs` (`make
+ts-bindings`, `make ts-bindings-test`, or `cargo build -p holochain_cli
+--features ts_rs`) compiles the type crates with `ts_rs`, so `ts_rs`-gated
+code must still be warning-free and its tests must be cheap and side-effect
+free — that build just isn't the default workspace one any more. `cargo
+test -p <type crate>` alone, without `holochain_cli/ts_rs` in the feature
+set, still has it off.
 
 **Criterion — does a type need a TS export?** Only if it is reachable from
 the wire surface: transitively referenced (directly or via a field, enum
@@ -128,7 +133,8 @@ need a TS export even if they resemble an exported type.
   `export_ts_bindings` function (crate root or `ts` module), which chains
   its in-set deps' functions; when adding one, register it there. The
   whole tree is written by the `hc export-ts-bindings` subcommand
-  (`crates/hc/src/export_ts_bindings.rs`; `make ts-bindings` runs
+  (`crates/hc/src/export_ts_bindings.rs`, built into `hc` only behind `hc`'s
+  own opt-in `ts_rs` feature; `make ts-bindings` runs
   `cargo run -p holochain_cli --features unstable-countersigning --
   export-ts-bindings --out-dir ./bindings`) because ts-rs only merges
   declarations sharing an output file within one process — never split the
@@ -138,27 +144,34 @@ need a TS export even if they resemble an exported type.
   bypassable). `make ts-bindings-test` runs the export
   and the `hc` integration tests under `crates/hc/tests/` that check the
   written tree (file layout, `@public` tags, `number`/`.js` dialect,
-  countersigning API presence) — CI runs this target; the type crates'
-  `ts_rs`-gated tests run in `make test-workspace` through feature
-  unification.
+  countersigning API presence) — CI runs this target; that's also where the
+  type crates' `ts_rs`-gated tests run, since `hc`'s `ts_rs` feature (and so
+  theirs, through feature unification) is off in `make test-workspace`.
 - The subcommand lives in `hc` rather than a dedicated binary so that
   holochain-client-js can run it from Holonix's stock `packages.hc`
   (built with `--manifest-path crates/hc/Cargo.toml --bin hc`) at a pinned
-  revision, with no feature or `--bin` override. `hc` pulls in neither the
-  `holochain` crate nor a wasmer backend, so the export does not compile a
-  WASM engine.
+  revision, overridden with `--features ts_rs` (or `unstable-countersigning`
+  for the countersigning app API too) — no `--bin` override needed. `hc`
+  pulls in neither the `holochain` crate nor a wasmer backend, so the export
+  does not compile a WASM engine.
 - The subcommand sets the TypeScript dialect in code (`number` for 64-bit
   integers, `.js` import extensions) and takes only the output directory
   from `--out-dir` (default `./bindings`). There is no `.cargo/config.toml`
   `TS_RS_*` block any more; nothing reads `TS_RS_EXPORT_DIR`.
-- `make ts-bindings` builds `hc` with `unstable-countersigning` so the
-  countersigning app API reaches the bindings (its session state types are
-  exported regardless). The feature cannot be on by default in `hc`: a
-  workspace build would unify it into `holochain`'s
-  `holochain_conductor_api` while `holochain`'s own feature is off, and
-  `holochain`'s exhaustive match on `AppRequest` would stop compiling.
-  Types and fields gated behind the remaining `unstable-*` features are
-  compiled out of the export build and absent from the bindings.
+- `hc`'s `ts_rs` feature (which builds in the subcommand) is off by default:
+  turning it on for every workspace build would, through feature
+  unification, compile the type crates with `ts_rs` for `make
+  build-workspace`, `make test-workspace`, `static-clippy` and `static-doc`
+  too. `make ts-bindings` instead builds `hc` with `unstable-countersigning`,
+  which implies `ts_rs` and additionally reaches the countersigning app API
+  (its session state types are exported regardless of the feature). Neither
+  feature can be on by default in `hc`: besides the `ts_rs` unification cost
+  above, `unstable-countersigning` on by default would unify it into
+  `holochain`'s `holochain_conductor_api` while `holochain`'s own feature is
+  off, and `holochain`'s exhaustive match on `AppRequest` would stop
+  compiling. Types and fields gated behind the remaining `unstable-*`
+  features are compiled out of the export build and absent from the
+  bindings.
 - Zome call return types (`Record`, `Details`, `Link`, `AgentActivity`) are
   outside the wire closure — a zome call carries them as an opaque
   `ExternIO` the client decodes itself — but are exported anyway, because

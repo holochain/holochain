@@ -1,9 +1,10 @@
 //! The `hc export-ts-bindings` subcommand.
 //!
 //! Writes the conductor API TypeScript binding tree consumed by
-//! holochain-client-js. It is a built-in subcommand of every `hc` build so a
-//! consumer can regenerate the types against the Holochain revision its own
-//! flake pins, using Holonix's `packages.hc` as is.
+//! holochain-client-js. It is built into `hc` behind the opt-in `ts_rs`
+//! Cargo feature (off by default) so a consumer can regenerate the types
+//! against the Holochain revision its own flake pins, by building `hc` with
+//! `--features ts_rs`.
 //!
 //! The TypeScript dialect is fixed here rather than read from the
 //! environment: the tree targets holochain-client-js, which needs plain

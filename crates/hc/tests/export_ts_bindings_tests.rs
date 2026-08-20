@@ -1,5 +1,10 @@
 //! Integration tests for `hc export-ts-bindings`.
 //!
+//! This target has `required-features = ["ts_rs"]` in `hc`'s `Cargo.toml`,
+//! since the subcommand under test only exists in a `ts_rs`-featured build;
+//! `cargo test -p holochain_cli --features ts_rs` (or `unstable-countersigning`,
+//! which implies it) is what builds and runs it.
+//!
 //! These live under `tests/`, not as `hc`'s lib unit tests, so that
 //! `assert_cmd::Command::cargo_bin("hc")` resolves through Cargo's
 //! `CARGO_BIN_EXE_hc` environment variable (set only for integration-test
