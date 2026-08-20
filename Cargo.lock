@@ -3300,6 +3300,7 @@ dependencies = [
  "rmp-serde",
  "rustls",
  "serde",
+ "serde_bytes",
  "serde_json",
  "socket2",
  "sqlx",
