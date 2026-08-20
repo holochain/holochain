@@ -85,8 +85,14 @@ impl_from! {
 pub const DIRECT_SIGNAL_MAX_SIZE: usize = 1024 * 1024;
 
 /// Wrapper type for transmitting a signed direct signal over the network.
+///
+/// The payload is encoded as msgpack `bin` (one byte per byte) and the sender
+/// signs the SHA2-512 hash of the encoding, never the raw bytes: lair signing
+/// frames are capped at 8 KiB. The `bin` encoding starts with a msgpack bin
+/// header, so the signed hash can never collide with a signed zome call,
+/// whose parameters encode as a msgpack map.
 #[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
-pub struct DirectSignal(pub Vec<u8>);
+pub struct DirectSignal(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 #[cfg(test)]
 mod tests {
@@ -123,5 +129,28 @@ mod tests {
             let recovered: SystemSignal = serde_json::from_str(&json).unwrap();
             assert_eq!(signal, &recovered);
         }
+    }
+
+    /// A max-size payload must encode as msgpack `bin` (1 byte per payload
+    /// byte plus a 5-byte bin32 header), never as an array of ints, or the
+    /// receiver's pre-decode size bound would reject legitimate signals.
+    #[test]
+    fn direct_signal_max_payload_encodes_as_bin() {
+        // 0xFF forces the worst case: an array-of-ints encoding would need
+        // two bytes per element and blow past the bound.
+        let signal = DirectSignal(vec![0xFF; DIRECT_SIGNAL_MAX_SIZE]);
+
+        let bytes = holochain_serialized_bytes::encode(&signal).unwrap();
+
+        assert!(bytes.len() >= DIRECT_SIGNAL_MAX_SIZE);
+        assert!(
+            bytes.len() <= DIRECT_SIGNAL_MAX_SIZE + 5,
+            "encoded direct signal is {} bytes, bound is {}",
+            bytes.len(),
+            DIRECT_SIGNAL_MAX_SIZE + 5
+        );
+
+        let decoded: DirectSignal = holochain_serialized_bytes::decode(&bytes).unwrap();
+        assert_eq!(decoded.0, signal.0);
     }
 }

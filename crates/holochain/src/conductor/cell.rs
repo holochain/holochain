@@ -30,7 +30,6 @@ use error::CellError;
 use futures::future::FutureExt;
 use holo_hash::*;
 use holochain_cascade::authority;
-use holochain_keystore::AgentPubKeyExt;
 use holochain_nonce::fresh_nonce;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pError, HolochainP2pResult};
@@ -432,30 +431,31 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         signature: Signature,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            // Add 3 to allow for msgpack overhead for an "array 16"
-            if signal.len() > DIRECT_SIGNAL_MAX_SIZE + 3 {
-                let signal_length = signal.len();
+            // Add 5 for the msgpack bin32 header of the encoded payload.
+            if signal.len() > DIRECT_SIGNAL_MAX_SIZE + 5 {
                 warn!(
-                    "Received signal payload that is {signal_length:?} > {}",
-                    DIRECT_SIGNAL_MAX_SIZE + 3
+                    "Received direct signal of {len} bytes, limit is {limit}",
+                    len = signal.len(),
+                    limit = DIRECT_SIGNAL_MAX_SIZE + 5
                 );
                 return Err(HolochainP2pError::other(
-                    "Received signal payload that was too long",
+                    "Received direct signal that was too long",
+                ));
+            }
+
+            // Verify against the hash of the exact bytes received, as for zome calls, before
+            // spending any work on decoding.
+            let valid_sig = is_valid_signature(&from_agent, &signal, &signature)
+                .await
+                .map_err(HolochainP2pError::other)?;
+            if !valid_sig {
+                warn!("Received direct signal with an invalid signature");
+                return Err(HolochainP2pError::other(
+                    "Received direct signal with an invalid signature",
                 ));
             }
 
             let signal: DirectSignal = decode(&signal).map_err(HolochainP2pError::other)?;
-
-            let valid_sig = from_agent
-                .verify_signature(&signature, &signal)
-                .await
-                .map_err(HolochainP2pError::other)?;
-            if !valid_sig {
-                warn!("Received signal payload with an invalid signature");
-                return Err(HolochainP2pError::other(
-                    "Received signal with an invalid signature",
-                ));
-            }
 
             if let Err(e) = self.signal_tx.send(Signal::AppDirect {
                 cell_id: CellId::new(dna_hash, to_agent),
