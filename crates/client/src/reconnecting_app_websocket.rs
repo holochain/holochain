@@ -36,6 +36,10 @@ pub struct ReconnectingAppWebsocketBuilder {
 impl ReconnectingAppWebsocketBuilder {
     /// Sets the origin sent when connecting, which must be admitted by the
     /// app interface's allowed origins.
+    ///
+    /// The same origin is sent when connecting to the admin interface, so it
+    /// has to be admitted by both interfaces. There is no way to give the two
+    /// different origins.
     pub fn origin(mut self, origin: impl Into<String>) -> Self {
         self.origin = Some(origin.into());
         self
@@ -83,6 +87,12 @@ impl ReconnectingAppWebsocketBuilder {
     /// interface or the app itself is still being set up. It never gives up;
     /// bound it by wrapping the call in [`tokio::time::timeout`], which works
     /// because the retry loop is cancel safe.
+    ///
+    /// A permanent misconfiguration, such as an app id that is not installed
+    /// or an origin no app interface admits, retries exactly as a conductor
+    /// that is merely down does. To tell the two apart, connect with
+    /// [`ReconnectingAppWebsocketBuilder::connect`] or bound this call with a
+    /// timeout.
     pub async fn connect_with_retry(self) -> ConductorApiResult<ReconnectingAppWebsocket> {
         let admin_ws = ReconnectingAdminWebsocket::connect_with_retry(
             self.admin_addr,
@@ -143,7 +153,7 @@ impl ReconnectingAppWebsocketBuilder {
                     if connected_at.elapsed() < config.initial_delay {
                         let delay = delay_for_attempt(flaps, &config);
                         tracing::warn!(
-                            target = "holochain_client::app",
+                            target: "holochain_client::app",
                             flaps,
                             ?delay,
                             "connection closed shortly after connecting, backing off before reconnecting"
@@ -166,12 +176,16 @@ impl ReconnectingAppWebsocketBuilder {
                         })
                         .await;
 
-                    // Report the gap before signals start flowing again, so a
-                    // consumer re-syncs against a live connection.
+                    // The connection is published before the gap is
+                    // reported, so a consumer woken by `Interrupted` re-syncs
+                    // against a live connection. A signal arriving before the
+                    // forwarder is registered is dropped, which is what the
+                    // `Interrupted` that precedes it tells the consumer to
+                    // recover.
+                    current.write().replace(app_ws.clone());
                     let _ = signal_tx.send(SignalEvent::Interrupted);
                     forward_signals(&app_ws, signal_tx.clone()).await;
 
-                    current.write().replace(app_ws);
                     closed = next_closed;
                 }
             }
