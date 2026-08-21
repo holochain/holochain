@@ -1,5 +1,6 @@
 use holochain::sweettest::SweetConductor;
 use holochain_client::{AdminWebsocket, ConductorApiError};
+use holochain_websocket::{WebsocketConfig, WebsocketListener};
 use holochain_zome_types::prelude::ExternIO;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -184,7 +185,7 @@ async fn connect_with_retry_waits_for_the_conductor() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_requests_fail_fast_while_disconnected() {
-    let (mut conductor, admin_port, app_id, signer) =
+    let (mut conductor, admin_port, app_id, signer, _app_port) =
         common::install_fixture_app_with_fixed_admin_port().await;
 
     let app_ws = holochain_client::ReconnectingAppWebsocket::builder(
@@ -218,12 +219,12 @@ async fn app_requests_fail_fast_while_disconnected() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn signals_resume_on_the_same_subscription_after_a_restart() {
-    let (mut conductor, admin_port, app_id, signer) =
+    let (mut conductor, admin_port, app_id, signer, app_port) =
         common::install_fixture_app_with_fixed_admin_port().await;
 
     let app_ws = holochain_client::ReconnectingAppWebsocket::builder(
         SocketAddr::new(Ipv4Addr::LOCALHOST.into(), admin_port),
-        app_id,
+        app_id.clone(),
         signer,
     )
     .origin("my-service")
@@ -255,6 +256,14 @@ async fn signals_resume_on_the_same_subscription_after_a_restart() {
     assert!(
         app_ws.current().is_ok(),
         "Interrupted arrived before the connection was published"
+    );
+
+    // The interface was attached on port 0, so the restart puts it on a
+    // different port and the reconnect only succeeds by rediscovering it.
+    let restarted_app_port = common::discover_fixture_app_port(admin_port, &app_id).await;
+    assert_ne!(
+        restarted_app_port, app_port,
+        "app interface port did not move across the restart, so rediscovery is untested"
     );
 
     // And real signals flow again on that same subscription.
@@ -358,4 +367,89 @@ async fn dropping_the_connection_stops_reconnecting() {
     );
 
     acceptor.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_connection_that_drops_immediately_is_backed_off() {
+    // A peer that completes the websocket handshake and then closes drives the
+    // uptime guard, which the handshake-failing paths do not reach because
+    // they back off inside `connect_with_backoff` instead.
+    let listener = WebsocketListener::bind(
+        Arc::new(WebsocketConfig::LISTENER_DEFAULT),
+        (Ipv4Addr::LOCALHOST, 0),
+    )
+    .await
+    .unwrap();
+    let port = listener.local_addrs().unwrap()[0].port();
+
+    // Held long enough that the client is certainly connected, and far short
+    // of `initial_delay` so every connection counts as short lived.
+    const HOLD: Duration = Duration::from_millis(200);
+    const INITIAL_DELAY: Duration = Duration::from_secs(2);
+
+    let accepted: Arc<std::sync::Mutex<Vec<std::time::Instant>>> = Arc::default();
+    let rejected = Arc::new(AtomicUsize::new(0));
+    let server = tokio::spawn({
+        let accepted = accepted.clone();
+        let rejected = rejected.clone();
+        async move {
+            loop {
+                match listener.accept().await {
+                    Ok(connection) => {
+                        accepted.lock().unwrap().push(std::time::Instant::now());
+                        tokio::time::sleep(HOLD).await;
+                        drop(connection);
+                    }
+                    Err(_) => {
+                        rejected.fetch_add(1, Ordering::SeqCst);
+                    }
+                }
+            }
+        }
+    });
+
+    let _admin_ws = holochain_client::ReconnectingAdminWebsocket::connect(
+        (Ipv4Addr::LOCALHOST, port),
+        Some("flap-test".to_string()),
+        holochain_client::ReconnectConfig {
+            initial_delay: INITIAL_DELAY,
+            max_delay: INITIAL_DELAY,
+            escalate_after: u32::MAX,
+        },
+    )
+    .await
+    .unwrap();
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    loop {
+        if accepted.lock().unwrap().len() >= 3 {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "client did not reconnect three times"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    // Every dial completed a handshake, so each reconnect followed a live
+    // connection rather than a failed connect.
+    assert_eq!(rejected.load(Ordering::SeqCst), 0);
+
+    // Without the guard the reconnect would follow the close immediately, so
+    // the gaps would be about `HOLD`.
+    let gaps: Vec<Duration> = accepted
+        .lock()
+        .unwrap()
+        .windows(2)
+        .map(|w| w[1] - w[0])
+        .collect();
+    for gap in &gaps {
+        assert!(
+            *gap >= HOLD + INITIAL_DELAY.mul_f64(0.75),
+            "reconnected after {gap:?}, which is too soon to have been delayed by the guard"
+        );
+    }
+
+    server.abort();
 }
