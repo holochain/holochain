@@ -2,6 +2,7 @@ mod admin_websocket;
 mod app_websocket;
 mod app_websocket_inner;
 mod error;
+mod reconnect;
 mod signing;
 mod util;
 
@@ -24,6 +25,7 @@ pub use holochain_zome_types::prelude::{
     CellId, ClonedCell, ExternIO, GrantedFunctions, Timestamp,
 };
 pub use kitsune2_api::Url;
+pub use reconnect::ReconnectConfig;
 pub use signing::client_signing::{ClientAgentSigner, SigningCredentials};
 #[cfg(feature = "lair_signing")]
 pub use signing::lair_signing::LairAgentSigner;
