@@ -70,7 +70,7 @@ where
         match factory().await {
             Ok(value) => {
                 if attempt > 0 {
-                    tracing::info!(target = label, attempts = attempt, "reconnected");
+                    tracing::info!(connection = label, attempts = attempt, "reconnected");
                 }
                 return value;
             }
@@ -78,14 +78,14 @@ where
                 let delay = delay_for_attempt(attempt, config);
                 if attempt >= config.escalate_after {
                     tracing::error!(
-                        target = label,
+                        connection = label,
                         attempt,
                         ?delay,
                         error = %err,
                         "reconnect failing persistently, operator attention needed"
                     );
                 } else {
-                    tracing::warn!(target = label, attempt, ?delay, error = %err, "reconnect attempt failed");
+                    tracing::warn!(connection = label, attempt, ?delay, error = %err, "reconnect attempt failed");
                 }
                 attempt = attempt.saturating_add(1);
                 tokio::time::sleep(delay).await;
