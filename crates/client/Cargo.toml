@@ -33,11 +33,12 @@ parking_lot = "0.12.1"
 rand = { version = "0.8" }
 serde = "1.0"
 thiserror = "2.0"
-tokio = { version = "1.36", features = ["rt", "sync", "time", "macros"] }
+tokio = { version = "1.36", features = ["rt", "sync", "time"] }
 tracing = "0.1"
 
 [dev-dependencies]
 bytes = "1.10.1"
+tokio = { version = "1.36", features = ["macros"] }
 mr_bundle = { version = "^0.8.0-dev.1", path = "../mr_bundle" }
 holochain = { version = "^0.8.0-dev.2", path = "../holochain", default-features = false, features = [
   "sweettest",
