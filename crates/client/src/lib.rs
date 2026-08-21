@@ -1,4 +1,5 @@
 mod admin_websocket;
+mod app_connect;
 mod app_websocket;
 mod app_websocket_inner;
 mod error;
@@ -9,6 +10,8 @@ mod signing;
 mod util;
 
 pub use admin_websocket::{AdminWebsocket, AuthorizeSigningCredentialsPayload, EnableAppResponse};
+#[cfg(feature = "test_utils")]
+pub use app_connect::discover_app_interface_port as discover_app_interface_port_for_test;
 pub use app_websocket::{AppWebsocket, CallZomeOptions, ZomeCallTarget};
 pub use error::{ConductorApiError, ConductorApiResult};
 pub use holochain_conductor_api::{

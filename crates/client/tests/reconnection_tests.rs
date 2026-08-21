@@ -78,3 +78,49 @@ async fn admin_requests_resume_after_a_conductor_restart() {
         tokio::time::sleep(Duration::from_millis(200)).await;
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_interface_discovery_finds_a_matching_interface() {
+    let (conductor, admin_port) = common::conductor_with_fixed_admin_port().await;
+
+    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port), None)
+        .await
+        .unwrap();
+
+    let app_id: holochain_client::InstalledAppId = "test-app".into();
+    let attached_port = admin_ws
+        .attach_app_interface(
+            0,
+            None,
+            holochain_client::AllowedOrigins::Origins(
+                vec!["my-service".to_string()].into_iter().collect(),
+            ),
+            Some(app_id.clone()),
+        )
+        .await
+        .unwrap();
+
+    let found = holochain_client::discover_app_interface_port_for_test(
+        &admin_ws,
+        &app_id,
+        Some("my-service"),
+    )
+    .await
+    .unwrap();
+    assert_eq!(found, attached_port);
+
+    // An origin the interface does not allow finds nothing.
+    let err = holochain_client::discover_app_interface_port_for_test(
+        &admin_ws,
+        &app_id,
+        Some("other-service"),
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        matches!(err, ConductorApiError::AppInterfaceNotFound { .. }),
+        "got {err:?}"
+    );
+
+    drop(conductor);
+}
