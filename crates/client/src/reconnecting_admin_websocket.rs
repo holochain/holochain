@@ -1,5 +1,5 @@
 use crate::error::{ConductorApiError, ConductorApiResult};
-use crate::reconnect::{connect_with_backoff, ReconnectConfig};
+use crate::reconnect::{connect_with_backoff, delay_for_attempt, ReconnectConfig};
 use crate::util::AbortOnDropHandle;
 use crate::AdminWebsocket;
 use holochain_websocket::{ConnectRequest, WebsocketConfig};
@@ -11,8 +11,12 @@ use std::sync::Arc;
 /// An admin websocket that re-establishes itself after the conductor restarts.
 ///
 /// Requests made while the connection is down fail with
-/// [`ConductorApiError::Disconnected`] rather than blocking. Reconnection never
-/// gives up; drop every clone of this handle to stop it.
+/// [`ConductorApiError::Disconnected`] rather than blocking. Between a
+/// connection dying and that being observed, a request can still be issued on
+/// the dead socket and fail with the underlying websocket error instead; both
+/// are retryable and callers need not distinguish them.
+///
+/// Reconnection never gives up; drop every clone of this handle to stop it.
 #[derive(Clone)]
 pub struct ReconnectingAdminWebsocket {
     current: Arc<RwLock<Option<AdminWebsocket>>>,
@@ -78,9 +82,29 @@ impl ReconnectingAdminWebsocket {
             let current = current.clone();
             async move {
                 let mut closed = closed;
+                let mut flaps: u32 = 0;
                 loop {
+                    let connected_at = std::time::Instant::now();
                     closed.closed().await;
                     current.write().take();
+
+                    // A connection accepted and then dropped straight away
+                    // would otherwise reconnect with no delay, because the
+                    // backoff counter only advances on failed connects. Count
+                    // a short-lived connection as a failed attempt.
+                    if connected_at.elapsed() < config.initial_delay {
+                        let delay = delay_for_attempt(flaps, &config);
+                        tracing::warn!(
+                            target = "holochain_client::admin",
+                            flaps,
+                            ?delay,
+                            "connection closed shortly after connecting, backing off before reconnecting"
+                        );
+                        flaps = flaps.saturating_add(1);
+                        tokio::time::sleep(delay).await;
+                    } else {
+                        flaps = 0;
+                    }
 
                     let (admin_ws, next_closed) =
                         connect_with_backoff("holochain_client::admin", &config, || {
