@@ -167,7 +167,6 @@ async fn test_integrity() {
 /// Test that a manifest with multiple integrity zomes and dependencies parses
 /// to the correct dna file.
 #[tokio::test]
-#[cfg_attr(target_os = "windows", ignore = "theres a hash mismatch - check crlf?")]
 #[cfg(not(feature = "unstable-migration"))]
 async fn test_multi_integrity() {
     let pack_dna = |path| async move {
@@ -272,7 +271,6 @@ async fn test_multi_integrity() {
 /// Test that a manifest with multiple integrity zomes and dependencies parses
 /// to the correct dna file.
 #[tokio::test]
-#[cfg_attr(target_os = "windows", ignore = "theres a hash mismatch - check crlf?")]
 #[cfg(feature = "unstable-migration")]
 async fn test_multi_integrity() {
     let pack_dna = |path| async move {
