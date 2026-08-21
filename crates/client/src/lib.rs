@@ -5,6 +5,7 @@ mod app_websocket_inner;
 mod error;
 mod reconnect;
 mod reconnecting_admin_websocket;
+mod reconnecting_app_websocket;
 mod signal_stream;
 mod signing;
 mod util;
@@ -32,6 +33,7 @@ pub use holochain_zome_types::prelude::{
 pub use kitsune2_api::Url;
 pub use reconnect::ReconnectConfig;
 pub use reconnecting_admin_websocket::ReconnectingAdminWebsocket;
+pub use reconnecting_app_websocket::{ReconnectingAppWebsocket, ReconnectingAppWebsocketBuilder};
 pub use signal_stream::{SignalEvent, SignalStream};
 pub use signing::client_signing::{ClientAgentSigner, SigningCredentials};
 #[cfg(feature = "lair_signing")]

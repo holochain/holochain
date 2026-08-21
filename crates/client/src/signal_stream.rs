@@ -2,7 +2,6 @@ use holochain_types::prelude::Signal;
 use tokio::sync::broadcast::{self, error::RecvError};
 
 /// How many signals a resilient connection buffers per subscriber.
-#[allow(dead_code)]
 pub(crate) const SIGNAL_CHANNEL_CAPACITY: usize = 1024;
 
 /// An item yielded by a [`SignalStream`].
@@ -40,7 +39,6 @@ impl SignalStream {
     }
 }
 
-#[allow(dead_code)]
 pub(crate) fn signal_stream(rx: broadcast::Receiver<SignalEvent>) -> SignalStream {
     SignalStream(rx)
 }

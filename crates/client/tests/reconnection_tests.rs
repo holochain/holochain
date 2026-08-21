@@ -1,11 +1,10 @@
 use holochain::sweettest::SweetConductor;
 use holochain_client::{AdminWebsocket, ConductorApiError};
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
 mod common;
-
-// `mod fixture;` arrives in a later task, with the tests that use it.
+mod fixture;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn admin_close_notify_fires_on_conductor_shutdown() {
@@ -123,4 +122,93 @@ async fn app_interface_discovery_finds_a_matching_interface() {
     );
 
     drop(conductor);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn connect_fails_fast_when_nothing_is_listening() {
+    let port = common::free_port();
+
+    let result = tokio::time::timeout(
+        Duration::from_secs(10),
+        holochain_client::ReconnectingAdminWebsocket::connect(
+            (Ipv4Addr::LOCALHOST, port),
+            None,
+            holochain_client::ReconnectConfig::default(),
+        ),
+    )
+    .await
+    .expect("connect hung instead of failing fast");
+
+    assert!(result.is_err());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn connect_with_retry_waits_for_the_conductor() {
+    // Reserve a port, then hand it to a conductor that starts only after the
+    // connect attempt is already retrying.
+    let port = common::free_port();
+
+    let connecting = tokio::spawn(async move {
+        holochain_client::ReconnectingAdminWebsocket::connect_with_retry(
+            (Ipv4Addr::LOCALHOST, port),
+            None,
+            holochain_client::ReconnectConfig::default(),
+        )
+        .await
+    });
+
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    assert!(
+        !connecting.is_finished(),
+        "connected before anything was listening"
+    );
+
+    let _conductor = common::conductor_on_admin_port(port).await;
+
+    let admin_ws = tokio::time::timeout(Duration::from_secs(60), connecting)
+        .await
+        .expect("connect_with_retry did not complete within 60s")
+        .unwrap()
+        .unwrap();
+
+    admin_ws
+        .current()
+        .unwrap()
+        .list_app_interfaces()
+        .await
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_requests_fail_fast_while_disconnected() {
+    let (mut conductor, admin_port, app_id, signer) =
+        common::install_fixture_app_with_fixed_admin_port().await;
+
+    let app_ws = holochain_client::ReconnectingAppWebsocket::builder(
+        SocketAddr::new(Ipv4Addr::LOCALHOST.into(), admin_port),
+        app_id,
+        signer,
+    )
+    .origin("my-service")
+    .connect()
+    .await
+    .unwrap();
+
+    app_ws.app_info().await.unwrap();
+
+    conductor.shutdown().await;
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        match app_ws.app_info().await {
+            Err(ConductorApiError::Disconnected) => break,
+            _ => {
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "never reported Disconnected"
+                );
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        }
+    }
 }
