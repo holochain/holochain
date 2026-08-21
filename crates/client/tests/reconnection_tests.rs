@@ -2,6 +2,8 @@ use holochain::sweettest::SweetConductor;
 use holochain_client::{AdminWebsocket, ConductorApiError};
 use holochain_zome_types::prelude::ExternIO;
 use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 mod common;
@@ -248,6 +250,13 @@ async fn signals_resume_on_the_same_subscription_after_a_restart() {
     .await;
     assert!(interrupted.is_ok(), "no Interrupted event after restart");
 
+    // The gap is reported only once the connection is live again, so a
+    // consumer re-syncing in response to it finds a usable socket.
+    assert!(
+        app_ws.current().is_ok(),
+        "Interrupted arrived before the connection was published"
+    );
+
     // And real signals flow again on that same subscription.
     let deadline = std::time::Instant::now() + Duration::from_secs(60);
     loop {
@@ -292,27 +301,61 @@ async fn signals_resume_on_the_same_subscription_after_a_restart() {
 async fn dropping_the_connection_stops_reconnecting() {
     let (mut conductor, admin_port) = common::conductor_with_fixed_admin_port().await;
 
+    // Short delays so several reconnect attempts land inside the test.
+    let config = holochain_client::ReconnectConfig {
+        initial_delay: Duration::from_millis(100),
+        max_delay: Duration::from_millis(200),
+        escalate_after: u32::MAX,
+    };
+
     let admin_ws = holochain_client::ReconnectingAdminWebsocket::connect(
         (Ipv4Addr::LOCALHOST, admin_port),
         None,
-        holochain_client::ReconnectConfig::default(),
+        config,
     )
     .await
     .unwrap();
 
     conductor.shutdown().await;
 
-    // Let the reconnect loop start failing, then drop the handle.
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // Stand in for the conductor so reconnect attempts are observable. Each
+    // accepted connection is one dial by the client; closing it immediately
+    // fails the client's websocket handshake, so it backs off and dials again.
+    let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, admin_port))
+        .await
+        .unwrap();
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let acceptor = tokio::spawn({
+        let attempts = attempts.clone();
+        async move {
+            while let Ok((stream, _)) = listener.accept().await {
+                attempts.fetch_add(1, Ordering::SeqCst);
+                drop(stream);
+            }
+        }
+    });
+
+    // The client dials repeatedly while the handle is alive.
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    while attempts.load(Ordering::SeqCst) < 3 {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "client never retried the connection"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
     drop(admin_ws);
 
-    // Nothing is left holding the conductor's port open, so a fresh listener
-    // can take it. This would fail if the reconnect task were still running
-    // and had won the race to reconnect.
+    // Let any dial already in flight finish, then confirm dialling has stopped.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let after_drop = attempts.load(Ordering::SeqCst);
     tokio::time::sleep(Duration::from_secs(2)).await;
-    let listener = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, admin_port));
-    assert!(
-        listener.is_ok(),
-        "port still in use after dropping the handle"
+    assert_eq!(
+        attempts.load(Ordering::SeqCst),
+        after_drop,
+        "reconnect attempts continued after the handle was dropped"
     );
+
+    acceptor.abort();
 }
