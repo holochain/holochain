@@ -1,5 +1,6 @@
 use holochain::sweettest::SweetConductor;
 use holochain_client::{AdminWebsocket, ConductorApiError};
+use holochain_zome_types::prelude::ExternIO;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
@@ -211,4 +212,107 @@ async fn app_requests_fail_fast_while_disconnected() {
             }
         }
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn signals_resume_on_the_same_subscription_after_a_restart() {
+    let (mut conductor, admin_port, app_id, signer) =
+        common::install_fixture_app_with_fixed_admin_port().await;
+
+    let app_ws = holochain_client::ReconnectingAppWebsocket::builder(
+        SocketAddr::new(Ipv4Addr::LOCALHOST.into(), admin_port),
+        app_id,
+        signer,
+    )
+    .origin("my-service")
+    .connect()
+    .await
+    .unwrap();
+
+    // Taken once, never re-registered.
+    let mut signals = app_ws.signals();
+
+    conductor.shutdown().await;
+    conductor.startup().await;
+
+    // The conductor restart moved the app interface port, because
+    // startup_app_interfaces restores an interface on its originally
+    // requested port. The subscription still resumes.
+    let interrupted = tokio::time::timeout(Duration::from_secs(90), async {
+        loop {
+            if let Some(holochain_client::SignalEvent::Interrupted) = signals.next().await {
+                return;
+            }
+        }
+    })
+    .await;
+    assert!(interrupted.is_ok(), "no Interrupted event after restart");
+
+    // And real signals flow again on that same subscription.
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    loop {
+        let Ok(app) = app_ws.current() else {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "app never became callable"
+            );
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            continue;
+        };
+        let cell_id = common::provisioned_cell_id(app.cached_app_info());
+        if app_ws
+            .call_zome(
+                cell_id.into(),
+                common::FIXTURE_ZOME_NAME.into(),
+                common::FIXTURE_EMIT_FN_NAME.into(),
+                ExternIO::encode(()).unwrap(),
+            )
+            .await
+            .is_ok()
+        {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "app never became callable"
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+
+    let signal = tokio::time::timeout(Duration::from_secs(30), signals.next())
+        .await
+        .expect("no signal after reconnect");
+    assert!(matches!(
+        signal,
+        Some(holochain_client::SignalEvent::Signal(_))
+    ));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn dropping_the_connection_stops_reconnecting() {
+    let (mut conductor, admin_port) = common::conductor_with_fixed_admin_port().await;
+
+    let admin_ws = holochain_client::ReconnectingAdminWebsocket::connect(
+        (Ipv4Addr::LOCALHOST, admin_port),
+        None,
+        holochain_client::ReconnectConfig::default(),
+    )
+    .await
+    .unwrap();
+
+    conductor.shutdown().await;
+
+    // Let the reconnect loop start failing, then drop the handle.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    drop(admin_ws);
+
+    // Nothing is left holding the conductor's port open, so a fresh listener
+    // can take it. This would fail if the reconnect task were still running
+    // and had won the race to reconnect.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let listener = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, admin_port));
+    assert!(
+        listener.is_ok(),
+        "port still in use after dropping the handle"
+    );
 }
