@@ -94,6 +94,21 @@ where
     }
 }
 
+/// Defines a method on a reconnecting wrapper that forwards to the live socket.
+///
+/// The body resolves the current connection, so a request made while the
+/// connection is down fails with [`crate::ConductorApiError::Disconnected`].
+macro_rules! delegate {
+    ($(#[$meta:meta])* $name:ident($($arg:ident: $ty:ty),* $(,)?) -> $ret:ty) => {
+        $(#[$meta])*
+        pub async fn $name(&self, $($arg: $ty),*) -> $crate::error::ConductorApiResult<$ret> {
+            self.current()?.$name($($arg),*).await
+        }
+    };
+}
+
+pub(crate) use delegate;
+
 #[cfg(test)]
 mod tests {
     use super::*;

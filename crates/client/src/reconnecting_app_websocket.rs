@@ -1,6 +1,6 @@
 use crate::app_connect::discover_app_interface_port;
 use crate::error::{ConductorApiError, ConductorApiResult};
-use crate::reconnect::{connect_with_backoff, delay_for_attempt, ReconnectConfig};
+use crate::reconnect::{connect_with_backoff, delay_for_attempt, delegate, ReconnectConfig};
 use crate::signal_stream::{signal_stream, SignalEvent, SignalStream, SIGNAL_CHANNEL_CAPACITY};
 use crate::util::{AbortOnDropHandle, ClosedNotify};
 use crate::{AdminWebsocket, AppWebsocket, DynAgentSigner, ReconnectingAdminWebsocket};
@@ -228,15 +228,6 @@ impl std::fmt::Debug for ReconnectingAppWebsocket {
     }
 }
 
-macro_rules! delegate {
-    ($(#[$meta:meta])* $name:ident($($arg:ident: $ty:ty),* $(,)?) -> $ret:ty) => {
-        $(#[$meta])*
-        pub async fn $name(&self, $($arg: $ty),*) -> ConductorApiResult<$ret> {
-            self.current()?.$name($($arg),*).await
-        }
-    };
-}
-
 impl ReconnectingAppWebsocket {
     /// Starts building a connection to an app.
     ///
@@ -269,6 +260,11 @@ impl ReconnectingAppWebsocket {
     }
 
     /// Returns the live app websocket.
+    ///
+    /// The returned socket is a snapshot of the connection as it stands, and a
+    /// reconnect replaces it. Call this once per request and drop the result;
+    /// a stored socket stops working at the next reconnect and reports raw
+    /// websocket errors instead of [`ConductorApiError::Disconnected`].
     ///
     /// # Errors
     ///
