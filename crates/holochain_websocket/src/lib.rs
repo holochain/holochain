@@ -242,6 +242,7 @@ impl RMap {
 /// It is intended to capture all the errors that a caller might want to handle. Other errors that
 /// are unlikely to be recoverable are mapped to [WebsocketError::Other].
 #[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
 pub enum WebsocketError {
     /// The websocket has been closed by the other side.
     #[error("Websocket closed: {0}")]

@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- `holochain_websocket` reports connection loss precisely. `WebsocketError`
+  carries `ReceiverClosed`, `ResponderDropped` and `UnexpectedRawFrame`
+  variants, and `WebsocketError::is_connection_closed` tells a caller whether an
+  error means the connection is gone and reconnecting is worthwhile, rather
+  than a request-level failure. `WebsocketError` is `#[non_exhaustive]`, so
+  matches on it need a wildcard arm.
 - Added `ReconnectingAdminWebsocket` and `ReconnectingAppWebsocket` to the Rust
   client. These re-establish their connection after the conductor restarts,
   with capped exponential backoff. Their `connect_with_retry` constructors also
