@@ -1,3 +1,48 @@
+//! A Rust client for the Holochain Conductor API.
+//!
+//! [`AdminWebsocket`] and [`AppWebsocket`] are single connections that fail
+//! when the conductor goes away. [`ReconnectingAdminWebsocket`] and
+//! [`ReconnectingAppWebsocket`] re-establish themselves instead.
+//!
+//! A conductor restart invalidates every app authentication token and moves
+//! any app interface attached on port 0, so a resilient app connection is
+//! identified by the admin address and the installed app id rather than by an
+//! app interface port.
+//!
+//! `connect` fails if the conductor does not accept, which suits a CLI.
+//! `connect_with_retry` waits for a conductor that has not started yet; bound
+//! it with [`tokio::time::timeout`] if you do not want to wait forever.
+//!
+//! ```rust,no_run
+//! # #[tokio::main]
+//! # async fn main() {
+//! use std::net::{Ipv4Addr, SocketAddr};
+//! use holochain_client::{
+//!     ClientAgentSigner, ReconnectingAppWebsocket, SignalEvent,
+//! };
+//!
+//! let app_ws = ReconnectingAppWebsocket::builder(
+//!     SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 30_000),
+//!     "my-app".to_string(),
+//!     ClientAgentSigner::default().into(),
+//! )
+//! .origin("my-service")
+//! .connect_with_retry()
+//! .await
+//! .unwrap();
+//!
+//! let mut signals = app_ws.signals();
+//! while let Some(event) = signals.next().await {
+//!     match event {
+//!         SignalEvent::Signal(signal) => println!("{signal:?}"),
+//!         // Signals were missed while the connection was down. Holochain does
+//!         // not replay them, so re-read any state derived from signals.
+//!         SignalEvent::Interrupted => println!("re-syncing"),
+//!     }
+//! }
+//! # }
+//! ```
+
 mod admin_websocket;
 mod app_connect;
 mod app_websocket;

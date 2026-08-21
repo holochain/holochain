@@ -16,6 +16,26 @@ Types and bindings to connect easily to a running Holochain conductor from Rust.
 
 **Rust client v0.5.x** is compatible with **Holochain v0.3.x**.
 
+## Connection resilience
+
+`AdminWebsocket` and `AppWebsocket` are single connections. When the conductor
+restarts, they stop working and the caller reconnects.
+
+`ReconnectingAdminWebsocket` and `ReconnectingAppWebsocket` repair themselves.
+Use `connect` when the conductor should already be running and a failure is
+worth reporting, and `connect_with_retry` when you are waiting for one to
+start; the latter never gives up, so bound it with `tokio::time::timeout` if
+you need it to.
+
+Requests made while a connection is down return
+`ConductorApiError::Disconnected`; retry them once the connection is back.
+Zome calls are never retried for you, because re-signing one mints a fresh
+nonce and could write to the source chain twice.
+
+Signals emitted while a client is disconnected are lost — Holochain has no
+signal replay. A `SignalStream` therefore reports `SignalEvent::Interrupted`
+when it resumes, so state derived from signals can be re-read.
+
 ## Running the tests
 
 ``` bash
