@@ -3135,6 +3135,7 @@ dependencies = [
  "event-emitter-rs",
  "holo_hash",
  "holochain",
+ "holochain_client",
  "holochain_conductor_api",
  "holochain_nonce",
  "holochain_serialized_bytes",

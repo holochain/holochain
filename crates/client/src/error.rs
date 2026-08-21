@@ -17,6 +17,10 @@ pub enum ConductorApiError {
     AppNotFound,
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+    #[error("Not connected to the conductor")]
+    Disconnected,
+    #[error("No socket addresses resolved")]
+    NoAddressesResolved,
 }
 
 pub type ConductorApiResult<T> = Result<T, ConductorApiError>;

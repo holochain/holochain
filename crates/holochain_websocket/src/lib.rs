@@ -275,8 +275,10 @@ pub enum WebsocketError {
 impl WebsocketError {
     /// Returns `true` if this error means the connection is no longer usable.
     ///
-    /// A request timeout and a deserialization failure both leave the
-    /// connection viable, so they return `false`.
+    /// Errors raised inside `WsCoreSync::exec` tear the connection down and
+    /// return `true`. A request timeout, a dropped responder and a
+    /// deserialization failure are all raised outside `exec`, leave the
+    /// connection viable, and return `false`.
     pub fn is_connection_closed(&self) -> bool {
         matches!(
             self,
@@ -284,7 +286,6 @@ impl WebsocketError {
                 | WebsocketError::Websocket(_)
                 | WebsocketError::Io(_)
                 | WebsocketError::ReceiverClosed
-                | WebsocketError::ResponderDropped
                 | WebsocketError::UnexpectedRawFrame
         )
     }
@@ -1084,12 +1085,12 @@ mod test;
 #[cfg(test)]
 mod error_tests {
     use super::WebsocketError;
+    use holochain_serialized_bytes::prelude::SerializedBytesError;
 
     #[test]
     fn connection_closed_classification() {
         assert!(WebsocketError::Close("ConnectionClosed".to_string()).is_connection_closed());
         assert!(WebsocketError::ReceiverClosed.is_connection_closed());
-        assert!(WebsocketError::ResponderDropped.is_connection_closed());
         assert!(WebsocketError::UnexpectedRawFrame.is_connection_closed());
         assert!(WebsocketError::Io(std::io::Error::other("boom")).is_connection_closed());
     }
@@ -1103,5 +1104,12 @@ mod error_tests {
             .unwrap_err();
         assert!(!WebsocketError::Timeout(elapsed).is_connection_closed());
         assert!(!WebsocketError::Other("something else".to_string()).is_connection_closed());
+        // A response carrying no data drops the responder on a live
+        // connection, so this is a request-level failure.
+        assert!(!WebsocketError::ResponderDropped.is_connection_closed());
+        assert!(
+            !WebsocketError::Deserialize(SerializedBytesError::Deserialize("boom".to_string()))
+                .is_connection_closed()
+        );
     }
 }

@@ -1,5 +1,5 @@
 use crate::error::{ConductorApiError, ConductorApiResult};
-use crate::util::AbortOnDropHandle;
+use crate::util::{AbortOnDropHandle, ClosedNotify};
 use event_emitter_rs::EventEmitter;
 use holochain_conductor_api::{
     AppAuthenticationRequest, AppAuthenticationToken, AppInfo, AppRequest, AppResponse,
@@ -29,7 +29,7 @@ impl AppWebsocketInner {
     pub(crate) async fn connect(
         socket_addr: impl ToSocketAddrs,
         origin: Option<String>,
-    ) -> ConductorApiResult<Self> {
+    ) -> ConductorApiResult<(Self, ClosedNotify)> {
         let websocket_config = Arc::new(WebsocketConfig::CLIENT_DEFAULT);
 
         Self::connect_with_config(socket_addr, websocket_config, origin).await
@@ -40,7 +40,7 @@ impl AppWebsocketInner {
         socket_addr: impl ToSocketAddrs,
         websocket_config: Arc<WebsocketConfig>,
         origin: Option<String>,
-    ) -> ConductorApiResult<Self> {
+    ) -> ConductorApiResult<(Self, ClosedNotify)> {
         let mut last_err = None;
         for addr in socket_addr.to_socket_addrs()? {
             let request: ConnectRequest = if let Some(o) = &origin {
@@ -57,22 +57,20 @@ impl AppWebsocketInner {
             }
         }
 
-        Err(last_err.unwrap_or_else(|| {
-            ConductorApiError::WebsocketError(holochain_websocket::WebsocketError::Other(
-                "No addresses resolved".to_string(),
-            ))
-        }))
+        Err(last_err.unwrap_or(ConductorApiError::NoAddressesResolved))
     }
 
     /// Connect to a Conductor API app websocket with a custom [WebsocketConfig] and [ConnectRequest].
     pub async fn connect_with_config_and_request(
         websocket_config: Arc<WebsocketConfig>,
         request: ConnectRequest,
-    ) -> ConductorApiResult<Self> {
+    ) -> ConductorApiResult<(Self, ClosedNotify)> {
         let (tx, mut rx) = connect(websocket_config, request).await?;
 
         let event_emitter = EventEmitter::new();
         let mutex = Arc::new(Mutex::new(event_emitter));
+
+        let (closed_tx, closed_rx) = tokio::sync::oneshot::channel();
 
         let poll_handle = tokio::task::spawn({
             let mutex = mutex.clone();
@@ -83,14 +81,18 @@ impl AppWebsocketInner {
                         event_emitter.emit("signal", signal_bytes);
                     }
                 }
+                let _ = closed_tx.send(());
             }
         });
 
-        Ok(Self {
-            tx,
-            event_emitter: mutex,
-            _abort_handle: Arc::new(AbortOnDropHandle::new(poll_handle.abort_handle())),
-        })
+        Ok((
+            Self {
+                tx,
+                event_emitter: mutex,
+                _abort_handle: Arc::new(AbortOnDropHandle::new(poll_handle.abort_handle())),
+            },
+            ClosedNotify::new(closed_rx),
+        ))
     }
 
     pub(crate) async fn on_signal<F: Fn(Signal) + 'static + Sync + Send>(

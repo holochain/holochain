@@ -28,3 +28,5 @@ pub use signing::client_signing::{ClientAgentSigner, SigningCredentials};
 #[cfg(feature = "lair_signing")]
 pub use signing::lair_signing::LairAgentSigner;
 pub use signing::{AgentSigner, DynAgentSigner};
+#[cfg(feature = "test_utils")]
+pub use util::ClosedNotify;
