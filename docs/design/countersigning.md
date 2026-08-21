@@ -93,14 +93,19 @@ guess at it.
 
 **Guaranteed.**
 
-- **No participant's chain records the session unless every participant signed
-  it.** A participant only reveals its committed entry once it holds every other
-  participant's signature over their own action.
-- **No partial session is visible in the DHT.** System validation of a
+- **No participant reveals or publishes the session unless every participant
+  signed it.** A participant only reveals its committed entry once it holds every
+  other participant's signature over their own action. Note the boundary: the
+  entry *is* written to the participant's own chain before any certificate
+  exists — that is what being prepared means — and it is publication, not
+  recording, that waits for the certificate.
+- **No partial session integrates as a valid DHT record.** System validation of a
   countersigned entry op requires *every* action in the action set to be present
   locally before the op progresses. All participants' entry ops share one basis,
-  so an authority never integrates a partial set. This holds today and is load
-  bearing for the design.
+  so an authority never integrates a partial set. Partial sets can still be
+  *stored* — in a collector's session state or in validation limbo — so the
+  guarantee is about integration, not about no bytes existing anywhere. This
+  holds today and is load bearing for the design.
 - **A participant cannot be committed twice.** The chain lock reserves exactly
   one sequence number for one fingerprint.
 - **Divergence requires a provable fault.** If two participants reach different
@@ -150,8 +155,21 @@ and distributes it back — again at the app layer.
 Because every participant's response is required, and because a participant's
 frozen chain state cannot change while the lock is held, **the session data is
 uniquely determined by the preflight request**. There is exactly one possible
-countersigned entry per fingerprint. (This is only true once M-of-N optional
-signers are removed; see [change 6](#6-drop-m-of-n-optional-signers).)
+countersigned entry per fingerprint.
+
+Two things are needed for that to hold.
+
+1. M-of-N optional signers must be removed, so that the response set is not a
+   choosable subset; see [change 6](#6-drop-m-of-n-optional-signers).
+2. **A participant must accept a given fingerprint at most once, ever.** The lock
+   only freezes the chain while it is held. Once a session is abandoned or
+   revealed and the lock released, the chain head advances, and re-accepting the
+   same request would produce a different `CounterSigningAgentState`, a different
+   session data, and therefore a *different entry hash* for the same fingerprint.
+   Two sessions would then exist carrying the same agent's promise, each needing
+   a different action set to complete. Acceptance must therefore be recorded
+   durably and repeat acceptances refused, across restarts; see
+   [change 7](#7-durable-prepared-session-record).
 
 ### Phase 2 — commit
 
@@ -223,21 +241,51 @@ session.
 - Nobody outside the participant set contributes to it. The collector's signature
   is not part of it and is not wanted.
 
-**Abort certificate** — any single participant's signed action at the sequence
-number that participant promised, which is *not* that participant's session
+**Abort certificate** — evidence that a participant `X` has *placed on its
+chain*, at the sequence number `X` promised, an action that is not `X`'s session
 action.
 
-- Unforgeable: it is signed by that participant.
-- Conclusive: a source chain is a total order. If participant `X` has a different
-  action at seq `N+1`, `X` can never also place the session action there without
-  forking its own chain. So no commit certificate can exist unless `X` is
-  provably faulty.
-- **One is enough.** A single participant declining ends the session for everyone.
+- Bound to the promise: the action must be authored by `X`, carry
+  `action_seq = N+1` and `prev_action = <the chain top X declared in its
+  preflight response>`, and hash to something other than `X`'s session action.
+- **Chain membership, not merely a signature.** A signature alone is not
+  sufficient. Nothing stops `X` signing an extra action at that sequence number
+  and handing it out privately while its real chain carries the session action.
+  The evidence must therefore come from `X`'s own committed chain state or from
+  a valid `AgentActivity` response at that sequence — that is, `X` must have
+  *published* the conflicting action.
+- Conclusive once that holds: a source chain is a total order, so an action
+  published at seq `N+1` means `X` cannot also place the session action there
+  without forking its own chain.
+- **One is enough.** A single participant declining ends the session for
+  everyone.
 
-The essential property is the **asymmetry**: a commit needs every participant, an
-abort needs one. And the essential consequence is that **no third party is ever
-trusted**. A collector, a DHT authority, and a random peer are all equally
-untrusted; they are transports for evidence that verifies itself.
+Note the **asymmetry in forgeability**, which the first draft of this design got
+wrong. A commit certificate cannot be forged at any price: it requires other
+agents' signatures. An abort certificate can be *attempted* by a malicious `X`
+for the cost of one extra signature — which is precisely why chain membership is
+required rather than a bare signature. With that requirement, forging an abort
+certificate means publishing a fork of your own chain, so the attack is
+self-incriminating: it is detectable and warrantable at the one authority whose
+job is to detect it.
+
+That is the honest ceiling. Making abort forgery *impossible* rather than
+self-incriminating would need either unanimity among participants — which is
+unreachable, since the participant being waited on is the one not answering — or
+a quorum of witnesses, which is rejected in
+[Rejected alternatives](#rejected-alternatives).
+
+A peer-supplied signed action that has not been published is therefore **a hint,
+not a certificate**. It is a reason to go and look; it is not a reason to
+abandon.
+
+The essential property is still the **asymmetry of quantity**: a commit needs
+every participant, an abort needs one. And the essential consequence is that **no
+third party is ever trusted**. A collector, a DHT authority, and a random peer
+are all equally untrusted; they are transports for evidence that verifies
+itself. Requiring chain membership does not make an authority trusted — an
+authority that returns nothing has said nothing, and only a positive, signed,
+sequence-bound response counts.
 
 This is why no quorum is required. There is nothing for a quorum to decide.
 Quorums exist to make a *decision* singular when the deciders could disagree.
@@ -415,7 +463,19 @@ What exists today, and where it departs from the above. Code references are to
    initiator can assemble different subsets from the same request, producing
    different entry hashes that both embed the same participant's promise.
 
-8. **Workspace state is not derivable from the database.**
+8. **Reveal is not atomic.** `apply_success_state_changes` releases the chain
+   lock and clears the withhold-publish flag in two separate operations. A crash
+   between them leaves ops withheld with no lock, so the session is
+   indistinguishable from no session and its ops are never published.
+
+9. **Acceptance is not recorded durably.** `accept_countersigning_request`
+   checks only the in-memory workspace and the chain lock. After the lock is
+   released, the same preflight request can be accepted again at a new chain
+   head, producing a second session with the same fingerprint but a different
+   entry hash. A restart during the prepared phase also loses the request
+   entirely, since the lock keeps only its fingerprint.
+
+10. **Workspace state is not derivable from the database.**
    `CountersigningSessionState::SignaturesCollected` and `::Unknown` carry
    retry counters and collected bundles that exist only in memory, so
    `refresh.rs` has to reconcile them against the database after a restart, with
@@ -426,7 +486,7 @@ What exists today, and where it departs from the above. Code references are to
 Ordered by value against cost. Changes 1–4 are small and independently
 useful; each of 1, 2 and 3 can land on its own and each removes real failures.
 Change 1 is the one that must land: everything else is either evidence
-plumbing or cleanup.
+plumbing, durability, or cleanup.
 
 ### 1. Committed participants never decide on a timer
 
@@ -445,10 +505,16 @@ In `incomplete.rs`, replace the "all other participants abandoned" condition wit
 Delete `SessionCompletionDecision::Indeterminate` as an input to any decision —
 it becomes simply "keep waiting".
 
+The condition tightens in one direction while it loosens in the other: one
+participant is enough, but the evidence must show **chain membership**, not just
+a signature. `incomplete.rs` already reads agent activity, which is the right
+source; what it must not do is accept a bare signed action handed over by a peer
+as grounds to abandon.
+
 Also delete the `NUM_AUTHORITIES_TO_QUERY` agreement logic. Asking three
 authorities and requiring them to agree is an attempt to make an unreliable
-signal reliable. The signal is not needed: a single self-certifying action from
-a single source is conclusive, and no number of non-answers ever is.
+signal reliable. The signal is not needed: one positive, sequence-bound,
+published action is conclusive, and no number of non-answers ever is.
 
 This is a net **deletion** of logic. `incomplete.rs` shrinks from decision
 inference to certificate collection.
@@ -461,12 +527,23 @@ Add one network request, participant to participant:
 > you promised in your preflight response.
 
 Three possible replies: the session action, some other action, or "not yet
-decided". The first two are certificate fragments; the third is not evidence and
-is treated as no answer.
+decided". The third is not evidence and is treated as no answer.
 
-This is the change that makes the collector non-essential. If every participant
-committed but the collector died holding a partial set, the participants can
-assemble the certificate among themselves.
+The two useful replies are **not** symmetric, and the asymmetry matters here:
+
+- A returned **session action** is a commit certificate fragment and is complete
+  evidence on its own. It cannot be forged, because it is the peer's own
+  signature over the action the receiver independently computes from the session
+  data.
+- A returned **other action** is only a hint. Acting on it requires confirming
+  chain membership through agent activity, per
+  [The two certificates](#the-two-certificates). Without that, a malicious peer
+  could abandon a session for everyone else by signing one throwaway action.
+
+This is the change that makes the collector non-essential on the commit path. If
+every participant committed but the collector died holding a partial set, the
+participants can assemble the certificate among themselves without the network
+being able to mislead them.
 
 ### 4. The collector publishes the complete set
 
@@ -479,6 +556,19 @@ Once integrated, the entry basis holds a complete, replicated, durable commit
 certificate that any participant can pull with `get_details`. This is what makes
 the certificate outlive the collector without requiring the collector to
 persist anything.
+
+Two conditions on relying on that, both of which the recovering participant
+enforces locally:
+
+- **A `get_details` response is a certificate only when it carries the complete
+  expected action set**, checked against the action set the participant computes
+  itself from the session data. A response with some of the actions is a partial
+  result, not a partial decision.
+- **The collector's completion condition is durable delivery, not a successful
+  send.** Publishing is best-effort and asynchronous; the collector is not
+  finished when the push returns, and must remain able to re-publish. A
+  participant never treats "the collector said it published" as evidence — only
+  the integrated set counts.
 
 Note that this makes the entry public as soon as the set is complete, before
 participants reveal. That is not a change in exposure: the set cannot be complete
@@ -515,7 +605,45 @@ needing a different set to complete, and a participant can only satisfy one.
 Dropping it is a breaking change to `PreflightRequest` behind an unstable
 feature.
 
-### 7. Collector durability (optional)
+### 7. Durable prepared-session record
+
+The chain lock stores only `(author, subject, timestamp)`, and `subject` is the
+fingerprint — a hash, from which the preflight request cannot be recovered. Two
+things therefore need a durable record beyond the lock, both keyed by
+`(author, fingerprint)`:
+
+- **The accepted preflight request itself**, so that a restart during the
+  prepared phase can reconstruct `Accepted { preflight_request, deadline }`
+  rather than discarding the session. Today a restart before commit cannot
+  recover and the chain is simply unlocked.
+- **The fact of acceptance, permanently**, so that a repeat acceptance of the
+  same fingerprint is refused after the lock has been released. This is what
+  gives one entry hash per fingerprint; see [Phase 1](#phase-1--prepare).
+
+The acceptance marker must outlive the session by much longer than the session
+does — it is what prevents a replayed request years later — while the request
+body can be dropped once the session resolves.
+
+Progress counters (`participants_confirmed`, `last_attempt_at`) are *not*
+persisted. They are diagnostic, they reset on restart, and the API contract says
+so rather than pretending otherwise.
+
+### 8. Reveal is a single transaction
+
+Revealing does two writes: release the chain lock, and clear the withhold-publish
+flag on the session's ops (`apply_success_state_changes` in `complete.rs`). They
+are currently separate awaits. A crash between them leaves ops withheld with no
+lock — and since the lock is what
+[change 10](#10-session-state-becomes-derivable-from-the-database) derives state
+from, the session then looks like no session at all, and its ops are never
+published.
+
+Perform both in one transaction. Recovery must additionally handle the state if
+it is ever reached: a chain head that is a countersigning session, no lock, and
+ops still withheld means *revealed but not published*, and the correct action is
+to finish publishing — never to abandon.
+
+### 9. Collector durability (optional)
 
 Persisting the collector's partial sets across a restart is worthwhile but is now
 an **optimisation**, not a safety requirement — safety comes from changes 2–4.
@@ -523,22 +651,29 @@ It shortens recovery in the common "collector restarted mid-session" case.
 
 If implemented, see [Storage](#storage).
 
-### 8. Session state becomes derivable from the database
+### 10. Session state becomes derivable from the database
 
 With bundles no longer accumulated in memory and retry counters no longer
 affecting outcomes, the session state is a function of persisted state alone:
 
-| Chain lock | Chain head | State |
-| --- | --- | --- |
-| none | — | no session |
-| held | not the session entry | `Accepted` |
-| held | the session entry | `Committed` |
+| Chain lock | Chain head | Withheld ops | State |
+| --- | --- | --- | --- |
+| none | — | none | no session |
+| none | the session entry | present | revealed, publish unfinished — resume publishing |
+| held | not the session entry | — | `Accepted` (request read from the prepared-session record) |
+| held | the session entry | present | `Committed` |
 
-`CountersigningSessionState` collapses to those two variants plus the
+`CountersigningSessionState` collapses to `Accepted` and `Committed` plus the
 information an app needs about progress. `Unknown` disappears — there is no
 longer a state in which the conductor does not know what to do; there is only
-"waiting for a certificate". `refresh_workspace_state` reduces to reading the
-lock and the head, and restart becomes free.
+"waiting for a certificate". `refresh_workspace_state` reduces to this table,
+and restart becomes free.
+
+Note the two dependencies. The `Accepted` row needs
+[change 7](#7-durable-prepared-session-record), because the lock's fingerprint
+alone cannot reproduce the preflight request. The second row exists only because
+reveal is two writes; with [change 8](#8-reveal-is-a-single-transaction) it
+becomes unreachable, and recovery keeps handling it defensively.
 
 ## Fork safety
 
@@ -549,10 +684,16 @@ The design's safety claim is:
 
 Argument. A participant reveals only on a commit certificate, which contains
 every participant's signed session action. A participant abandons only on an
-abort certificate, which is some participant `X`'s signed non-session action at
-`X`'s promised sequence number. For both to exist, `X` must have signed two
-different actions at the same sequence number — a chain fork by `X`, which is
-exactly the fault Holochain already detects and warrants.
+abort certificate, which is some participant `X`'s *published* non-session
+action at `X`'s promised sequence number. For both to exist, `X` must have
+signed two different actions at the same sequence number and published one of
+them — a chain fork by `X`, which is exactly the fault Holochain already detects
+and warrants.
+
+The published requirement is what carries the argument. Were a bare signature
+enough, `X` could break atomicity for a chosen victim at the cost of one
+throwaway signature, keeping its real chain clean and its fork undetectable;
+see [The two certificates](#the-two-certificates).
 
 Note what the argument does *not* need. It does not need participants to
 withhold each other's ops, and it does not need any special handling of
@@ -613,12 +754,28 @@ unchanged. A signal on entering `Committed` is added so a UI can tell the user
 their chain is blocked without polling.
 
 `AbandonCountersigningSession` and `PublishCountersigningSession` are kept as
-**operator escape hatches**. Their precondition changes from "at least one
-automatic resolution attempt has been made" to "the session is `Committed` and no
-certificate has been obtained". Their documentation must say plainly that they
-override the safety property: force-abandon can fork the caller's chain against a
-session that completed, and force-publish can leave an entry that never
-integrates. They exist for the case where the peers are gone for good.
+**operator escape hatches**, with three changes.
+
+- **They move to the admin interface.** They are currently on the authenticated
+  app interface, which means any app client can invoke them. These are the only
+  two operations in the design that deliberately bypass the certificate
+  invariant — force-abandon can fork the caller's chain against a session that
+  completed, and force-publish can leave an entry that never integrates — so
+  they belong on the operator surface, not the app one. This is a breaking API
+  change, which is acceptable behind an unstable feature.
+- **Each use is recorded durably**, with the fingerprint, the state at the time,
+  and the evidence held. An override is the one moment a chain can be corrupted
+  on purpose; it should not be reconstructible only from logs.
+- **The precondition changes** from "at least one automatic resolution attempt
+  has been made" to "the session is `Committed` and no certificate has been
+  obtained".
+
+The counter-argument is that on a personal machine the user *is* the operator,
+and an app UI is the natural place to offer "this has been stuck for a week, give
+up?". That is a real cost of moving them, and it is a decision worth revisiting:
+the app interface could keep a *request* to override that the operator surface
+then confirms. What should not survive is an unaudited app-interface call that
+silently breaks the invariant the rest of this design exists to hold.
 
 ## Storage
 
@@ -629,7 +786,7 @@ migration set and connection pool for a handful of rows, and — decisively —
 collector state must be written in the same transaction as op and limbo writes.
 Cross-database atomicity is not available.
 
-The table is only needed for [change 7](#7-collector-durability-optional).
+The table is only needed for [change 9](#9-collector-durability-optional).
 Sketch, following the conventions in the existing DHT schema:
 
 ```sql
@@ -666,16 +823,33 @@ Primitive access goes in `holochain_data`; a store-style API over it goes in
 - Verify before storing: the session data's preflight response signatures are
   valid, the author is a listed participant, and the action matches the action
   set computed from the session data.
-- Reject sessions whose `session_times` have already ended.
-- Cap rows per author.
+- **Refuse to open a new session** whose `session_times` have already ended.
+  Do **not** refuse *actions* for a session already being tracked on the same
+  grounds. Committed participants have no deadline, so a late action may be the
+  one that completes the set, and rejecting it would contradict
+  [The one deadline](#the-one-deadline). The deadline gates admission of new
+  sessions; retention alone gates how long an open one is kept.
+
+Quotas, none of which the deadline substitutes for:
+
+- Total bytes and total open sessions, globally and per author.
+- Sessions per author per unit time, rate limited.
+
+Two limits the system already provides and which do not need restating in the
+schema: `MAX_COUNTERSIGNING_AGENTS` (8) caps the participant count and therefore
+the action rows per session, and `MAX_ENTRY_SIZE` caps the session entry blob.
 
 An attacker must therefore produce a fully signed, self-consistent session before
-we store a single row.
+we store a single row — but signature validity is not a quota. A well-resourced
+attacker can generate many valid sessions, so the byte and cardinality caps, not
+the cryptography, are what bound the exposure.
 
 **Retention.** `retain_until = session_end + tail`. Rows may be dropped as soon as
 the set is complete and its ops have integrated, because the entry basis then
 holds the certificate. The tail exists only to serve participants who have not yet
-pulled.
+pulled. Retention is a maximum, not a guarantee: a collector under pressure may
+evict early, and no participant's safety depends on the collector keeping
+anything.
 
 ## Offline friendliness
 
@@ -740,10 +914,18 @@ case.
 
 Rejected as unnecessary rather than wrong. A quorum makes a *decision* singular
 when the deciders could disagree. Once abort is defined as a participant's own
-signed chain action, both outcomes are facts about participant signatures, no
+published chain action, both outcomes are facts about participant chains, no
 third party decides anything, and there is nothing for a quorum to be quorate
 about. It would also require replacing the entry-basis neighbourhood with a named
 witness set, which is a deliberate property of the current design.
+
+One thing a quorum would buy that this design does not: it would make abort
+certificates unforgeable outright, rather than forgeable-but-self-incriminating
+(see [The two certificates](#the-two-certificates)). That is a genuine
+difference, and it is the strongest argument for revisiting this. It is judged
+not to be worth a witness quorum, a named witness set, and an attestation round
+on every session, to close a hole whose exploitation requires publishing a fork
+of your own chain.
 
 **Named witness set instead of the entry-basis neighbourhood.** Considered as
 part of the quorum design and dropped with it. The neighbourhood is intentional
