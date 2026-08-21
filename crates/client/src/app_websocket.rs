@@ -186,7 +186,6 @@ impl AppWebsocket {
 
     /// Connects and additionally returns a notification that resolves when the
     /// connection is no longer usable.
-    #[allow(dead_code)]
     pub(crate) async fn connect_with_notify(
         request: ConnectRequest,
         websocket_config: Arc<WebsocketConfig>,

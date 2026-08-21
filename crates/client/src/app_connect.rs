@@ -8,7 +8,6 @@ use holochain_types::app::InstalledAppId;
 /// An interface qualifies when it is either unrestricted or bound to this app,
 /// and its allowed origins admit `origin`. Where several qualify, the lowest
 /// port is chosen so that repeated calls against an unchanged conductor agree.
-#[allow(dead_code)] // reachable only via the `test_utils`-gated re-export for now
 pub async fn discover_app_interface_port(
     admin_ws: &AdminWebsocket,
     installed_app_id: &InstalledAppId,
