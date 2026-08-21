@@ -34,7 +34,6 @@ impl Default for ReconnectConfig {
 /// The delay doubles per attempt, is capped at [`ReconnectConfig::max_delay`],
 /// and carries up to 10% jitter so that many clients reconnecting to the same
 /// conductor do not synchronise.
-#[allow(dead_code)]
 pub(crate) fn delay_for_attempt(attempt: u32, config: &ReconnectConfig) -> Duration {
     let factor = 1u32.checked_shl(attempt.min(20)).unwrap_or(u32::MAX);
     let capped = config
@@ -56,7 +55,6 @@ pub(crate) fn delay_for_attempt(attempt: u32, config: &ReconnectConfig) -> Durat
 ///
 /// This never returns an error. Cancel it by dropping the future, which is how
 /// a resilient connection stops reconnecting when its handle goes away.
-#[allow(dead_code)]
 pub(crate) async fn connect_with_backoff<F, Fut, T, E>(
     label: &str,
     config: &ReconnectConfig,
