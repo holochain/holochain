@@ -258,9 +258,36 @@ pub enum WebsocketError {
     /// An IO error occurred.
     #[error("IO error: {0}")]
     Io(#[from] Error),
+    /// The receive half of the connection has closed.
+    #[error("Receiver closed")]
+    ReceiverClosed,
+    /// The responder for a request was dropped before a response arrived.
+    #[error("Responder dropped")]
+    ResponderDropped,
+    /// A raw websocket frame arrived where a complete message was expected.
+    #[error("Unexpected raw frame")]
+    UnexpectedRawFrame,
     /// Some other error occurred.
     #[error("Other error: {0}")]
     Other(String),
+}
+
+impl WebsocketError {
+    /// Returns `true` if this error means the connection is no longer usable.
+    ///
+    /// A request timeout and a deserialization failure both leave the
+    /// connection viable, so they return `false`.
+    pub fn is_connection_closed(&self) -> bool {
+        matches!(
+            self,
+            WebsocketError::Close(_)
+                | WebsocketError::Websocket(_)
+                | WebsocketError::Io(_)
+                | WebsocketError::ReceiverClosed
+                | WebsocketError::ResponderDropped
+                | WebsocketError::UnexpectedRawFrame
+        )
+    }
 }
 
 /// A result type, with the error type [WebsocketError].
@@ -466,9 +493,7 @@ impl WebsocketReceiver {
                         .await
                         .next()
                         .await
-                        .ok_or::<WebsocketError>(WebsocketError::Other(
-                            "ReceiverClosed".to_string(),
-                        ))?
+                        .ok_or::<WebsocketError>(WebsocketError::ReceiverClosed)?
                         .map_err(Box::new)?;
                     let msg = match msg {
                         Message::Text(s) => s.as_bytes().to_vec(),
@@ -486,9 +511,7 @@ impl WebsocketReceiver {
                         Message::Close(frame) => {
                             return Err(WebsocketError::Close(format!("{frame:?}")));
                         }
-                        Message::Frame(_) => {
-                            return Err(WebsocketError::Other("UnexpectedRawFrame".to_string()))
-                        }
+                        Message::Frame(_) => return Err(WebsocketError::UnexpectedRawFrame),
                     };
                     match WireMessage::try_from_bytes(msg)? {
                         WireMessage::Authenticate { data } => {
@@ -636,7 +659,7 @@ impl WebsocketSender {
             // await the response
             let resp = resp_r
                 .await
-                .map_err(|_| WebsocketError::Other("ResponderDropped".to_string()))??;
+                .map_err(|_| WebsocketError::ResponderDropped)??;
 
             // decode the response
             let res = decode(&Vec::from(UnsafeBytes::from(resp)))?;
@@ -1057,3 +1080,28 @@ impl Callback for ConnectCallback {
 
 #[cfg(test)]
 mod test;
+
+#[cfg(test)]
+mod error_tests {
+    use super::WebsocketError;
+
+    #[test]
+    fn connection_closed_classification() {
+        assert!(WebsocketError::Close("ConnectionClosed".to_string()).is_connection_closed());
+        assert!(WebsocketError::ReceiverClosed.is_connection_closed());
+        assert!(WebsocketError::ResponderDropped.is_connection_closed());
+        assert!(WebsocketError::UnexpectedRawFrame.is_connection_closed());
+        assert!(WebsocketError::Io(std::io::Error::other("boom")).is_connection_closed());
+    }
+
+    #[tokio::test]
+    async fn request_level_errors_are_not_connection_closed() {
+        // A request timeout is awaited outside `WsCoreSync::exec`, so it does
+        // not tear the connection down.
+        let elapsed = tokio::time::timeout(std::time::Duration::ZERO, std::future::pending::<()>())
+            .await
+            .unwrap_err();
+        assert!(!WebsocketError::Timeout(elapsed).is_connection_closed());
+        assert!(!WebsocketError::Other("something else".to_string()).is_connection_closed());
+    }
+}
