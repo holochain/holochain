@@ -33,7 +33,7 @@ parking_lot = "0.12.1"
 rand = { version = "0.8" }
 serde = "1.0"
 thiserror = "2.0"
-tokio = { version = "1.36", features = ["rt"] }
+tokio = { version = "1.36", features = ["rt", "sync", "time", "macros"] }
 
 [dev-dependencies]
 bytes = "1.10.1"
@@ -41,6 +41,7 @@ mr_bundle = { version = "^0.8.0-dev.1", path = "../mr_bundle" }
 holochain = { version = "^0.8.0-dev.2", path = "../holochain", default-features = false, features = [
   "sweettest",
 ] }
+holochain_client = { path = ".", features = ["test_utils"] }
 holochain_wasm_test_utils = { version = "^0.8.0-dev.2", path = "../test_utils/wasm" }
 
 kitsune2_core = "0.5.0"
@@ -51,6 +52,8 @@ yaml_serde = "0.10"
 default = ["lair_signing"]
 
 lair_signing = ["dep:lair_keystore_api"]
+
+test_utils = []
 
 wasmer-sys-cranelift = ["holochain/wasmer-sys-cranelift"]
 wasmer-wasmi = ["holochain/wasmer-wasmi"]

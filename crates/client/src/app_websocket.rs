@@ -1,5 +1,6 @@
 use crate::app_websocket_inner::AppWebsocketInner;
 use crate::signing::DynAgentSigner;
+use crate::util::ClosedNotify;
 use crate::{signing::sign_zome_call, ConductorApiError, ConductorApiResult};
 use anyhow::{anyhow, Result};
 use holo_hash::{AgentPubKey, DnaHash};
@@ -78,7 +79,7 @@ impl AppWebsocket {
         signer: DynAgentSigner,
         origin: Option<String>,
     ) -> ConductorApiResult<Self> {
-        let app_ws = AppWebsocketInner::connect(socket_addr, origin).await?;
+        let (app_ws, _closed) = AppWebsocketInner::connect(socket_addr, origin).await?;
         Self::post_connect(app_ws, token, signer).await
     }
 
@@ -118,7 +119,7 @@ impl AppWebsocket {
         signer: DynAgentSigner,
         origin: Option<String>,
     ) -> ConductorApiResult<Self> {
-        let app_ws =
+        let (app_ws, _closed) =
             AppWebsocketInner::connect_with_config(socket_addr, websocket_config, origin).await?;
         Self::post_connect(app_ws, token, signer).await
     }
@@ -178,9 +179,23 @@ impl AppWebsocket {
         token: AppAuthenticationToken,
         signer: DynAgentSigner,
     ) -> ConductorApiResult<Self> {
-        let app_ws =
+        let (app_ws, _closed) =
             AppWebsocketInner::connect_with_config_and_request(websocket_config, request).await?;
         Self::post_connect(app_ws, token, signer).await
+    }
+
+    /// Connects and additionally returns a notification that resolves when the
+    /// connection is no longer usable.
+    #[allow(dead_code)]
+    pub(crate) async fn connect_with_notify(
+        request: ConnectRequest,
+        websocket_config: Arc<WebsocketConfig>,
+        token: AppAuthenticationToken,
+        signer: DynAgentSigner,
+    ) -> ConductorApiResult<(Self, ClosedNotify)> {
+        let (app_ws, closed) =
+            AppWebsocketInner::connect_with_config_and_request(websocket_config, request).await?;
+        Ok((Self::post_connect(app_ws, token, signer).await?, closed))
     }
 
     async fn post_connect(

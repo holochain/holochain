@@ -1,5 +1,5 @@
 use crate::error::{ConductorApiError, ConductorApiResult};
-use crate::util::AbortOnDropHandle;
+use crate::util::{AbortOnDropHandle, ClosedNotify};
 use holo_hash::{ActionHash, DnaHash};
 use holochain_conductor_api::{
     AdminInterfaceConfig, AdminRequest, AdminResponse, AppAuthenticationToken,
@@ -125,11 +125,7 @@ impl AdminWebsocket {
             }
         }
 
-        Err(last_err.unwrap_or_else(|| {
-            ConductorApiError::WebsocketError(holochain_websocket::WebsocketError::Other(
-                "No addresses resolved".to_string(),
-            ))
-        }))
+        Err(last_err.unwrap_or(ConductorApiError::NoAddressesResolved))
     }
 
     /// Connect to a Conductor API admin websocket with a custom [ConnectRequest] and [WebsocketConfig].
@@ -175,17 +171,47 @@ impl AdminWebsocket {
         request: ConnectRequest,
         websocket_config: Arc<WebsocketConfig>,
     ) -> ConductorApiResult<Self> {
+        let (admin_ws, _closed) = Self::connect_with_notify(request, websocket_config).await?;
+        Ok(admin_ws)
+    }
+
+    /// Connects and additionally returns a notification that resolves when the
+    /// connection is no longer usable.
+    pub(crate) async fn connect_with_notify(
+        request: ConnectRequest,
+        websocket_config: Arc<WebsocketConfig>,
+    ) -> ConductorApiResult<(Self, ClosedNotify)> {
         let (tx, mut rx) = connect(websocket_config.clone(), request).await?;
+
+        let (closed_tx, closed_rx) = tokio::sync::oneshot::channel();
 
         // WebsocketReceiver needs to be polled in order to receive responses
         // from remote to sender requests.
-        let poll_handle =
-            tokio::task::spawn(async move { while rx.recv::<AdminResponse>().await.is_ok() {} });
+        let poll_handle = tokio::task::spawn(async move {
+            while rx.recv::<AdminResponse>().await.is_ok() {}
+            let _ = closed_tx.send(());
+        });
 
-        Ok(Self {
-            tx,
-            _poll_handle: Arc::new(AbortOnDropHandle::new(poll_handle.abort_handle())),
-        })
+        Ok((
+            Self {
+                tx,
+                _poll_handle: Arc::new(AbortOnDropHandle::new(poll_handle.abort_handle())),
+            },
+            ClosedNotify::new(closed_rx),
+        ))
+    }
+
+    #[cfg(feature = "test_utils")]
+    /// Connects and returns the close notification, for tests that assert
+    /// disconnection is observed.
+    pub async fn connect_for_test(
+        socket_addr: impl ToSocketAddrs,
+    ) -> ConductorApiResult<(Self, crate::util::ClosedNotify)> {
+        let addr = socket_addr
+            .to_socket_addrs()?
+            .next()
+            .ok_or(ConductorApiError::NoAddressesResolved)?;
+        Self::connect_with_notify(addr.into(), Arc::new(WebsocketConfig::CLIENT_DEFAULT)).await
     }
 
     /// Issue an app authentication token for the specified app.
