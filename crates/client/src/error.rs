@@ -21,6 +21,11 @@ pub enum ConductorApiError {
     Disconnected,
     #[error("No socket addresses resolved")]
     NoAddressesResolved,
+    #[error("No app interface accepts app {installed_app_id} from origin {origin:?}")]
+    AppInterfaceNotFound {
+        installed_app_id: holochain_types::app::InstalledAppId,
+        origin: Option<String>,
+    },
 }
 
 pub type ConductorApiResult<T> = Result<T, ConductorApiError>;
