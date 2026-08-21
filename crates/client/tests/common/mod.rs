@@ -67,7 +67,7 @@ pub struct TestString(pub String);
 /// Installs the fixture app on a conductor whose admin port survives a restart,
 /// and returns a signer authorized to call its zomes.
 pub async fn install_fixture_app_with_fixed_admin_port(
-) -> (SweetConductor, u16, InstalledAppId, DynAgentSigner) {
+) -> (SweetConductor, u16, InstalledAppId, DynAgentSigner, u16) {
     let (conductor, admin_port) = conductor_with_fixed_admin_port().await;
 
     let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port), None)
@@ -90,7 +90,8 @@ pub async fn install_fixture_app_with_fixed_admin_port(
     admin_ws.enable_app(app_id.clone()).await.unwrap();
 
     // Attached on port 0, so the conductor restores it on a different port
-    // after a restart. That is what makes the rediscovery path load bearing.
+    // after a restart. That is what makes the rediscovery path load bearing,
+    // and why the discovered port is returned for a caller to compare against.
     admin_ws
         .attach_app_interface(
             0,
@@ -135,7 +136,18 @@ pub async fn install_fixture_app_with_fixed_admin_port(
         .unwrap();
     signer.add_credentials(cell_id, credentials);
 
-    (conductor, admin_port, app_id, signer.into())
+    (conductor, admin_port, app_id, signer.into(), port)
+}
+
+/// Discovers the port the fixture app's interface is currently listening on.
+pub async fn discover_fixture_app_port(admin_port: u16, app_id: &InstalledAppId) -> u16 {
+    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port), None)
+        .await
+        .unwrap();
+
+    holochain_client::discover_app_interface_port_for_test(&admin_ws, app_id, Some("my-service"))
+        .await
+        .unwrap()
 }
 
 /// Reads the provisioned cell id out of an app's info.
