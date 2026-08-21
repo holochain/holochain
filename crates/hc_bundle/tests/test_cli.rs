@@ -388,7 +388,6 @@ async fn test_multi_integrity() {
 }
 
 #[tokio::test]
-#[cfg_attr(target_os = "windows", ignore = "theres a hash mismatch - check crlf?")]
 async fn test_hash_dna_function() {
     {
         let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-dna"));
