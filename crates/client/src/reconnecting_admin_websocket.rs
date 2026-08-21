@@ -95,7 +95,7 @@ impl ReconnectingAdminWebsocket {
                     if connected_at.elapsed() < config.initial_delay {
                         let delay = delay_for_attempt(flaps, &config);
                         tracing::warn!(
-                            target = "holochain_client::admin",
+                            target: "holochain_client::admin",
                             flaps,
                             ?delay,
                             "connection closed shortly after connecting, backing off before reconnecting"
