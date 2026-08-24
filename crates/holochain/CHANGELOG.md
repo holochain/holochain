@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix source-chain restore was ignoring an app's manifest `bootstrap_url`/`relay_url` overrides, and instead always joined the network with the conductor's default config.
+- Fix a source-chain restore bug where ordinary gossip for the restoring agent's own chain could be rejected during validation and permanently block restore's own write, leaving the cell's chain looking empty after `enable_app`.
+- Fix source-chain restore stalling permanently when no peers are yet known for the agent's DHT location. It now retries like any other insufficient-peers response.
+
 ## 0.8.0-dev.4
 
 ## 0.8.0-dev.3
