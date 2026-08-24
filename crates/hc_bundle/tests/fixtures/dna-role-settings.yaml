@@ -1,0 +1,4 @@
+modifiers:
+  network_seed: hc-dna-hash-test-seed
+  properties:
+    foo: bar

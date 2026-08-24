@@ -1,6 +1,7 @@
 //! CLI definitions.
 
 use crate::error::HcBundleResult;
+use crate::modifiers::{resolve_modifier_overrides, DnaRoleSettings};
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use holochain_types::dna::DnaBundle;
@@ -97,6 +98,26 @@ pub enum HcDnaBundleSubcommand {
     Hash {
         /// The path to the dna file.
         path: std::path::PathBuf,
+
+        /// Network seed to override the one in the DNA manifest before
+        /// computing the hash.
+        ///
+        /// Matches the `--network-seed` flag of `hc sandbox generate`: use it
+        /// to compute the hash a cell will have when installed with this seed.
+        /// A `network_seed` in the `--role-settings` file takes precedence
+        /// over this flag, mirroring install-time behavior.
+        #[arg(long, short = 's')]
+        network_seed: Option<String>,
+
+        /// Optional path to a yaml file containing modifiers to override the
+        /// values in the DNA manifest before computing the hash.
+        ///
+        /// The file holds the settings for a single DNA: a `modifiers` block
+        /// with optional `network_seed` and `properties` fields, matching one
+        /// role's entry in the roles settings file accepted by
+        /// `hc sandbox generate --roles-settings`. Other fields are ignored.
+        #[arg(long)]
+        role_settings: Option<std::path::PathBuf>,
     },
 }
 
@@ -335,11 +356,30 @@ impl HcDnaBundleSubcommand {
 
                 println!("{schema_string}");
             }
-            Self::Hash { path } => {
+            Self::Hash {
+                path,
+                network_seed,
+                role_settings,
+            } => {
+                let role_settings = match role_settings {
+                    Some(path) => {
+                        let yaml = ffs::read_to_string(&path).await?;
+                        let settings: DnaRoleSettings = yaml_serde::from_str(&yaml)
+                            .context("Failed to parse the role settings file")?;
+                        Some(settings)
+                    }
+                    None => None,
+                };
+                let modifiers = resolve_modifier_overrides(network_seed, role_settings)?;
                 let bundle = FileSystemBundler::load_from::<ValidatedDnaManifest>(path)
                     .await
                     .map(DnaBundle::from)?;
-                let dna_hash_b64 = bundle.to_dna_file().await?.0.dna_hash().to_string();
+                let dna_hash_b64 = bundle
+                    .into_dna_file(modifiers)
+                    .await?
+                    .0
+                    .dna_hash()
+                    .to_string();
                 println!("{dna_hash_b64}");
             }
         }

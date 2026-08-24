@@ -26,19 +26,20 @@ path = "src/bin/hc-dna.rs"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.0", features = ["derive"] }
+holochain_serialized_bytes = "=0.0.57"
+holochain_types = { version = "^0.8.0-dev.4", path = "../holochain_types" }
 holochain_util = { version = "^0.8.0-dev.0", path = "../holochain_util", features = [
   "backtrace",
 ] }
-holochain_serialized_bytes = "=0.0.57"
-holochain_types = { version = "^0.8.0-dev.4", path = "../holochain_types" }
 mr_bundle = { version = "^0.8.0-dev.2", path = "../mr_bundle", features = [
   "fs",
 ] }
-yaml_serde = "0.10"
+schemars = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
 thiserror = "2.0"
 tokio = { version = "1.27", features = ["full"] }
-schemars = "0.9"
-serde_json = "1.0"
+yaml_serde = "0.10"
 
 [dev-dependencies]
 assert_cmd = "2.0"
