@@ -268,6 +268,126 @@ async fn restore_from_dht_end_to_end() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn restore_from_zero_arc_node_succeeds() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+    // Conductor A authors a chain for `agent` the normal way
+    let mut conductor_a = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let keystore = conductor_a.keystore();
+    let agent = SweetAgents::one(keystore.clone()).await;
+
+    let app_a = conductor_a
+        .setup_app_for_agent("app", agent.clone(), std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_a = app_a.into_cells().remove(0);
+    conductor_a
+        .declare_full_storage_arcs(cell_a.dna_hash())
+        .await;
+
+    // Conductor C is a full-arc peer for a different agent and is the authority
+    let mut conductor_c = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let app_c = conductor_c
+        .setup_app("app", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_c = app_c.into_cells().remove(0);
+    conductor_c
+        .declare_full_storage_arcs(cell_c.dna_hash())
+        .await;
+
+    let last_hash_on_a: ActionHash = conductor_a
+        .call(&cell_a.zome(TestWasm::Create), "create_entry", ())
+        .await;
+
+    await_consistency([&cell_a, &cell_c]).await.unwrap();
+
+    let last_record_on_a: Option<Record> = conductor_a
+        .call(&cell_a.zome(TestWasm::Create), "get_post", last_hash_on_a)
+        .await;
+    let last_seq_on_a = last_record_on_a.unwrap().action().action_seq();
+
+    // Shut down the original, so it can't act as an authority for the restore of itself
+    conductor_a.shutdown().await;
+
+    // Conductor B restores on a zero-arc node so it holds no local DHT data
+    let mut config_b = SweetConductorConfig::rendezvous(true).tune_network_config(|nc| {
+        nc.target_arc_factor = 0;
+    });
+    config_b.restore_chain_quorum = 1;
+    let mut conductor_b =
+        SweetConductor::create_with_defaults(config_b, Some(keystore.clone()), Some(rendezvous))
+            .await;
+
+    let app_id = "restored".to_string();
+    let mut signal_rx = conductor_b.subscribe_to_app_signals(app_id.clone());
+
+    conductor_b
+        .install_app(
+            &app_id,
+            Some(agent.clone()),
+            std::slice::from_ref(&dna_file),
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    let app_info = conductor_b
+        .raw_handle()
+        .get_app_info(&app_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(app_info.status, AppStatus::AwaitingRestore);
+
+    let role = dna_file.dna_hash().to_string();
+    let restore_cell_id = match app_info.cell_info[&role].first().unwrap() {
+        CellInfo::Provisioned(c) => c.cell_id.clone(),
+        other => panic!("Expected a provisioned cell, got: {other:?}"),
+    };
+    let restore_cell = conductor_b.get_sweet_cell(restore_cell_id).unwrap();
+
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: restore_cell.cell_id().clone()
+        }
+    );
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::AppRestoreComplete {
+            installed_app_id: app_id.clone()
+        }
+    );
+
+    conductor_b.enable_app(app_id).await.unwrap();
+
+    // The cell continues authoring from the restored chain head rather than starting over, proving
+    // the restored data actually landed even though this node's arc is empty
+    let new_hash: ActionHash = conductor_b
+        .call(&restore_cell.zome(TestWasm::Create), "create_entry", ())
+        .await;
+    let new_record: Option<Record> = conductor_b
+        .call(&restore_cell.zome(TestWasm::Create), "get_post", new_hash)
+        .await;
+    assert_eq!(new_record.unwrap().action().action_seq(), last_seq_on_a + 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn restore_from_dht_respects_manifest_p2p_config_overrides() {
     holochain_trace::test_run();
 
