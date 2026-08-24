@@ -127,6 +127,15 @@ async fn restore_from_dht_end_to_end() {
         .await;
     let last_seq_on_a = last_record_on_a.unwrap().action().action_seq();
 
+    // Save the original raw chain
+    let chain_on_a = conductor_a
+        .raw_handle()
+        .dump_full_cell_state(cell_a.cell_id(), None, None)
+        .await
+        .unwrap()
+        .source_chain_dump
+        .records;
+
     // Shut down the original, so it can't act as an authority for the restore of itself
     conductor_a.shutdown().await;
 
@@ -219,6 +228,32 @@ async fn restore_from_dht_end_to_end() {
         app_status(&conductor_b, &app_id).await,
         AppStatus::Disabled(DisabledAppReason::NeverStarted)
     );
+
+    // Get the restored raw chain
+    let chain_on_b = conductor_b
+        .raw_handle()
+        .dump_full_cell_state(restore_cell.cell_id(), None, None)
+        .await
+        .unwrap()
+        .source_chain_dump
+        .records;
+
+    // The restored chain must have the same action hashes in the same order
+    assert_eq!(chain_on_a.len(), chain_on_b.len());
+    for (a, b) in chain_on_a.iter().zip(&chain_on_b) {
+        assert_eq!(a.action_address, b.action_address);
+        assert_eq!(a.action, b.action);
+    }
+
+    // Public entries must also be fully restored
+    assert_eq!(chain_on_a[2].entry, chain_on_b[2].entry);
+    assert_eq!(chain_on_a[5].entry, chain_on_b[5].entry);
+    assert_eq!(chain_on_a[6].entry, chain_on_b[6].entry);
+
+    // The private genesis `CapGrant` entry could not be restored because it is never distributed on
+    // the DHT, so only its action restores.
+    assert!(chain_on_a[3].entry.is_some());
+    assert_eq!(chain_on_b[3].entry, None);
 
     conductor_b.enable_app(app_id).await.unwrap();
 
