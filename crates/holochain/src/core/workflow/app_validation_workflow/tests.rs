@@ -1,3 +1,4 @@
+use crate::conductor::conductor::InstallAppCommonFlags;
 use crate::conductor::{Conductor, ConductorHandle};
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -716,6 +717,100 @@ async fn handle_error_in_op_validation() {
         .unwrap()
         .len();
     assert_eq!(ops_to_validate, 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn restoring_app_validation_rejects_and_warrants_op_once_ribosome_is_loaded() {
+    holochain_trace::test_run();
+
+    let entry_def = EntryDef::default_from_id("entry_def_id");
+    let zomes = SweetInlineZomes::new(vec![entry_def], 0).integrity_function(
+        "validate",
+        move |_, op: Op| match op {
+            Op::CreateEntry(_) => Ok(ValidateCallbackResult::Invalid("rejected by test".into())),
+            _ => Ok(ValidateCallbackResult::Valid),
+        },
+    );
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let dna_hash = dna_file.dna_hash().clone();
+
+    let mut conductor = SweetConductor::standard().await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let app_id = "restoring".to_string();
+    conductor
+        .install_app(
+            &app_id,
+            Some(agent.clone()),
+            std::slice::from_ref(&dna_file),
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    // Restart as ribosomes are always loaded for freshly-installed apps but are only reloaded for
+    // enabled apps at startup. A restoring app is never enabled, so the restore orchestrator is the
+    // only thing that reloads this app's ribosome.
+    conductor.shutdown().await;
+    conductor.startup().await;
+
+    let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
+        conductor.get_dht_store(&dna_hash).unwrap(),
+        conductor.keystore(),
+    ));
+
+    let mut create = fixt!(Action, CreateAction);
+    *create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: Default::default(),
+    });
+    let entry = fixt!(Entry);
+    let op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateEntry(
+        SignedAction::new(create, fixt!(Signature)),
+        OpEntry::Present(entry),
+    )));
+    let op_hash = op_hashed.as_hash().clone();
+
+    app_validation_workspace
+        .dht_store
+        .record_incoming_ops(vec![(op_hashed, false)])
+        .await
+        .unwrap();
+    app_validation_workspace
+        .dht_store
+        .record_chain_op_sys_validation_outcomes(vec![(op_hash, SysOutcome::Accepted)])
+        .await
+        .unwrap();
+
+    let network = Arc::new(HolochainP2pDna::new(
+        conductor.holochain_p2p().clone(),
+        dna_hash.clone(),
+    ));
+
+    // The restore orchestrator that reloads the ribosome runs as a background task, so we don't
+    // know when it's done. A rejection plus a warrant is proof that the real validation ran.
+    crate::test_utils::retry_fn_until_timeout(
+        || async {
+            let outcome_summary = app_validation_workflow_inner(
+                Arc::new(dna_hash.clone()),
+                app_validation_workspace.clone(),
+                conductor.raw_handle(),
+                network.clone(),
+                agent.clone(),
+            )
+            .await
+            .unwrap();
+            outcome_summary.rejected == 1 && outcome_summary.warranted == 1
+        },
+        Some(10_000),
+        Some(100),
+    )
+    .await
+    .unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix source-chain restore was ignoring an app's manifest `bootstrap_url`/`relay_url` overrides, and instead always joined the network with the conductor's default config.
+- Fix a source-chain restore bug where ordinary gossip for the restoring agent's own chain could be rejected during validation and permanently block restore's own write, leaving the cell's chain looking empty after `enable_app`.
+- Fix source-chain restore stalling permanently when no peers are yet known for the agent's DHT location. It now retries like any other insufficient-peers response.
 - Fix `AdminRequest::ListCapabilityGrants` with `include_revoked: false` always returning an empty list. It now lists the capability grants that have not been revoked. \#5950
 - **BREAKING CHANGE**: Fix `SendDirectSignal` failing with `FrameOverflow` for payloads over 8 KiB. Payloads up to the documented 1 MiB limit are now delivered. The signature scheme and wire encoding changed, so direct signals sent between conductors with and without this fix are dropped by the receiver — upgrade both ends. \#5937
 - **BREAKING CHANGE**: Errors for zome calls against a cell that is not running now state why. `ConductorError::CellDisabled` is replaced by `ConductorError::CellNotRunning(cell_id, reason)`, where the reason distinguishes an app that is disabled, awaiting membrane proofs, restoring its source chains, or permanently unrecoverable, from a disabled clone cell or a cell that has not finished starting.

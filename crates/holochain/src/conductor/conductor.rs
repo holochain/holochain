@@ -1729,6 +1729,7 @@ const RESTORE_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(
 /// of an app's cells and determines the app-level status and signals from the per-cell results.
 mod restore_impls {
     use super::*;
+    use holochain_types::cell_config_overrides::CellConfigOverrides;
 
     impl Conductor {
         /// Spawn the per-app restore orchestrator as a conductor-managed task, so it is cancelled
@@ -1770,17 +1771,26 @@ mod restore_impls {
         installed_app_id: InstalledAppId,
     ) -> ConductorResult<()> {
         let state = conductor.get_state().await?;
-        let cell_ids: Vec<CellId> = state
-            .get_app(&installed_app_id)?
+        let app = state.get_app(&installed_app_id)?;
+        let cell_ids: Vec<CellId> = app
             .provisioned_cells()
             .map(|(_, cell_id)| cell_id)
             .collect();
 
+        // Required for gossip received during restore, otherwise it fails validation as DnaMissing
+        conductor.load_wasms_into_ribosome_for_app(app).await?;
+
+        let config_override = Conductor::p2p_config_overrides(&app.manifest);
         let quorum = conductor.config.restore_chain_quorum;
 
         for cell_id in cell_ids {
             let (cascade, dht_store, network, sys_validation_trigger) =
-                join_network_and_build_restore_cascade(&conductor, &cell_id).await?;
+                join_network_and_build_restore_cascade(
+                    &conductor,
+                    &cell_id,
+                    config_override.clone(),
+                )
+                .await?;
 
             // Marks the cell as undergoing chain restore for the lifetime of this guard
             let _restoring_guard = RestoringCellGuard::new(conductor.clone(), cell_id.clone())?;
@@ -1866,7 +1876,9 @@ mod restore_impls {
     ///
     /// Joining the network is required, otherwise the cell wouldn't join until the app is enabled
     /// and any P2P query against it would fail. The joined network handle is returned so the caller
-    /// can leave it again if restore ends in permanent failure.
+    /// can leave it again if restore ends in permanent failure. `config_override` should be the
+    /// same value `enable_app` would later join with, so restore doesn't create the DNA's network
+    /// space with different config than the rest of the app expects.
     ///
     /// Also spawns (or reuses, if already running for this DNA) the sys/app validation, integration
     /// and validation-receipt consumers, and returns the sys-validation trigger. A restoring cell
@@ -1875,6 +1887,7 @@ mod restore_impls {
     async fn join_network_and_build_restore_cascade(
         conductor: &ConductorHandle,
         cell_id: &CellId,
+        config_override: Option<CellConfigOverrides>,
     ) -> ConductorResult<(
         CascadeImpl,
         DhtStore,
@@ -1888,7 +1901,7 @@ mod restore_impls {
             cell_id.dna_hash().clone(),
         ));
         network
-            .join(cell_id.agent_pubkey().clone(), None, None)
+            .join(cell_id.agent_pubkey().clone(), None, config_override)
             .await?;
         let cascade = CascadeImpl::empty(dht_store.clone()).with_network(network.clone());
 
