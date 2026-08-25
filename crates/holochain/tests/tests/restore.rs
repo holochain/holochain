@@ -268,6 +268,150 @@ async fn restore_from_dht_end_to_end() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn restore_from_dht_without_prior_init_runs_init_after_restore() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+    // Conductor A installs the app but never makes a zome call
+    let mut conductor_a = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let keystore = conductor_a.keystore();
+    let agent = SweetAgents::one(keystore.clone()).await;
+
+    let app_a = conductor_a
+        .setup_app_for_agent("app", agent.clone(), std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_a = app_a.into_cells().remove(0);
+    conductor_a
+        .declare_full_storage_arcs(cell_a.dna_hash())
+        .await;
+
+    // Conductor C is a full-arc peer for a different agent and is the authority restore queries
+    let mut conductor_c = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let app_c = conductor_c
+        .setup_app("app", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_c = app_c.into_cells().remove(0);
+    conductor_c
+        .declare_full_storage_arcs(cell_c.dna_hash())
+        .await;
+
+    await_consistency([&cell_a, &cell_c]).await.unwrap();
+
+    let chain_on_a = conductor_a
+        .raw_handle()
+        .dump_full_cell_state(cell_a.cell_id(), None, None)
+        .await
+        .unwrap()
+        .source_chain_dump
+        .records;
+    assert_eq!(chain_on_a.len(), 3);
+    assert!(!chain_on_a
+        .iter()
+        .any(|r| r.action.action_type() == ActionType::InitZomesComplete));
+
+    // Shut down the original, so it can't act as an authority for the restore of itself
+    conductor_a.shutdown().await;
+
+    let mut config_b = SweetConductorConfig::rendezvous(true);
+    config_b.restore_chain_quorum = 1;
+    let mut conductor_b =
+        SweetConductor::create_with_defaults(config_b, Some(keystore.clone()), Some(rendezvous))
+            .await;
+
+    let app_id = "restored".to_string();
+    let mut signal_rx = conductor_b.subscribe_to_app_signals(app_id.clone());
+
+    conductor_b
+        .install_app(
+            &app_id,
+            Some(agent.clone()),
+            std::slice::from_ref(&dna_file),
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    let app_info = conductor_b
+        .raw_handle()
+        .get_app_info(&app_id)
+        .await
+        .unwrap()
+        .unwrap();
+    let role = dna_file.dna_hash().to_string();
+    let restore_cell_id = match app_info.cell_info[&role].first().unwrap() {
+        CellInfo::Provisioned(c) => c.cell_id.clone(),
+        other => panic!("Expected a provisioned cell, got: {other:?}"),
+    };
+    let restore_cell = conductor_b.get_sweet_cell(restore_cell_id).unwrap();
+
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: restore_cell.cell_id().clone()
+        }
+    );
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::AppRestoreComplete {
+            installed_app_id: app_id.clone()
+        }
+    );
+
+    conductor_b.enable_app(app_id).await.unwrap();
+
+    // Restore must not change the init state as the chain is still just genesis right after restore
+    let chain_on_b_after_restore = conductor_b
+        .raw_handle()
+        .dump_full_cell_state(restore_cell.cell_id(), None, None)
+        .await
+        .unwrap()
+        .source_chain_dump
+        .records;
+    assert_eq!(chain_on_b_after_restore.len(), 3);
+    for (a, b) in chain_on_a.iter().zip(&chain_on_b_after_restore) {
+        assert_eq!(a.action_address, b.action_address);
+        assert_eq!(a.action, b.action);
+    }
+
+    // The first zome call on the restored cell must run init normally
+    let new_hash: ActionHash = conductor_b
+        .call(&restore_cell.zome(TestWasm::Create), "create_entry", ())
+        .await;
+    let new_record: Option<Record> = conductor_b
+        .call(&restore_cell.zome(TestWasm::Create), "get_post", new_hash)
+        .await;
+    assert_eq!(new_record.unwrap().action().action_seq(), 5);
+
+    let chain_on_b = conductor_b
+        .raw_handle()
+        .dump_full_cell_state(restore_cell.cell_id(), None, None)
+        .await
+        .unwrap()
+        .source_chain_dump
+        .records;
+    let init_actions_on_b: Vec<_> = chain_on_b
+        .iter()
+        .filter(|r| r.action.action_type() == ActionType::InitZomesComplete)
+        .collect();
+    assert_eq!(init_actions_on_b.len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn restore_from_zero_arc_node_succeeds() {
     holochain_trace::test_run();
 
