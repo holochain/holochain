@@ -28,6 +28,7 @@ mod builder;
 mod cells_with_conflicting_overrides;
 mod p2p_config_override;
 mod state_dump;
+mod zome_call_capability;
 
 /// App can't be installed if another app is already installed under the
 /// same InstalledAppId
