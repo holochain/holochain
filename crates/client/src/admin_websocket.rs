@@ -8,7 +8,6 @@ use holochain_conductor_api::{
     PeerMetaInfo, SourceChainCursor, StorageInfo,
 };
 use holochain_types::network::HolochainTransportStats;
-use holochain_types::prelude::CapGrant;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_types::{
     dna::AgentPubKey,
@@ -18,9 +17,10 @@ use holochain_types::{
     },
 };
 use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketSender};
+use holochain_zome_types::capability::GrantZomeCallCapabilityGrant;
 use holochain_zome_types::prelude::{
-    Capability, DnaDef, GrantConstraint, GrantZomeCallCapabilityPayload, GrantedFunctions,
-    ZomeCallGrant, CAP_SECRET_BYTES,
+    DnaDef, GrantConstraint, GrantZomeCallCapabilityPayload, GrantedFunctions, ZomeCallGrant,
+    CAP_SECRET_BYTES,
 };
 use kitsune2_api::Url;
 use serde::{Deserialize, Serialize};
@@ -621,15 +621,15 @@ impl AdminWebsocket {
 
         self.grant_zome_call_capability(GrantZomeCallCapabilityPayload {
             cell_id: request.cell_id,
-            cap_grant: CapGrant {
+            cap_grant: GrantZomeCallCapabilityGrant {
                 tag: "zome-call-signing-key".to_string(),
                 constraint: GrantConstraint::Assigned {
                     secret: cap_secret.into(),
                     assignees: BTreeSet::from([signing_agent_key.clone()]),
                 },
-                capability: Capability::ZomeCall(ZomeCallGrant {
+                grant: ZomeCallGrant {
                     functions: request.functions.unwrap_or(GrantedFunctions::All),
-                }),
+                },
             },
         })
         .await?;

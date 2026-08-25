@@ -44,7 +44,7 @@ pub struct ZomeCallGrant {
     pub functions: GrantedFunctions,
 }
 
-/// The outbound DTO of a [`CapGrant`].
+/// The outbound data transfer object of a [`CapGrant`].
 ///
 /// [`GrantConstraint`] secrets are omitted, access types and assignees are provided under
 /// [`GrantConstraintInfo`].
@@ -189,11 +189,9 @@ impl GrantConstraint {
         match self {
             GrantConstraint::Unrestricted => true,
             // note the PartialEq implementation is constant time for secrets
-            GrantConstraint::Transferable { secret, .. } => {
-                given_secret.map(|given| secret == given).unwrap_or(false)
-            }
-            GrantConstraint::Assigned { secret, .. } => {
-                given_secret.map(|given| secret == given).unwrap_or(false)
+            GrantConstraint::Transferable { secret, .. }
+            | GrantConstraint::Assigned { secret, .. } => {
+                given_secret.is_some_and(|given| given == secret)
             }
         }
     }

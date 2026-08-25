@@ -26,7 +26,6 @@ mod add_agent_infos;
 mod app_state;
 mod builder;
 mod cells_with_conflicting_overrides;
-mod grant_zome_call_capability;
 mod p2p_config_override;
 mod state_dump;
 

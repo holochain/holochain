@@ -117,13 +117,13 @@ pub async fn grant_zome_call_capability(
 
     let request = AdminRequest::GrantZomeCallCapability(Box::new(GrantZomeCallCapabilityPayload {
         cell_id: cell_id.clone(),
-        cap_grant: CapGrant {
+        cap_grant: GrantZomeCallCapabilityGrant {
             tag: "".into(),
             constraint: GrantConstraint::Assigned {
                 secret: cap_secret,
                 assignees,
             },
-            capability: Capability::ZomeCall(ZomeCallGrant { functions }),
+            grant: ZomeCallGrant { functions },
         },
     }));
     let response = admin_tx.request(request);

@@ -32,6 +32,7 @@ use serde::{Deserialize, Serialize};
 
 mod grant;
 pub use grant::*;
+use holochain_integrity_types::capability::{Capability, GrantConstraint, ZomeCallGrant};
 
 /// Parameters for granting a zome call capability.
 #[derive(Debug, Deserialize, Serialize)]
@@ -42,7 +43,31 @@ pub struct GrantZomeCallCapabilityPayload {
     pub cell_id: CellId,
     /// The grant to commit, specifying the capability to grant and the constraint
     /// under which it may be used.
-    pub cap_grant: CapGrant,
+    pub cap_grant: GrantZomeCallCapabilityGrant,
+}
+
+/// Part of a [`GrantZomeCallCapabilityPayload`] payload to be translated to a [`CapGrant`] internally.
+#[derive(Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+pub struct GrantZomeCallCapabilityGrant {
+    /// A string by which to later query for saved grants.
+    /// This does not need to be unique within a source chain.
+    pub tag: String,
+    /// Specifies who may claim this capability, and by what means
+    pub constraint: GrantConstraint,
+    /// Grant access to zome calls with a [`ZomeCallGrant`].
+    pub grant: ZomeCallGrant,
+}
+
+impl From<GrantZomeCallCapabilityGrant> for CapGrant {
+    fn from(grant: GrantZomeCallCapabilityGrant) -> Self {
+        CapGrant {
+            tag: grant.tag,
+            constraint: grant.constraint,
+            capability: Capability::ZomeCall(grant.grant),
+        }
+    }
 }
 
 /// A list which map a cell ID to their capability grant information.
