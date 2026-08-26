@@ -445,7 +445,7 @@ fn dna_hash_cli_failure(dna_path: &Path, role_settings: &Path) -> String {
 }
 
 #[tokio::test]
-async fn test_hash_dna_function() {
+async fn hash_dna_function() {
     let (_temp_dir, dna_path) = pack_dna_hash_fixture();
     let expected = "uhC0kMpN6EzEhjaPP-MWeJi1cH2Zyw7OYEDEekSnjWE85WgCnIvEG";
     let actual = dna_hash_cli(&dna_path, &[]);
