@@ -47,7 +47,7 @@ pub struct GrantZomeCallCapabilityPayload {
 }
 
 /// Part of a [`GrantZomeCallCapabilityPayload`] payload to be translated to a [`CapGrant`] internally.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
 pub struct GrantZomeCallCapabilityGrant {

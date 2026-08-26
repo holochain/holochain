@@ -391,7 +391,7 @@ async fn conductor_can_startup_with_cloned_cell() {
     assert!(zome_call_response.is_ok());
 
     conductor.shutdown().await;
-    conductor.startup(false).await;
+    conductor.startup().await;
 
     // calling the cell works after restart
     let zome = SweetZome::new(
@@ -434,7 +434,7 @@ async fn conductor_can_startup_with_cloned_cell() {
     );
 
     conductor.shutdown().await;
-    conductor.startup(false).await;
+    conductor.startup().await;
 
     // calling the cell still fails after restart, cell still disabled
     let zome = SweetZome::new(
