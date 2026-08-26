@@ -47,9 +47,12 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<ActionHa
 /// When an agent wants to expose zome functions to be called remotely by other agents they need to select
 /// a security model and probably generate a secret.
 ///
-/// The input needs to evalute to a [`ZomeCallCapGrant`] struct which defines the tag, access and
-/// granted zome/function pairs. The access is a [`CapAccess`] enum with variants [`CapAccess::Unrestricted`],
-/// [`CapAccess::Transferable`], and [`CapAccess::Assigned`].
+/// The input needs to evaluate to a [`CapGrantEntry`] struct, which defines the tag, the
+/// constraint under which the grant may be used, and the capability being granted. The constraint
+/// is a [`GrantConstraint`] enum with variants [`GrantConstraint::Unrestricted`],
+/// [`GrantConstraint::Transferable`], and [`GrantConstraint::Assigned`]. The capability is a
+/// [`Capability`] enum; use [`Capability::ZomeCall`] with a [`ZomeCallGrant`] to grant access to a
+/// set of zome/function pairs.
 ///
 /// The tag is an arbitrary [`String`] that developers or users can use to categorise and administer
 /// grants committed to the chain. The tag should also match the [`CapClaim`] tags committed on the
@@ -58,9 +61,9 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<ActionHa
 ///
 /// Provided the grant author agent is reachable on the network:
 ///
-/// - [`CapAccess::Unrestricted`] access means any external agent can call the extern
-/// - [`CapAccess::Transferable`] access means any external agent with a valid secret can call the extern
-/// - [`CapAccess::Assigned`] access means only explicitly approved agents with a valid secret can call the extern
+/// - [`GrantConstraint::Unrestricted`] access means any external agent can call the extern
+/// - [`GrantConstraint::Transferable`] access means any external agent with a valid secret can call the extern
+/// - [`GrantConstraint::Assigned`] access means only explicitly approved agents with a valid secret can call the extern
 ///
 /// The authoring agent itself always has an implicit capability which grants access to its own externs,
 /// and needs no special capability grant.
@@ -111,7 +114,7 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<ActionHa
 /// There is an apparent "chicken or the egg" situation where [`CapGrant`] are required for remote
 /// agents to call externs, so how does an agent request a grant in the first place?
 /// The simplest pattern is for agents to create an extern dedicated to assess incoming grant
-/// requests and to apply [`CapAccess::Unrestricted`] access to it during the zome's `init` callback.
+/// requests and to apply [`GrantConstraint::Unrestricted`] access to it during the zome's `init` callback.
 /// If Alice wants access to Bob's `foo` function she first grants Bob `Assigned` access to her own
 /// `accept_foo_grant` extern and sends her grant's secret to Bob's `issue_foo_grant` function. Bob
 /// receives Alice's request and, if he is willing to grant Alice access, he commits Alice's secret
@@ -120,7 +123,7 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<ActionHa
 /// to Alice's `accept_foo_grant` extern. Alice checks her grant, which matches Bob's public key
 /// and the secret Bob received from her, then she commits a new CapClaim including the secret that
 /// Bob generated. Now Alice can call `foo` on Bob's machine any time he is online, and because all
-/// the secrets are [`CapAccess::Assigned`] Bob can track and update exactly who has access to his externs.
+/// the secrets are [`GrantConstraint::Assigned`] Bob can track and update exactly who has access to his externs.
 pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> ExternResult<ActionHash> {
     create(CreateInput::new(
         EntryDefLocation::CapGrant,
@@ -166,7 +169,7 @@ where
 /// Capability secrets must be unique within and across all chains.
 /// Using this function consistently guarantees uniqueness.
 ///
-/// If an attacker can guess a secret to masquerade as another agent and execute [`CapAccess::Transferable`] code.
+/// If an attacker can guess a secret to masquerade as another agent and execute [`GrantConstraint::Transferable`] code.
 ///
 /// Re-using secrets is forbidden within and across all claims and grants.
 pub fn generate_cap_secret() -> ExternResult<CapSecret> {

@@ -7,7 +7,7 @@ use crate::tests::test_utils::{
     register_and_install_dna, start_holochain_with_lair, write_config, SupervisedChild,
 };
 use ed25519_dalek::SigningKey;
-use hdk::prelude::{CapAccess, GrantZomeCallCapabilityPayload, GrantedFunctions, ZomeCallCapGrant};
+use hdk::prelude::{CapAccess, GrantConstraint, GrantZomeCallCapabilityPayload, GrantedFunctions};
 use hdk::prelude::{
     CapSecret, CellId, FunctionName, PreflightRequest, PreflightRequestAcceptance, Role,
 };
@@ -698,9 +698,9 @@ impl Agent {
         let request =
             AdminRequest::GrantZomeCallCapability(Box::new(GrantZomeCallCapabilityPayload {
                 cell_id: cell_id.clone(),
-                cap_grant: ZomeCallCapGrant {
+                cap_grant: CapAccess {
                     tag: "".into(),
-                    access: CapAccess::Assigned {
+                    access: GrantConstraint::Assigned {
                         secret: cap_secret,
                         assignees,
                     },

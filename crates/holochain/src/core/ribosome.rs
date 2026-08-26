@@ -394,7 +394,7 @@ impl ZomeCallInvocation {
         let check_function = (self.zome.zome_name().clone(), self.fn_name.clone());
         let check_agent = self.provenance.clone();
         let check_secret = self.cap_secret;
-        let maybe_grant: Option<CapGrant> = host_access
+        let maybe_grant: Option<CapAccess> = host_access
             .workspace
             .source_chain()
             .as_ref()

@@ -102,7 +102,7 @@ pub struct PrivateEntryRow {
 pub struct CapGrantRow {
     /// Hash of the `CapGrant` action (primary key).
     pub action_hash: Vec<u8>,
-    /// Encoded [`CapAccess`](holochain_integrity_types::action::CapAccessType).
+    /// Encoded [`GrantConstraintType`](holochain_integrity_types::capability::GrantConstraintType).
     pub cap_access: i64,
     /// Optional human-readable tag.
     pub tag: Option<String>,

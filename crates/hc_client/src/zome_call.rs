@@ -79,9 +79,9 @@ use holochain_client::{
 };
 use holochain_conductor_api::{CellInfo, IssueAppAuthenticationTokenPayload};
 use holochain_types::prelude::{
-    AgentPubKey, CapAccess, CapSecret, DnaHashB64, ExternIO, FunctionName,
-    GrantZomeCallCapabilityPayload, GrantedFunctions, InstalledAppId, ZomeCallCapGrant, ZomeName,
-    CAP_SECRET_BYTES,
+    AgentPubKey, CapSecret, DnaHashB64, ExternIO, FunctionName, GrantConstraint,
+    GrantZomeCallCapabilityGrant, GrantZomeCallCapabilityPayload, GrantedFunctions, InstalledAppId,
+    ZomeCallGrant, ZomeName, CAP_SECRET_BYTES,
 };
 use holochain_types::websocket::AllowedOrigins;
 use serde::{Deserialize, Serialize};
@@ -180,14 +180,16 @@ pub async fn zome_call_auth(zome_call_auth: ZomeCallAuth) -> anyhow::Result<()> 
         admin_client
             .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
                 cell_id: cell_id.clone(),
-                cap_grant: ZomeCallCapGrant::new(
-                    "sandbox".to_string(),
-                    CapAccess::Assigned {
+                cap_grant: GrantZomeCallCapabilityGrant {
+                    tag: "sandbox".to_string(),
+                    constraint: GrantConstraint::Assigned {
                         secret: auth.cap_secret,
                         assignees: vec![signing_agent_key.clone()].into_iter().collect(),
                     },
-                    GrantedFunctions::All,
-                ),
+                    grant: ZomeCallGrant {
+                        functions: GrantedFunctions::All,
+                    },
+                },
             })
             .await?;
         crate::msg!("Authorized zome calls for cell: {:?}", cell_id);
