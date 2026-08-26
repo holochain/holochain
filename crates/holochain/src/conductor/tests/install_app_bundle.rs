@@ -526,11 +526,12 @@ async fn use_existing_integration() {
         conductor
             .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
                 cell_id: cell_id_1.clone(),
-                cap_grant: ZomeCallCapGrant {
+                cap_grant: GrantZomeCallCapabilityGrant {
                     tag: "tag".into(),
-                    // access: CapAccess::Unrestricted,
-                    access: CapAccess::Transferable { secret },
-                    functions: GrantedFunctions::All,
+                    constraint: GrantConstraint::Transferable { secret },
+                    grant: ZomeCallGrant {
+                        functions: GrantedFunctions::All,
+                    },
                 },
             })
             .await

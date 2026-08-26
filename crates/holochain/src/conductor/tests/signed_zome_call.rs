@@ -34,12 +34,14 @@ async fn signed_zome_call() {
     let mut assignees = BTreeSet::new();
     assignees.insert(cap_access_public_key.clone());
 
-    let cap_grant = ZomeCallCapGrant {
+    let cap_grant = GrantZomeCallCapabilityGrant {
         tag: "signing_key".into(),
-        functions: granted_functions,
-        access: CapAccess::Assigned {
+        constraint: GrantConstraint::Assigned {
             secret: cap_access_secret,
             assignees,
+        },
+        grant: ZomeCallGrant {
+            functions: granted_functions,
         },
     };
 
@@ -89,7 +91,7 @@ async fn signed_zome_call() {
         .await
         .unwrap();
     assert!(actual_cap_grant.is_some());
-    assert!(actual_cap_grant.unwrap().is_valid(
+    assert!(actual_cap_grant.unwrap().is_valid_for_zome_call(
         &granted_function,
         &cap_access_public_key,
         Some(&cap_access_secret)
@@ -155,12 +157,14 @@ async fn signed_zome_call_wildcard() {
     let mut assignees = BTreeSet::new();
     assignees.insert(cap_access_public_key.clone());
 
-    let cap_grant = ZomeCallCapGrant {
+    let cap_grant = GrantZomeCallCapabilityGrant {
         tag: "signing_key".into(),
-        functions: granted_functions,
-        access: CapAccess::Assigned {
+        constraint: GrantConstraint::Assigned {
             secret: cap_access_secret,
             assignees,
+        },
+        grant: ZomeCallGrant {
+            functions: granted_functions,
         },
     };
 
@@ -190,7 +194,7 @@ async fn signed_zome_call_wildcard() {
         .await
         .unwrap();
     assert!(actual_cap_grant.is_some());
-    assert!(actual_cap_grant.unwrap().is_valid(
+    assert!(actual_cap_grant.unwrap().is_valid_for_zome_call(
         &called_function,
         &cap_access_public_key,
         Some(&cap_access_secret)
@@ -242,12 +246,14 @@ async fn cap_grant_info_call() {
     let mut assignees = BTreeSet::new();
     assignees.insert(cap_access_public_key.clone());
 
-    let cap_grant = ZomeCallCapGrant {
+    let cap_grant = GrantZomeCallCapabilityGrant {
         tag: "signing_key".into(),
-        functions: granted_functions,
-        access: CapAccess::Assigned {
+        constraint: GrantConstraint::Assigned {
             secret: cap_access_secret,
             assignees,
+        },
+        grant: ZomeCallGrant {
+            functions: granted_functions,
         },
     };
 
@@ -373,12 +379,14 @@ async fn grant_zome_call_capability_call() {
     let _ = conductor
         .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
             cell_id: cell_id.clone(),
-            cap_grant: ZomeCallCapGrant {
+            cap_grant: GrantZomeCallCapabilityGrant {
                 tag: "signing_key".into(),
-                functions: granted_functions,
-                access: CapAccess::Assigned {
+                constraint: GrantConstraint::Assigned {
                     secret: cap_access_secret,
                     assignees,
+                },
+                grant: ZomeCallGrant {
+                    functions: granted_functions,
                 },
             },
         })
@@ -469,10 +477,12 @@ async fn grant_zome_call_capability_call_ensures_zome_initialization() {
     let _ = conductor
         .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
             cell_id: cell_id.clone(),
-            cap_grant: ZomeCallCapGrant {
+            cap_grant: GrantZomeCallCapabilityGrant {
                 tag: "signing_key".into(),
-                functions: granted_functions,
-                access: CapAccess::Assigned {
+                grant: ZomeCallGrant {
+                    functions: granted_functions,
+                },
+                constraint: GrantConstraint::Assigned {
                     secret: cap_access_secret,
                     assignees,
                 },
@@ -533,10 +543,12 @@ async fn revoke_zome_call_capability_call() {
     let mut assignees = BTreeSet::new();
     assignees.insert(cap_access_public_key.clone());
 
-    let cap_grant = ZomeCallCapGrant {
+    let cap_grant = GrantZomeCallCapabilityGrant {
         tag: "signing_key".into(),
-        functions: granted_functions,
-        access: CapAccess::Assigned {
+        grant: ZomeCallGrant {
+            functions: granted_functions,
+        },
+        constraint: GrantConstraint::Assigned {
             secret: cap_access_secret,
             assignees,
         },
@@ -714,12 +726,14 @@ async fn cap_grant_info_excludes_only_revoked_grants() {
     let mut assignees = BTreeSet::new();
     assignees.insert(fixt!(AgentPubKey, ::fixt::Predictable, 1));
 
-    let cap_grant = |tag: &str, secret: CapSecret| ZomeCallCapGrant {
+    let cap_grant = |tag: &str, secret: CapSecret| GrantZomeCallCapabilityGrant {
         tag: tag.into(),
-        functions: granted_functions.clone(),
-        access: CapAccess::Assigned {
+        constraint: GrantConstraint::Assigned {
             secret,
             assignees: assignees.clone(),
+        },
+        grant: ZomeCallGrant {
+            functions: granted_functions.clone(),
         },
     };
 
