@@ -43,6 +43,15 @@ pub struct DnaModifiersOpt<P = SerializedBytes> {
     pub properties: Option<P>,
 }
 
+impl<P> DnaModifiersOpt<P> {
+    /// Replaces fields with any `Some` fields from `modifiers`.
+    pub fn update(mut self, modifiers: Self) -> Self {
+        self.network_seed = modifiers.network_seed.or(self.network_seed);
+        self.properties = modifiers.properties.or(self.properties);
+        self
+    }
+}
+
 impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> Default
     for DnaModifiersOpt<P>
 {
@@ -111,4 +120,26 @@ fn properties_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
     schemars::json_schema!({
         "type": ["object", "null"],
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn optional_modifiers_update_only_set_fields() {
+        let original = DnaModifiersOpt {
+            network_seed: Some("original-seed".to_string()),
+            properties: Some("original-properties".to_string()),
+        };
+        let overrides = DnaModifiersOpt {
+            network_seed: Some("override-seed".to_string()),
+            properties: None,
+        };
+
+        let updated = original.update(overrides);
+
+        assert_eq!(updated.network_seed.as_deref(), Some("override-seed"));
+        assert_eq!(updated.properties.as_deref(), Some("original-properties"));
+    }
 }

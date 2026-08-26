@@ -4220,12 +4220,10 @@ fn get_modifiers_map_from_role_settings(roles_settings: &Option<RoleSettingsMap>
     match roles_settings {
         Some(role_settings_map) => role_settings_map
             .iter()
-            .filter_map(|(role_name, role_settings)| match role_settings {
-                #[allow(deprecated)]
-                RoleSettings::UseExisting { .. } => None,
-                RoleSettings::Provisioned { modifiers, .. } => {
-                    modifiers.as_ref().map(|m| (role_name.clone(), m.clone()))
-                }
+            .filter_map(|(role_name, role_settings)| {
+                role_settings
+                    .modifiers()
+                    .map(|modifiers| (role_name.clone(), modifiers.clone()))
             })
             .collect(),
         None => HashMap::new(),

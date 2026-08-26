@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- `hc dna hash` now accepts modifier overrides: `--network-seed`/`-s` and
+  `--role-settings <path to yaml>`, matching the semantics of
+  `hc sandbox generate`. This makes it possible to compute ahead of time the
+  DNA hash a role will have once install-time modifiers are applied.
+  A `network_seed` in the role settings file takes precedence over `--network-seed`, mirroring
+  installation. \#5946
 - Fix source-chain restore was ignoring an app's manifest `bootstrap_url`/`relay_url` overrides, and instead always joined the network with the conductor's default config.
 - Fix a source-chain restore bug where ordinary gossip for the restoring agent's own chain could be rejected during validation and permanently block restore's own write, leaving the cell's chain looking empty after `enable_app`.
 - Fix source-chain restore stalling permanently when no peers are yet known for the agent's DHT location. It now retries like any other insufficient-peers response.

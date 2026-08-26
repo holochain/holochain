@@ -200,6 +200,16 @@ impl Default for RoleSettings {
     }
 }
 
+impl RoleSettings {
+    /// Returns modifier overrides for a provisioned role.
+    pub fn modifiers(&self) -> Option<&DnaModifiersOpt<YamlProperties>> {
+        match self {
+            Self::UseExisting { .. } => None,
+            Self::Provisioned { modifiers, .. } => modifiers.as_ref(),
+        }
+    }
+}
+
 impl From<RoleSettingsYaml> for RoleSettings {
     fn from(role_settings: RoleSettingsYaml) -> Self {
         match role_settings {
@@ -1187,6 +1197,22 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&role_settings).unwrap(),
             "{\"type\":\"provisioned\",\"value\":{\"membrane_proof\":null,\"modifiers\":null,\"init_properties\":null}}"
+        );
+    }
+
+    #[test]
+    fn provisioned_role_settings_expose_modifier_overrides() {
+        let role_settings = RoleSettings::Provisioned {
+            membrane_proof: None,
+            modifiers: Some(DnaModifiersOpt::none().with_network_seed("seed".to_string())),
+            init_properties: None,
+        };
+
+        assert_eq!(
+            role_settings
+                .modifiers()
+                .and_then(|modifiers| modifiers.network_seed.as_deref()),
+            Some("seed")
         );
     }
 
