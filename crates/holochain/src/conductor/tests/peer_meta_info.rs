@@ -36,14 +36,14 @@ async fn peer_meta_info() {
         .unwrap();
 
     let url = Url::from_str("ws://test.com:80/test-url").unwrap();
-    let ktimestamp = Timestamp::now();
+    // Peer meta expiry is stored with second granularity, so expire on a whole
+    // second in the future.
+    let ktimestamp =
+        Timestamp::from_micros((Timestamp::now().as_micros() / 1_000_000 + 60) * 1_000_000);
     let htimestamp = HTimestamp(ktimestamp.as_micros());
 
     // Write a 1-2 peer meta entries into each space's peer meta store
-    let db1 = conductor
-        .spaces
-        .peer_meta_store(dna1.dna_hash())
-        .unwrap();
+    let db1 = conductor.spaces.peer_meta_store(dna1.dna_hash()).unwrap();
 
     let peer_meta_store1 = Arc::new(HolochainPeerMetaStore::create(db1).await.unwrap());
     peer_meta_store1
@@ -64,10 +64,7 @@ async fn peer_meta_info() {
         .await
         .unwrap();
 
-    let db2 = conductor
-        .spaces
-        .peer_meta_store(dna2.dna_hash())
-        .unwrap();
+    let db2 = conductor.spaces.peer_meta_store(dna2.dna_hash()).unwrap();
 
     let peer_meta_store2 = Arc::new(HolochainPeerMetaStore::create(db2).await.unwrap());
     peer_meta_store2
@@ -166,14 +163,14 @@ async fn app_peer_meta_info() {
         .unwrap();
 
     let url = Url::from_str("ws://test.com:80/test-url").unwrap();
-    let ktimestamp: Timestamp = Timestamp::now();
+    // Peer meta expiry is stored with second granularity, so expire on a whole
+    // second in the future.
+    let ktimestamp =
+        Timestamp::from_micros((Timestamp::now().as_micros() / 1_000_000 + 60) * 1_000_000);
     let htimestamp = HTimestamp(ktimestamp.as_micros());
 
     // Write a peer meta entry into app1's peer meta store
-    let db1 = conductor
-        .spaces
-        .peer_meta_store(dna1.dna_hash())
-        .unwrap();
+    let db1 = conductor.spaces.peer_meta_store(dna1.dna_hash()).unwrap();
 
     let peer_meta_store1 = Arc::new(HolochainPeerMetaStore::create(db1).await.unwrap());
     peer_meta_store1

@@ -2936,15 +2936,18 @@ mod misc_impls {
                     let cap_action_hash = grant_record.action_address().clone();
                     let mut revoke_time: Option<Timestamp> = None;
 
-                    // skip grant info if include_revoked is false
-                    if !include_revoked {
-                        continue;
-                    // set revoke time if delete action exists
-                    } else if delete_action_hash_map.contains_key(&cap_action_hash) {
+                    if delete_action_hash_map.contains_key(&cap_action_hash) {
+                        // skip grant info if include_revoked is false
+                        if !include_revoked {
+                            continue;
+                        }
+
+                        // set revoke time because a corresponding delete action exists
                         revoke_time = delete_action_hash_map
                             .get(&cap_action_hash)
                             .map(|time| time.to_owned())
                     }
+
                     let zome_cap_grant = match grant_record.entry.to_grant_option() {
                         Some(zome_cap_grant) => {
                             DesensitizedZomeCallCapGrant::from(zome_cap_grant.clone())
