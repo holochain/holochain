@@ -5,7 +5,6 @@
 mod cli;
 mod error;
 mod init;
-mod modifiers;
 mod packing;
 
 pub use cli::{

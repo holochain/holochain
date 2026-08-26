@@ -543,7 +543,7 @@ fn hash_dna_rejects_malformed_role_settings_yaml() {
 fn hash_dna_rejects_role_settings_without_modifiers() {
     let (temp_dir, dna_path) = pack_dna_hash_fixture();
     let settings_path = temp_dir.path().join("role-settings-without-modifiers.yaml");
-    fs::write(&settings_path, "membrane_proof: ~\n").unwrap();
+    fs::write(&settings_path, "type: provisioned\nmembrane_proof: ~\n").unwrap();
 
     let stderr = dna_hash_cli_failure(&dna_path, &settings_path);
 

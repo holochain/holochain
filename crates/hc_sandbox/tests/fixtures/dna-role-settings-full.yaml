@@ -1,3 +1,4 @@
+type: provisioned
 modifiers:
   network_seed: some random network seed
   properties: some properties in the manifest
