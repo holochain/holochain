@@ -11,6 +11,9 @@ use sqlx::{Executor, QueryBuilder, Sqlite};
 
 /// Insert an `Action` row. `record_validity` is `Some(Accepted)` for
 /// self-authored actions and `None` for incoming network actions.
+/// A decided status promotes an existing pending row, as can happen when
+/// gossip precedes chain restoration. Existing decided statuses are preserved;
+/// only op integration recomputes those from validation results.
 ///
 /// The stored hash is taken from `action.as_hash()` — the caller is
 /// responsible for constructing the [`SignedActionHashed`] with the correct
@@ -39,7 +42,9 @@ where
         "INSERT INTO Action (hash, author, seq, prev_hash, timestamp, action_type,
                              action_data, signature, entry_hash, private_entry,
                              record_validity)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(hash) DO UPDATE SET record_validity = excluded.record_validity
+         WHERE Action.record_validity IS NULL AND excluded.record_validity IS NOT NULL",
     )
     .bind(action.as_hash().get_raw_36())
     .bind(inner.header.author.get_raw_36())
