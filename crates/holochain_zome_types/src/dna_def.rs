@@ -28,7 +28,7 @@ pub type CoordinatorZomes = Vec<(ZomeName, CoordinatorZomeDef)>;
 #[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
 #[cfg_attr(feature = "full-dna-def", builder(public))]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct DnaDef {
     /// The friendly "name" of a Holochain DNA.
     #[cfg_attr(

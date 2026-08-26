@@ -124,19 +124,25 @@ test-workspace-wasmer-wasmi:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer-wasmi
 
-# Runs the `export-ts-bindings` binary in the hc crate, which stages the whole
-# binding tree in one process (ts-rs only merges declarations sharing an output
-# file within a single process) before atomically replacing TS_RS_EXPORT_DIR.
-# See holochain_conductor_api::export_ts_bindings.
+# Writes the TypeScript binding tree with `hc export-ts-bindings`, which
+# stages the whole tree in one process (ts-rs only merges declarations sharing
+# an output file within a single process) before replacing the output
+# directory. `hc`'s `ts_rs` feature builds in the subcommand; it is off by
+# default so ordinary workspace builds don't compile the type crates with
+# `ts_rs`. `unstable-countersigning` implies `ts_rs` and additionally adds the
+# countersigning app API. See holochain_conductor_api::export_ts_bindings.
 ts-bindings:
-	TS_RS_EXPORT_DIR=$(or $(TS_RS_EXPORT_DIR),./bindings) \
-		cargo run -p holochain_cli --features ts_rs,unstable-countersigning --bin export-ts-bindings
+	cargo run -p holochain_cli --locked --features unstable-countersigning -- \
+		export-ts-bindings --out-dir $(or $(TS_BINDINGS_DIR),./bindings)
 
-# The ts_rs-gated tests in holochain_conductor_api: the wire-format smoke test
-# and the tag-injection helper's unit tests.
+# Runs the export, then the hc integration tests, with the countersigning app
+# API enabled. The ts-bindings prerequisite's real purpose here is to build
+# hc with the right features first, so the tests under crates/hc/tests/ pick
+# up that binary via CARGO_BIN_EXE_hc instead of a stale one. The ts_rs-gated
+# tests of the type crates only run here, not in test-workspace: hc's ts_rs
+# feature is off by default there, so the type crates compile without it.
 ts-bindings-test: ts-bindings
-	cargo test -p holochain_conductor_api --features ts_rs,unstable-countersigning admin_request_bindings_smoke
-	cargo test -p holochain_conductor_api --features ts_rs,unstable-countersigning tag_exports_public
+	cargo test -p holochain_cli --features unstable-countersigning
 
 clean:
 	cargo clean

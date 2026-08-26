@@ -243,7 +243,9 @@ impl AdminInterfaceApi {
                 Ok(AdminResponse::NetworkStatsDumped(stats))
             }
             AddAgentInfo { agent_infos } => {
-                self.conductor_handle.add_agent_infos(agent_infos).await?;
+                self.conductor_handle
+                    .add_agent_infos(agent_infos, None)
+                    .await?;
                 Ok(AdminResponse::AgentInfoAdded)
             }
             AgentInfo { dna_hashes } => {

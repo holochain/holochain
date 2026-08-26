@@ -37,7 +37,7 @@ use holochain_integrity_types::capability::{Capability, GrantConstraint, ZomeCal
 /// Parameters for granting a zome call capability.
 #[derive(Debug, Deserialize, Serialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct GrantZomeCallCapabilityPayload {
     /// Cell for which to authorize the capability.
     pub cell_id: CellId,
@@ -76,13 +76,13 @@ impl From<GrantZomeCallCapabilityGrant> for CapGrant {
 /// because it is problematic with msgpack encoding.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct AppCapGrantInfo(pub Vec<(CellId, Vec<CapGrantInfo>)>);
 
 /// Information about a capability grant.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/capabilities.ts"))]
 pub struct CapGrantInfo {
     /// The granted capability and its constraint, with secrets removed.
     pub cap_grant: DesensitizedCapGrant,

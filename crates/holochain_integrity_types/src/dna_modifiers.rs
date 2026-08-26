@@ -9,7 +9,7 @@ use holochain_serialized_bytes::prelude::*;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "types.ts"))]
 pub struct DnaModifiers {
     /// The network seed of a DNA is included in the computation of the DNA hash.
     /// The DNA hash in turn determines the network peers and the DHT, meaning
@@ -183,7 +183,7 @@ mod ts_export {
 
     #[test]
     fn properties_shape_is_per_instantiation() {
-        let cfg = ts_rs::Config::from_env();
+        let cfg = ts_rs::Config::default();
 
         assert_eq!(
             DnaModifiersOpt::<SerializedBytes>::inline(&cfg),

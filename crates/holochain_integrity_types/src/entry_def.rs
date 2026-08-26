@@ -75,7 +75,7 @@ pub struct EntryDefs(pub Vec<EntryDef>);
     Default,
 )]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/entry.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/entry.ts"))]
 pub enum EntryVisibility {
     #[default]
     Public,

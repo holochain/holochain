@@ -12,7 +12,7 @@ use std::collections::{BTreeSet, HashSet};
 /// This must match the strictness of the [`GrantConstraint`].
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/capabilities.ts"))]
 pub struct CapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
@@ -38,7 +38,7 @@ pub enum Capability {
 /// The inner properties of a [`Capability::ZomeCall`].
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/capabilities.ts"))]
 pub struct ZomeCallGrant {
     /// Set of functions to which this capability grants ZomeCall access
     pub functions: GrantedFunctions,
@@ -50,7 +50,7 @@ pub struct ZomeCallGrant {
 /// [`GrantConstraintInfo`].
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/capabilities.ts"))]
 pub struct DesensitizedCapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
@@ -156,7 +156,7 @@ impl CapAccess {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/capabilities.ts"))]
 pub enum GrantConstraint {
     /// No restriction: callable by anyone.
     Unrestricted,
@@ -274,7 +274,7 @@ impl GrantConstraint {
 /// Represents [`GrantConstraint`] info for capability grants, with secrets removed.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/capabilities.ts"))]
 pub struct GrantConstraintInfo {
     /// The access type.
     access_type: String,
@@ -298,7 +298,7 @@ holo_hash::ts_alias!(
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/capabilities.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/capabilities.ts"))]
 pub enum GrantedFunctions {
     /// grant all zomes all functions
     All,

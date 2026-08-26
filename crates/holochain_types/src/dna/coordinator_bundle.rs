@@ -19,7 +19,7 @@ use std::collections::HashMap;
     derive_more::From,
 )]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct CoordinatorBundle(mr_bundle::Bundle<CoordinatorManifest>);
 
 impl Manifest for CoordinatorManifest {

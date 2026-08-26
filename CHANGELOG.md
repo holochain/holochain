@@ -14,6 +14,106 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260824.005809
+
+## [hcterm-0.8.0-dev.4](crates/hcterm/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_cli-0.8.0-dev.4](crates/holochain_cli/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_cli\_bundle-0.8.0-dev.4](crates/holochain_cli_bundle/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_cli\_client-0.8.0-dev.4](crates/holochain_cli_client/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_cli\_sandbox-0.8.0-dev.4](crates/holochain_cli_sandbox/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_client-0.10.0-dev.4](crates/holochain_client/CHANGELOG.md#0.10.0-dev.4)
+
+## [holochain-0.8.0-dev.4](crates/holochain/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_cascade-0.8.0-dev.4](crates/holochain_cascade/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_conductor\_config-0.8.0-dev.4](crates/holochain_conductor_config/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_wasm\_test\_utils-0.8.0-dev.4](crates/holochain_wasm_test_utils/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_websocket-0.8.0-dev.4](crates/holochain_websocket/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_p2p-0.8.0-dev.4](crates/holochain_p2p/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_state-0.8.0-dev.4](crates/holochain_state/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_data-0.8.0-dev.4](crates/holochain_data/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_conductor\_api-0.8.0-dev.4](crates/holochain_conductor_api/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_keystore-0.8.0-dev.4](crates/holochain_keystore/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_types-0.8.0-dev.4](crates/holochain_types/CHANGELOG.md#0.8.0-dev.4)
+
+# 20260820.161351
+
+## [hcterm-0.8.0-dev.3](crates/hcterm/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_cli-0.8.0-dev.3](crates/holochain_cli/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_cli\_bundle-0.8.0-dev.3](crates/holochain_cli_bundle/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_cli\_client-0.8.0-dev.3](crates/holochain_cli_client/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_cli\_sandbox-0.8.0-dev.3](crates/holochain_cli_sandbox/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_client-0.10.0-dev.3](crates/holochain_client/CHANGELOG.md#0.10.0-dev.3)
+
+## [holochain-0.8.0-dev.3](crates/holochain/CHANGELOG.md#0.8.0-dev.3)
+
+- **BREAKING CHANGE**: Fix `SendDirectSignal` failing with `FrameOverflow` for payloads over 8 KiB. Payloads up to the documented 1 MiB limit are now delivered. The signature scheme and wire encoding changed, so direct signals sent between conductors with and without this fix are dropped by the receiver — upgrade both ends. \#5937
+- Add `hc export-ts-bindings`, a built-in `hc` subcommand that writes the TypeScript type declarations for the conductor’s admin and app API and signals to a directory (`./bindings` by default, `--out-dir` to choose another). If the directory already exists, its contents are replaced; the command refuses to do so when the directory is the root directory, or the working directory or an ancestor of it. Building `hc` with `--features unstable-countersigning` additionally includes the countersigning app API. \#5214
+- Add `AddAgentInfo` to the app interface, allowing apps to add signed agent info to the conductor’s peer store. \#5016
+- **BREAKING CHANGE**: `Signal::AppDirect`, delivered to an app when another agent sends it a direct signal via `SendDirectSignal`, now includes the sending agent’s public key as `from_agent`. \#5938
+- **BREAKING CHANGE**: Errors for zome calls against a cell that is not running now state why. `ConductorError::CellDisabled` is replaced by `ConductorError::CellNotRunning(cell_id, reason)`, where the reason distinguishes an app that is disabled, awaiting membrane proofs, restoring its source chains, or permanently unrecoverable, from a disabled clone cell or a cell that has not finished starting.
+
+## [holochain\_cascade-0.8.0-dev.3](crates/holochain_cascade/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_conductor\_config-0.8.0-dev.3](crates/holochain_conductor_config/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_test\_wasm\_common-0.8.0-dev.2](crates/holochain_test_wasm_common/CHANGELOG.md#0.8.0-dev.2)
+
+## [holochain\_wasm\_test\_utils-0.8.0-dev.3](crates/holochain_wasm_test_utils/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_websocket-0.8.0-dev.3](crates/holochain_websocket/CHANGELOG.md#0.8.0-dev.3)
+
+## [hdk-0.8.0-dev.2](crates/hdk/CHANGELOG.md#0.8.0-dev.2)
+
+## [holochain\_p2p-0.8.0-dev.3](crates/holochain_p2p/CHANGELOG.md#0.8.0-dev.3)
+
+## [hdi-0.9.0-dev.2](crates/hdi/CHANGELOG.md#0.9.0-dev.2)
+
+## [holochain\_state-0.8.0-dev.3](crates/holochain_state/CHANGELOG.md#0.8.0-dev.3)
+
+## [hdk\_derive-0.8.0-dev.2](crates/hdk_derive/CHANGELOG.md#0.8.0-dev.2)
+
+## [holochain\_data-0.8.0-dev.3](crates/holochain_data/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_conductor\_api-0.8.0-dev.3](crates/holochain_conductor_api/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_keystore-0.8.0-dev.3](crates/holochain_keystore/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_state\_types-0.8.0-dev.2](crates/holochain_state_types/CHANGELOG.md#0.8.0-dev.2)
+
+## [holochain\_types-0.8.0-dev.3](crates/holochain_types/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_zome\_types-0.8.0-dev.2](crates/holochain_zome_types/CHANGELOG.md#0.8.0-dev.2)
+
+## [mr\_bundle-0.8.0-dev.2](crates/mr_bundle/CHANGELOG.md#0.8.0-dev.2)
+
+## [holochain\_integrity\_types-0.8.0-dev.2](crates/holochain_integrity_types/CHANGELOG.md#0.8.0-dev.2)
+
+## [holochain\_nonce-0.8.0-dev.2](crates/holochain_nonce/CHANGELOG.md#0.8.0-dev.2)
+
+## [holo\_hash-0.8.0-dev.2](crates/holo_hash/CHANGELOG.md#0.8.0-dev.2)
+
+## [holochain\_timestamp-0.8.0-dev.2](crates/holochain_timestamp/CHANGELOG.md#0.8.0-dev.2)
+
 # 20260817.005712
 
 ## [hcterm-0.8.0-dev.2](crates/hcterm/CHANGELOG.md#0.8.0-dev.2)

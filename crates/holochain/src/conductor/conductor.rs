@@ -1729,6 +1729,7 @@ const RESTORE_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(
 /// of an app's cells and determines the app-level status and signals from the per-cell results.
 mod restore_impls {
     use super::*;
+    use holochain_types::cell_config_overrides::CellConfigOverrides;
 
     impl Conductor {
         /// Spawn the per-app restore orchestrator as a conductor-managed task, so it is cancelled
@@ -1770,17 +1771,26 @@ mod restore_impls {
         installed_app_id: InstalledAppId,
     ) -> ConductorResult<()> {
         let state = conductor.get_state().await?;
-        let cell_ids: Vec<CellId> = state
-            .get_app(&installed_app_id)?
+        let app = state.get_app(&installed_app_id)?;
+        let cell_ids: Vec<CellId> = app
             .provisioned_cells()
             .map(|(_, cell_id)| cell_id)
             .collect();
 
+        // Required for gossip received during restore, otherwise it fails validation as DnaMissing
+        conductor.load_wasms_into_ribosome_for_app(app).await?;
+
+        let config_override = Conductor::p2p_config_overrides(&app.manifest);
         let quorum = conductor.config.restore_chain_quorum;
 
         for cell_id in cell_ids {
             let (cascade, dht_store, network, sys_validation_trigger) =
-                join_network_and_build_restore_cascade(&conductor, &cell_id).await?;
+                join_network_and_build_restore_cascade(
+                    &conductor,
+                    &cell_id,
+                    config_override.clone(),
+                )
+                .await?;
 
             // Marks the cell as undergoing chain restore for the lifetime of this guard
             let _restoring_guard = RestoringCellGuard::new(conductor.clone(), cell_id.clone())?;
@@ -1866,7 +1876,9 @@ mod restore_impls {
     ///
     /// Joining the network is required, otherwise the cell wouldn't join until the app is enabled
     /// and any P2P query against it would fail. The joined network handle is returned so the caller
-    /// can leave it again if restore ends in permanent failure.
+    /// can leave it again if restore ends in permanent failure. `config_override` should be the
+    /// same value `enable_app` would later join with, so restore doesn't create the DNA's network
+    /// space with different config than the rest of the app expects.
     ///
     /// Also spawns (or reuses, if already running for this DNA) the sys/app validation, integration
     /// and validation-receipt consumers, and returns the sys-validation trigger. A restoring cell
@@ -1875,6 +1887,7 @@ mod restore_impls {
     async fn join_network_and_build_restore_cascade(
         conductor: &ConductorHandle,
         cell_id: &CellId,
+        config_override: Option<CellConfigOverrides>,
     ) -> ConductorResult<(
         CascadeImpl,
         DhtStore,
@@ -1888,7 +1901,7 @@ mod restore_impls {
             cell_id.dna_hash().clone(),
         ));
         network
-            .join(cell_id.agent_pubkey().clone(), None, None)
+            .join(cell_id.agent_pubkey().clone(), None, config_override)
             .await?;
         let cascade = CascadeImpl::empty(dht_store.clone()).with_network(network.clone());
 
@@ -2764,6 +2777,7 @@ mod scheduler_impls {
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
     use holochain_conductor_api::{CellInfo, JsonDump};
+    use holochain_keystore::AgentPubKeyExt;
     use holochain_zome_types::prelude::Entry;
     use kitsune2_api::SpaceId;
     use std::sync::atomic::Ordering;
@@ -3314,15 +3328,33 @@ mod misc_impls {
             })
         }
 
-        /// Add signed agent info to the conductor
-        pub async fn add_agent_infos(&self, agent_infos: Vec<String>) -> ConductorApiResult<()> {
+        /// Add signed agent info to the conductor.
+        ///
+        /// If `allowed_dna_hashes` is `Some`, every agent info must belong to one of
+        /// those DNAs; otherwise the whole request is rejected and no peer store is
+        /// modified. `None` allows agent info for any DNA and is used by the admin
+        /// interface.
+        pub async fn add_agent_infos(
+            &self,
+            agent_infos: Vec<String>,
+            allowed_dna_hashes: Option<Vec<DnaHash>>,
+        ) -> ConductorApiResult<()> {
             let mut parsed_by_space: HashMap<SpaceId, Vec<Arc<AgentInfoSigned>>> = HashMap::new();
+            let allowed_dna_hashes = allowed_dna_hashes.as_ref();
             // Parse agent infos and add them to a map indexed by space id.
             for info in agent_infos {
                 let parsed_info = kitsune2_api::AgentInfoSigned::decode(
                     &kitsune2_core::Ed25519Verifier,
                     info.as_bytes(),
                 )?;
+                let dna_hash = DnaHash::from_k2_space(&parsed_info.space);
+                if let Some(allowed_dna_hashes) = allowed_dna_hashes {
+                    if !allowed_dna_hashes.contains(&dna_hash) {
+                        return Err(ConductorApiError::other(format!(
+                            "Agent info space {dna_hash} is not part of app"
+                        )));
+                    }
+                }
                 let space_id = parsed_info.space.clone();
                 parsed_by_space
                     .entry(space_id)
@@ -3450,9 +3482,13 @@ mod misc_impls {
 
             let signal_bytes = holochain_serialized_bytes::encode(&DirectSignal(signal))?;
 
-            let sig = self
-                .keystore()
-                .sign(app_info.agent_pub_key.clone(), signal_bytes.clone().into())
+            // Sign the hash, not the bytes: lair signing frames are capped at 8 KiB while
+            // payloads go up to `DIRECT_SIGNAL_MAX_SIZE`. The receiver verifies through
+            // `is_valid_signature`, which hashes the received bytes the same way.
+            let hash = holo_hash::sha2_512(&signal_bytes);
+            let sig = app_info
+                .agent_pub_key
+                .sign_raw(self.keystore(), hash.into())
                 .await?;
 
             self.holochain_p2p()

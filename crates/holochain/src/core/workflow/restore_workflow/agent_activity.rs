@@ -96,6 +96,16 @@ pub(super) async fn acquire_responses(
                 Vec::new(),
             ));
         }
+        // No peers are known for the agent's location but may be discovered later.
+        Err(CascadeError::NetworkError(HolochainP2pError::NoPeersForLocation(..))) => {
+            return Ok((
+                AcquireOutcome::Retry(RetryReason::TooFewResponses {
+                    got: 0,
+                    need: quorum as usize,
+                }),
+                Vec::new(),
+            ));
+        }
         Err(err) => return Err(WorkflowError::CascadeError(err)),
     };
 
@@ -832,6 +842,27 @@ mod tests {
         assert!(matches!(
             outcome,
             AcquireOutcome::Retry(RetryReason::TooFewResponses { got: 1, need: 2 })
+        ));
+        assert!(warrants.is_empty());
+    }
+
+    #[tokio::test]
+    async fn acquire_responses_maps_no_peers_for_location_to_retry() {
+        let agent = ::fixt::fixt!(AgentPubKey);
+        let mut mock = holochain_p2p::MockHolochainP2pDnaT::new();
+        mock.expect_get_agent_activity_multi().returning(|_, _, _| {
+            Err(holochain_p2p::HolochainP2pError::NoPeersForLocation(
+                "get_agent_activity_multi".into(),
+                0,
+            ))
+        });
+        let network: holochain_p2p::DynHolochainP2pDna = std::sync::Arc::new(mock);
+        let cascade = cascade_with_network(network).await;
+
+        let (outcome, warrants) = acquire_responses(&cascade, &agent, 2).await.unwrap();
+        assert!(matches!(
+            outcome,
+            AcquireOutcome::Retry(RetryReason::TooFewResponses { got: 0, need: 2 })
         ));
         assert!(warrants.is_empty());
     }

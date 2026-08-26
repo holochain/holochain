@@ -11,7 +11,7 @@ use holochain_zome_types::prelude::*;
 /// How an entry is represented inside a `ChainOp`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/dht-ops.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/dht-ops.ts"))]
 pub enum OpEntry {
     /// The entry is included with the op.
     Present(Entry),
@@ -24,7 +24,7 @@ pub enum OpEntry {
 /// Chain-level DHT ops. Each variant targets a specific authority.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/dht-ops.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/dht-ops.ts"))]
 pub enum ChainOp {
     /// Store an action record at the action's hash authority.
     CreateRecord(SignedAction, OpEntry),
@@ -49,7 +49,7 @@ pub enum ChainOp {
 /// Top-level DHT op.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/dht-ops.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/dht-ops.ts"))]
 pub enum DhtOp {
     /// A chain-level op (record/entry/activity/link).
     ChainOp(Box<ChainOp>),

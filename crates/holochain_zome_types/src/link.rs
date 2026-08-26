@@ -21,7 +21,7 @@ use holochain_timestamp::Timestamp;
     SerializedBytes,
 )]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "hdk/link.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/link.ts"))]
 pub struct Link {
     /// The author of this link
     pub author: holo_hash::AgentPubKey,

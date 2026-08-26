@@ -36,7 +36,7 @@ use std::collections::HashMap;
 )]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct AppManifestV0 {
     /// Name of the App. This may be used as the installed_app_id.
     pub name: String,
@@ -82,7 +82,7 @@ pub struct AppManifestV0 {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct AppRoleManifest {
     /// The ID which will be used to refer to:
     /// - this role,
@@ -114,7 +114,7 @@ impl AppRoleManifest {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub struct AppRoleDnaManifest {
     /// Where to find this DNA.
     ///
@@ -170,7 +170,7 @@ impl AppRoleDnaManifest {
 #[serde(tag = "strategy")]
 #[allow(missing_docs)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/admin/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/admin/types.ts"))]
 pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
     Create { deferred: bool },

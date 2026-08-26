@@ -106,6 +106,7 @@ pub enum WireMessage {
     },
     RemoteSignalDirectEvt {
         to_agent: AgentPubKey,
+        #[serde(with = "serde_bytes")]
         signal: Vec<u8>,
         from_agent: AgentPubKey,
         signature: Signature,
@@ -371,5 +372,43 @@ impl WireMessage {
     /// Incoming "Ping" response.
     pub fn ping_res(msg_id: u64) -> WireMessage {
         Self::PingRes { msg_id }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The direct signal payload must go over the wire as msgpack `bin`
+    /// (one byte per byte), not as an array of ints (up to two bytes per
+    /// byte): a 1 MiB signal must not become 2 MiB on the wire.
+    #[test]
+    fn remote_signal_direct_evt_encodes_signal_as_bytes() {
+        let signal = vec![0xFFu8; 4096];
+        let msg = WireMessage::remote_signal_direct_evt(
+            AgentPubKey::from_raw_36(vec![1; 36]),
+            signal.clone(),
+            AgentPubKey::from_raw_36(vec![2; 36]),
+            Signature([3; 64]),
+        );
+        let encoded = WireMessage::encode_batch(&[&msg]).unwrap();
+        // Two hashes (2 * (2 + 39)), a signature (2 + 64), the bin32 header
+        // (5), the enum tag/content map and field names, and the batch
+        // array wrapper: well under 512.
+        assert!(
+            encoded.len() < signal.len() + 512,
+            "encoded {} bytes for a {} byte signal",
+            encoded.len(),
+            signal.len()
+        );
+        let decoded = WireMessage::decode_batch(&encoded).unwrap();
+        match decoded.into_iter().next().unwrap() {
+            WireMessage::RemoteSignalDirectEvt {
+                signal: decoded, ..
+            } => {
+                assert_eq!(decoded, signal)
+            }
+            other => panic!("unexpected wire message: {other:?}"),
+        }
     }
 }

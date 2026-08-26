@@ -9,7 +9,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **BREAKING CHANGE**: Capability grants are restructured to make room for capabilities other than zome calls. A grant is now `CapGrantEntry { tag, constraint, capability }`: `constraint` (formerly `access`) says who may claim the grant, and `capability` says what it grants, currently `Capability::ZomeCall(ZomeCallGrant { functions })` — build that shape with `CapGrant::new_zome_call_grant`. A grant only authorizes the capability it was issued for. The admin API follows: `GrantZomeCallCapability`'s `cap_grant` is now a `GrantZomeCallCapabilityGrant { tag, constraint, grant: { functions } }` rather than a whole grant, so it can only ever grant zome calls, and `ListCapabilityGrants` reports the new grant shape. Capability grants already on a source chain cannot be read by this version and must be re-issued. Types are renamed to match: `ZomeCallCapGrant` → `CapGrant`, the old `CapGrant` enum → `CapAccess`, `CapAccess` → `GrantConstraint`, `DesensitizedZomeCallCapGrant` → `DesensitizedCapGrant`, `CapAccessInfo` → `GrantConstraintInfo`. \#5820
 - **BREAKING CHANGE**: Remove `Entry::app_fancy` and `Entry::entry_type`. Use `Entry::app` with `SerializedBytes`, and read an entry type from the action that wrote it.
-- **BREAKING CHANGE**: `Signal::AppDirect`, delivered to an app when another agent sends it a direct signal via `SendDirectSignal`, now includes the sending agent's public key as `from_agent`. \#5938
+- Fix source-chain restore was ignoring an app's manifest `bootstrap_url`/`relay_url` overrides, and instead always joined the network with the conductor's default config.
+- Fix a source-chain restore bug where ordinary gossip for the restoring agent's own chain could be rejected during validation and permanently block restore's own write, leaving the cell's chain looking empty after `enable_app`.
+- Fix source-chain restore stalling permanently when no peers are yet known for the agent's DHT location. It now retries like any other insufficient-peers response.
+
+## 0.8.0-dev.4
+
+## 0.8.0-dev.3
+
+- **BREAKING CHANGE**: Fix `SendDirectSignal` failing with `FrameOverflow` for payloads over 8 KiB. Payloads up to the documented 1 MiB limit are now delivered. The signature scheme and wire encoding changed, so direct signals sent between conductors with and without this fix are dropped by the receiver — upgrade both ends. \#5937
+- Add `hc export-ts-bindings`, a built-in `hc` subcommand that writes the TypeScript type declarations for the conductor’s admin and app API and signals to a directory (`./bindings` by default, `--out-dir` to choose another). If the directory already exists, its contents are replaced; the command refuses to do so when the directory is the root directory, or the working directory or an ancestor of it. Building `hc` with `--features unstable-countersigning` additionally includes the countersigning app API. \#5214
+- Add `AddAgentInfo` to the app interface, allowing apps to add signed agent info to the conductor’s peer store. \#5016
+- **BREAKING CHANGE**: `Signal::AppDirect`, delivered to an app when another agent sends it a direct signal via `SendDirectSignal`, now includes the sending agent’s public key as `from_agent`. \#5938
 - **BREAKING CHANGE**: Errors for zome calls against a cell that is not running now state why. `ConductorError::CellDisabled` is replaced by `ConductorError::CellNotRunning(cell_id, reason)`, where the reason distinguishes an app that is disabled, awaiting membrane proofs, restoring its source chains, or permanently unrecoverable, from a disabled clone cell or a cell that has not finished starting.
 
 ## 0.8.0-dev.2

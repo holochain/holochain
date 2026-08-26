@@ -132,7 +132,7 @@ mod ts_export {
 
     #[test]
     fn decls_are_plain_string_aliases() {
-        let cfg = ts_rs::Config::from_env();
+        let cfg = ts_rs::Config::default();
         assert_eq!(DnaHashB64Ts::decl(&cfg), "type DnaHashB64 = string;");
         assert_eq!(WasmHashB64Ts::decl(&cfg), "type WasmHashB64 = string;");
     }

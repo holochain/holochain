@@ -383,3 +383,53 @@ async fn direct_signal_to_dna_not_in_app_is_rejected() {
     let response = send_direct_signal(&tx, other_dna_hash, vec![agent], b"payload".to_vec()).await;
     assert_error_contains(&response, "was not found in app");
 }
+
+/// Regression test for #5937: a payload of exactly `DIRECT_SIGNAL_MAX_SIZE` bytes must be
+/// accepted by the sender and delivered to the target. `0xFF` bytes are the worst case for the
+/// old array-of-ints encoding, which would have doubled the size on the wire.
+#[tokio::test(flavor = "multi_thread")]
+async fn direct_signal_with_max_size_payload_is_delivered() {
+    holochain_trace::test_run();
+
+    let mut conductors =
+        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(true))
+            .await;
+    let dna = SweetDnaFile::unique_empty().await;
+    let app_batch = conductors
+        .setup_app("app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
+    let ((alice,), (bob,)): ((SweetCell,), (SweetCell,)) = app_batch.into_tuples();
+
+    let dna_hash = dna.dna_hash().clone();
+
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(&alice, 1, Duration::from_secs(90))
+        .await
+        .unwrap();
+
+    let (alice_tx, alice_rx) = connect_app_ws(&conductors[0], "app").await;
+    let _alice_rx = WsPollRecv::new::<AppResponse>(alice_rx);
+
+    let (_bob_tx, mut bob_rx) = connect_app_ws(&conductors[1], "app").await;
+
+    let payload = vec![0xFFu8; DIRECT_SIGNAL_MAX_SIZE];
+    let response = send_direct_signal(
+        &alice_tx,
+        dna_hash,
+        vec![bob.agent_pubkey().clone()],
+        payload.clone(),
+    )
+    .await;
+    assert!(
+        matches!(response, AppResponse::Ok),
+        "unexpected response: {response:?}"
+    );
+
+    let (cell_id, _from_agent, signal) =
+        try_recv_direct_signal(&mut bob_rx, Duration::from_secs(60))
+            .await
+            .expect("Bob did not receive the max-size direct signal");
+    assert_eq!(cell_id, *bob.cell_id());
+    assert_eq!(signal, payload);
+}

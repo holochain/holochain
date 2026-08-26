@@ -18,7 +18,7 @@ use std::collections::{BTreeMap, HashMap};
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub enum AppRequest {
     /// Get info about the app that you are connected to, including info about each cell installed
     /// by this app.
@@ -39,6 +39,19 @@ pub enum AppRequest {
         /// Optionally limit the results to specific DNA hashes
         #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         dna_hashes: Option<Vec<DnaHash>>,
+    },
+
+    /// Add signed agent info to the Conductor's peer store.
+    ///
+    /// This enables apps to share agent info through mechanisms other than
+    /// a bootstrap server.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::AgentInfoAdded`]
+    AddAgentInfo {
+        /// The signed agent info, as produced by [`kitsune2_api::AgentInfoSigned::encode`].
+        agent_infos: Vec<String>,
     },
 
     /// Request the contents of the peer meta store(s) related to
@@ -306,7 +319,11 @@ pub enum AppRequest {
     /// function `send_remote_signal`. On the receiving end, the conductor does not call the
     /// corresponding zome's `recv_remote_signal` function, which would then have to invoke the HDK
     /// function `emit_signal`. The result is that signals can be exchanged between peers without
-    /// having to run a WASM function on each side.
+    /// having to run a WASM function on each side. The receiving app gets the payload as
+    /// `Signal::AppDirect`.
+    ///
+    /// The payload may be up to `DIRECT_SIGNAL_MAX_SIZE` (1 MiB) bytes; larger payloads are
+    /// rejected with an error.
     ///
     /// Note that this bypasses the usual security mechanism where zomes must create a capability
     /// grant to permit `recv_remote_signal` to be invoked without restriction.
@@ -331,7 +348,7 @@ pub enum AppRequest {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub enum AppResponse {
     /// Can occur in response to any [`AppRequest`].
     ///
@@ -345,6 +362,9 @@ pub enum AppResponse {
 
     /// The successful response to an [`AppRequest::AgentInfo`].
     AgentInfo(Vec<String>),
+
+    /// The successful response to an [`AppRequest::AddAgentInfo`].
+    AgentInfoAdded,
 
     /// The successful response to an [`AppRequest::PeerMetaInfo`].
     ///
@@ -425,7 +445,7 @@ pub enum AppResponse {
 /// The data provided over an app interface in order to make a zome call.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct ZomeCallParamsSigned {
     /// Bytes of the serialized zome call payload that consists of all fields of the
     /// [`ZomeCallParams`].
@@ -458,7 +478,7 @@ impl ZomeCallParamsSigned {
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub enum CellInfo {
     /// Cells provisioned at app installation as defined in the bundle.
     Provisioned(ProvisionedCell),
@@ -503,7 +523,7 @@ impl CellInfo {
 /// Not yet implemented.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct StemCell {
     /// The hash of the DNA that this cell would be instantiated from
     pub original_dna_hash: DnaHash,
@@ -516,7 +536,7 @@ pub struct StemCell {
 /// Provisioned cell, a cell instantiated from a DNA on app installation.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct ProvisionedCell {
     /// The cell's identifying data
     pub cell_id: CellId,
@@ -529,7 +549,7 @@ pub struct ProvisionedCell {
 /// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct AppInfo {
     /// The unique identifier for an installed app in this conductor
     pub installed_app_id: InstalledAppId,
@@ -654,7 +674,7 @@ impl AppInfo {
 /// The request payload sent on a Holochain app websocket to authenticate the connection.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_rs", ts(export, export_to = "api/app/types.ts"))]
+#[cfg_attr(feature = "ts_rs", ts(export_to = "api/app/types.ts"))]
 pub struct AppAuthenticationRequest {
     /// The authentication token that was provided by the conductor when [`crate::admin_interface::AdminRequest::IssueAppAuthenticationToken`] was called.
     #[cfg_attr(
