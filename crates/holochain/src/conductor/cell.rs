@@ -431,12 +431,11 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         signature: Signature,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            // Add 5 for the msgpack bin32 header of the encoded payload.
-            if signal.len() > DIRECT_SIGNAL_MAX_SIZE + 5 {
+            if signal.len() > DIRECT_SIGNAL_MAX_ENCODED_SIZE {
                 warn!(
                     "Received direct signal of {len} bytes, limit is {limit}",
                     len = signal.len(),
-                    limit = DIRECT_SIGNAL_MAX_SIZE + 5
+                    limit = DIRECT_SIGNAL_MAX_ENCODED_SIZE
                 );
                 return Err(HolochainP2pError::other(
                     "Received direct signal that was too long",
@@ -457,10 +456,30 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
 
             let signal: DirectSignal = decode(&signal).map_err(HolochainP2pError::other)?;
 
+            // The secret arrives inside the signed bytes, so it is bound to the payload and to
+            // `from_agent` by the signature checked above.
+            let granted = self
+                .space
+                .dht_store
+                .as_read()
+                .valid_direct_signal_grant(&to_agent, &from_agent, signal.cap_secret.as_ref())
+                .await
+                .map_err(HolochainP2pError::other)?
+                .is_some();
+            if !granted {
+                warn!(
+                    ?from_agent,
+                    "Received direct signal with no matching capability grant"
+                );
+                return Err(HolochainP2pError::other(
+                    "Received direct signal with no matching capability grant",
+                ));
+            }
+
             if let Err(e) = self.signal_tx.send(Signal::AppDirect {
                 cell_id: CellId::new(dna_hash, to_agent),
                 from_agent,
-                signal: signal.0,
+                signal: signal.signal,
             }) {
                 info!(?e, "Failed to relay direct signal to app")
             }

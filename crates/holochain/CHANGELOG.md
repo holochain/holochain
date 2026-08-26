@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Direct signals now require a capability grant. To receive them an agent must commit a `Capability::DirectSignal` grant permitting the sender, built with `CapGrant::new_direct_signal_grant`; there is no implicit access, so a grant is needed even to signal yourself. `AppRequest::SendDirectSignal` takes a new `cap_secret`, for grants that carry one. The signed payload encoding changed, so direct signals between conductors with and without this change are dropped by the receiver — upgrade both ends. \#5820
 - `hc dna hash` now accepts modifier overrides: `--network-seed`/`-s` and
   `--role-settings <path to yaml>`, matching the semantics of
   `hc sandbox generate`. This makes it possible to compute ahead of time the
