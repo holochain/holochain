@@ -215,19 +215,21 @@ _Size limitation:_ _App_ entries have a maximum size of 4 MB (4,000,000 bytes). 
 
 ##### CapGrant
 
-The _CapGrant_ entry type is a system entry for granting capabilities to other agents. Capabilities allow fine-grained control over who can call specific zome functions.
+The _CapGrant_ entry type is a system entry for granting capabilities to other agents. Capabilities allow fine-grained control over which agents may exercise a capability of this agent's cell.
 
 A CapGrant entry contains:
 - _Tag_: A string identifier for this grant.
-- _Access_: The access level, one of _Unrestricted_, _Transferable_, or _Assigned_.
-- _Functions_: The set of zome functions this grant permits.
-- _Secret_: For _Transferable_ and _Assigned_ grants, a secret that must be provided.
-- _Assignees_: For _Assigned_ grants, the list of authorized agent public keys.
+- _Constraint_: Who may exercise this grant, and by what means. One of _Unrestricted_, _Transferable_, or _Assigned_.
+- _Capability_: What the grant authorizes. A grant authorizes only the capability it names.
 
-Access levels:
-- _Unrestricted_: Any agent can exercise this capability, without a secret
+Constraints:
+- _Unrestricted_: Any agent can exercise this capability, without a secret.
 - _Transferable_: A secret must be provided, but any agent with the secret can use it.
-- _Assigned_: Requires both a secret and authorization, defined by the calling agent being in the assignees list.
+- _Assigned_: Requires both a secret and authorization, defined by the calling agent being in the assignees list. Carries the list of authorized agent public keys.
+
+Capabilities:
+- _ZomeCall_: Call the zome functions named by the grant. Carries the set of permitted zome/function pairs, or a marker that all functions are permitted.
+- _DirectSignal_: Send this agent a direct signal.
 
 ## Distributed Hash Table Operations (DHT Ops)
 
