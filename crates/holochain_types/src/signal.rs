@@ -84,15 +84,36 @@ impl_from! {
 /// The maximum size that Holochain will permit sending or receiving in a single direct signal.
 pub const DIRECT_SIGNAL_MAX_SIZE: usize = 1024 * 1024;
 
-/// Wrapper type for transmitting a signed direct signal over the network.
+/// The largest encoding a [`DirectSignal`] carrying a max-size payload can produce.
 ///
-/// The payload is encoded as msgpack `bin` (one byte per byte) and the sender
-/// signs the SHA2-512 hash of the encoding, never the raw bytes: lair signing
-/// frames are capped at 8 KiB. The `bin` encoding starts with a msgpack bin
-/// header, so the signed hash can never collide with a signed zome call,
-/// whose parameters encode as a msgpack map.
-#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
-pub struct DirectSignal(#[serde(with = "serde_bytes")] pub Vec<u8>);
+/// The receiver bounds the bytes it is willing to decode by this before spending any work on
+/// them. `direct_signal_max_encoding_fits_the_bound` pins the real worst case against it.
+pub const DIRECT_SIGNAL_MAX_ENCODED_SIZE: usize = DIRECT_SIGNAL_MAX_SIZE + 128;
+
+/// The signed contents of a direct signal.
+///
+/// The whole struct is encoded, and the sender signs the SHA2-512 hash of that encoding rather
+/// than the raw bytes, because lair signing frames are capped at 8 KiB while payloads go up to
+/// [`DIRECT_SIGNAL_MAX_SIZE`]. Signing the encoding is what binds `cap_secret` to `signal`: a
+/// relaying peer cannot strip or swap the secret without invalidating the signature.
+///
+/// The encoding is a msgpack map, as a signed zome call's parameters are. The two cannot be
+/// confused for one another because their field sets are disjoint: `ZomeCallParams` has no
+/// `signal` field, and this struct has none of `cell_id`, `zome_name`, `fn_name`, `provenance`,
+/// `nonce` or `expires_at`, so neither encoding deserializes as the other type. Keep the field
+/// sets disjoint when adding to either struct.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct DirectSignal {
+    /// The payload, opaque to Holochain.
+    ///
+    /// Encoded as msgpack `bin`, one byte per byte, rather than an array of ints.
+    #[serde(with = "serde_bytes")]
+    pub signal: Vec<u8>,
+
+    /// The secret for the receiver's [`Capability::DirectSignal`] grant, when the grant the
+    /// sender is exercising carries one.
+    pub cap_secret: Option<CapSecret>,
+}
 
 #[cfg(test)]
 mod tests {
@@ -131,26 +152,88 @@ mod tests {
         }
     }
 
-    /// A max-size payload must encode as msgpack `bin` (1 byte per payload
-    /// byte plus a 5-byte bin32 header), never as an array of ints, or the
-    /// receiver's pre-decode size bound would reject legitimate signals.
+    /// The payload must encode as msgpack `bin` (1 byte per payload byte), never as an array of
+    /// ints, and a max-size signal carrying a secret must stay inside the receiver's pre-decode
+    /// bound, or legitimate signals would be rejected unread.
     #[test]
-    fn direct_signal_max_payload_encodes_as_bin() {
-        // 0xFF forces the worst case: an array-of-ints encoding would need
-        // two bytes per element and blow past the bound.
-        let signal = DirectSignal(vec![0xFF; DIRECT_SIGNAL_MAX_SIZE]);
+    fn direct_signal_max_encoding_fits_the_bound() {
+        // 0xFF forces the worst case: an array-of-ints encoding would need two bytes per element
+        // and blow past the bound. A secret is present because that is the larger encoding.
+        let signal = DirectSignal {
+            signal: vec![0xFF; DIRECT_SIGNAL_MAX_SIZE],
+            cap_secret: Some([0xFF; CAP_SECRET_BYTES].into()),
+        };
 
         let bytes = holochain_serialized_bytes::encode(&signal).unwrap();
 
         assert!(bytes.len() >= DIRECT_SIGNAL_MAX_SIZE);
         assert!(
-            bytes.len() <= DIRECT_SIGNAL_MAX_SIZE + 5,
+            bytes.len() <= DIRECT_SIGNAL_MAX_ENCODED_SIZE,
             "encoded direct signal is {} bytes, bound is {}",
             bytes.len(),
-            DIRECT_SIGNAL_MAX_SIZE + 5
+            DIRECT_SIGNAL_MAX_ENCODED_SIZE
         );
 
         let decoded: DirectSignal = holochain_serialized_bytes::decode(&bytes).unwrap();
-        assert_eq!(decoded.0, signal.0);
+        assert_eq!(decoded, signal);
+    }
+
+    #[test]
+    fn direct_signal_round_trips_with_and_without_a_secret() {
+        for cap_secret in [None, Some(CapSecret::from([3; CAP_SECRET_BYTES]))] {
+            let signal = DirectSignal {
+                signal: b"payload".to_vec(),
+                cap_secret,
+            };
+            let bytes = holochain_serialized_bytes::encode(&signal).unwrap();
+            let decoded: DirectSignal = holochain_serialized_bytes::decode(&bytes).unwrap();
+            assert_eq!(decoded, signal);
+        }
+    }
+
+    /// The secret is inside the signed bytes, so a relaying peer cannot alter it without
+    /// producing different bytes for the receiver to verify the signature against.
+    #[test]
+    fn changing_the_secret_changes_the_signed_bytes() {
+        let encode = |cap_secret| {
+            holochain_serialized_bytes::encode(&DirectSignal {
+                signal: b"payload".to_vec(),
+                cap_secret,
+            })
+            .unwrap()
+        };
+
+        let granted = encode(Some(CapSecret::from([1; CAP_SECRET_BYTES])));
+        assert_ne!(
+            granted,
+            encode(Some(CapSecret::from([2; CAP_SECRET_BYTES])))
+        );
+        assert_ne!(granted, encode(None));
+    }
+
+    /// Both types encode as a msgpack map, so they are kept apart by having disjoint field sets
+    /// rather than by their shape. Neither encoding may deserialize as the other type.
+    #[test]
+    fn direct_signal_and_zome_call_params_do_not_decode_as_each_other() {
+        let signal = DirectSignal {
+            signal: b"payload".to_vec(),
+            cap_secret: Some(CapSecret::from([1; CAP_SECRET_BYTES])),
+        };
+        let signal_bytes = holochain_serialized_bytes::encode(&signal).unwrap();
+
+        let params = ZomeCallParams {
+            cell_id: CellId::new(fixt!(DnaHash), fixt!(AgentPubKey)),
+            zome_name: "zome".into(),
+            fn_name: "fn".into(),
+            cap_secret: Some(CapSecret::from([1; CAP_SECRET_BYTES])),
+            provenance: fixt!(AgentPubKey),
+            payload: ExternIO::encode(()).unwrap(),
+            nonce: [0; 32].into(),
+            expires_at: Timestamp::from_micros(1_000_000),
+        };
+        let params_bytes = holochain_serialized_bytes::encode(&params).unwrap();
+
+        assert!(holochain_serialized_bytes::decode::<_, ZomeCallParams>(&signal_bytes).is_err());
+        assert!(holochain_serialized_bytes::decode::<_, DirectSignal>(&params_bytes).is_err());
     }
 }
