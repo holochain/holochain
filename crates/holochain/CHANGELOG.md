@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- `hc dna hash` now accepts modifier overrides: `--network-seed`/`-s` and
+  `--role-settings <path to yaml>`, matching the semantics of
+  `hc sandbox generate`. This makes it possible to compute ahead of time the
+  DNA hash a role will have once install-time modifiers are applied.
+  A `network_seed` in the role settings file takes precedence over `--network-seed`, mirroring
+  installation. \#5946
 - Fix `AdminRequest::ListCapabilityGrants` with `include_revoked: false` always returning an empty list. It now lists the capability grants that have not been revoked. \#5950
 - **BREAKING CHANGE**: Capability grants are restructured to make room for capabilities other than zome calls. A grant is now `CapGrantEntry { tag, constraint, capability }`: `constraint` (formerly `access`) says who may claim the grant, and `capability` says what it grants, currently `Capability::ZomeCall(ZomeCallGrant { functions })` — build that shape with `CapGrant::new_zome_call_grant`. A grant only authorizes the capability it was issued for. The admin API follows: `GrantZomeCallCapability`'s `cap_grant` is now a `GrantZomeCallCapabilityGrant { tag, constraint, grant: { functions } }` rather than a whole grant, so it can only ever grant zome calls, and `ListCapabilityGrants` reports the new grant shape. Capability grants already on a source chain cannot be read by this version and must be re-issued. Types are renamed to match: `ZomeCallCapGrant` → `CapGrant`, the old `CapGrant` enum → `CapAccess`, `CapAccess` → `GrantConstraint`, `DesensitizedZomeCallCapGrant` → `DesensitizedCapGrant`, `CapAccessInfo` → `GrantConstraintInfo`. \#5820
 - **BREAKING CHANGE**: Remove `Entry::app_fancy` and `Entry::entry_type`. Use `Entry::app` with `SerializedBytes`, and read an entry type from the action that wrote it.

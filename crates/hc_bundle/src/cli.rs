@@ -4,7 +4,10 @@ use crate::error::HcBundleResult;
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use holochain_types::dna::DnaBundle;
-use holochain_types::prelude::{AppManifest, DnaManifest, ValidatedDnaManifest};
+use holochain_types::prelude::{
+    AppManifest, DnaManifest, DnaModifiersOpt, RoleSettings, RoleSettingsYaml,
+    ValidatedDnaManifest, YamlProperties,
+};
 use holochain_types::web_app::WebAppManifest;
 use holochain_util::ffs;
 use mr_bundle::{FileSystemBundler, Manifest};
@@ -97,6 +100,26 @@ pub enum HcDnaBundleSubcommand {
     Hash {
         /// The path to the dna file.
         path: std::path::PathBuf,
+
+        /// Network seed to override the one in the DNA manifest before
+        /// computing the hash.
+        ///
+        /// Matches the `--network-seed` flag of `hc sandbox generate`: use it
+        /// to compute the hash a cell will have when installed with this seed.
+        /// A `network_seed` in the `--role-settings` file takes precedence
+        /// over this flag, mirroring install-time behavior.
+        #[arg(long, short = 's')]
+        network_seed: Option<String>,
+
+        /// Optional path to a yaml file containing modifiers to override the
+        /// values in the DNA manifest before computing the hash.
+        ///
+        /// The file holds one complete role entry from the roles settings file
+        /// accepted by `hc sandbox generate --roles-settings`, including
+        /// `type: provisioned` and a `modifiers` block. Other provisioned-role
+        /// fields are accepted but ignored.
+        #[arg(long)]
+        role_settings: Option<std::path::PathBuf>,
     },
 }
 
@@ -335,11 +358,36 @@ impl HcDnaBundleSubcommand {
 
                 println!("{schema_string}");
             }
-            Self::Hash { path } => {
+            Self::Hash {
+                path,
+                network_seed,
+                role_settings,
+            } => {
+                let mut modifiers = DnaModifiersOpt::<YamlProperties> {
+                    network_seed,
+                    properties: None,
+                };
+                if let Some(path) = role_settings {
+                    let yaml = ffs::read_to_string(&path).await?;
+                    let settings: RoleSettingsYaml = yaml_serde::from_str(&yaml)
+                        .context("Failed to parse the role settings file")?;
+                    let settings = RoleSettings::from(settings);
+                    let overrides = settings.modifiers().context(
+                        "the role settings file does not contain a `modifiers` block, \
+                         so there is nothing to override",
+                    )?;
+                    modifiers = modifiers.update(overrides.clone());
+                }
+                let modifiers = modifiers.serialized()?;
                 let bundle = FileSystemBundler::load_from::<ValidatedDnaManifest>(path)
                     .await
                     .map(DnaBundle::from)?;
-                let dna_hash_b64 = bundle.to_dna_file().await?.0.dna_hash().to_string();
+                let dna_hash_b64 = bundle
+                    .into_dna_file(modifiers)
+                    .await?
+                    .0
+                    .dna_hash()
+                    .to_string();
                 println!("{dna_hash_b64}");
             }
         }
