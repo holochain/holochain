@@ -162,9 +162,11 @@ mod tests {
                 let functions = GrantedFunctions::Listed(fns);
                 let cap_grant_entry = CapGrantEntry {
                     tag: "".into(),
-                    // empty access converts to unrestricted
-                    access: ().into(),
-                    functions,
+                    // empty constraint converts to unrestricted
+                    constraint: ().into(),
+                    capability: Capability::ZomeCall(ZomeCallGrant {
+                        functions,
+                    })
                 };
                 api.create(CreateInput::new(
                     EntryDefLocation::CapGrant,

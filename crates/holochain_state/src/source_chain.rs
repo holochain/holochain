@@ -817,9 +817,10 @@ where
         check_function: GrantedFunction,
         check_agent: AgentPubKey,
         check_secret: Option<CapSecret>,
-    ) -> SourceChainResult<Option<CapGrant>> {
-        let author_grant = CapGrant::from(self.agent_pubkey().clone());
-        if author_grant.is_valid(&check_function, &check_agent, check_secret.as_ref()) {
+    ) -> SourceChainResult<Option<CapAccess>> {
+        let author_grant = CapAccess::from(self.agent_pubkey().clone());
+        if author_grant.is_valid_for_zome_call(&check_function, &check_agent, check_secret.as_ref())
+        {
             // caller is source chain author
             return Ok(Some(author_grant));
         }
@@ -827,7 +828,7 @@ where
         // Remote caller. The candidate grants are read from the DhtStore, which
         // applies the access-type pre-filter and "not updated/deleted"
         // exclusion; the exact secret/assignee/function match remains the
-        // authority of `CapGrant::is_valid` below.
+        // authority of `CapAccess::is_valid_for_zome_call` below.
         let cap_grants = self
             .dht_store
             .as_read()
@@ -836,7 +837,11 @@ where
         // Loop over all found cap grants and check if one of them is valid for
         // assignee and function.
         for cap_grant in cap_grants {
-            if cap_grant.is_valid(&check_function, &check_agent, check_secret.as_ref()) {
+            if cap_grant.is_valid_for_zome_call(
+                &check_function,
+                &check_agent,
+                check_secret.as_ref(),
+            ) {
                 return Ok(Some(cap_grant));
             }
         }
@@ -1195,11 +1200,7 @@ pub(crate) fn cap_grant_index_params(
         _ => return None,
     };
 
-    let cap_access_i64 = match &cap_grant.access {
-        CapAccess::Unrestricted => 0_i64,
-        CapAccess::Transferable { .. } => 1_i64,
-        CapAccess::Assigned { .. } => 2_i64,
-    };
+    let cap_access_i64 = i64::from(GrantConstraintType::from(&cap_grant.constraint));
     // Deliberate empty→NULL normalisation: the schema stores an absent tag as
     // NULL rather than an empty string.
     let tag = if cap_grant.tag.is_empty() {
@@ -1506,7 +1507,7 @@ mod tests {
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         // create transferable cap grant
         #[allow(clippy::unnecessary_literal_unwrap)] // must be this type
-        let secret_access = CapAccess::from(secret.unwrap());
+        let secret_access = GrantConstraint::from(secret.unwrap());
 
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
@@ -1514,7 +1515,8 @@ mod tests {
         let mut fns = HashSet::new();
         fns.insert(function.clone());
         let functions = GrantedFunctions::Listed(fns);
-        let grant = ZomeCallCapGrant::new("tag".into(), secret_access.clone(), functions.clone());
+        let grant =
+            CapGrant::new_zome_call_grant("tag".into(), secret_access.clone(), functions.clone());
 
         let bob = keystore.new_sign_keypair_random().await.unwrap();
         let carol = keystore.new_sign_keypair_random().await.unwrap();
@@ -1525,7 +1527,7 @@ mod tests {
             chain
                 .valid_cap_grant(function.clone(), alice.clone(), secret)
                 .await?,
-            Some(CapGrant::ChainAuthor(alice.clone())),
+            Some(CapAccess::ChainAuthor(alice.clone())),
         );
 
         // bob should not get a cap grant as the secret hasn't been committed yet
@@ -1560,7 +1562,7 @@ mod tests {
             chain
                 .valid_cap_grant(function.clone(), alice.clone(), secret)
                 .await?,
-            Some(CapGrant::ChainAuthor(alice.clone())),
+            Some(CapAccess::ChainAuthor(alice.clone())),
         );
 
         // bob and carol (and everyone else) should be authorized with transferable cap grant
@@ -1590,8 +1592,9 @@ mod tests {
         assignees.insert(bob.clone());
         let updated_secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         #[allow(clippy::unnecessary_literal_unwrap)] // must be this type
-        let updated_access = CapAccess::from((updated_secret.unwrap(), assignees));
-        let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
+        let updated_access = GrantConstraint::from((updated_secret.unwrap(), assignees));
+        let updated_grant =
+            CapGrant::new_zome_call_grant("tag".into(), updated_access.clone(), functions);
 
         // commit grant update to alice's source chain
         let (updated_action_hash, updated_entry_hash) = {
@@ -1619,13 +1622,13 @@ mod tests {
             chain
                 .valid_cap_grant(function.clone(), alice.clone(), secret)
                 .await?,
-            Some(CapGrant::ChainAuthor(alice.clone())),
+            Some(CapAccess::ChainAuthor(alice.clone())),
         );
         assert_eq!(
             chain
                 .valid_cap_grant(function.clone(), alice.clone(), updated_secret)
                 .await?,
-            Some(CapGrant::ChainAuthor(alice.clone())),
+            Some(CapAccess::ChainAuthor(alice.clone())),
         );
 
         // bob must not get a valid cap grant with the initial cap secret,
@@ -1705,13 +1708,13 @@ mod tests {
             chain
                 .valid_cap_grant(function.clone(), alice.clone(), secret)
                 .await?,
-            Some(CapGrant::ChainAuthor(alice.clone())),
+            Some(CapAccess::ChainAuthor(alice.clone())),
         );
         assert_eq!(
             chain
                 .valid_cap_grant(function.clone(), alice.clone(), updated_secret)
                 .await?,
-            Some(CapGrant::ChainAuthor(alice.clone())),
+            Some(CapAccess::ChainAuthor(alice.clone())),
         );
 
         // bob should not get a cap grant for any secret anymore
@@ -1729,9 +1732,9 @@ mod tests {
         );
 
         // create an unrestricted cap grant in alice's chain
-        let unrestricted_grant = ZomeCallCapGrant::new(
+        let unrestricted_grant = CapGrant::new_zome_call_grant(
             "unrestricted".into(),
-            CapAccess::Unrestricted,
+            GrantConstraint::Unrestricted,
             GrantedFunctions::All,
         );
         let (original_action_address, original_entry_address) = {
@@ -1827,9 +1830,9 @@ mod tests {
         let some_fn_name: FunctionName = "some_fn".into();
         let mut granted_fns = HashSet::new();
         granted_fns.insert((some_zome_name.clone(), some_fn_name.clone()));
-        let first_unrestricted_grant = ZomeCallCapGrant::new(
+        let first_unrestricted_grant = CapGrant::new_zome_call_grant(
             "unrestricted_1".into(),
-            CapAccess::Unrestricted,
+            GrantConstraint::Unrestricted,
             GrantedFunctions::Listed(granted_fns),
         );
 
@@ -1838,9 +1841,9 @@ mod tests {
         let granted_fn_name: FunctionName = "granted_fn".into();
         let mut granted_fns = HashSet::new();
         granted_fns.insert((granted_zome_name.clone(), granted_fn_name.clone()));
-        let second_unrestricted_grant = ZomeCallCapGrant::new(
+        let second_unrestricted_grant = CapGrant::new_zome_call_grant(
             "unrestricted_2".into(),
-            CapAccess::Unrestricted,
+            GrantConstraint::Unrestricted,
             GrantedFunctions::Listed(granted_fns),
         );
 

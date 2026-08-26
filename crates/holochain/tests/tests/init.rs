@@ -102,10 +102,12 @@ async fn call_init_from_init_across_cells() {
                 EntryVisibility::Private,
                 Entry::CapGrant(CapGrantEntry {
                     tag: "".into(),
-                    access: ().into(),
-                    functions: GrantedFunctions::Listed(
-                        vec![("no-init".into(), "xxx".into())].into_iter().collect(),
-                    ),
+                    constraint: ().into(),
+                    capability: Capability::ZomeCall(ZomeCallGrant {
+                        functions: GrantedFunctions::Listed(
+                            vec![("no-init".into(), "xxx".into())].into_iter().collect(),
+                        ),
+                    }),
                 }),
                 ChainTopOrdering::default(),
             ))?;

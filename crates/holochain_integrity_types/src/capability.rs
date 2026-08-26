@@ -24,10 +24,12 @@
 //! information needed to refer to the capability as well as the secret needed
 //! to send to the Grantor.
 
+mod access;
 mod claim;
 mod grant;
 mod secret;
 
+pub use access::*;
 pub use claim::*;
 pub use grant::*;
 pub use secret::*;

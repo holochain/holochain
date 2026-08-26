@@ -42,6 +42,7 @@ mod tests {
     use holochain_integrity_types::action::{
         Action, ActionData, ActionHeader, DnaData, InitZomesCompleteData, RecordValidity,
     };
+    use holochain_integrity_types::capability::GrantConstraintType;
     use holochain_integrity_types::entry::Entry;
     use holochain_integrity_types::record::SignedHashed;
     use holochain_integrity_types::signature::Signature;
@@ -362,13 +363,17 @@ mod tests {
 
         let author = action.hashed.content.header.author.clone();
         let action_hash = action.as_hash().clone();
-        db.insert_cap_grant(&action_hash, 1 /* Transferable */, Some("my-tag"))
-            .await
-            .unwrap();
+        db.insert_cap_grant(
+            &action_hash,
+            GrantConstraintType::Transferable.into(),
+            Some("my-tag"),
+        )
+        .await
+        .unwrap();
 
         let by_access = db
             .as_ref()
-            .get_cap_grants_by_access(author.clone(), 1)
+            .get_cap_grants_by_access(author.clone(), GrantConstraintType::Transferable.into())
             .await
             .unwrap();
         assert_eq!(by_access.len(), 1);
@@ -390,15 +395,19 @@ mod tests {
         for seed in [3u8, 1, 2] {
             let action = sample_action(seed);
             db.insert_action(&action, None).await.unwrap();
-            db.insert_cap_grant(action.as_hash(), 1, Some("shared-tag"))
-                .await
-                .unwrap();
+            db.insert_cap_grant(
+                action.as_hash(),
+                GrantConstraintType::Transferable.into(),
+                Some("shared-tag"),
+            )
+            .await
+            .unwrap();
         }
 
         let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
         let by_access = db
             .as_ref()
-            .get_cap_grants_by_access(author.clone(), 1)
+            .get_cap_grants_by_access(author.clone(), GrantConstraintType::Transferable.into())
             .await
             .unwrap();
         assert_eq!(by_access.len(), 3);
@@ -448,7 +457,7 @@ mod tests {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let missing = ActionHash::from_raw_36(vec![42u8; 36]);
         let err = db
-            .insert_cap_grant(&missing, 0, None)
+            .insert_cap_grant(&missing, GrantConstraintType::Unrestricted.into(), None)
             .await
             .unwrap_err()
             .to_string();
