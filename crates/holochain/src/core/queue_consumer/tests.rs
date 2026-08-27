@@ -254,7 +254,7 @@ async fn publish_loop() {
     let dht_store = test_dht_store(fixt!(DnaHash)).await;
     // Seed the op as an integrated, self-authored op ready to publish.
     dht_store
-        .test_insert_authored_chain_op(op, None, None, None)
+        .test_insert_authored_chain_op(op, None, None, None, None)
         .await
         .unwrap();
     tokio::time::pause();

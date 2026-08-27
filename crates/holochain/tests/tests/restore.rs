@@ -1212,7 +1212,7 @@ async fn insert_fetchable_action(store: &DhtStore, signed: &SignedActionHashed) 
     let chain_op = ChainOp::CreateRecord(signed_action, OpEntry::ActionOnly);
     let op = DhtOpHashed::from_content_sync(DhtOp::from(chain_op));
     store
-        .test_insert_authored_chain_op(op, None, None, None)
+        .test_insert_authored_chain_op(op, None, None, None, None)
         .await
         .unwrap();
 }
@@ -1295,7 +1295,7 @@ async fn restore_succeeds_when_one_peer_serves_a_forged_action() {
         ChainOp::AgentActivity(SignedAction::new(tip.action.clone(), Signature([0; 64])));
     let op = DhtOpHashed::from_content_sync(DhtOp::from(chain_op));
     store_m
-        .test_insert_authored_chain_op(op, None, None, None)
+        .test_insert_authored_chain_op(op, None, None, None, None)
         .await
         .unwrap();
 

@@ -1209,9 +1209,14 @@ impl DhtStore<DbWrite<Dht>> {
     /// The parent `Action` is inserted first (its `private_entry` flag is
     /// derived from the action's entry visibility). Entries are not stored,
     /// since the publish queue does not read them.
+    ///
+    /// When `action_hash_override` is set, that hash is stored as the action's hash instead of the
+    /// one computed from its content. This means that the row is invalid which can be used to
+    /// simulate a peer serving an action with a hash that doesn't match the content.
     pub async fn test_insert_authored_chain_op(
         &self,
         op: DhtOpHashed,
+        action_hash_override: Option<ActionHash>,
         last_publish_time: Option<Timestamp>,
         receipts_complete: Option<bool>,
         withhold_publish: Option<bool>,
@@ -1229,7 +1234,8 @@ impl DhtStore<DbWrite<Dht>> {
         };
 
         let signed_action = chain_op.signed_action();
-        let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.data());
+        let action_hash = action_hash_override
+            .unwrap_or_else(|| holo_hash::ActionHash::with_data_sync(signed_action.data()));
         let sah = SignedActionHashed::with_presigned(
             holo_hash::HoloHashed::with_pre_hashed(
                 signed_action.data().clone(),

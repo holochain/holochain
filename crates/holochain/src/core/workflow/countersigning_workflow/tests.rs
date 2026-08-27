@@ -1970,7 +1970,7 @@ impl TestHarness {
         self.test_space
             .space
             .dht_store
-            .test_insert_authored_chain_op(dht_op, None, None, Some(true))
+            .test_insert_authored_chain_op(dht_op, None, None, None, Some(true))
             .await
             .unwrap();
 
