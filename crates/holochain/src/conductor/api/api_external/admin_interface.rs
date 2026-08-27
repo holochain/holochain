@@ -266,7 +266,6 @@ impl AdminInterfaceApi {
             }
             GrantZomeCallCapability(payload) => self
                 .conductor_handle
-                .clone()
                 .grant_zome_call_capability(*payload)
                 .await
                 .map(AdminResponse::ZomeCallCapabilityGranted),
@@ -276,7 +275,6 @@ impl AdminInterfaceApi {
                 cell_id,
             } => {
                 self.conductor_handle
-                    .clone()
                     .revoke_zome_call_capability(cell_id, action_hash)
                     .await?;
                 Ok(AdminResponse::ZomeCallCapabilityRevoked)

@@ -2785,7 +2785,7 @@ mod misc_impls {
     impl Conductor {
         /// Grant a zome call capability for a cell
         pub async fn grant_zome_call_capability(
-            self: Arc<Self>,
+            self: &Arc<Self>,
             payload: GrantZomeCallCapabilityPayload,
         ) -> ConductorApiResult<ActionHash> {
             let GrantZomeCallCapabilityPayload { cell_id, cap_grant } = payload;
@@ -2817,8 +2817,7 @@ mod misc_impls {
                 )
                 .await?;
 
-            self.clone()
-                .self_validate_commit(&cell_id, workspace.clone())
+            self.self_validate_commit(&cell_id, workspace.clone())
                 .await?;
 
             workspace
@@ -2843,7 +2842,7 @@ mod misc_impls {
         ///
         /// Honors the `disable_self_validation` tuning param, like the call zome workflow does.
         async fn self_validate_commit(
-            self: Arc<Self>,
+            self: &Arc<Self>,
             cell_id: &CellId,
             workspace: SourceChainWorkspace,
         ) -> ConductorApiResult<()> {
@@ -2860,13 +2859,19 @@ mod misc_impls {
             let ribosome = self.get_ribosome(cell_id)?;
             let network: holochain_p2p::DynHolochainP2pDna =
                 Arc::new(self.cell_by_id(cell_id).await?.holochain_p2p_dna().clone());
-            crate::core::workflow::inline_validation(workspace, network, self, ribosome).await?;
+            crate::core::workflow::inline_validation(
+                workspace,
+                network,
+                Arc::clone(self),
+                ribosome,
+            )
+            .await?;
             Ok(())
         }
 
         /// Revoke a zome call capability for a cell identified by the [`ActionHash`] of the grant.
         pub async fn revoke_zome_call_capability(
-            self: Arc<Self>,
+            self: &Arc<Self>,
             cell_id: CellId,
             action_hash: ActionHash,
         ) -> ConductorApiResult<ActionHash> {
@@ -2913,8 +2918,7 @@ mod misc_impls {
                 .put(action_data, None, ChainTopOrdering::default())
                 .await?;
 
-            self.clone()
-                .self_validate_commit(&cell_id, workspace.clone())
+            self.self_validate_commit(&cell_id, workspace.clone())
                 .await?;
 
             workspace
