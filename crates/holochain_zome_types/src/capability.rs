@@ -1,25 +1,28 @@
 //! Capability Grants and Claims
 //!
-//! This module provides a custom system for defining application-specific
-//! capabilities, and allowing others to access those capabilities in a
-//! fine-grained manner. The Grantor of a capability can receive requests from
-//! a Claimant, and if the claim provides the right criteria, the Grantor will
-//! perform the task specified by the capability and respond to the Claimant.
+//! This module provides a system for granting other agents access to a
+//! capability of the Grantor's cell, in a fine-grained manner. A Claimant that
+//! satisfies the grant may exercise the granted capability against the Grantor.
 //!
-//! Capabilities come with three possible degrees of access control:
+//! A grant names the capability it authorizes, and authorizes nothing else:
+//! - `Capability::ZomeCall`: call the granted zome functions on the Grantor's
+//!   conductor.
+//! - `Capability::DirectSignal`: send the Grantor a direct signal.
+//!
+//! Who may exercise a capability is controlled by the grant's
+//! `GrantConstraint`, which comes with three possible degrees of access
+//! control:
 //! - Unrestricted: anybody can exercise this capability
 //! - Transferable: a secret must be provided, but anybody with the secret may
 //!   exercise the capability
 //! - Assigned: Like Transferable, but there is a list of approved AgentPubKeys,
 //!   and requests from any other agents are ignored.
 //!
-//! Capabilities are declared by a Grantor via a **`CapGrant`**. `CapGrant`s
-//! are not directly committed to a source chain, but can be constructed from
-//! certain source chain entries. They define a certain bit of functionality,
-//! as well as the access controls which determine who may exercise the granted
-//! functionality.
+//! Capabilities are declared by a Grantor via a **`CapGrant`**, which is
+//! committed to their source chain as a private entry. The Grantor then shares
+//! the secret with the agents they mean to grant access to.
 //!
-//! Capabilites are exercised by other agents via a **`CapClaim`** which they
+//! Capabilities are exercised by other agents via a **`CapClaim`** which they
 //! commit to their source chain as a private entry. This struct contains the
 //! information needed to refer to the capability as well as the secret needed
 //! to send to the Grantor.

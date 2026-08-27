@@ -7,9 +7,11 @@ use std::collections::{BTreeSet, HashSet};
 
 /// The entry for a capability grant.
 ///
-/// This data is committed to the callee's source chain as a private entry. The remote calling
-/// agent must provide a secret and we source their pubkey from the active network connection.
-/// This must match the strictness of the [`GrantConstraint`].
+/// This data is committed to the grantor's source chain as a private entry. A grant authorizes
+/// only the [`Capability`] it names, and only for the agents its [`GrantConstraint`] permits. The
+/// pubkey of the agent exercising the grant is sourced from the active network connection, and
+/// they must provide the grant's secret unless the constraint is
+/// [`GrantConstraint::Unrestricted`].
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "ts_rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts_rs", ts(export_to = "hdk/capabilities.ts"))]
@@ -78,7 +80,7 @@ impl From<CapGrant> for DesensitizedCapGrant {
 }
 
 impl CapGrant {
-    /// Constructor
+    /// Construct a grant that authorizes calls to the given zome functions.
     pub fn new_zome_call_grant(
         tag: String,
         constraint: GrantConstraint,
@@ -88,6 +90,15 @@ impl CapGrant {
             tag,
             constraint,
             capability: Capability::ZomeCall(ZomeCallGrant { functions }),
+        }
+    }
+
+    /// Construct a grant that authorizes direct signals.
+    pub fn new_direct_signal_grant(tag: String, constraint: GrantConstraint) -> Self {
+        Self {
+            tag,
+            constraint,
+            capability: Capability::DirectSignal,
         }
     }
 }
@@ -427,6 +438,36 @@ mod tests {
                 "{constraint:?} direct-signal grant authorized a zome call without a secret"
             );
         }
+    }
+
+    #[test]
+    fn constructors_build_the_capability_they_name() {
+        let secret: CapSecret = [1; 64].into();
+
+        let zome_call = CapGrant::new_zome_call_grant(
+            "zome-call".to_string(),
+            GrantConstraint::Transferable { secret },
+            GrantedFunctions::All,
+        );
+        assert_eq!(zome_call.tag, "zome-call");
+        assert_eq!(
+            zome_call.constraint,
+            GrantConstraint::Transferable { secret }
+        );
+        assert_eq!(
+            zome_call.capability,
+            Capability::ZomeCall(ZomeCallGrant {
+                functions: GrantedFunctions::All
+            })
+        );
+
+        let direct_signal = CapGrant::new_direct_signal_grant(
+            "direct-signal".to_string(),
+            GrantConstraint::Unrestricted,
+        );
+        assert_eq!(direct_signal.tag, "direct-signal");
+        assert_eq!(direct_signal.constraint, GrantConstraint::Unrestricted);
+        assert_eq!(direct_signal.capability, Capability::DirectSignal);
     }
 
     /// The mirror of the above: a zome call grant must never authorize a direct signal.

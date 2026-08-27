@@ -325,8 +325,12 @@ pub enum AppRequest {
     /// The payload may be up to `DIRECT_SIGNAL_MAX_SIZE` (1 MiB) bytes; larger payloads are
     /// rejected with an error.
     ///
-    /// Note that this bypasses the usual security mechanism where zomes must create a capability
-    /// grant to permit `recv_remote_signal` to be invoked without restriction.
+    /// Each recipient only accepts the signal if they have committed a `Capability::DirectSignal`
+    /// grant that permits the sending agent, so an app that wants to receive direct signals must
+    /// commit one — typically from its `init` callback. A recipient whose grant carries a secret
+    /// additionally requires `cap_secret` to match. Signals to a recipient with no matching grant
+    /// are dropped by that recipient, which the sender is not told about; sending is best effort
+    /// either way.
     SendDirectSignal {
         /// The app network to send messages on.
         dna_hash: DnaHash,
@@ -341,6 +345,14 @@ pub enum AppRequest {
         /// Treated as opaque by Holochain, it is up to the application to decide how to serialize,
         /// deserialize and process payloads.
         signal: Vec<u8>,
+
+        /// The secret for the recipients' capability grant, if their grants carry one.
+        ///
+        /// The same secret is offered to every agent in `agents`, and each recipient matches it
+        /// against their secret-bearing grants only, so recipients holding different secrets, or
+        /// a mix of secret-bearing and unrestricted grants, need one request each.
+        #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
+        cap_secret: Option<CapSecret>,
     },
 }
 
@@ -770,6 +782,59 @@ mod tests {
             AppRequest::DumpOpTimings {
                 cursor: None,
                 limit: None,
+                ..
+            }
+        ));
+    }
+
+    /// A caller that predates `cap_secret`, or one exercising an unrestricted grant, omits the
+    /// field entirely. Serde's derive reads a missing `Option` field as `None`, over both the
+    /// msgpack wire encoding and JSON.
+    #[test]
+    fn send_direct_signal_request_defaults_omitted_cap_secret() {
+        use holo_hash::{AgentPubKey, DnaHash};
+
+        let dna_hash = DnaHash::from_raw_36(vec![1; 36]);
+        let agent = AgentPubKey::from_raw_36(vec![2; 36]);
+
+        let json: AppRequest = serde_json::from_value(serde_json::json!({
+            "type": "send_direct_signal",
+            "value": {
+                "dna_hash": dna_hash,
+                "agents": [agent.clone()],
+                "signal": [1, 2, 3],
+            }
+        }))
+        .unwrap();
+        assert!(matches!(
+            json,
+            AppRequest::SendDirectSignal {
+                cap_secret: None,
+                ..
+            }
+        ));
+
+        #[derive(Debug, serde::Serialize)]
+        #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+        enum LegacyAppRequest {
+            SendDirectSignal {
+                dna_hash: DnaHash,
+                agents: Vec<AgentPubKey>,
+                signal: Vec<u8>,
+            },
+        }
+
+        let bytes = holochain_serialized_bytes::encode(&LegacyAppRequest::SendDirectSignal {
+            dna_hash,
+            agents: vec![agent],
+            signal: vec![1, 2, 3],
+        })
+        .unwrap();
+        let decoded: AppRequest = holochain_serialized_bytes::decode(&bytes).unwrap();
+        assert!(matches!(
+            decoded,
+            AppRequest::SendDirectSignal {
+                cap_secret: None,
                 ..
             }
         ));

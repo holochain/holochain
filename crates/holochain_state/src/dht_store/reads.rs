@@ -2294,15 +2294,16 @@ impl DhtStore<DbRead<Dht>> {
         Ok(Some(create))
     }
 
-    /// The author's candidate capability grants for the validity loop in
-    /// [`SourceChain::valid_cap_grant`](crate::source_chain::SourceChain::valid_cap_grant).
+    /// The author's candidate capability grants for the validity loops in
+    /// [`SourceChain::valid_cap_grant`](crate::source_chain::SourceChain::valid_cap_grant) and
+    /// [`valid_direct_signal_grant`](Self::valid_direct_signal_grant).
     ///
     /// - When `check_secret` is `Some`, only grants that carry a secret
     ///   (`Transferable` / `Assigned`) are considered. The exact-secret match is
-    ///   left to the caller's [`CapAccess::is_valid_for_zome_call`], which is
-    ///   equivalent because it requires `secret == given` for both secret-bearing
-    ///   variants (a secret-bearing check therefore never matches an
-    ///   `Unrestricted` grant).
+    ///   left to the caller's [`CapAccess::is_valid_for_zome_call`] or
+    ///   [`CapAccess::is_valid_for_direct_signal`], which is equivalent because it
+    ///   requires `secret == given` for both secret-bearing variants (a
+    ///   secret-bearing check therefore never matches an `Unrestricted` grant).
     /// - When `check_secret` is `None`, only `Unrestricted` grants are
     ///   considered.
     ///
@@ -2378,6 +2379,25 @@ impl DhtStore<DbRead<Dht>> {
             }
         }
         Ok(grants)
+    }
+
+    /// The `author`'s grant authorizing `from_agent` to send them a direct signal, if any.
+    ///
+    /// Unlike a zome call, an agent has no implicit access to its own direct signals, so this
+    /// consults committed grants only: `from_agent` needs a
+    /// [`Capability::DirectSignal`](holochain_zome_types::prelude::Capability::DirectSignal)
+    /// grant whose constraint permits them, even when `from_agent == author`.
+    pub async fn valid_direct_signal_grant(
+        &self,
+        author: &AgentPubKey,
+        from_agent: &AgentPubKey,
+        check_secret: Option<&CapSecret>,
+    ) -> StateQueryResult<Option<CapAccess>> {
+        Ok(self
+            .valid_cap_grants(author, check_secret)
+            .await?
+            .into_iter()
+            .find(|grant| grant.is_valid_for_direct_signal(from_agent, check_secret)))
     }
 
     /// `true` if `entry_hash` has been updated or deleted by `author` — the

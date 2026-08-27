@@ -3444,12 +3444,16 @@ mod misc_impls {
         }
 
         /// Send a signal directly to the specified agents, bypassing WASM execution
+        ///
+        /// `cap_secret` is offered to every recipient; each one checks it against their own
+        /// `Capability::DirectSignal` grants and drops the signal if none match.
         pub async fn send_direct_signal(
             &self,
             installed_app_id: InstalledAppId,
             dna_hash: DnaHash,
             agents: Vec<AgentPubKey>,
             signal: Vec<u8>,
+            cap_secret: Option<CapSecret>,
         ) -> ConductorResult<()> {
             if agents.is_empty() {
                 return Err(ConductorError::Other("No agents to signal".into()));
@@ -3483,10 +3487,12 @@ mod misc_impls {
                 return Err(ConductorError::Other(format!("Attempted to send to DNA hash {dna_hash:?} but it was not found in app {installed_app_id}").into()));
             }
 
-            let signal_bytes = holochain_serialized_bytes::encode(&DirectSignal(signal))?;
+            let signal_bytes =
+                holochain_serialized_bytes::encode(&DirectSignal { signal, cap_secret })?;
 
             // Sign the hash, not the bytes: lair signing frames are capped at 8 KiB while
-            // payloads go up to `DIRECT_SIGNAL_MAX_SIZE`. The receiver verifies through
+            // payloads go up to `DIRECT_SIGNAL_MAX_SIZE`. Signing the encoded struct is what
+            // binds the secret to the payload. The receiver verifies through
             // `is_valid_signature`, which hashes the received bytes the same way.
             let hash = holo_hash::sha2_512(&signal_bytes);
             let sig = app_info
