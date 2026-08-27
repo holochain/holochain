@@ -1624,6 +1624,124 @@ async fn restore_from_dht_chain_fork_warrant_transitions_to_unrecoverable() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_from_dht_transitions_to_unrecoverable_with_warrant_for_invalid_chain_op() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+    let mut conductor_c = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let app_c = conductor_c
+        .setup_app("app", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_c = app_c.into_cells().remove(0);
+    conductor_c
+        .declare_full_storage_arcs(cell_c.dna_hash())
+        .await;
+
+    let mut config_d = SweetConductorConfig::rendezvous(true);
+    config_d.restore_chain_quorum = 1;
+    let mut conductor_d =
+        SweetConductor::from_config_rendezvous(config_d, rendezvous.clone()).await;
+    let keystore = conductor_d.keystore();
+    let agent = SweetAgents::one(keystore.clone()).await;
+
+    let invalid_action = Action {
+        header: ActionHeader {
+            author: agent.clone(),
+            timestamp: Timestamp::from_micros(0),
+            action_seq: 0,
+            prev_action: None,
+        },
+        data: ActionData::Dna(DnaData {
+            dna_hash: DnaHash::from_raw_36(vec![9; 36]),
+        }),
+    };
+    let invalid_action_signature = agent.sign(&keystore, invalid_action.clone()).await.unwrap();
+    let invalid_action = SignedActionHashed::with_presigned(
+        ActionHashed::from_content_sync(invalid_action),
+        invalid_action_signature,
+    );
+
+    let store_c = conductor_c.get_dht_store(dna_file.dna_hash()).unwrap();
+    let invalid_signed_action = SignedAction::new(
+        invalid_action.hashed.content.clone(),
+        invalid_action.signature.clone(),
+    );
+    let invalid_op =
+        DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(invalid_signed_action)));
+    store_c
+        .test_insert_authored_chain_op(invalid_op, None, None, None, None)
+        .await
+        .unwrap();
+
+    let warrant = Warrant::new(
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+            action_author: agent.clone(),
+            action: (
+                invalid_action.as_hash().clone(),
+                invalid_action.signature.clone(),
+            ),
+            chain_op_type: ChainOpType::AgentActivity,
+            reason: "because I said so".into(),
+        }),
+        cell_c.agent_pubkey().clone(),
+        Timestamp::now(),
+        agent.clone(),
+    );
+    let warrant_op = WarrantOp::sign(&conductor_c.keystore(), warrant)
+        .await
+        .unwrap();
+    let warrant_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from((*warrant_op).clone()));
+    store_c
+        .test_insert_integrated_warrant(warrant_op_hashed)
+        .await
+        .unwrap();
+
+    let app_id = "restored".to_string();
+    let mut signal_rx = conductor_d.subscribe_to_app_signals(app_id.clone());
+
+    conductor_d
+        .install_app(
+            &app_id,
+            Some(agent.clone()),
+            std::slice::from_ref(&dna_file),
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    let (restore_cell_id, reason) = match next_restore_signal(&mut signal_rx).await {
+        SystemSignal::RestoreFailed { cell_id, reason } => (cell_id, reason),
+        signal => panic!("expected RestoreFailed, got: {signal:?}"),
+    };
+
+    assert!(
+        matches!(reason, UnrecoverableCellReason::ChainIntegrityWarrant(_)),
+        "expected a ChainIntegrityWarrant reason, got: {reason:?}"
+    );
+
+    assert_eq!(
+        app_status(&conductor_d, &app_id).await,
+        AppStatus::Unrecoverable(restore_cell_id, reason)
+    );
+
+    let err = conductor_d.enable_app(app_id).await.unwrap_err();
+    assert!(
+        matches!(err, ConductorError::AppStatusError(_)),
+        "expected AppStatusError, got: {err:?}"
+    );
+}
+
 /// Number of accepted actions authored by `agent` in `dna_hash`'s per-DNA database. Reads the DB
 /// directly rather than via `dump_full_cell_state`, which also pulls peer info and so requires the
 /// DNA's network space to already exist.
