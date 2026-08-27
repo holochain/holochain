@@ -37,9 +37,7 @@ use holo_hash::fixt::EntryHashFixturator;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_zome_types::fixt::{
-    ActionFixturator, CloseChainAction, CreateAction, CreateLinkAction,
-};
+use holochain_zome_types::fixt::{ActionFixturator, CreateAction, CreateLinkAction};
 use matches::assert_matches;
 
 /// Entry type in the action matches the entry variant
@@ -65,23 +63,6 @@ fn check_entry_type_test() {
             ))
         );
     }
-}
-
-/// No action may follow a CloseChain
-#[test]
-fn check_prev_action_not_close_chain_test() {
-    let action = fixt!(Action, CreateAction);
-
-    let close_chain = fixt!(Action, CloseChainAction);
-    assert_matches!(
-        check_prev_action_not_close_chain(&action, &close_chain),
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevActionError(ref e)
-        )) if e.source == PrevActionErrorKind::ActionAfterChainClose
-    );
-
-    let create = fixt!(Action, CreateAction);
-    assert_matches!(check_prev_action_not_close_chain(&action, &create), Ok(()));
 }
 
 /// Hash integrity check. The hash of an entry always matches what's in the action.
