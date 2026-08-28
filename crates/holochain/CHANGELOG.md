@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix `GrantZomeCallCapability` and `RevokeZomeCallCapability` bypassing self-validation. The admin calls now validate the commit the same way zome calls do, so granting or revoking a capability on a closed source chain fails instead of writing an invalid action that peers would reject and warrant the agent for. \#5949
 - `hc dna hash` now accepts modifier overrides: `--network-seed`/`-s` and
   `--role-settings <path to yaml>`, matching the semantics of
   `hc sandbox generate`. This makes it possible to compute ahead of time the

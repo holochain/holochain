@@ -1,5 +1,7 @@
 use super::retrieve_previous_actions_for_ops;
+use super::sys_validate_record;
 use super::validation_deps::SysValDeps;
+use crate::core::validation::OutcomeOrError;
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::core::workflow::sys_validation_workflow::validate_op;
 use crate::core::workflow::WorkflowResult;
@@ -2205,6 +2207,64 @@ async fn action_after_close_chain() {
         ),
         outcome
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sys_validate_record_rejects_action_after_chain_close() {
+    holochain_trace::test_run();
+
+    let test_case = TestCase::new().await;
+
+    // The chain head is a CloseChain action.
+    let mut close_action = fixt!(Action, CloseChainAction);
+    close_action.header.author = test_case.agent.clone();
+    close_action.header.timestamp = Timestamp::now();
+    close_action.header.action_seq = 23;
+    close_action.header.prev_action = Some(fixt!(ActionHash));
+    if let ActionData::CloseChain(d) = &mut close_action.data {
+        d.new_target = None;
+    }
+    let previous_action = test_case.sign_action(close_action).await;
+
+    // A locally authored record trying to extend the chain past the close.
+    // Everything about it is valid except that it follows a CloseChain.
+    let entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
+        vec![1, 3, 5],
+    ))));
+    let mut create = fixt!(Action, CreateAction);
+    create.header.author = test_case.agent.clone();
+    create.header.timestamp = Timestamp::now();
+    create.header.action_seq = 24;
+    create.header.prev_action = Some(previous_action.as_hash().clone());
+    *create.entry_type_mut().unwrap() = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
+    *create.entry_hash_mut().unwrap() = EntryHash::with_data_sync(&entry);
+    let record = Record::new(
+        test_case.sign_action(create).await,
+        RecordEntry::Present(entry),
+    );
+
+    let cascade = MockCascade::with_records(vec![Record::new(previous_action, RecordEntry::NA)]);
+
+    let outcome = sys_validate_record(&record, Arc::new(cascade)).await;
+
+    match outcome {
+        Err(OutcomeOrError::Outcome(outcome)) => assert_eq!(
+            ValidationOutcome::PrevActionError(
+                (
+                    PrevActionErrorKind::ActionAfterChainClose,
+                    record.action().clone()
+                )
+                    .into()
+            )
+            .to_string(),
+            outcome.to_string()
+        ),
+        other => panic!("expected a rejection but the outcome was {other:?}"),
+    }
 }
 
 // TODO this hits code which claims to be unreachable. Clearly it isn't so investigate the code path.
