@@ -6,6 +6,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::io::Read;
+use std::path::{Component, Path};
 
 pub mod resource;
 
@@ -16,6 +17,12 @@ pub type ResourceMap = BTreeMap<ResourceIdentifier, ResourceBytes>;
 ///
 /// This is meant to be serialized for standalone distribution, and deserialized
 /// by the receiver.
+///
+/// Resource-identifier safety (rejecting absolute paths and parent-directory
+/// traversal) is enforced only by [`Bundle::unpack`], not by this type's
+/// [`Deserialize`] impl. Callers that need that guarantee on untrusted bytes
+/// must go through [`Bundle::unpack`] rather than deserializing a `Bundle`
+/// directly.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Bundle<M>
 where
@@ -59,10 +66,40 @@ where
 
     /// Unpack bytes produced by [`pack`](Bundle::pack) into a new [Bundle].
     ///
-    /// Uses [`unpack`](crate::unpack) to produce the new Bundle.
+    /// Uses [`unpack`](crate::unpack) to produce the new bundle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MrBundleError::IoError`] if decompression fails,
+    /// [`MrBundleError::MsgpackDecodeError`] if deserialization fails, or
+    /// [`MrBundleError::InvalidResourceId`] if a resource identifier could
+    /// escape a consumer's bundle root.
     pub fn unpack(source: impl Read) -> MrBundleResult<Self> {
-        crate::unpack(source)
+        let bundle: Self = crate::unpack(source)?;
+
+        for resource_id in bundle.resources.keys() {
+            validate_resource_id(resource_id)?;
+        }
+
+        Ok(bundle)
     }
+}
+
+fn validate_resource_id(resource_id: &ResourceIdentifier) -> MrBundleResult<()> {
+    let path = Path::new(resource_id);
+    let escapes_root = path.is_absolute()
+        || path.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        });
+
+    if escapes_root {
+        return Err(MrBundleError::InvalidResourceId(resource_id.clone()));
+    }
+
+    Ok(())
 }
 
 // Same failure mode as `HoloHashed<C>` (`holo_hash::hashed`):
@@ -277,13 +314,32 @@ mod tests {
 
     #[test]
     fn round_trip_pack_unpack() {
-        let manifest = TestManifest(vec!["1.thing".into(), "2.thing".into()]);
+        let manifest = TestManifest(vec!["1.thing".into(), "nested/2.thing".into()]);
 
         let bundle = Bundle::new(
             manifest.clone(),
             vec![
                 ("1.thing".into(), vec![1].into()),
-                ("2.thing".into(), vec![2].into()),
+                ("nested/2.thing".into(), vec![2].into()),
+            ],
+        )
+        .unwrap();
+
+        let packed = bundle.pack().unwrap();
+        let unpacked = Bundle::unpack(packed.reader()).unwrap();
+
+        assert_eq!(bundle, unpacked);
+    }
+
+    #[test]
+    fn round_trip_pack_unpack_with_cur_dir_components() {
+        let manifest = TestManifest(vec!["./thing".into(), "nested/./thing".into()]);
+
+        let bundle = Bundle::new(
+            manifest.clone(),
+            vec![
+                ("./thing".into(), vec![1].into()),
+                ("nested/./thing".into(), vec![2].into()),
             ],
         )
         .unwrap();
@@ -331,5 +387,41 @@ mod tests {
             &ResourceBytes::from(vec![1]),
             bundle.get_resource(&"thing".into()).unwrap()
         );
+    }
+
+    fn packed_bundle_with_resource_id(resource_id: &str) -> bytes::Bytes {
+        Bundle::new(
+            TestManifest(vec![resource_id.to_string()]),
+            [(resource_id.to_string(), vec![1].into())],
+        )
+        .unwrap()
+        .pack()
+        .unwrap()
+    }
+
+    fn assert_unpack_rejects(resource_id: &str) {
+        let packed = packed_bundle_with_resource_id(resource_id);
+        let error = Bundle::<TestManifest>::unpack(packed.reader())
+            .expect_err("unsafe resource identifier unexpectedly unpacked");
+
+        assert!(
+            matches!(&error, MrBundleError::InvalidResourceId(id) if id == resource_id),
+            "expected InvalidResourceId({resource_id:?}), got {error:?}"
+        );
+    }
+
+    #[test]
+    fn unpack_rejects_unsafe_resource_ids() {
+        for resource_id in ["../outside", "nested/../../outside", "/outside"] {
+            assert_unpack_rejects(resource_id);
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn unpack_rejects_windows_prefixed_resource_ids() {
+        for resource_id in [r"C:\outside", r"C:outside"] {
+            assert_unpack_rejects(resource_id);
+        }
     }
 }
