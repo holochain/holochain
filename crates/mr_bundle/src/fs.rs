@@ -160,12 +160,19 @@ impl FileSystemBundler {
     ///
     /// This version of the [expand_to](FileSystemBundler::expand_to) has looser constraints on the
     /// contents of the manifest. As a consequence, the file name for the manifest must be provided.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a resource identifier could escape `target_dir`, the target directory
+    /// already exists without `force`, serialization fails, or a filesystem operation fails.
     pub async fn expand_named_to<M: Debug + Serialize + DeserializeOwned>(
         bundle: &Bundle<M>,
         manifest_file_name: &str,
         target_dir: impl AsRef<Path>,
         force: bool,
     ) -> MrBundleResult<()> {
+        bundle.validate_resource_ids()?;
+
         let target_dir = target_dir.as_ref();
 
         // If the directory already exists, and we're not forcing, then we can't continue.

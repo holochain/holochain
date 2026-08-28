@@ -1,7 +1,8 @@
+use mr_bundle::error::MrBundleError;
 use mr_bundle::{
     resource_id_for_path, Bundle, FileSystemBundler, Manifest, ResourceBytes, ResourceIdentifier,
 };
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -208,4 +209,35 @@ async fn file_system_bundler_with_raw_bundle() {
         "some content",
         std::fs::read_to_string(unpacked_dir.join("bundled.thing")).unwrap()
     );
+}
+
+#[tokio::test]
+async fn expand_named_to_rejects_unsafe_resource_ids() {
+    #[derive(serde::Serialize)]
+    struct UncheckedBundle {
+        manifest: yaml_serde::Value,
+        resources: BTreeMap<ResourceIdentifier, ResourceBytes>,
+    }
+
+    let resource_id = "../outside";
+    let unchecked_bundle = UncheckedBundle {
+        manifest: yaml_serde::Value::Null,
+        resources: [(resource_id.to_string(), vec![1].into())]
+            .into_iter()
+            .collect(),
+    };
+    let serialized = rmp_serde::to_vec(&unchecked_bundle).unwrap();
+    let bundle: Bundle<yaml_serde::Value> = rmp_serde::from_slice(&serialized).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let target_dir = dir.path().join("target");
+
+    let error = FileSystemBundler::expand_named_to(&bundle, "manifest.yaml", target_dir, false)
+        .await
+        .expect_err("unsafe resource identifier unexpectedly expanded");
+
+    assert!(
+        matches!(&error, MrBundleError::InvalidResourceId(id) if id == resource_id),
+        "expected InvalidResourceId({resource_id:?}), got {error:?}"
+    );
+    assert!(!dir.path().join("outside").exists());
 }

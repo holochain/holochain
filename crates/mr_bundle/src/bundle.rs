@@ -19,10 +19,10 @@ pub type ResourceMap = BTreeMap<ResourceIdentifier, ResourceBytes>;
 /// by the receiver.
 ///
 /// Resource-identifier safety (rejecting absolute paths and parent-directory
-/// traversal) is enforced only by [`Bundle::unpack`], not by this type's
-/// [`Deserialize`] impl. Callers that need that guarantee on untrusted bytes
-/// must go through [`Bundle::unpack`] rather than deserializing a `Bundle`
-/// directly.
+/// traversal) is enforced by [`Bundle::unpack`] and filesystem expansion, not
+/// by this type's [`Deserialize`] impl. Callers that need that guarantee before
+/// other operations on untrusted bytes must go through [`Bundle::unpack`]
+/// rather than deserializing a `Bundle` directly.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Bundle<M>
 where
@@ -77,11 +77,13 @@ where
     pub fn unpack(source: impl Read) -> MrBundleResult<Self> {
         let bundle: Self = crate::unpack(source)?;
 
-        for resource_id in bundle.resources.keys() {
-            validate_resource_id(resource_id)?;
-        }
+        bundle.validate_resource_ids()?;
 
         Ok(bundle)
+    }
+
+    pub(crate) fn validate_resource_ids(&self) -> MrBundleResult<()> {
+        self.resources.keys().try_for_each(validate_resource_id)
     }
 }
 
