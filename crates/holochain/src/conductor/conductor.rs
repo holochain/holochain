@@ -2785,7 +2785,7 @@ mod misc_impls {
     impl Conductor {
         /// Grant a zome call capability for a cell
         pub async fn grant_zome_call_capability(
-            &self,
+            self: &Arc<Self>,
             payload: GrantZomeCallCapabilityPayload,
         ) -> ConductorApiResult<ActionHash> {
             let GrantZomeCallCapabilityPayload { cell_id, cap_grant } = payload;
@@ -2794,7 +2794,7 @@ mod misc_impls {
             let cell = self.cell_by_id(&cell_id).await?;
             cell.check_or_run_zome_init().await?;
 
-            let source_chain = SourceChain::new(
+            let workspace = SourceChainWorkspace::new(
                 self.get_or_create_dht_store(cell_id.dna_hash())?,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
@@ -2808,7 +2808,8 @@ mod misc_impls {
                 entry_hash,
             });
 
-            let action_hash = source_chain
+            let action_hash = workspace
+                .source_chain()
                 .put(
                     action_data,
                     Some(cap_grant_entry),
@@ -2816,7 +2817,11 @@ mod misc_impls {
                 )
                 .await?;
 
-            source_chain
+            self.self_validate_commit(&cell_id, workspace.clone())
+                .await?;
+
+            workspace
+                .source_chain()
                 .flush(
                     cell.holochain_p2p_dna()
                         .target_arcs()
@@ -2832,9 +2837,41 @@ mod misc_impls {
             Ok(action_hash)
         }
 
+        /// Run inline validation on the scratch content of the given workspace, the same way
+        /// zome call commits are self-validated.
+        ///
+        /// Honors the `disable_self_validation` tuning param, like the call zome workflow does.
+        async fn self_validate_commit(
+            self: &Arc<Self>,
+            cell_id: &CellId,
+            workspace: SourceChainWorkspace,
+        ) -> ConductorApiResult<()> {
+            let disable_self_validation = self
+                .config
+                .tuning_params
+                .as_ref()
+                .is_some_and(|p| p.disable_self_validation);
+            if disable_self_validation {
+                tracing::warn!("Self validation is disabled, skipping validation of local commits");
+                return Ok(());
+            }
+
+            let ribosome = self.get_ribosome(cell_id)?;
+            let network: holochain_p2p::DynHolochainP2pDna =
+                Arc::new(self.cell_by_id(cell_id).await?.holochain_p2p_dna().clone());
+            crate::core::workflow::inline_validation(
+                workspace,
+                network,
+                Arc::clone(self),
+                ribosome,
+            )
+            .await?;
+            Ok(())
+        }
+
         /// Revoke a zome call capability for a cell identified by the [`ActionHash`] of the grant.
         pub async fn revoke_zome_call_capability(
-            &self,
+            self: &Arc<Self>,
             cell_id: CellId,
             action_hash: ActionHash,
         ) -> ConductorApiResult<ActionHash> {
@@ -2842,7 +2879,7 @@ mod misc_impls {
             let cell = self.cell_by_id(&cell_id).await?;
             cell.check_or_run_zome_init().await?;
 
-            let source_chain = SourceChain::new(
+            let workspace = SourceChainWorkspace::new(
                 self.get_or_create_dht_store(cell_id.dna_hash())?,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
@@ -2854,7 +2891,8 @@ mod misc_impls {
                 .include_entries(true)
                 .entry_type(EntryType::CapGrant);
 
-            let cap_grant_entry = source_chain
+            let cap_grant_entry = workspace
+                .source_chain()
                 .query(grant_query.clone())
                 .await?
                 .into_iter()
@@ -2875,11 +2913,16 @@ mod misc_impls {
                 deletes_address: action_hash,
                 deletes_entry_address: entry_hash,
             });
-            let action_hash = source_chain
+            let action_hash = workspace
+                .source_chain()
                 .put(action_data, None, ChainTopOrdering::default())
                 .await?;
 
-            source_chain
+            self.self_validate_commit(&cell_id, workspace.clone())
+                .await?;
+
+            workspace
+                .source_chain()
                 .flush(
                     cell.holochain_p2p_dna()
                         .target_arcs()

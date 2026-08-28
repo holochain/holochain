@@ -267,6 +267,21 @@ pub fn check_prev_seq(action: &Action, prev_action: &Action) -> SysValidationRes
     }
 }
 
+/// Check that the previous action is not a CloseChain
+///
+/// A CloseChain is always required to be the last action in a chain, so no
+/// action may follow it.
+pub fn check_prev_action_not_close_chain(
+    action: &Action,
+    prev_action: &Action,
+) -> SysValidationResult<()> {
+    match prev_action.data {
+        ActionData::CloseChain(_) => Err(PrevActionErrorKind::ActionAfterChainClose)
+            .map_err(|e| ValidationOutcome::PrevActionError((e, action.clone()).into()).into()),
+        _ => Ok(()),
+    }
+}
+
 /// Check the entry variant matches the variant in the actions entry type
 pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationResult<()> {
     entry_type_matches(entry_type, entry)

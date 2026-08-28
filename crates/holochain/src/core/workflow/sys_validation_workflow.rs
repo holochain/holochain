@@ -62,6 +62,7 @@
 //! These checks are run when storing a new action for a [`DhtOp`].
 //!
 //! - Check that the [`Action`] is either a [`ActionData::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
+//! - Checks that the previous action is never a [`ActionData::CloseChain`], since this is always required to be the last action in a chain.
 //! - Checks that the author of the current action is the same as the author of the previous action.
 //! - Checks that the timestamp of the current action is greater than the timestamp of the previous action.
 //! - Checks that the sequence number of the current action is exactly 1 more than the sequence number of the previous action.
@@ -1357,13 +1358,7 @@ fn register_agent_activity(
             .and_then(|s| s.as_action())
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
 
-        match prev_action.data {
-            ActionData::CloseChain(_) => Err(ValidationOutcome::PrevActionError(
-                (PrevActionErrorKind::ActionAfterChainClose, action.clone()).into(),
-            )
-            .into()),
-            _ => Ok(()),
-        }
+        check_prev_action_not_close_chain(action, prev_action)
     } else {
         Ok(())
     }
@@ -1381,6 +1376,7 @@ fn store_record(action: &Action, validation_dependencies: SysValDeps) -> SysVali
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
+        check_prev_action_not_close_chain(action, prev_action)?;
         check_prev_author(action, prev_action)?;
         check_prev_timestamp(action, prev_action)?;
         check_prev_seq(action, prev_action)?;
