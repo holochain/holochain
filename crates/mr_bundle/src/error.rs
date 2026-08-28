@@ -26,6 +26,10 @@ pub enum MrBundleError {
     #[error("Failed to decode bundle to [{0}] due to a deserialization error: {1}")]
     MsgpackDecodeError(String, rmp_serde::decode::Error),
 
+    /// A bundle resource identifier contains an unsafe path.
+    #[error("Invalid resource id in bundle: {0}")]
+    InvalidResourceId(ResourceIdentifier),
+
     /// A YAML error
     #[cfg(feature = "fs")]
     #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
