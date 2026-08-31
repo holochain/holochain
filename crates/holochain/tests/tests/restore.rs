@@ -2027,6 +2027,145 @@ async fn restore_retries_on_head_disagreement_then_converges() {
     }
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_retries_until_quorum_is_met() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+    // The original conductor that authors a chain for the agent the normal way
+    let mut conductor_a = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let keystore = conductor_a.keystore();
+    let agent = SweetAgents::one(keystore.clone()).await;
+
+    let app_a = conductor_a
+        .setup_app_for_agent("app", agent.clone(), std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_a = app_a.into_cells().remove(0);
+    conductor_a
+        .declare_full_storage_arcs(cell_a.dna_hash())
+        .await;
+
+    // The only authority known to Conductor D at first
+    let mut conductor_c1 = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let app_c1 = conductor_c1
+        .setup_app("app", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_c1 = app_c1.into_cells().remove(0);
+    conductor_c1
+        .declare_full_storage_arcs(cell_c1.dna_hash())
+        .await;
+
+    let _: ActionHash = conductor_a
+        .call(&cell_a.zome(TestWasm::Create), "create_entry", ())
+        .await;
+    await_consistency([&cell_a, &cell_c1]).await.unwrap();
+
+    let chain_on_a = conductor_a
+        .raw_handle()
+        .dump_full_cell_state(cell_a.cell_id(), None, None)
+        .await
+        .unwrap()
+        .source_chain_dump
+        .records;
+
+    // Shut down the original, so it can't act as an authority for the restore of itself
+    conductor_a.shutdown().await;
+
+    let mut config_d = SweetConductorConfig::rendezvous(true);
+    config_d.restore_chain_quorum = 2;
+    let mut conductor_d = SweetConductor::create_with_defaults(
+        config_d,
+        Some(keystore.clone()),
+        Some(rendezvous.clone()),
+    )
+    .await;
+
+    let app_id = "restored".to_string();
+    let mut signal_rx = conductor_d.subscribe_to_app_signals(app_id.clone());
+    let restore_cell_id = CellId::new(dna_file.dna_hash().clone(), agent.clone());
+
+    conductor_d
+        .install_app(
+            &app_id,
+            Some(agent.clone()),
+            std::slice::from_ref(&dna_file),
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    // Only C1 is made known to D, so a quorum of 2 cannot be met
+    SweetConductor::exchange_peer_info([&conductor_d, &conductor_c1]).await;
+
+    // Restore retries on a fixed 5s backoff while short of quorum. Wait past one full cycle before
+    // checking, so this isn't just because no peers have responded yet.
+    tokio::time::sleep(std::time::Duration::from_secs(6)).await;
+    assert_eq!(
+        app_status(&conductor_d, &app_id).await,
+        AppStatus::AwaitingRestore
+    );
+
+    // A second authority appears, syncing peer-to-peer from C1 rather than reviving Conductor A
+    let mut conductor_c2 = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let app_c2 = conductor_c2
+        .setup_app("app", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_c2 = app_c2.into_cells().remove(0);
+    conductor_c2
+        .declare_full_storage_arcs(cell_c2.dna_hash())
+        .await;
+    await_consistency([&cell_c1, &cell_c2]).await.unwrap();
+
+    SweetConductor::exchange_peer_info([&conductor_d, &conductor_c2]).await;
+
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: restore_cell_id.clone()
+        }
+    );
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::AppRestoreComplete {
+            installed_app_id: app_id.clone()
+        }
+    );
+
+    let chain_on_d = conductor_d
+        .raw_handle()
+        .dump_full_cell_state(&restore_cell_id, None, None)
+        .await
+        .unwrap()
+        .source_chain_dump
+        .records;
+    assert_eq!(chain_on_a.len(), chain_on_d.len());
+    for (a, d) in chain_on_a.iter().zip(&chain_on_d) {
+        assert_eq!(a.action_address, d.action_address);
+        assert_eq!(a.action, d.action);
+        assert_eq!(a.signature, d.signature);
+    }
+}
+
 /// Number of accepted actions authored by `agent` in `dna_hash`'s per-DNA database. Reads the DB
 /// directly rather than via `dump_full_cell_state`, which also pulls peer info and so requires the
 /// DNA's network space to already exist.
