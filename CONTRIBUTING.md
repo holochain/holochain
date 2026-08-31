@@ -6,6 +6,10 @@ As an Open Source project, Holochain welcomes contributions of all sorts. Bug re
 documentation contributions, tests, feedback, and more are welcome. This document describes how to most effectively 
 make each type of contribution.
 
+## AI-generated contributions
+
+[AI Policy](./AI_POLICY.md)
+
 ## Social
 
 We are committed to foster a vibrant thriving community, including growing a culture that breaks cycles of 
