@@ -14,6 +14,68 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260831.030531
+
+## [hcterm-0.8.0-dev.5](crates/hcterm/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_cli-0.8.0-dev.5](crates/holochain_cli/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_cli\_bundle-0.8.0-dev.5](crates/holochain_cli_bundle/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_cli\_client-0.8.0-dev.5](crates/holochain_cli_client/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_cli\_sandbox-0.8.0-dev.5](crates/holochain_cli_sandbox/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_client-0.10.0-dev.5](crates/holochain_client/CHANGELOG.md#0.10.0-dev.5)
+
+## [holochain-0.8.0-dev.5](crates/holochain/CHANGELOG.md#0.8.0-dev.5)
+
+- Reject bundle resource identifiers containing absolute paths or parent directory traversal, preventing malicious bundles from writing resources outside their extraction directory. \#5784
+- Fix `GrantZomeCallCapability` and `RevokeZomeCallCapability` bypassing self-validation. The admin calls now validate the commit the same way zome calls do, so granting or revoking a capability on a closed source chain fails instead of writing an invalid action that peers would reject and warrant the agent for. \#5949
+- `hc dna hash` now accepts modifier overrides: `--network-seed`/`-s` and `--role-settings <path to yaml>`, matching the semantics of `hc sandbox generate`. This makes it possible to compute ahead of time the DNA hash a role will have once install-time modifiers are applied. A `network_seed` in the role settings file takes precedence over `--network-seed`, mirroring installation. \#5946
+- Fix `AdminRequest::ListCapabilityGrants` with `include_revoked: false` always returning an empty list. It now lists the capability grants that have not been revoked. \#5950
+- **BREAKING CHANGE**: Capability grants are restructured to make room for capabilities other than zome calls. A grant is now `CapGrantEntry { tag, constraint, capability }`: `constraint` (formerly `access`) says who may claim the grant, and `capability` says what it grants, currently `Capability::ZomeCall(ZomeCallGrant { functions })` — build that shape with `CapGrant::new_zome_call_grant`. A grant only authorizes the capability it was issued for. The admin API follows: `GrantZomeCallCapability`’s `cap_grant` is now a `GrantZomeCallCapabilityGrant { tag, constraint, grant: { functions } }` rather than a whole grant, so it can only ever grant zome calls, and `ListCapabilityGrants` reports the new grant shape. Capability grants already on a source chain cannot be read by this version and must be re-issued. Types are renamed to match: `ZomeCallCapGrant` → `CapGrant`, the old `CapGrant` enum → `CapAccess`, `CapAccess` → `GrantConstraint`, `DesensitizedZomeCallCapGrant` → `DesensitizedCapGrant`, `CapAccessInfo` → `GrantConstraintInfo`. \#5820
+- **BREAKING CHANGE**: Remove `Entry::app_fancy` and `Entry::entry_type`. Use `Entry::app` with `SerializedBytes`, and read an entry type from the action that wrote it.
+- Fix source-chain restore was ignoring an app’s manifest `bootstrap_url`/`relay_url` overrides, and instead always joined the network with the conductor’s default config.
+- Fix a source-chain restore bug where ordinary gossip for the restoring agent’s own chain could be rejected during validation and permanently block restore’s own write, leaving the cell’s chain looking empty after `enable_app`.
+- Fix source-chain restore stalling permanently when no peers are yet known for the agent’s DHT location. It now retries like any other insufficient-peers response.
+
+## [holochain\_cascade-0.8.0-dev.5](crates/holochain_cascade/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_conductor\_config-0.8.0-dev.5](crates/holochain_conductor_config/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_test\_wasm\_common-0.8.0-dev.3](crates/holochain_test_wasm_common/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_wasm\_test\_utils-0.8.0-dev.5](crates/holochain_wasm_test_utils/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_websocket-0.8.0-dev.5](crates/holochain_websocket/CHANGELOG.md#0.8.0-dev.5)
+
+## [hdk-0.8.0-dev.3](crates/hdk/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_p2p-0.8.0-dev.5](crates/holochain_p2p/CHANGELOG.md#0.8.0-dev.5)
+
+## [hdi-0.9.0-dev.3](crates/hdi/CHANGELOG.md#0.9.0-dev.3)
+
+## [holochain\_state-0.8.0-dev.5](crates/holochain_state/CHANGELOG.md#0.8.0-dev.5)
+
+## [hdk\_derive-0.8.0-dev.3](crates/hdk_derive/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_data-0.8.0-dev.5](crates/holochain_data/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_conductor\_api-0.8.0-dev.5](crates/holochain_conductor_api/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_keystore-0.8.0-dev.5](crates/holochain_keystore/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_state\_types-0.8.0-dev.3](crates/holochain_state_types/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_types-0.8.0-dev.5](crates/holochain_types/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_zome\_types-0.8.0-dev.3](crates/holochain_zome_types/CHANGELOG.md#0.8.0-dev.3)
+
+## [mr\_bundle-0.8.0-dev.3](crates/mr_bundle/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_integrity\_types-0.8.0-dev.3](crates/holochain_integrity_types/CHANGELOG.md#0.8.0-dev.3)
+
 # 20260824.005809
 
 ## [hcterm-0.8.0-dev.4](crates/hcterm/CHANGELOG.md#0.8.0-dev.4)

@@ -7,22 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Reject bundle resource identifiers containing absolute paths or parent
-  directory traversal, preventing malicious bundles from writing resources
-  outside their extraction directory. \#5784
+## 0.8.0-dev.5
+
+- Reject bundle resource identifiers containing absolute paths or parent directory traversal, preventing malicious bundles from writing resources outside their extraction directory. \#5784
 - Fix `GrantZomeCallCapability` and `RevokeZomeCallCapability` bypassing self-validation. The admin calls now validate the commit the same way zome calls do, so granting or revoking a capability on a closed source chain fails instead of writing an invalid action that peers would reject and warrant the agent for. \#5949
-- `hc dna hash` now accepts modifier overrides: `--network-seed`/`-s` and
-  `--role-settings <path to yaml>`, matching the semantics of
-  `hc sandbox generate`. This makes it possible to compute ahead of time the
-  DNA hash a role will have once install-time modifiers are applied.
-  A `network_seed` in the role settings file takes precedence over `--network-seed`, mirroring
-  installation. \#5946
+- `hc dna hash` now accepts modifier overrides: `--network-seed`/`-s` and `--role-settings <path to yaml>`, matching the semantics of `hc sandbox generate`. This makes it possible to compute ahead of time the DNA hash a role will have once install-time modifiers are applied. A `network_seed` in the role settings file takes precedence over `--network-seed`, mirroring installation. \#5946
 - Fix `AdminRequest::ListCapabilityGrants` with `include_revoked: false` always returning an empty list. It now lists the capability grants that have not been revoked. \#5950
-- **BREAKING CHANGE**: Capability grants are restructured to make room for capabilities other than zome calls. A grant is now `CapGrantEntry { tag, constraint, capability }`: `constraint` (formerly `access`) says who may claim the grant, and `capability` says what it grants, currently `Capability::ZomeCall(ZomeCallGrant { functions })` — build that shape with `CapGrant::new_zome_call_grant`. A grant only authorizes the capability it was issued for. The admin API follows: `GrantZomeCallCapability`'s `cap_grant` is now a `GrantZomeCallCapabilityGrant { tag, constraint, grant: { functions } }` rather than a whole grant, so it can only ever grant zome calls, and `ListCapabilityGrants` reports the new grant shape. Capability grants already on a source chain cannot be read by this version and must be re-issued. Types are renamed to match: `ZomeCallCapGrant` → `CapGrant`, the old `CapGrant` enum → `CapAccess`, `CapAccess` → `GrantConstraint`, `DesensitizedZomeCallCapGrant` → `DesensitizedCapGrant`, `CapAccessInfo` → `GrantConstraintInfo`. \#5820
+- **BREAKING CHANGE**: Capability grants are restructured to make room for capabilities other than zome calls. A grant is now `CapGrantEntry { tag, constraint, capability }`: `constraint` (formerly `access`) says who may claim the grant, and `capability` says what it grants, currently `Capability::ZomeCall(ZomeCallGrant { functions })` — build that shape with `CapGrant::new_zome_call_grant`. A grant only authorizes the capability it was issued for. The admin API follows: `GrantZomeCallCapability`’s `cap_grant` is now a `GrantZomeCallCapabilityGrant { tag, constraint, grant: { functions } }` rather than a whole grant, so it can only ever grant zome calls, and `ListCapabilityGrants` reports the new grant shape. Capability grants already on a source chain cannot be read by this version and must be re-issued. Types are renamed to match: `ZomeCallCapGrant` → `CapGrant`, the old `CapGrant` enum → `CapAccess`, `CapAccess` → `GrantConstraint`, `DesensitizedZomeCallCapGrant` → `DesensitizedCapGrant`, `CapAccessInfo` → `GrantConstraintInfo`. \#5820
 - **BREAKING CHANGE**: Remove `Entry::app_fancy` and `Entry::entry_type`. Use `Entry::app` with `SerializedBytes`, and read an entry type from the action that wrote it.
-- Fix source-chain restore was ignoring an app's manifest `bootstrap_url`/`relay_url` overrides, and instead always joined the network with the conductor's default config.
-- Fix a source-chain restore bug where ordinary gossip for the restoring agent's own chain could be rejected during validation and permanently block restore's own write, leaving the cell's chain looking empty after `enable_app`.
-- Fix source-chain restore stalling permanently when no peers are yet known for the agent's DHT location. It now retries like any other insufficient-peers response.
+- Fix source-chain restore was ignoring an app’s manifest `bootstrap_url`/`relay_url` overrides, and instead always joined the network with the conductor’s default config.
+- Fix a source-chain restore bug where ordinary gossip for the restoring agent’s own chain could be rejected during validation and permanently block restore’s own write, leaving the cell’s chain looking empty after `enable_app`.
+- Fix source-chain restore stalling permanently when no peers are yet known for the agent’s DHT location. It now retries like any other insufficient-peers response.
 
 ## 0.8.0-dev.4
 
