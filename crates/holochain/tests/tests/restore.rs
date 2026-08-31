@@ -1742,6 +1742,155 @@ async fn restore_from_dht_transitions_to_unrecoverable_with_warrant_for_invalid_
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_succeeds_when_a_warrant_for_a_valid_action_is_rejected() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+    // The original conductor that authors a chain for the agent the normal way
+    let mut conductor_a = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let keystore = conductor_a.keystore();
+    let agent = SweetAgents::one(keystore.clone()).await;
+
+    let app_a = conductor_a
+        .setup_app_for_agent("app", agent.clone(), std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_a = app_a.into_cells().remove(0);
+    conductor_a
+        .declare_full_storage_arcs(cell_a.dna_hash())
+        .await;
+
+    // The honest authority used for the restore
+    let mut conductor_c = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let app_c = conductor_c
+        .setup_app("app", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_c = app_c.into_cells().remove(0);
+    conductor_c
+        .declare_full_storage_arcs(cell_c.dna_hash())
+        .await;
+
+    let _: ActionHash = conductor_a
+        .call(&cell_a.zome(TestWasm::Create), "create_entry", ())
+        .await;
+
+    await_consistency([&cell_a, &cell_c]).await.unwrap();
+
+    let chain_on_a = conductor_a
+        .raw_handle()
+        .dump_full_cell_state(cell_a.cell_id(), None, None)
+        .await
+        .unwrap()
+        .source_chain_dump
+        .records;
+
+    // A dishonest peer that holds none of the agent's chain data, only a false warrant against it
+    let mut conductor_m = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let app_m = conductor_m
+        .setup_app("app", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_m = app_m.into_cells().remove(0);
+    conductor_m
+        .declare_full_storage_arcs(cell_m.dna_hash())
+        .await;
+    let store_m = conductor_m.get_dht_store(dna_file.dna_hash()).unwrap();
+
+    // The accused action is genuine and valid so local validation should clear it
+    let accused = &chain_on_a[4];
+    let warrant = Warrant::new(
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+            action_author: agent.clone(),
+            action: (accused.action_address.clone(), accused.signature.clone()),
+            chain_op_type: ChainOpType::CreateRecord,
+            reason: "false accusation".into(),
+        }),
+        cell_m.agent_pubkey().clone(),
+        Timestamp::now(),
+        agent.clone(),
+    );
+    let warrant_op = WarrantOp::sign(&conductor_m.keystore(), warrant)
+        .await
+        .unwrap();
+    let warrant_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from((*warrant_op).clone()));
+    store_m
+        .test_insert_integrated_warrant(warrant_op_hashed)
+        .await
+        .unwrap();
+
+    // Shut down the original, so it can't act as an authority for the restore of itself
+    conductor_a.shutdown().await;
+
+    let mut config_b = SweetConductorConfig::rendezvous(true);
+    config_b.restore_chain_quorum = 1;
+    let mut conductor_b =
+        SweetConductor::create_with_defaults(config_b, Some(keystore.clone()), Some(rendezvous))
+            .await;
+
+    let app_id = "restored".to_string();
+    let mut signal_rx = conductor_b.subscribe_to_app_signals(app_id.clone());
+    let restore_cell_id = CellId::new(dna_file.dna_hash().clone(), agent.clone());
+
+    conductor_b
+        .install_app(
+            &app_id,
+            Some(agent.clone()),
+            std::slice::from_ref(&dna_file),
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    SweetConductor::exchange_peer_info([&conductor_b, &conductor_c, &conductor_m]).await;
+
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: restore_cell_id.clone()
+        }
+    );
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::AppRestoreComplete {
+            installed_app_id: app_id.clone()
+        }
+    );
+
+    // The restored chain matches Conductor A's chain so the false warrant did not block it
+    let chain_on_b = conductor_b
+        .raw_handle()
+        .dump_full_cell_state(&restore_cell_id, None, None)
+        .await
+        .unwrap()
+        .source_chain_dump
+        .records;
+    assert_eq!(chain_on_a.len(), chain_on_b.len());
+    for (a, b) in chain_on_a.iter().zip(&chain_on_b) {
+        assert_eq!(a.action_address, b.action_address);
+        assert_eq!(a.action, b.action);
+        assert_eq!(a.signature, b.signature);
+    }
+}
+
 /// Number of accepted actions authored by `agent` in `dna_hash`'s per-DNA database. Reads the DB
 /// directly rather than via `dump_full_cell_state`, which also pulls peer info and so requires the
 /// DNA's network space to already exist.
