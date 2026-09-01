@@ -1290,9 +1290,15 @@ impl DhtStore<DbWrite<Dht>> {
     /// [`test_insert_authored_chain_op`](DhtStore::test_insert_authored_chain_op),
     /// which inserts the action once, to add the sibling op types for the same
     /// action without colliding on the `Action` primary key.
+    ///
+    /// `action_hash_override` can be used to override the hash stored as the op's action hash
+    /// instead of computing one from its content. If paired with `test_insert_authored_chain_op`
+    /// then pass the same hash passed to that function, so the sibling op points to the same action
+    /// hash.
     pub async fn test_insert_additional_integrated_op(
         &self,
         op: DhtOpHashed,
+        action_hash_override: Option<ActionHash>,
         withhold_publish: Option<bool>,
     ) -> StateMutationResult<()> {
         use holochain_data::dht::InsertChainOp;
@@ -1309,7 +1315,9 @@ impl DhtStore<DbWrite<Dht>> {
             }
         };
 
-        let action_hash = holo_hash::ActionHash::with_data_sync(chain_op.signed_action().data());
+        let action_hash = action_hash_override.unwrap_or_else(|| {
+            holo_hash::ActionHash::with_data_sync(chain_op.signed_action().data())
+        });
         let basis_hash = chain_op.dht_basis();
         let storage_center_loc = basis_hash.get_loc();
         let now = Timestamp::now();
