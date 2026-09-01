@@ -9,9 +9,11 @@ use holochain_conductor_api::CellInfo;
 use holochain_keystore::{AgentPubKeyExt, WarrantOpExt};
 use holochain_state::dht_store::DhtStore;
 use holochain_types::app::{AppManifest, AppManifestV0, AppStatus, DisabledAppReason};
+use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_types::signal::SystemSignal;
 use holochain_wasm_test_utils::TestWasm;
+use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
 /// The kitsune2 agent IDs currently joined to the network space of the passed [`DnaHash`].
@@ -2164,6 +2166,195 @@ async fn restore_retries_until_quorum_is_met() {
         assert_eq!(a.action, d.action);
         assert_eq!(a.signature, d.signature);
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_from_stale_head_then_authoring_produces_a_detectable_fork() {
+    holochain_trace::test_run();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+
+    // An inline zome to create entries and query chain status for a given agent
+    let entry_def = EntryDef::default_from_id("any");
+    let inline_zomes = SweetInlineZomes::new(vec![entry_def], 0)
+        .function("create", move |api, _: ()| {
+            #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
+            struct S(String);
+
+            let entry = Entry::app(S("entry".to_string()).try_into().unwrap()).unwrap();
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                EntryVisibility::Public,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        })
+        .function("get_agent_activity", move |api, agent: AgentPubKey| {
+            Ok(api.get_agent_activity(GetAgentActivityInput::new(
+                agent,
+                ChainQueryFilter::default(),
+                ActivityRequest::Status,
+                GetOptions::default(),
+            ))?)
+        });
+    let (dna_file, _, _) =
+        SweetDnaFile::from_inline_zomes("restore-stale-head".to_string(), inline_zomes).await;
+
+    // Conductor A authors the agent's first action the normal way
+    let mut conductor_a = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let keystore = conductor_a.keystore();
+    let agent = SweetAgents::one(keystore.clone()).await;
+
+    let app_a = conductor_a
+        .setup_app_for_agent("app", agent.clone(), std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_a = app_a.into_cells().remove(0);
+    conductor_a
+        .declare_full_storage_arcs(cell_a.dna_hash())
+        .await;
+
+    let _: ActionHash = conductor_a
+        .call(&cell_a.zome(SweetInlineZomes::COORDINATOR), "create", ())
+        .await;
+
+    // Conductor C_stale syncs with A up to this point, then goes offline
+    let mut conductor_c_stale = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let app_c_stale = conductor_c_stale
+        .setup_app("app", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_c_stale = app_c_stale.into_cells().remove(0);
+    conductor_c_stale
+        .declare_full_storage_arcs(cell_c_stale.dna_hash())
+        .await;
+
+    await_consistency([&cell_a, &cell_c_stale]).await.unwrap();
+    conductor_c_stale.shutdown().await;
+
+    // Conductor A authors more data, changing the chain head, then goes offline before C_stale
+    // comes back, so C_stale can never learn about the true chain head.
+    let true_head: ActionHash = conductor_a
+        .call(&cell_a.zome(SweetInlineZomes::COORDINATOR), "create", ())
+        .await;
+
+    // Conductor C_witness syncs to the full, true chain head so it conflicts with C_stale
+    let mut conductor_c_witness = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        rendezvous.clone(),
+    )
+    .await;
+    let app_c_witness = conductor_c_witness
+        .setup_app("app", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let cell_c_witness = app_c_witness.into_cells().remove(0);
+    conductor_c_witness
+        .declare_full_storage_arcs(cell_c_witness.dna_hash())
+        .await;
+    await_consistency([&cell_a, &cell_c_witness]).await.unwrap();
+
+    // Shut down the original for good, so it can never republish to C_stale
+    conductor_a.shutdown().await;
+
+    // C_witness also goes offline before C_stale returns so that they don't gossip
+    conductor_c_witness.shutdown().await;
+
+    // C_stale comes back online as the only peer
+    conductor_c_stale.startup().await;
+
+    // Restore Conductor D with a quorum of 1 so the stale head is accepted
+    let mut config_d = SweetConductorConfig::rendezvous(true);
+    config_d.restore_chain_quorum = 1;
+    let mut conductor_d = SweetConductor::create_with_defaults(
+        config_d,
+        Some(keystore.clone()),
+        Some(rendezvous.clone()),
+    )
+    .await;
+
+    let app_id = "restored".to_string();
+    let mut signal_rx = conductor_d.subscribe_to_app_signals(app_id.clone());
+    let restore_cell_id = CellId::new(dna_file.dna_hash().clone(), agent.clone());
+
+    conductor_d
+        .install_app(
+            &app_id,
+            Some(agent.clone()),
+            std::slice::from_ref(&dna_file),
+            Some(InstallAppCommonFlags {
+                restore_from_dht: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    SweetConductor::exchange_peer_info([&conductor_d, &conductor_c_stale]).await;
+
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::RestoreComplete {
+            cell_id: restore_cell_id.clone()
+        }
+    );
+    assert_eq!(
+        next_restore_signal(&mut signal_rx).await,
+        SystemSignal::AppRestoreComplete {
+            installed_app_id: app_id.clone()
+        }
+    );
+
+    // Confirm the restore really did restore to the stale head, missing the new data
+    let chain_on_d = conductor_d
+        .raw_handle()
+        .dump_full_cell_state(&restore_cell_id, None, None)
+        .await
+        .unwrap()
+        .source_chain_dump
+        .records;
+    assert!(chain_on_d.iter().all(|r| r.action_address != true_head));
+
+    // Conductor D authors new content on top of its stale head, creating a genuine fork
+    conductor_d.enable_app(app_id).await.unwrap();
+    let restore_cell = conductor_d.get_sweet_cell(restore_cell_id).unwrap();
+    let forked_head: ActionHash = conductor_d
+        .call(
+            &restore_cell.zome(SweetInlineZomes::COORDINATOR),
+            "create",
+            (),
+        )
+        .await;
+    assert_ne!(forked_head, true_head);
+
+    // C_witness comes back online and learns of D's forked action
+    conductor_c_witness.startup().await;
+    SweetConductor::exchange_peer_info([&conductor_d, &conductor_c_witness]).await;
+
+    let mut forked_status = None;
+    holochain::retry_until_timeout!(30_000, 200, {
+        let activity: AgentActivityStatus = conductor_c_witness
+            .call(
+                &cell_c_witness.zome(SweetInlineZomes::COORDINATOR),
+                "get_agent_activity",
+                agent.clone(),
+            )
+            .await;
+        if matches!(activity.status, ChainStatus::Forked(_)) {
+            forked_status = Some(activity.status);
+            break;
+        }
+    });
+    assert!(matches!(forked_status, Some(ChainStatus::Forked(_))));
 }
 
 /// Number of accepted actions authored by `agent` in `dna_hash`'s per-DNA database. Reads the DB
