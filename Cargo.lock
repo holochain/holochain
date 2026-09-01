@@ -3467,6 +3467,7 @@ dependencies = [
  "regex",
  "schemars 0.9.0",
  "serde",
+ "serde_bytes",
  "serde_derive",
  "serde_json",
  "serde_with",
