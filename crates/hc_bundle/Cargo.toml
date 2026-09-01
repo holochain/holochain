@@ -34,7 +34,7 @@ holochain_util = { version = "^0.8.0-dev.0", path = "../holochain_util", feature
 mr_bundle = { version = "^0.8.0-dev.3", path = "../mr_bundle", features = [
   "fs",
 ] }
-schemars = "0.9"
+schemars = "1.2"
 serde_json = "1.0"
 thiserror = "2.0"
 tokio = { version = "1.27", features = ["full"] }
@@ -45,7 +45,7 @@ assert_cmd = "2.0"
 matches = "0.1"
 tempfile = "3"
 serde_json = "1.0"
-jsonschema = "0.45"
+jsonschema = "0.51"
 walkdir = "2"
 
 [lints]
