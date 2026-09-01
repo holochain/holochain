@@ -41,15 +41,15 @@ tracing-appender = "0.2.3"
 opentelemetry = "0.31"
 strum_macros = "0.27.2"
 
-kitsune2 = { version = "0.5.0", default-features = false, features = [
+kitsune2 = { version = "0.6.0-dev.1", default-features = false, features = [
   "transport-iroh",
 ] }
-kitsune2_bootstrap_srv = { version = "0.5.0", default-features = false, features = [
+kitsune2_bootstrap_srv = { version = "0.6.0-dev.1", default-features = false, features = [
   "iroh-relay",
 ] }
-kitsune2_api = "0.5.0"
-kitsune2_core = "0.5.0"
-kitsune2_transport_iroh = { version = "0.5.0", default-features = false }
+kitsune2_api = "0.6.0-dev.1"
+kitsune2_core = "0.6.0-dev.1"
+kitsune2_transport_iroh = { version = "0.6.0-dev.1", default-features = false }
 # TEMPORARY PIN (see PR #5849): iroh 1.0.0 otherwise resolves quinn 0.11.11 /
 # quinn-proto 0.11.15 / socket2 0.6.4, which regress QUIC connection establishment
 # on Windows and break the zero-arc integration tests. These are transitive deps of

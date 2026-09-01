@@ -24,7 +24,7 @@ holochain_trace = { version = "^0.8.0-dev.0", path = "../holochain_trace" }
 holochain_util = { version = "=0.9.0-dev.4", features = ["backtrace"] }
 holochain_zome_types = { version = "=0.9.0-dev.0", features = ["full"] }
 holochain_timestamp = { version = "=0.9.0-dev.4" }
-kitsune2_api = "0.5.0"
+kitsune2_api = "0.6.0-dev.1"
 itertools = { version = "0.14" }
 mr_bundle = { path = "../mr_bundle", features = [
   "fs",
