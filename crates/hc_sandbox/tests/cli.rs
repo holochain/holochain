@@ -814,7 +814,7 @@ async fn dna_hash_with_overrides_matches_installed_cells() {
 
     holochain_trace::test_run();
     // Keep the sandbox off the public bootstrap and relay servers.
-    let local_network = TestBootstrapSrv::new(false).await;
+    let local_network = kitsune2_test_utils::bootstrap::TestBootstrapSrv::new(false).await;
     let local_network_url = local_network.addr().to_string();
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
