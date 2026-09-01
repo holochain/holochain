@@ -414,7 +414,7 @@ async fn direct_signal_with_max_size_payload_is_delivered() {
         "unexpected response: {response:?}"
     );
 
-    let (cell_id, _from_agent, signal) =
+    let (cell_id, signal) =
         try_recv_direct_signal(&mut bob_rx, Duration::from_secs(60))
             .await
             .expect("Bob did not receive the max-size direct signal");
