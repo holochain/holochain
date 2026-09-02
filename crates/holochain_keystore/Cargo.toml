@@ -32,7 +32,7 @@ nanoid = "0.4"
 one_err = "0.0.8"
 opentelemetry = "0.31"
 parking_lot = "0.12"
-schemars = "0.9"
+schemars = "1.2"
 serde = { version = "1.0", features = ["derive"] }
 shrinkwraprs = "0.3"
 sodoken = "0.1.0"
