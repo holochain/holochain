@@ -26,7 +26,7 @@ holo_hash = { version = "^0.8.0-dev.2", path = "../holo_hash", features = [
   "encoding",
   "kitsune2",
 ] }
-holochain_client = { version = "^0.10.0-dev.4", path = "../client", default-features = false }
+holochain_client = { version = "^0.10.0-dev.5", path = "../client", default-features = false }
 holochain_util = { version = "^0.8.0-dev.0", path = "../holochain_util" }
 holochain_conductor_api = { version = "^0.8.0-dev.5", path = "../holochain_conductor_api", default-features = false }
 holochain_types = { version = "^0.8.0-dev.5", path = "../holochain_types" }

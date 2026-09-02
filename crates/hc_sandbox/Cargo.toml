@@ -24,7 +24,7 @@ anyhow = "1.0"
 ansi_term = "0.12"
 clap = { version = "4.0", features = ["derive", "env"] }
 futures = "0.3"
-holochain_client = { version = "^0.10.0-dev.4", path = "../client", default-features = false }
+holochain_client = { version = "^0.10.0-dev.5", path = "../client", default-features = false }
 holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.8.0-dev.5" }
 holochain_types = { path = "../holochain_types", version = "^0.8.0-dev.5", features = [
   "fixturators",
