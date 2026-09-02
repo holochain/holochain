@@ -4,7 +4,7 @@ use holochain_conductor_api::{
     AdminInterfaceConfig, AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest,
     InterfaceDriver,
 };
-use holochain_conductor_api::{AppResponse, AppStatusFilter};
+use holochain_conductor_api::{AppResponse, AppStatusFilter, CellInfo};
 use holochain_conductor_config::config::{read_config, write_config};
 use holochain_types::app::InstalledAppId;
 use holochain_types::prelude::{SerializedBytes, SerializedBytesError, YamlProperties};
@@ -14,7 +14,7 @@ use holochain_websocket::{
 };
 use std::future::Future;
 use std::net::ToSocketAddrs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
@@ -680,6 +680,217 @@ async fn generate_sandbox_and_get_admin_ports() {
     );
 
     shutdown_sandbox(hc_generate).await;
+}
+
+#[derive(Debug)]
+struct DnaHashFixture {
+    app_bundle: PathBuf,
+    dna_bundle: PathBuf,
+    roles_settings: PathBuf,
+    role_1_settings: PathBuf,
+    role_3_settings: PathBuf,
+}
+
+fn copy_fixture_file(source: &Path, destination: &Path) {
+    std::fs::create_dir_all(
+        destination
+            .parent()
+            .expect("fixture destination has no parent"),
+    )
+    .unwrap();
+    std::fs::copy(source, destination).unwrap_or_else(|error| {
+        panic!(
+            "failed to copy fixture file from {source} to {destination}: {error}",
+            source = source.display(),
+            destination = destination.display()
+        )
+    });
+}
+
+async fn run_hc_pack(bundle_type: &str, source: &Path) {
+    let output = get_hc_command()
+        .arg(bundle_type)
+        .arg("pack")
+        .arg(source)
+        .output()
+        .await
+        .unwrap_or_else(|error| panic!("failed to run hc {bundle_type} pack: {error}"));
+    assert!(
+        output.status.success(),
+        "hc {bundle_type} pack failed: {stderr}",
+        stderr = String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+async fn package_dna_hash_fixture(temp_dir: &Path) -> DnaHashFixture {
+    let source = std::env::current_dir().unwrap().join("tests/fixtures");
+    let fixture_dir = temp_dir.join("dna-hash-fixture");
+    let dna_dir = fixture_dir.join("dna");
+
+    copy_fixture_file(
+        &source.join("my-app/happ.yaml"),
+        &fixture_dir.join("happ.yaml"),
+    );
+    copy_fixture_file(
+        &source.join("my-app/dna/dna.yaml"),
+        &dna_dir.join("dna.yaml"),
+    );
+    copy_fixture_file(
+        &source.join("my-app/dna/zomes/test_wasm_foo.wasm"),
+        &dna_dir.join("zomes/test_wasm_foo.wasm"),
+    );
+
+    let roles_settings = fixture_dir.join("roles-settings.yaml");
+    let role_1_settings = fixture_dir.join("dna-role-settings-full.yaml");
+    let role_3_settings = fixture_dir.join("dna-role-settings-properties-only.yaml");
+    copy_fixture_file(&source.join("roles-settings.yaml"), &roles_settings);
+    copy_fixture_file(
+        &source.join("dna-role-settings-full.yaml"),
+        &role_1_settings,
+    );
+    copy_fixture_file(
+        &source.join("dna-role-settings-properties-only.yaml"),
+        &role_3_settings,
+    );
+
+    let dna_bundle = dna_dir.join("a dna.dna");
+    let app_bundle = fixture_dir.join("my-fixture-app.happ");
+    assert!(!dna_bundle.exists());
+    assert!(!app_bundle.exists());
+
+    run_hc_pack("dna", &dna_dir).await;
+    run_hc_pack("app", &fixture_dir).await;
+
+    assert!(dna_bundle.exists());
+    assert!(app_bundle.exists());
+
+    DnaHashFixture {
+        app_bundle,
+        dna_bundle,
+        roles_settings,
+        role_1_settings,
+        role_3_settings,
+    }
+}
+
+/// Runs `hc dna hash` with modifier overrides and returns the printed hash.
+async fn dna_hash_cli(dna_path: &Path, network_seed: &str, role_settings: &Path) -> String {
+    let mut cmd = get_hc_command();
+    cmd.arg("dna")
+        .arg("hash")
+        .arg(dna_path)
+        .arg("--network-seed")
+        .arg(network_seed)
+        .arg("--role-settings")
+        .arg(role_settings)
+        .stdout(Stdio::piped());
+    let output = cmd.output().await.expect("Failed to run hc dna hash");
+    assert!(
+        output.status.success(),
+        "hc dna hash failed: {stderr}",
+        stderr = String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+/// Returns the DNA hash of the single provisioned cell for a role.
+fn provisioned_dna_hash(cells: &[CellInfo], role: &str) -> String {
+    match cells
+        .first()
+        .unwrap_or_else(|| panic!("no cell info for role {role}"))
+    {
+        CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().to_string(),
+        other => panic!("expected provisioned cell for role {role}, got {other:?}"),
+    }
+}
+
+/// Installs the fixture app with both a network seed and roles settings
+/// overrides, then verifies `hc dna hash` computes the same hashes the
+/// installed cells actually got.
+#[tokio::test(flavor = "multi_thread")]
+async fn dna_hash_with_overrides_matches_installed_cells() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let fixture = package_dna_hash_fixture(temp_dir.path()).await;
+
+    holochain_trace::test_run();
+    // Keep the sandbox off the public bootstrap and relay servers.
+    let local_network = kitsune2_test_utils::bootstrap::TestBootstrapSrv::new(false).await;
+    let local_network_url = local_network.addr().to_string();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--network-seed")
+        .arg("cli seed override")
+        .arg("--roles-settings")
+        .arg(&fixture.roles_settings)
+        .arg("--in-process-lair")
+        .arg("--run=0")
+        .arg(&fixture.app_bundle)
+        .arg("network")
+        .arg(format!("--bootstrap={local_network_url}"))
+        .arg("quic")
+        .arg(&local_network_url)
+        .current_dir(temp_dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
+
+    let app_info = get_app_info(
+        launch_info.admin_port,
+        "test-app".into(),
+        *launch_info.app_ports.first().expect("No app ports found"),
+    )
+    .await;
+
+    let cell_info = match app_info {
+        AppResponse::AppInfo(Some(info)) => info.cell_info,
+        other => panic!("Unexpected response {other:?}"),
+    };
+
+    // role-1: roles-settings override both seed and properties, and win over
+    // the --network-seed passed to `hc sandbox generate`. The equivalent
+    // `hc dna hash` call must agree — including the precedence of the role
+    // settings file's seed over --network-seed.
+    let role_1_hash = provisioned_dna_hash(
+        cell_info
+            .get("role-1")
+            .unwrap_or_else(|| panic!("no cell info for role role-1")),
+        "role-1",
+    );
+    let cli_hash = dna_hash_cli(
+        &fixture.dna_bundle,
+        "cli seed override",
+        &fixture.role_1_settings,
+    )
+    .await;
+    assert_eq!(role_1_hash, cli_hash);
+
+    // role-3: untouched by roles-settings, so it got the generate-level
+    // network seed plus the properties baked into happ.yaml.
+    let role_3_hash = provisioned_dna_hash(
+        cell_info
+            .get("role-3")
+            .unwrap_or_else(|| panic!("no cell info for role role-3")),
+        "role-3",
+    );
+    let cli_hash = dna_hash_cli(
+        &fixture.dna_bundle,
+        "cli seed override",
+        &fixture.role_3_settings,
+    )
+    .await;
+    assert_eq!(role_3_hash, cli_hash);
+
+    shutdown_sandbox(hc_admin).await;
 }
 
 include!(concat!(env!("OUT_DIR"), "/target.rs"));

@@ -6,6 +6,7 @@ use mr_bundle::FileSystemBundler;
 use schemars::JsonSchema;
 use serde_json::Value;
 use std::{
+    fs,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -387,22 +388,173 @@ async fn test_multi_integrity() {
     assert_eq!(*dna.dna_def(), expected);
 }
 
+fn pack_dna_hash_fixture() -> (tempfile::TempDir, PathBuf) {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/my-app/dnas/dna1");
+    let dna_dir = temp_dir.path().join("dna1");
+    fs::create_dir_all(dna_dir.join("zomes")).unwrap();
+
+    for relative_path in ["dna.yaml", "zomes/zome11.wasm", "zomes/zome12.wasm"] {
+        fs::copy(source_dir.join(relative_path), dna_dir.join(relative_path)).unwrap();
+    }
+
+    let dna_path = dna_dir.join("a dna.dna");
+    assert!(dna_path.is_absolute());
+    assert!(!dna_path.exists());
+
+    let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-dna"));
+    cmd.arg("pack").arg(&dna_dir);
+    cmd.assert().success();
+
+    assert!(dna_path.is_file());
+
+    (temp_dir, dna_path)
+}
+
+fn dna_hash_command(dna_path: &Path) -> Command {
+    let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-dna"));
+    cmd.arg("hash").arg(dna_path);
+    cmd
+}
+
+fn dna_hash_cli(dna_path: &Path, args: &[&str]) -> String {
+    let mut cmd = dna_hash_command(dna_path);
+    cmd.args(args);
+    let stdout = cmd.assert().success().get_output().stdout.clone();
+    // Normalize Windows/linux line endings
+    String::from_utf8_lossy(&stdout).replace(['\r', '\n'], "")
+}
+
+fn dna_hash_cli_with_role_settings(
+    dna_path: &Path,
+    network_seed: Option<&str>,
+    role_settings: &Path,
+) -> String {
+    let mut cmd = dna_hash_command(dna_path);
+    if let Some(network_seed) = network_seed {
+        cmd.arg("--network-seed").arg(network_seed);
+    }
+    cmd.arg("--role-settings").arg(role_settings);
+    let stdout = cmd.assert().success().get_output().stdout.clone();
+    String::from_utf8_lossy(&stdout).replace(['\r', '\n'], "")
+}
+
+fn dna_hash_cli_failure(dna_path: &Path, role_settings: &Path) -> String {
+    let mut cmd = dna_hash_command(dna_path);
+    cmd.arg("--role-settings").arg(role_settings);
+    let stderr = cmd.assert().failure().get_output().stderr.clone();
+    String::from_utf8_lossy(&stderr).into_owned()
+}
+
 #[tokio::test]
 #[cfg_attr(target_os = "windows", ignore = "theres a hash mismatch - check crlf?")]
-async fn test_hash_dna_function() {
-    {
-        let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-dna"));
-        let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
-        cmd.assert().success();
-    }
-    {
-        let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-dna"));
-        let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
-        let stdout = cmd.assert().success().get_output().stdout.clone();
-        let actual = String::from_utf8_lossy(&stdout).replace(['\r', '\n'], ""); // Normalize Windows/linux
-        let expected = "uhC0kMpN6EzEhjaPP-MWeJi1cH2Zyw7OYEDEekSnjWE85WgCnIvEG";
-        assert_eq!(expected, actual, "Expected: {expected}\nActual: {actual}");
-    }
+async fn hash_dna_function() {
+    let (_temp_dir, dna_path) = pack_dna_hash_fixture();
+    let expected = "uhC0kMpN6EzEhjaPP-MWeJi1cH2Zyw7OYEDEekSnjWE85WgCnIvEG";
+    let actual = dna_hash_cli(&dna_path, &[]);
+    assert_eq!(expected, actual, "Expected: {expected}\nActual: {actual}");
+}
+
+#[tokio::test]
+#[cfg_attr(target_os = "windows", ignore = "theres a hash mismatch - check crlf?")]
+async fn hash_dna_with_modifier_overrides() {
+    let (_temp_dir, dna_path) = pack_dna_hash_fixture();
+    let base = dna_hash_cli(&dna_path, &[]);
+
+    // --network-seed alone changes the hash, deterministically on every OS.
+    let seed_hash = dna_hash_cli(&dna_path, &["--network-seed", "hc-dna-hash-test-seed"]);
+    assert_ne!(base, seed_hash);
+    let expected_seed_hash = "uhC0kZR2x_xAxE4_wypMnRPjwhk4DeG1dnOGphZpL1lBRAnqoYLoJ";
+    assert_eq!(expected_seed_hash, seed_hash);
+
+    let short_seed_hash = dna_hash_cli(&dna_path, &["-s", "hc-dna-hash-test-seed"]);
+    assert_eq!(expected_seed_hash, short_seed_hash);
+    assert_eq!(seed_hash, short_seed_hash);
+
+    // The CLI must agree with the library path used at install time.
+    let bundle = read_dna(&dna_path).await.unwrap();
+    let modifiers = DnaModifiersOpt::none().with_network_seed("hc-dna-hash-test-seed".into());
+    let library_hash = bundle
+        .into_dna_file(modifiers)
+        .await
+        .unwrap()
+        .0
+        .dna_hash()
+        .to_string();
+    assert_eq!(library_hash, seed_hash);
+
+    // --role-settings overrides seed and properties.
+    let role_settings =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/dna-role-settings.yaml");
+    let settings_hash = dna_hash_cli_with_role_settings(&dna_path, None, &role_settings);
+    assert_ne!(base, settings_hash);
+    assert_ne!(seed_hash, settings_hash);
+    assert_eq!(
+        "uhC0kvdsQLPWXzSUqwIC1Gr423E_oB9IF5RsizmRTUPv_fyTILYTZ",
+        settings_hash
+    );
+
+    let bundle = read_dna(&dna_path).await.unwrap();
+    let properties = YamlProperties::new(yaml_serde::from_str("foo: bar").unwrap());
+    let modifiers = DnaModifiersOpt::none()
+        .with_network_seed("hc-dna-hash-test-seed".into())
+        .with_properties(properties)
+        .serialized()
+        .unwrap();
+    let library_hash = bundle
+        .into_dna_file(modifiers)
+        .await
+        .unwrap()
+        .0
+        .dna_hash()
+        .to_string();
+    assert_eq!(library_hash, settings_hash);
+
+    // When both are given, the role settings file wins (install-time precedence).
+    let both_hash =
+        dna_hash_cli_with_role_settings(&dna_path, Some("some-other-seed"), &role_settings);
+    assert_eq!(settings_hash, both_hash);
+}
+
+#[test]
+fn hash_dna_rejects_missing_role_settings_file() {
+    let (temp_dir, dna_path) = pack_dna_hash_fixture();
+    let missing_path = temp_dir.path().join("missing-role-settings.yaml");
+
+    let stderr = dna_hash_cli_failure(&dna_path, &missing_path);
+
+    assert!(
+        stderr.contains("missing-role-settings.yaml"),
+        "stderr did not name the missing role settings file: {stderr}"
+    );
+}
+
+#[test]
+fn hash_dna_rejects_malformed_role_settings_yaml() {
+    let (temp_dir, dna_path) = pack_dna_hash_fixture();
+    let settings_path = temp_dir.path().join("malformed-role-settings.yaml");
+    fs::write(&settings_path, "modifiers: [unterminated\n").unwrap();
+
+    let stderr = dna_hash_cli_failure(&dna_path, &settings_path);
+
+    assert!(
+        stderr.contains("Failed to parse the role settings file"),
+        "stderr did not explain that the role settings YAML is malformed: {stderr}"
+    );
+}
+
+#[test]
+fn hash_dna_rejects_role_settings_without_modifiers() {
+    let (temp_dir, dna_path) = pack_dna_hash_fixture();
+    let settings_path = temp_dir.path().join("role-settings-without-modifiers.yaml");
+    fs::write(&settings_path, "type: provisioned\nmembrane_proof: ~\n").unwrap();
+
+    let stderr = dna_hash_cli_failure(&dna_path, &settings_path);
+
+    assert!(
+        stderr.contains("does not contain a `modifiers` block"),
+        "stderr did not explain that the modifiers block is required: {stderr}"
+    );
 }
 
 #[test]

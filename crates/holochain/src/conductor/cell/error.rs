@@ -25,8 +25,6 @@ pub enum CellError {
     ActionError(#[from] ActionError),
     #[error("This cell has not had a successful genesis and cannot be created")]
     CellWithoutGenesis(CellId),
-    #[error("The cell with id {0} is disabled.")]
-    CellDisabled(CellId),
     #[error("Authentication failure. Bad signature {0:?} by provenance {1}.")]
     ZomeCallAuthenticationFailed(Signature, AgentPubKey),
     #[error(

@@ -7,6 +7,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix `GrantZomeCallCapability` and `RevokeZomeCallCapability` bypassing self-validation. The admin calls now validate the commit the same way zome calls do, so granting or revoking a capability on a closed source chain fails instead of writing an invalid action that peers would reject and warrant the agent for. \#5949
+- `hc dna hash` now accepts modifier overrides: `--network-seed`/`-s` and
+  `--role-settings <path to yaml>`, matching the semantics of
+  `hc sandbox generate`. This makes it possible to compute ahead of time the
+  DNA hash a role will have once install-time modifiers are applied.
+  A `network_seed` in the role settings file takes precedence over `--network-seed`, mirroring
+  installation. \#5946
+- Fix source-chain restore was ignoring an app's manifest `bootstrap_url`/`relay_url` overrides, and instead always joined the network with the conductor's default config.
+- Fix a source-chain restore bug where ordinary gossip for the restoring agent's own chain could be rejected during validation and permanently block restore's own write, leaving the cell's chain looking empty after `enable_app`.
+- Fix source-chain restore stalling permanently when no peers are yet known for the agent's DHT location. It now retries like any other insufficient-peers response.
+- Fix `AdminRequest::ListCapabilityGrants` with `include_revoked: false` always returning an empty list. It now lists the capability grants that have not been revoked. \#5950
+- **BREAKING CHANGE**: Fix `SendDirectSignal` failing with `FrameOverflow` for payloads over 8 KiB. Payloads up to the documented 1 MiB limit are now delivered. The signature scheme and wire encoding changed, so direct signals sent between conductors with and without this fix are dropped by the receiver — upgrade both ends. \#5937
+- **BREAKING CHANGE**: Errors for zome calls against a cell that is not running now state why. `ConductorError::CellDisabled` is replaced by `ConductorError::CellNotRunning(cell_id, reason)`, where the reason distinguishes an app that is disabled, awaiting membrane proofs, restoring its source chains, or permanently unrecoverable, from a disabled clone cell or a cell that has not finished starting.
+- Add the source-chain restore workflow and allow installing an app with `InstallAppPayload::restore_from_dht: true`. Doing so skips genesis and reconstructs each cell's chain from the DHT instead, letting an existing agent key resume authoring on a new node. The app sits in `AppStatus::AwaitingRestore` until every cell restores, then requires `enable_app` like a normal install. A validated `ChainIntegrityWarrant` against the agent moves the app to the terminal `AppStatus::Unrecoverable(cell_id, reason)` instead. There is no repair path if an app is marked as `AppStatus::Unrecoverable`, it can only be uninstalled. See `docs/design/source_chain_restore.md`. \#5800
+
 ## 0.7.0
 
 ## 0.7.0-rc.5

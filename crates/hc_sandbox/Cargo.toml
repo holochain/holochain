@@ -46,6 +46,7 @@ walkdir = "2"
 
 [dev-dependencies]
 tempfile = "3.20.0"
+kitsune2_test_utils = "0.5.1"
 
 [target.'cfg(unix)'.dev-dependencies]
 nix = { version = "0.30", features = ["process", "signal"] }

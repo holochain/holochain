@@ -3052,6 +3052,7 @@ dependencies = [
  "holochain_types",
  "holochain_util",
  "holochain_websocket",
+ "kitsune2_test_utils",
  "nix 0.30.1",
  "serde",
  "serde_json",
@@ -3300,6 +3301,7 @@ dependencies = [
  "rmp-serde",
  "rustls",
  "serde",
+ "serde_bytes",
  "serde_json",
  "socket2",
  "sqlx",
@@ -3466,6 +3468,7 @@ dependencies = [
  "regex",
  "schemars 0.9.0",
  "serde",
+ "serde_bytes",
  "serde_derive",
  "serde_json",
  "serde_with",
@@ -4550,9 +4553,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_test_utils"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1925c738833cd9167933cb34324afbb18bb05759c49ed390434ce20fb52fd506"
+checksum = "26eac7d427147fea092b4aa345917bac65100f3e4b01b73a19d1ccfdb2833d40"
 dependencies = [
  "axum",
  "bytes",

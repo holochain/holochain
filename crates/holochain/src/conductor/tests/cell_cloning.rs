@@ -1,5 +1,8 @@
 use crate::{
-    conductor::{api::error::ConductorApiError, error::ConductorError, CellError},
+    conductor::{
+        api::error::ConductorApiError,
+        error::{CellUnavailableReason, ConductorError},
+    },
     sweettest::*,
 };
 use holo_hash::ActionHash;
@@ -388,7 +391,7 @@ async fn conductor_can_startup_with_cloned_cell() {
     assert!(zome_call_response.is_ok());
 
     conductor.shutdown().await;
-    conductor.startup(false).await;
+    conductor.startup().await;
 
     // calling the cell works after restart
     let zome = SweetZome::new(
@@ -419,10 +422,19 @@ async fn conductor_can_startup_with_cloned_cell() {
     let zome_call_response: Result<ActionHash, _> = conductor
         .call_fallible(&zome, "call_create_entry", ())
         .await;
-    matches!(zome_call_response, Err(ConductorApiError::CellError(CellError::CellDisabled(cell_id))) if cell_id == clone_cell.cell_id.clone());
+    assert!(
+        matches!(
+            &zome_call_response,
+            Err(ConductorApiError::ConductorError(ConductorError::CellNotRunning(
+                cell_id,
+                CellUnavailableReason::CloneCellDisabled
+            ))) if *cell_id == clone_cell.cell_id
+        ),
+        "expected CloneCellDisabled, got: {zome_call_response:?}"
+    );
 
     conductor.shutdown().await;
-    conductor.startup(false).await;
+    conductor.startup().await;
 
     // calling the cell still fails after restart, cell still disabled
     let zome = SweetZome::new(
@@ -432,5 +444,14 @@ async fn conductor_can_startup_with_cloned_cell() {
     let zome_call_response: Result<ActionHash, _> = conductor
         .call_fallible(&zome, "call_create_entry", ())
         .await;
-    matches!(zome_call_response, Err(ConductorApiError::CellError(CellError::CellDisabled(cell_id))) if cell_id == clone_cell.cell_id.clone());
+    assert!(
+        matches!(
+            &zome_call_response,
+            Err(ConductorApiError::ConductorError(ConductorError::CellNotRunning(
+                cell_id,
+                CellUnavailableReason::CloneCellDisabled
+            ))) if *cell_id == clone_cell.cell_id
+        ),
+        "expected CloneCellDisabled after restart, got: {zome_call_response:?}"
+    );
 }

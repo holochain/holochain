@@ -193,7 +193,8 @@ impl AppManifestV0 {
             // Only update the network seed for roles for which it makes sense to do so
             match role.provisioning.clone().unwrap_or_default() {
                 CellProvisioning::Create { .. } | CellProvisioning::CloneOnly => {
-                    role.dna.modifiers.network_seed = Some(network_seed.clone());
+                    let modifiers = DnaModifiersOpt::none().with_network_seed(network_seed.clone());
+                    role.dna.modifiers = role.dna.modifiers.clone().update(modifiers);
                 }
                 _ => {}
             }
@@ -221,12 +222,7 @@ impl AppManifestV0 {
         }
         for role in self.roles.iter_mut() {
             if let Some(modifier_opts) = modifiers.get(&role.name) {
-                if let Some(network_seed) = modifier_opts.network_seed.clone() {
-                    role.dna.modifiers.network_seed = Some(network_seed);
-                }
-                if let Some(props) = modifier_opts.properties.clone() {
-                    role.dna.modifiers.properties = Some(props);
-                }
+                role.dna.modifiers = role.dna.modifiers.clone().update(modifier_opts.clone());
             }
         }
         Ok(())

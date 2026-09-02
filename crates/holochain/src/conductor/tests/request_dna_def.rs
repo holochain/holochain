@@ -11,5 +11,5 @@ async fn request_dna_def() {
     let dna_def = conductor.get_dna_def(cells[0].cell_id());
 
     assert!(dna_def.is_some());
-    assert!(dna_def.unwrap() == *dna.dna_def());
+    assert!(dna_def.unwrap() == *dna.dna_def_hashed());
 }

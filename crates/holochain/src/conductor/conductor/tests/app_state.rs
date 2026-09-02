@@ -7,7 +7,7 @@ use crate::{
             },
             ConductorApiError,
         },
-        error::ConductorError,
+        error::{CellUnavailableReason, ConductorError},
         ribosome_store::RibosomeStore,
         space::Spaces,
         Conductor,
@@ -447,7 +447,7 @@ async fn disabled_clone_cell_cannot_be_called() {
     assert!(matches!(
         result,
         Err(ConductorApiError::ConductorError(
-            ConductorError::CellDisabled(_)
+            ConductorError::CellNotRunning(_, CellUnavailableReason::CloneCellDisabled)
         ))
     ));
 
@@ -465,7 +465,7 @@ async fn disabled_clone_cell_cannot_be_called() {
     assert!(matches!(
         result,
         Err(ConductorApiError::ConductorError(
-            ConductorError::CellDisabled(_)
+            ConductorError::CellNotRunning(_, CellUnavailableReason::CloneCellDisabled)
         ))
     ));
 
