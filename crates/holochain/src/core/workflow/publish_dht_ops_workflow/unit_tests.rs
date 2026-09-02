@@ -301,7 +301,7 @@ async fn private_entries_are_not_published() {
     // Seed all three ops as integrated, self-authored ops in the DHT store.
     for op in [register_agent_activity_op, store_entry_op, store_record_op] {
         dht_store
-            .test_insert_authored_chain_op(op, None, None, None)
+            .test_insert_authored_chain_op(op, None, None, None, None)
             .await
             .unwrap();
     }
@@ -362,7 +362,7 @@ async fn create_op(dht_store: &DhtStore, author: AgentPubKey) -> StateMutationRe
 
     let op_hash = op.as_hash().clone();
     dht_store
-        .test_insert_authored_chain_op(op, None, None, None)
+        .test_insert_authored_chain_op(op, None, None, None, None)
         .await?;
 
     Ok(op_hash)

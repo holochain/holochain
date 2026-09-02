@@ -758,7 +758,7 @@ async fn remove_countersigning_session_deletes_withheld_session() {
 
     // Withheld self-authored op (withhold_publish = Some(true)) plus its entry.
     store
-        .test_insert_authored_chain_op(op.clone(), None, None, Some(true))
+        .test_insert_authored_chain_op(op.clone(), None, None, None, Some(true))
         .await
         .unwrap();
     let entry = match chain_op.op_entry() {
@@ -812,7 +812,7 @@ async fn remove_countersigning_session_refuses_published() {
 
     // Published op: withhold_publish cleared (None).
     store
-        .test_insert_authored_chain_op(op.clone(), None, None, None)
+        .test_insert_authored_chain_op(op.clone(), None, None, None, None)
         .await
         .unwrap();
 
@@ -918,7 +918,7 @@ async fn validation_receipts_for_action_reconstructs_receipt() {
         holo_hash::ActionHash::with_data_sync(action)
     };
     store
-        .test_insert_authored_chain_op(op, None, None, None)
+        .test_insert_authored_chain_op(op, None, None, None, None)
         .await
         .unwrap();
 
@@ -1058,7 +1058,7 @@ async fn op_validation_status_returns_status_only_when_locally_validated() {
         holo_hash::ActionHash::with_data_sync(a)
     };
     store
-        .test_insert_authored_chain_op(op, None, None, None)
+        .test_insert_authored_chain_op(op, None, None, None, None)
         .await
         .unwrap();
     assert_eq!(
@@ -2825,6 +2825,7 @@ mod publish_query {
         dht_store
             .test_insert_authored_chain_op(
                 op,
+                None,
                 last_publish_time,
                 receipts_complete,
                 withhold_publish,

@@ -3594,7 +3594,7 @@ mod tests {
             signed_action,
         ))));
         store
-            .test_insert_authored_chain_op(op, None, None, None)
+            .test_insert_authored_chain_op(op, None, None, None, None)
             .await
             .unwrap();
         store
@@ -4107,18 +4107,30 @@ mod tests {
 
         // seqs 0 and 1: ordinary self-authored ops (withhold NULL -> visible).
         store
-            .test_insert_authored_chain_op(make_fork_op(&author, &prev, 0, 1), None, None, None)
+            .test_insert_authored_chain_op(
+                make_fork_op(&author, &prev, 0, 1),
+                None,
+                None,
+                None,
+                None,
+            )
             .await
             .unwrap();
         store
-            .test_insert_authored_chain_op(make_fork_op(&author, &prev, 1, 2), None, None, None)
+            .test_insert_authored_chain_op(
+                make_fork_op(&author, &prev, 1, 2),
+                None,
+                None,
+                None,
+                None,
+            )
             .await
             .unwrap();
         // seq 2: a withheld countersigning op (withhold_publish = true -> hidden).
         let withheld = make_fork_op(&author, &prev, 2, 3);
         let withheld_hash = withheld.as_hash().clone();
         store
-            .test_insert_authored_chain_op(withheld, None, None, Some(true))
+            .test_insert_authored_chain_op(withheld, None, None, None, Some(true))
             .await
             .unwrap();
 
