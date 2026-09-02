@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.7.1-rc.1
+
 ## 0.7.1-rc.0
 
 - Fix `GrantZomeCallCapability` and `RevokeZomeCallCapability` bypassing self-validation. The admin calls now validate the commit the same way zome calls do, so granting or revoking a capability on a closed source chain fails instead of writing an invalid action that peers would reject and warrant the agent for. \#5949
