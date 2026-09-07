@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Fix a `CloseChain` action with an agent migration target
+  being signed and verified with the target key instead of the chain author's
+  key. This let any agent publish a `CloseChain` in another agent's name and
+  fork their chain. Every action is now signed by and verified against its
+  author. `Action::signer` is removed; use `Action::author`. Existing agent-
+  target `CloseChain` actions signed only by the target key now fail
+  validation. \#5981
 - **BREAKING CHANGE**: Support membrane proofs and init properties from base64
   or binary files in CLI role settings, add `hc client call install-app
   --membrane-proof`, and add `hc client provide-memproofs` for deferred

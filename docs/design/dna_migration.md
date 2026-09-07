@@ -94,12 +94,18 @@ with visibility of both networks can detect such a fault.
 pub enum MigrationTarget {
     /// The new or previous DNA hash.
     Dna(DnaHash),
+    /// The new or previous Agent public key.
+    Agent(AgentPubKey),
 }
 ```
 
-`MigrationTarget` names the DNA the chain is migrating to (in `CloseChain`) or
-from (in `OpenChain`). Of the two components of a `CellId`, the agent key stays
-fixed across a chain switch and the DNA hash changes.
+`MigrationTarget` names the DNA or agent the chain is migrating to (in
+`CloseChain`) or from (in `OpenChain`). Of the two components of a `CellId`,
+the agent key stays fixed across a chain switch and the DNA hash changes.
+
+The `Agent` variant names an agent key for a key migration. It is signed only
+by the action author and does not prove the target agent's consent. If consent
+matters, the application must provide proof at the application level.
 
 ### HDK surface
 
