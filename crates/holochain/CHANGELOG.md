@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.8.0-dev.6
+
 ## 0.8.0-dev.5
 
 - Reject bundle resource identifiers containing absolute paths or parent directory traversal, preventing malicious bundles from writing resources outside their extraction directory. \#5784

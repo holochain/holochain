@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.8.0-dev.3"
+version = "0.8.0-dev.4"
 dependencies = [
  "getrandom 0.3.4",
  "hdi",
@@ -639,7 +639,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.8.0-dev.3"
+version = "0.8.0-dev.4"
 dependencies = [
  "hdk",
  "holochain_serialized_bytes",
