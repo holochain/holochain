@@ -94,12 +94,21 @@ with visibility of both networks can detect such a fault.
 pub enum MigrationTarget {
     /// The new or previous DNA hash.
     Dna(DnaHash),
+    /// The new or previous agent key.
+    Agent(AgentPubKey),
 }
 ```
 
 `MigrationTarget` names the DNA the chain is migrating to (in `CloseChain`) or
 from (in `OpenChain`). Of the two components of a `CellId`, the agent key stays
-fixed across a chain switch and the DNA hash changes.
+fixed across a chain switch and the DNA hash changes, so a chain switch uses the
+`Dna` variant.
+
+The `Agent` variant names an agent key instead, for a key migration. Like every
+other part of an action, it is signed only by the action's author, so it is an
+unverified claim: the named agent does not sign for it and nothing in the system
+checks that they agreed to it. An app that treats an agent target as evidence of
+the target agent's consent has to establish that consent itself.
 
 ### HDK surface
 

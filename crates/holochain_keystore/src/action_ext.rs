@@ -1,8 +1,6 @@
 use crate::{AgentPubKeyExt, KeystoreError, LairResult, MetaLairClient};
-use holo_hash::{AgentPubKey, HashableContentExtSync};
-use holochain_types::prelude::{
-    Action, ActionData, CloseChainData, MigrationTarget, SignedAction, SignedActionHashed,
-};
+use holo_hash::HashableContentExtSync;
+use holochain_types::prelude::{Action, SignedAction, SignedActionHashed};
 
 /// Extension for keystore operations on a [`SignedActionHashed`].
 #[async_trait::async_trait]
@@ -33,7 +31,9 @@ impl SignedActionHashedExt for SignedActionHashed {
         keystore: &MetaLairClient,
         action_hashed: holo_hash::HoloHashed<Action>,
     ) -> LairResult<Self> {
-        let signature = action_signer(&action_hashed.content)
+        let signature = action_hashed
+            .content
+            .author()
             .sign(keystore, &action_hashed.content)
             .await?;
         Ok(Self::with_presigned(action_hashed, signature))
@@ -41,7 +41,10 @@ impl SignedActionHashedExt for SignedActionHashed {
 
     /// Verify that the signature matches the signed action
     async fn verify_signature(&self) -> Result<(), KeystoreError> {
-        if !action_signer(&self.hashed.content)
+        if !self
+            .hashed
+            .content
+            .author()
             .verify_signature(self.signature(), &self.hashed.content)
             .await?
         {
@@ -54,25 +57,9 @@ impl SignedActionHashedExt for SignedActionHashed {
     }
 }
 
-/// The public key that should sign (and later verify) this action.
-///
-/// This is the author for every variant except a `CloseChain` that names an
-/// agent migration target: that variant is signed with the *new* key so the
-/// forward reference it carries is provably endorsed by the destination
-/// agent.
-fn action_signer(action: &Action) -> &AgentPubKey {
-    match &action.data {
-        ActionData::CloseChain(CloseChainData {
-            new_target: Some(MigrationTarget::Agent(agent)),
-            ..
-        }) => agent,
-        _ => &action.header.author,
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use crate::SignedActionHashedExt;
+    use crate::{test_keystore, AgentPubKeyExt, KeystoreError, SignedActionHashedExt};
     use holo_hash::{AgentPubKey, HoloHashed};
     use holochain_types::prelude::*;
     use holochain_zome_types::prelude::{SignedAction, SignedActionHashed};
@@ -105,5 +92,46 @@ mod test {
         );
         assert_eq!(shh.hashed.content, action);
         assert_eq!(shh.signature, signature);
+    }
+
+    /// A `CloseChain` naming an agent migration target is signed by the chain
+    /// author, like every other action. A signature by the target key must not
+    /// verify; otherwise anyone could close another agent's chain in that
+    /// agent's name (#5981).
+    // `test_keystore()` spawns lair onto a blocking task, which requires a multi-threaded runtime.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn close_chain_with_agent_target_is_signed_by_author() {
+        let keystore = test_keystore();
+        let author = AgentPubKey::new_random(&keystore).await.unwrap();
+        let new_agent = AgentPubKey::new_random(&keystore).await.unwrap();
+
+        let mut action = sample_action();
+        action.header.author = author.clone();
+        action.data = ActionData::CloseChain(CloseChainData {
+            new_target: Some(MigrationTarget::Agent(new_agent.clone())),
+        });
+        let hashed: HoloHashed<Action> = HoloHashed::from_content_sync(action.clone());
+
+        // Signing goes through the author key, and verifying checks it.
+        let signed = SignedActionHashed::sign(&keystore, hashed.clone())
+            .await
+            .unwrap();
+        assert!(author
+            .verify_signature(signed.signature(), &action)
+            .await
+            .unwrap());
+        assert!(!new_agent
+            .verify_signature(signed.signature(), &action)
+            .await
+            .unwrap());
+        signed.verify_signature().await.unwrap();
+
+        // A signature by the migration target key is a forgery.
+        let forged_sig = new_agent.sign(&keystore, &action).await.unwrap();
+        let forged = SignedActionHashed::with_presigned(hashed, forged_sig);
+        assert!(matches!(
+            forged.verify_signature().await,
+            Err(KeystoreError::InvalidSignature(..))
+        ));
     }
 }
