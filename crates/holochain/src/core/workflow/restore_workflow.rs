@@ -179,7 +179,13 @@ mod tests {
         records
     }
 
-    fn make_signed_warrant(agent: &AgentPubKey) -> SignedWarrant {
+    /// Builds a genuinely-signed warrant naming `agent`, so that the cascade's
+    /// warrant signature filter keeps it.
+    async fn make_signed_warrant(
+        keystore: &holochain_keystore::MetaLairClient,
+        agent: &AgentPubKey,
+    ) -> SignedWarrant {
+        let accuser = AgentPubKey::new_random(keystore).await.unwrap();
         let proof = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
             chain_author: agent.clone(),
             action_pair: (
@@ -190,11 +196,12 @@ mod tests {
         });
         let warrant = Warrant::new(
             proof,
-            ::fixt::fixt!(AgentPubKey),
+            accuser.clone(),
             Timestamp::from_micros(0),
             agent.clone(),
         );
-        SignedWarrant::new(warrant, ::fixt::fixt!(Signature))
+        let signature = accuser.sign(keystore, warrant.clone()).await.unwrap();
+        SignedWarrant::new(warrant, signature)
     }
 
     /// A mock network that returns one canned response, from a single fixed peer, per call,
@@ -250,7 +257,7 @@ mod tests {
         let cell_id = CellId::new(::fixt::fixt!(DnaHash), agent.clone());
 
         let dht_store = DhtStore::new_test(dht_id()).await.unwrap();
-        let warrant = make_signed_warrant(&agent);
+        let warrant = make_signed_warrant(&keystore, &agent).await;
         let hashed = DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(WarrantOp::from(
             warrant.clone(),
         ))));
@@ -292,7 +299,7 @@ mod tests {
         let cell_id = CellId::new(::fixt::fixt!(DnaHash), agent.clone());
 
         let dht_store = DhtStore::new_test(dht_id()).await.unwrap();
-        let warrant = make_signed_warrant(&agent);
+        let warrant = make_signed_warrant(&keystore, &agent).await;
         let hashed = DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(WarrantOp::from(
             warrant.clone(),
         ))));

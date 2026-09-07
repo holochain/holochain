@@ -29,6 +29,7 @@
 
 use super::*;
 use crate::conductor::space::TestSpaces;
+use crate::core::workflow::sys_validation_workflow::counterfeit_check_action;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 use holo_hash::fixt::ActionHashFixturator;
@@ -37,7 +38,9 @@ use holo_hash::fixt::EntryHashFixturator;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_zome_types::fixt::{ActionFixturator, CreateAction, CreateLinkAction};
+use holochain_zome_types::fixt::{
+    ActionFixturator, CloseChainAction, CreateAction, CreateLinkAction,
+};
 use matches::assert_matches;
 
 /// Entry type in the action matches the entry variant
@@ -142,6 +145,37 @@ async fn incoming_ops_filters_private_entry() {
     assert_eq!(num_ops, 1);
     let num_entries = space.dht_store.as_read().count_entries().await.unwrap();
     assert_eq!(num_entries, 0);
+}
+
+/// Every action, including a `CloseChain` that names an agent migration
+/// target, must be signed by its author. A `CloseChain` signed by the target
+/// key is a forgery: it would let any agent close, and so fork, another
+/// agent's chain in that agent's name (#5981).
+#[tokio::test(flavor = "multi_thread")]
+async fn close_chain_signed_by_migration_target_is_counterfeit() {
+    let keystore = test_keystore();
+    let author = keystore.new_sign_keypair_random().await.unwrap();
+    let forger = keystore.new_sign_keypair_random().await.unwrap();
+
+    let mut action = fixt!(Action, CloseChainAction);
+    action.header.author = author.clone();
+    let ActionData::CloseChain(close) = &mut action.data else {
+        panic!("the CloseChainAction curve must produce a CloseChain");
+    };
+    close.new_target = Some(MigrationTarget::Agent(forger.clone()));
+
+    // Signed by the forger, who is also the migration target: rejected.
+    let forged_sig = forger.sign(&keystore, &action).await.unwrap();
+    assert_matches!(
+        counterfeit_check_action(&forged_sig, &action).await,
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::CounterfeitAction(..)
+        ))
+    );
+
+    // Signed by the author: accepted.
+    let sig = author.sign(&keystore, &action).await.unwrap();
+    counterfeit_check_action(&sig, &action).await.unwrap();
 }
 
 /// A `CreateEntry` op is the public entry-authority op, so it must never carry
