@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix the cascade accepting peer data it had never checked. Agent activity fetched from the network was handed back to the caller without verifying that the actions were signed by the agent said to have authored them, so a peer could attribute actions to an agent who never wrote them. Warrants arriving with a get response, a get-links response or an agent activity response were also stored for validation without checking that the accusing agent had signed them. Both are now verified and anything that fails is discarded.
+- **BREAKING CHANGE**: Fix a `CloseChain` action with an agent migration target being signed and verified with the target key instead of the chain author's key. This let any agent publish a `CloseChain` in another agent's name and fork their chain. Every action is now signed by and verified against its author. `Action::signer` is removed; use `Action::author`. A `CloseChain` with an agent migration target that was authored before this release was signed with the target key, so it is now indistinguishable from a forgery: it is dropped as counterfeit on arrival, along with the rest of the batch it arrives in, and there is no automatic remediation. An agent migration target is now an unverified claim by the chain author, rather than something the named agent has signed for; an app that treats it as proof of the target agent's consent must check that consent itself. \#5981
+
 ## 0.8.0-dev.6
 
 ## 0.8.0-dev.5

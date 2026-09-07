@@ -73,6 +73,10 @@ pub enum MigrationTarget {
     /// Represents a DNA migration, and contains the new or previous DNA hash.
     Dna(DnaHash),
     /// Represents an Agent migration, and contains the new or previous Agent key.
+    ///
+    /// The key is an unverified claim by the action's author: the named agent
+    /// does not sign the action, so this is not evidence that they consented to
+    /// the migration. An app that needs that consent must establish it itself.
     Agent(AgentPubKey),
 }
 
@@ -544,27 +548,9 @@ pub struct Action {
 }
 
 impl Action {
-    /// The public key of the agent who "authored" this action.
-    ///
-    /// This is not necessarily the agent who signed the action; see
-    /// [`Action::signer`].
+    /// The public key of the agent who authored and signed this action.
     pub fn author(&self) -> &AgentPubKey {
         &self.header.author
-    }
-
-    /// The public key of the agent who signed this action.
-    ///
-    /// This is not necessarily the agent who "authored" the action: a
-    /// `CloseChain` action during an agent-key migration is signed with the
-    /// new key rather than the author key, because the new key must be
-    /// known in order for the migration to be effective.
-    pub fn signer(&self) -> &AgentPubKey {
-        match &self.data {
-            ActionData::CloseChain(CloseChainData {
-                new_target: Some(crate::action::MigrationTarget::Agent(agent)),
-            }) => agent,
-            _ => self.author(),
-        }
     }
 
     /// The microsecond timestamp at which this action was authored.
@@ -964,27 +950,5 @@ mod tests {
         assert!(a.is_genesis());
         a.header.action_seq = crate::action::POST_GENESIS_SEQ_THRESHOLD;
         assert!(!a.is_genesis());
-    }
-
-    #[test]
-    fn action_signer_defaults_to_author() {
-        let a = sample_action(sample_create_data());
-        assert_eq!(a.signer(), a.author());
-    }
-
-    #[test]
-    fn action_signer_uses_the_migration_agent_for_close_chain() {
-        let new_agent = AgentPubKey::from_raw_36(vec![7u8; 36]);
-        let a = sample_action(ActionData::CloseChain(CloseChainData {
-            new_target: Some(crate::action::MigrationTarget::Agent(new_agent.clone())),
-        }));
-        assert_eq!(a.signer(), &new_agent);
-        assert_ne!(a.signer(), a.author());
-    }
-
-    #[test]
-    fn action_signer_uses_author_for_close_chain_without_agent_target() {
-        let a = sample_action(ActionData::CloseChain(CloseChainData { new_target: None }));
-        assert_eq!(a.signer(), a.author());
     }
 }

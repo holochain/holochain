@@ -2169,14 +2169,6 @@ async fn action_after_close_chain() {
         d.new_target = Some(fixt!(MigrationTarget));
     }
 
-    // If this is an agent migration, the agent keypair needs to exist
-    // so the Close can be signed.
-    if let ActionData::CloseChain(d) = &mut dna_action.data {
-        if let Some(MigrationTarget::Agent(agent)) = d.new_target.as_mut() {
-            *agent = test_case.keystore.new_sign_keypair_random().await.unwrap();
-        }
-    }
-
     let previous_action = test_case.sign_action(dna_action).await;
 
     let mut create = fixt!(Action, CreateAction);

@@ -55,9 +55,12 @@ Design references: `docs/design/state_model.md` and `docs/design/data_model.md` 
 - **Public API docs**: `///` rustdoc on public items; module/crate docs should describe structure. Follow [rustdoc's guidance](https://doc.rust-lang.org/rustdoc/how-to-write-documentation.html#documenting-components): keep the first line a short, one-sentence summary — everything up to the first blank `///` line is reused as the summary in module/search listings — then a blank `///` line before any further detail.
 - **Commits**: Conventional Commits (`feat:`, `fix:`, `refactor:`, etc.), bodies wrapped near 72 chars.
 - **Changelog**: Write changelog entries only to
-  `crates/holochain/CHANGELOG.md`. Include only information relevant to end
-  users; omit internal implementation details and changes with no user-visible
-  impact.
+  `crates/holochain/CHANGELOG.md`, under `## Unreleased`. Include only
+  information relevant to end users; omit internal implementation details and
+  changes with no user-visible impact. A new entry goes at the **top** of the
+  `## Unreleased` list, above the entries already there, not appended at the
+  bottom — newest first, matching the ordering of the release sections
+  themselves.
 - **PRs**: branch off `develop`; changes are squash merged into `develop`; changes go from `develop` → `main` at release time and `main` should always be ignored for development.
 
 ### ts_rs client export

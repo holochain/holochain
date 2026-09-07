@@ -81,17 +81,11 @@ mod tests {
                 .coordinator
                 .erase_type();
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let mut input = CloseChainInput { new_target: None };
-
-        // If this is an agent migration, the agent keypair needs to exist
-        // so the Close can be signed.
-        if let Some(MigrationTarget::Agent(agent)) = input.new_target.as_mut() {
-            *agent = host_access
-                .keystore
-                .new_sign_keypair_random()
-                .await
-                .unwrap();
-        }
+        // An agent migration target is named by the author but signed with the
+        // author's own key, so no keypair has to exist for the target (#5981).
+        let input = CloseChainInput {
+            new_target: Some(MigrationTarget::Agent(AgentPubKey::from_raw_36(vec![7u8; 36]))),
+        };
 
         let host_access_2 = host_access.clone();
         call_context.host_context = host_access.into();

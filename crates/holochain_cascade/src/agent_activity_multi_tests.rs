@@ -3,6 +3,7 @@
 use super::*;
 use ::fixt::fixt;
 use holo_hash::fixt::AgentPubKeyFixturator;
+use holochain_keystore::{test_keystore, AgentPubKeyExt};
 use holochain_p2p::actor::GetActivityMultiOptions;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_types::activity::AgentActivityResponse;
@@ -117,4 +118,76 @@ async fn agent_activity_multi_without_network_errors() {
         .unwrap_err();
 
     assert!(matches!(err, CascadeError::NetworkNotInitialized));
+}
+
+/// A peer answering a multi call is not trusted to say what an agent authored.
+/// Records it serves that are not signed by the action's author are dropped
+/// before the caller sees them, even though the cascade otherwise passes each
+/// peer's response through untouched.
+// `test_keystore()` spawns lair onto a blocking task, which requires a multi-threaded runtime.
+#[tokio::test(flavor = "multi_thread")]
+async fn agent_activity_multi_drops_records_not_signed_by_their_author() {
+    let store = empty_store().await;
+    let keystore = test_keystore();
+    let author = holo_hash::AgentPubKey::new_random(&keystore).await.unwrap();
+    let responder = holo_hash::AgentPubKey::new_random(&keystore).await.unwrap();
+
+    let action = Action {
+        header: ActionHeader {
+            author: author.clone(),
+            timestamp: Timestamp::from_micros(42),
+            action_seq: 0,
+            prev_action: None,
+        },
+        data: ActionData::Dna(DnaData {
+            dna_hash: holo_hash::DnaHash::from_raw_36(vec![9u8; 36]),
+        }),
+    };
+    let record = |signature| {
+        Record::new(
+            SignedActionHashed::with_presigned(
+                holo_hash::HoloHashed::from_content_sync(action.clone()),
+                signature,
+            ),
+            RecordEntry::or_not_applicable(None),
+        )
+    };
+    let honest = record(author.sign(&keystore, &action).await.unwrap());
+    let forged = record(responder.sign(&keystore, &action).await.unwrap());
+
+    let canned = vec![(
+        responder.clone(),
+        AgentActivityResponse {
+            agent: author.clone(),
+            valid_activity: ChainItems::Full(vec![honest.clone(), forged]),
+            rejected_activity: ChainItems::NotRequested,
+            status: ChainStatus::Empty,
+            highest_observed: None,
+            warrants: Vec::new(),
+        },
+    )];
+
+    let mut network = MockHolochainP2pDnaT::new();
+    network
+        .expect_get_agent_activity_multi()
+        .times(1)
+        .returning(move |_, _, _| Ok(canned.clone()));
+
+    let cascade = CascadeImpl::empty(store).with_network(Arc::new(network));
+
+    let responses = cascade
+        .get_agent_activity_multi(
+            author,
+            ChainQueryFilter::new(),
+            GetActivityMultiOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(responses.len(), 1);
+    assert_eq!(
+        responses[0].1.valid_activity,
+        ChainItems::Full(vec![honest]),
+        "the record the responder signed itself must not reach the caller"
+    );
 }

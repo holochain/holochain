@@ -6,7 +6,7 @@ use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
-use holochain_zome_types::fixt::{ActionFixturator, CreateLinkAction};
+use holochain_zome_types::fixt::{ActionFixturator, CloseChainAction, CreateLinkAction};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_to_limbo() {
@@ -162,6 +162,67 @@ async fn require_validation_receipt_follows_publish_flag() {
         !requiring.contains(&gossiped_hash),
         "gossiped op should not require a validation receipt"
     );
+}
+
+/// The op ingest gate must drop a `CloseChain` that names an agent migration
+/// target and is signed by that target rather than by the chain's author.
+/// Accepting one would close, and so fork, the author's chain in their name
+/// without their key ever being used (#5981).
+#[tokio::test(flavor = "multi_thread")]
+async fn incoming_close_chain_signed_by_migration_target_is_dropped() {
+    holochain_trace::test_run();
+
+    let space = TestSpace::new(fixt!(DnaHash));
+    let dht_store = space.space.dht_store.clone();
+    let keystore = test_keystore();
+
+    let victim = keystore.new_sign_keypair_random().await.unwrap();
+    let attacker = keystore.new_sign_keypair_random().await.unwrap();
+
+    // A close of the victim's chain, naming the attacker as the migration target.
+    let mut action = fixt!(Action, CloseChainAction);
+    action.header.author = victim.clone();
+    let ActionData::CloseChain(close) = &mut action.data else {
+        panic!("the CloseChainAction curve must produce a CloseChain");
+    };
+    close.new_target = Some(MigrationTarget::Agent(attacker.clone()));
+    let action = action;
+
+    // Signed by the attacker, who is the migration target: must not be stored.
+    let forged_sig = attacker.sign(&keystore, &action).await.unwrap();
+    let forged: DhtOp =
+        ChainOp::AgentActivity(SignedAction::new(action.clone(), forged_sig)).into();
+    let forged_hash = DhtOpHash::with_data_sync(&forged);
+
+    let (sys_validation_trigger, _) = TriggerSender::new();
+    let result = incoming_dht_ops_workflow(
+        space.space.clone(),
+        sys_validation_trigger.clone(),
+        vec![(forged, true)],
+    )
+    .await;
+
+    assert!(
+        result.is_err(),
+        "a forged CloseChain must fail the counterfeit check"
+    );
+    verify_ops_present(&dht_store, vec![forged_hash], false).await;
+
+    // The same action signed by its author is accepted, so the rejection above
+    // is about the signing key and not about the action itself.
+    let authored_sig = victim.sign(&keystore, &action).await.unwrap();
+    let authored: DhtOp = ChainOp::AgentActivity(SignedAction::new(action, authored_sig)).into();
+    let authored_hash = DhtOpHash::with_data_sync(&authored);
+
+    incoming_dht_ops_workflow(
+        space.space.clone(),
+        sys_validation_trigger,
+        vec![(authored, true)],
+    )
+    .await
+    .unwrap();
+
+    verify_ops_present(&dht_store, vec![authored_hash], true).await;
 }
 
 async fn verify_ops_present(dht_store: &DhtStore, hash_list: Vec<DhtOpHash>, present: bool) {
