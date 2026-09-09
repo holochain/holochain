@@ -3533,7 +3533,7 @@ dependencies = [
  "nanoid 0.4.0",
  "parking_lot",
  "proptest",
- "proptest-derive 0.5.1",
+ "proptest-derive 0.8.0",
  "rand 0.9.5",
  "regex",
  "rmp-serde",
