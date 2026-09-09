@@ -2210,7 +2210,9 @@ checksum = "d45db016d36b838f563236e9193d0ee6ce38f3f68b6c94e914b4929c96bbb890"
 
 [[package]]
 name = "fixt"
-version = "0.8.0-dev.0"
+version = "0.9.0-dev.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1329c82f23f0a16573166c54d3bf01c99632af49a53567f6825d2f37e0ce80d3"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -2220,14 +2222,6 @@ dependencies = [
  "serde",
  "strum 0.27.2",
  "strum_macros 0.27.2",
-]
-
-[[package]]
-name = "fixt_test"
-version = "0.0.1"
-dependencies = [
- "fixt",
- "paste",
 ]
 
 [[package]]
@@ -2716,29 +2710,29 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.9.0-dev.3"
+version = "0.9.0-dev.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8753d8392ec36b08888c0417f154bf14066c376086e6385b0024a5bc6a9ec762"
 dependencies = [
- "fixt",
  "getrandom 0.3.4",
- "hdi",
  "hdk_derive",
  "holo_hash",
  "holochain_integrity_types",
  "holochain_serialized_bytes",
  "holochain_serialized_bytes_derive",
  "holochain_wasmer_guest",
- "mockall",
  "paste",
  "serde",
  "serde_bytes",
- "test-case",
  "tracing",
  "tracing-core",
 ]
 
 [[package]]
 name = "hdk"
-version = "0.8.0-dev.4"
+version = "0.9.0-dev.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2aa38bbd54d9ff8597ab5acf4be27d5f80dc7dbda99ee7ea188113800c62682"
 dependencies = [
  "getrandom 0.3.4",
  "hdi",
@@ -2746,17 +2740,17 @@ dependencies = [
  "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
- "mockall",
  "paste",
  "serde",
  "tracing",
  "tracing-core",
- "trybuild",
 ]
 
 [[package]]
 name = "hdk_derive"
-version = "0.8.0-dev.3"
+version = "0.9.0-dev.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe72267d7700c0fcf3c2947f651edeee13714c063aaa0bc167ad835dd8c5e988"
 dependencies = [
  "darling 0.21.3",
  "heck",
@@ -2766,7 +2760,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
- "trybuild",
 ]
 
 [[package]]
@@ -2890,7 +2883,9 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.8.0-dev.2"
+version = "0.9.0-dev.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05ead9f5d1cbade84a6dedafa1f1560cd352981d511fe4cac78de414b4b35a92"
 dependencies = [
  "base64 0.22.1",
  "blake2b_simd",
@@ -2909,7 +2904,6 @@ dependencies = [
  "schemars 0.9.0",
  "serde",
  "serde_bytes",
- "serde_json",
  "sha2 0.10.9",
  "thiserror 2.0.20",
  "ts-rs",
@@ -3245,22 +3239,21 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.8.0-dev.3"
+version = "0.9.0-dev.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cdb26403239e76906aaaba332ce0062acfaf19edd978de5ad1963e0d79469e2"
 dependencies = [
  "derive_builder",
- "fixt",
  "holo_hash",
- "holochain_integrity_types",
  "holochain_secure_primitive",
  "holochain_serialized_bytes",
  "holochain_timestamp",
  "holochain_util",
  "proptest",
- "proptest-derive 0.5.1",
+ "proptest-derive 0.8.0",
  "schemars 0.9.0",
  "serde",
  "serde_bytes",
- "serde_json",
  "subtle",
  "subtle-encoding",
  "tracing",
@@ -3327,7 +3320,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_nonce"
-version = "0.8.0-dev.2"
+version = "0.9.0-dev.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b50b6159a92bf29b0a4de45f5fd1086090e3833da8a9509e86088a68380706a1"
 dependencies = [
  "getrandom 0.3.4",
  "holochain_secure_primitive",
@@ -3384,7 +3379,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_secure_primitive"
-version = "0.8.0-dev.0"
+version = "0.9.0-dev.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a7acfd1773f13d4bfa868320c9b7d2e84d3e620610fb00991ec68a932a7cfe4"
 dependencies = [
  "paste",
  "serde",
@@ -3481,10 +3478,11 @@ dependencies = [
 
 [[package]]
 name = "holochain_timestamp"
-version = "0.8.0-dev.2"
+version = "0.9.0-dev.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88692136cfb2385070705dd88c6c1103a866c639813d9935696bf9d272ae6317"
 dependencies = [
  "chrono",
- "holochain_serialized_bytes",
  "serde",
  "ts-rs",
 ]
@@ -3535,7 +3533,7 @@ dependencies = [
  "nanoid 0.4.0",
  "parking_lot",
  "proptest",
- "proptest-derive 0.5.1",
+ "proptest-derive 0.8.0",
  "rand 0.9.5",
  "regex",
  "rmp-serde",
@@ -3559,7 +3557,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.8.0-dev.0"
+version = "0.9.0-dev.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5aa409cd88b92b701bdaba5e543e1d6faf7d528932ae6262bda5fefdac7367ab"
 dependencies = [
  "backtrace",
  "cfg-if",
@@ -3571,8 +3571,6 @@ dependencies = [
  "schemars 0.9.0",
  "sodoken",
  "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -3651,7 +3649,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.8.0-dev.3"
+version = "0.9.0-dev.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36306848e5ff4ea12b5c5cc69bb1e3ca5dd766b02c12f429c72338eedf45b9ce"
 dependencies = [
  "derive_builder",
  "derive_more",
@@ -3662,9 +3662,8 @@ dependencies = [
  "holochain_serialized_bytes",
  "holochain_timestamp",
  "holochain_wasmer_common",
- "holochain_zome_types",
  "proptest",
- "proptest-derive 0.5.1",
+ "proptest-derive 0.8.0",
  "rand 0.9.5",
  "schemars 0.9.0",
  "serde",
@@ -8451,12 +8450,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adb6935a6f5c20170eeceb1a3835a49e12e19d792f6dd344ccc76a985ca5a6ca"
 
 [[package]]
-name = "target-triple"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3a6bfce3d99adfa72d24750a61f782f3036a81e7f86d8841ee1326deaebd171"
-
-[[package]]
 name = "task-motel"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9016,21 +9009,6 @@ name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
-
-[[package]]
-name = "trybuild"
-version = "1.0.120"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e605bf6b39357663d8ba4e984f8be8da8df6bb32e81031d6889024ea8fd68e4"
-dependencies = [
- "glob",
- "serde",
- "serde_derive",
- "serde_json",
- "target-triple",
- "termcolor",
- "toml",
-]
 
 [[package]]
 name = "ts-rs"

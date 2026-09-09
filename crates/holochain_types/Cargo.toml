@@ -17,20 +17,13 @@ base64 = "0.22"
 derive_builder = "0.20"
 derive_more = { version = "2.0", features = ["constructor", "into_iterator"] }
 futures = "0.3"
-holo_hash = { version = "^0.8.0-dev.2", path = "../holo_hash", features = [
-  "encoding",
-  "schema",
-] }
-holochain_nonce = { version = "^0.8.0-dev.2", path = "../holochain_nonce" }
+holo_hash = { version = "=0.9.0-dev.4", features = ["encoding", "schema"] }
+holochain_nonce = { version = "=0.9.0-dev.0" }
 holochain_serialized_bytes = "=0.0.57"
 holochain_trace = { version = "^0.8.0-dev.0", path = "../holochain_trace" }
-holochain_util = { version = "^0.8.0-dev.0", path = "../holochain_util", features = [
-  "backtrace",
-] }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.8.0-dev.3", features = [
-  "full",
-] }
-holochain_timestamp = { version = "^0.8.0-dev.2", path = "../timestamp" }
+holochain_util = { version = "=0.9.0-dev.4", features = ["backtrace"] }
+holochain_zome_types = { version = "=0.9.0-dev.0", features = ["full"] }
+holochain_timestamp = { version = "=0.9.0-dev.4" }
 kitsune2_api = "0.5.0"
 itertools = { version = "0.14" }
 mr_bundle = { path = "../mr_bundle", features = [
@@ -58,7 +51,7 @@ indexmap = { version = "2.6.0", features = ["serde"] }
 schemars = "0.9"
 bytes = { version = "1.10.1", features = ["serde"] }
 
-fixt = { path = "../fixt", version = "^0.8.0-dev.0", optional = true }
+fixt = { version = "=0.9.0-dev.4", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 

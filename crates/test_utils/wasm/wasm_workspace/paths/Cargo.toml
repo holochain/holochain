@@ -16,8 +16,8 @@ crate-type = ["cdylib", "rlib"]
 
 # reminder - do not use workspace deps
 [dependencies]
-hdk = { path = "../../../../hdk" }
-hdi = { path = "../../../../hdi" }
+hdk = { version = "=0.9.0-dev.0" }
+hdi = { version = "=0.9.0-dev.4" }
 holochain_serialized_bytes = "*"
 serde = "1.0"
 

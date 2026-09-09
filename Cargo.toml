@@ -1,31 +1,19 @@
 [workspace]
 members = [
-  "crates/fixt",
-  "crates/fixt/test",
-  "crates/hdi",
-  "crates/hdk",
-  "crates/hdk_derive",
-  "crates/holo_hash",
   "crates/holochain",
   "crates/holochain_cascade",
   "crates/holochain_conductor_api",
   "crates/holochain_conductor_config",
   "crates/holochain_data",
-  "crates/holochain_integrity_types",
   "crates/holochain_keystore",
   "crates/holochain_metrics",
-  "crates/holochain_nonce",
   "crates/holochain_p2p",
-  "crates/holochain_secure_primitive",
   "crates/holochain_state",
   "crates/holochain_state_types",
   "crates/holochain_trace",
   "crates/holochain_types",
-  "crates/holochain_util",
   "crates/holochain_websocket",
-  "crates/holochain_zome_types",
   "crates/mr_bundle",
-  "crates/timestamp",
   "crates/client",
   "crates/hc_client",
   "crates/hc",
@@ -81,6 +69,19 @@ opt-level = "z"
 lto = true
 
 [patch.crates-io]
+# HDI crate group, https://github.com/holochain/holochain-hdi
+# fixt = { path = "../holochain-hdi/crates/fixt" }
+# hdi = { path = "../holochain-hdi/crates/hdi" }
+# hdk_derive = { path = "../holochain-hdi/crates/hdk_derive" }
+# holo_hash = { path = "../holochain-hdi/crates/holo_hash" }
+# holochain_integrity_types = { path = "../holochain-hdi/crates/holochain_integrity_types" }
+# holochain_secure_primitive = { path = "../holochain-hdi/crates/holochain_secure_primitive" }
+# holochain_timestamp = { path = "../holochain-hdi/crates/timestamp" }
+# holochain_util = { path = "../holochain-hdi/crates/holochain_util" }
+# HDK crate group, https://github.com/holochain/holochain-hdk
+# hdk = { path = "../holochain-hdk/crates/hdk" }
+# holochain_nonce = { path = "../holochain-hdk/crates/holochain_nonce" }
+# holochain_zome_types = { path = "../holochain-hdk/crates/holochain_zome_types" }
 # kitsune2_api = { path = "../kitsune2/crates/api" }
 # kitsune2_core = { path = "../kitsune2/crates/core" }
 # kitsune2 = { path = "../kitsune2/crates/kitsune2" }
