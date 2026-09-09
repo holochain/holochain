@@ -7,16 +7,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- **BREAKING CHANGE**: The HDI and HDK crates moved to their own
-  repositories and version lines. `hdi`, `hdk_derive`, `holo_hash`,
-  `holochain_integrity_types`, `holochain_timestamp`,
-  `holochain_secure_primitive`, `holochain_util` and `fixt` are released
-  from [holochain-hdi](https://github.com/holochain/holochain-hdi) starting at
-  `0.9.0-dev.4`; `hdk`, `holochain_zome_types` and `holochain_nonce` from
-  [holochain-hdk](https://github.com/holochain/holochain-hdk) starting at
-  `0.9.0-dev.0`. hApp projects should update those dependencies to the new
-  versions. \#5400
-
 ## 0.8.0-dev.6
 
 ## 0.8.0-dev.5
