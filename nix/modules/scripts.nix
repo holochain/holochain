@@ -115,8 +115,6 @@
           ];
 
           crates = [
-            "hdi"
-            "hdk"
             "holochain_keystore"
             "holochain_state"
           ];
