@@ -20,10 +20,19 @@ Feature flags worth knowing (defined in the `Makefile`):
 
 ## Architecture
 
-This is a Cargo workspace; everything ships as crates under `crates/`. The big-picture layering, from the bottom up:
+This is a Cargo workspace; the conductor and application crates ship under
+`crates/`, while the zome SDK crates are maintained in sibling repositories.
+The big-picture layering, from the bottom up:
 
-- **Hashing & primitives** — `holo_hash`, `timestamp`, `holochain_nonce`, `holochain_secure_primitive`, `holochain_util`.
-- **Types** — `holochain_integrity_types` (types available to integrity zomes; minimal, deterministic), `holochain_zome_types` (re-exports + coordinator-zome types), `holochain_types` (host-side rich types built on the above).
+- **Hashing & primitives** — `holo_hash`, `holochain_timestamp`,
+  `holochain_secure_primitive`, `holochain_util` live in
+  [holochain-hdi](https://github.com/holochain/holochain-hdi);
+  `holochain_nonce` in
+  [holochain-hdk](https://github.com/holochain/holochain-hdk). Consumed from
+  crates.io.
+- **Types** — `holochain_integrity_types` (holochain-hdi) and
+  `holochain_zome_types` (holochain-hdk) come from crates.io;
+  `holochain_types` (host-side rich types) lives here.
 - **Persistence** — `holochain_data` owns primitive SQLx data access and connection setup. `holochain_state` layers typed store APIs and workflow-facing operations on top.
 - **Networking** — `holochain_p2p` wraps `kitsune2` and exposes the gossip / publish / get / block APIs the conductor uses.
 - **Cascade** — Currently, `holochain_cascade` is the "fetch from local DBs, then fall back to the network" layer used by zome calls and validation. See the section about the in-progress migration to `holochain_data`.
@@ -31,7 +40,8 @@ This is a Cargo workspace; everything ships as crates under `crates/`. The big-p
   - `src/conductor/` — the long-running process: cells, interfaces, app/admin APIs, the ribosome store, space/cell management, config.
   - `src/core/` — domain logic: workflows, queue consumers, ribosome (WASM host), sys-validate / app-validate.
   - `src/sweettest/` — in-process test harness for spinning up conductors with inline or WASM zomes.
-- **SDKs** — `hdi` (integrity) and `hdk` (coordinator) are the developer-facing crates that compile to WASM; `hdk_derive` provides the macros.
+- **SDKs** — `hdi` and `hdk_derive` (holochain-hdi), `hdk`
+  (holochain-hdk). Not in this workspace.
 - **CLI / tooling** — `hc`, `hc_bundle`, `hc_sandbox`, `hc_service_check`, `holochain_terminal`, `client`, `hc_client`. `mr_bundle` is the bundle (DNA/hApp) format.
 - **Test wasms** — `crates/test_utils/wasm/wasm_workspace/` contains compiled-to-wasm test zomes; `TestWasm` enum in `crates/test_utils/wasm/src/lib.rs` is the registry. **Prefer inline zomes (`InlineZomeSet` / `SweetInlineZomes`) over adding new test wasms** — only add a WASM artifact when wasm-execution machinery is actually under test (per CONTRIBUTING.md).
 
@@ -40,6 +50,12 @@ Design references: `docs/design/state_model.md` and `docs/design/data_model.md` 
 `scripts/` holds the supported task runners. `holonix/` and `nix/` directories are deprecated and may be ignored.
 
 ## Project conventions
+
+**Working on moved crates**: clone `holochain-hdi` and `holochain-hdk` next to
+this repository and uncomment the matching `[patch.crates-io]` lines in the
+root `Cargo.toml` and in
+`crates/test_utils/wasm/wasm_workspace/Cargo.toml`. Re-comment them before
+committing.
 
 - **Where new code goes**: types into `holochain_types`, persistence into `holochain_data` and `holochain_state`, runtime/orchestration into `holochain`. Don't shortcut by piling logic into the top-level crate.
 - **Data-access naming (`holochain_state` / `holochain_cascade`)**: `get_*` reads only local state; `retrieve_*` may combine local and network lookups. The distinction is meaningful at the cascade — a cascade `get` stays local while a cascade `retrieve` can fall back to the network. At the network boundary a fetch is itself called a `get`, and the HDK bundles everything under `get` because how data is returned is transparent to the application.
@@ -62,11 +78,13 @@ Design references: `docs/design/state_model.md` and `docs/design/data_model.md` 
 
 ### ts_rs client export
 
-Some crates (`holo_hash`, `holochain_timestamp`, `holochain_nonce`,
-`mr_bundle`, `holochain_integrity_types`, `holochain_state_types`,
-`holochain_zome_types`, `holochain_types`, `holochain_conductor_api`) carry
-an opt-in `ts_rs` cargo feature that derives TypeScript bindings
-(`ts_rs::TS`) for the conductor's wire API, consumed by
+Some crates carry an opt-in `ts_rs` cargo feature that derives TypeScript
+bindings (`ts_rs::TS`) for the conductor's wire API. The external
+`holo_hash`, `holochain_timestamp`, `holochain_nonce`,
+`holochain_integrity_types` and `holochain_zome_types` crates now come from
+`holochain-hdi` or `holochain-hdk`; their `ts_rs` features are forwarded from
+the crates here. `mr_bundle`, `holochain_state_types`, `holochain_types` and
+`holochain_conductor_api` carry the feature here, consumed by
 `holochain-client-js`. It is off by default everywhere, including in `hc`:
 `hc export-ts-bindings` is a built-in subcommand, but it only compiles in
 when `hc` is built with its own opt-in `ts_rs` feature (`holochain_cli/ts_rs`).

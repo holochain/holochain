@@ -10,7 +10,7 @@ name = "files_integrity"
 
 # reminder - do not use workspace deps
 [dependencies]
-hdi = { path = "../../../../hdi" }
+hdi = { version = "=0.9.0-dev.4" }
 
 serde = "1.0"
 holochain_serialized_bytes = "0.0.57"

@@ -78,6 +78,19 @@ opt-level = "z"
 # it will publish unbuildable releases to crates.io
 
 [patch.crates-io]
+# HDI crate group, https://github.com/holochain/holochain-hdi
+# fixt = { path = "../../../../../holochain-hdi/crates/fixt" }
+# hdi = { path = "../../../../../holochain-hdi/crates/hdi" }
+# hdk_derive = { path = "../../../../../holochain-hdi/crates/hdk_derive" }
+# holo_hash = { path = "../../../../../holochain-hdi/crates/holo_hash" }
+# holochain_integrity_types = { path = "../../../../../holochain-hdi/crates/holochain_integrity_types" }
+# holochain_secure_primitive = { path = "../../../../../holochain-hdi/crates/holochain_secure_primitive" }
+# holochain_timestamp = { path = "../../../../../holochain-hdi/crates/timestamp" }
+# holochain_util = { path = "../../../../../holochain-hdi/crates/holochain_util" }
+# HDK crate group, https://github.com/holochain/holochain-hdk
+# hdk = { path = "../../../../../holochain-hdk/crates/hdk" }
+# holochain_nonce = { path = "../../../../../holochain-hdk/crates/holochain_nonce" }
+# holochain_zome_types = { path = "../../../../../holochain-hdk/crates/holochain_zome_types" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "develop" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2021-04-27-singlepass" }
 # holochain_wasmer_host = { path = "../../../../../holochain-wasmer/crates/host" }
