@@ -17,11 +17,11 @@ base64 = "0.22"
 derive_builder = "0.20"
 derive_more = { version = "2.0", features = ["constructor", "into_iterator"] }
 futures = "0.3"
-holo_hash = { version = "0.9.0-dev.4", features = ["encoding", "schema"] }
+holo_hash = { version = "0.9.0-dev.6", features = ["encoding", "schema"] }
 holochain_nonce = { version = "0.9.0-dev.0" }
 holochain_serialized_bytes = "=0.0.57"
 holochain_trace = { version = "^0.8.0-dev.0", path = "../holochain_trace" }
-holochain_util = { version = "0.9.0-dev.4", features = ["backtrace"] }
+holochain_util = { version = "0.9.0-dev.5", features = ["backtrace"] }
 holochain_zome_types = { version = "0.9.0-dev.0", features = ["full"] }
 holochain_timestamp = { version = "0.9.0-dev.4" }
 kitsune2_api = "0.6.0-dev.1"
