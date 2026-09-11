@@ -2977,7 +2977,7 @@ dependencies = [
  "rand 0.9.5",
  "rand-utf8",
  "rustls",
- "schemars 0.9.0",
+ "schemars 1.2.2",
  "sd-notify",
  "serde",
  "serde_bytes",
@@ -3061,7 +3061,7 @@ dependencies = [
  "jsonschema",
  "matches",
  "mr_bundle",
- "schemars 0.9.0",
+ "schemars 1.2.2",
  "serde_json",
  "tempfile",
  "thiserror 2.0.20",
@@ -3182,7 +3182,7 @@ dependencies = [
  "num_cpus",
  "pretty_assertions",
  "rmp-serde",
- "schemars 0.9.0",
+ "schemars 1.2.2",
  "serde",
  "serde_json",
  "serde_with",
@@ -3282,7 +3282,7 @@ dependencies = [
  "one_err",
  "opentelemetry 0.31.0",
  "parking_lot",
- "schemars 0.9.0",
+ "schemars 1.2.2",
  "serde",
  "shrinkwraprs",
  "sodoken",
@@ -3537,7 +3537,7 @@ dependencies = [
  "rand 0.9.5",
  "regex",
  "rmp-serde",
- "schemars 0.9.0",
+ "schemars 1.2.2",
  "serde",
  "serde_bytes",
  "serde_derive",
@@ -3649,9 +3649,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.9.0-dev.0"
+version = "0.9.0-dev.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36306848e5ff4ea12b5c5cc69bb1e3ca5dd766b02c12f429c72338eedf45b9ce"
+checksum = "5e8c997c77a0fac7f85e2b0afe25e6a10b918c19d093a5189cd5b2f76b6ed323"
 dependencies = [
  "derive_builder",
  "derive_more",
@@ -3664,13 +3664,13 @@ dependencies = [
  "holochain_wasmer_common",
  "proptest",
  "proptest-derive 0.8.0",
- "rand 0.9.5",
- "schemars 0.9.0",
+ "rand 0.10.2",
+ "schemars 1.2.2",
  "serde",
  "serde_bytes",
  "shrinkwraprs",
  "strum 0.27.2",
- "strum_macros 0.27.2",
+ "strum_macros 0.28.0",
  "subtle",
  "thiserror 2.0.20",
  "tracing",
