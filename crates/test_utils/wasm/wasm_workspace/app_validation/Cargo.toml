@@ -19,4 +19,4 @@ serde = "1.0"
 holochain_serialized_bytes = "0.0.57"
 holochain_test_wasm_common = { path = "../../../wasm_common", optional = true }
 hdk = { version = "0.9.0-dev.1" }
-hdi = { version = "=0.9.0-dev.4" }
+hdi = { version = "0.9.0-dev.4" }

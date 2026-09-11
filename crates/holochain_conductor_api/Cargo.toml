@@ -12,12 +12,12 @@ edition = "2021"
 [dependencies]
 kitsune2_transport_iroh = { version = "0.6.0-dev.1", optional = true, default-features = false }
 derive_more = { version = "2.0", features = ["from"] }
-holo_hash = { version = "=0.9.0-dev.4", features = ["full"] }
+holo_hash = { version = "0.9.0-dev.4", features = ["full"] }
 holochain_state_types = { version = "^0.8.0-dev.3", path = "../holochain_state_types" }
 holochain_serialized_bytes = "=0.0.57"
 holochain_types = { version = "^0.8.0-dev.6", path = "../holochain_types" }
-holochain_zome_types = { version = "=0.9.0-dev.0" }
-holochain_util = { version = "=0.9.0-dev.4", default-features = false, features = [
+holochain_zome_types = { version = "0.9.0-dev.0" }
+holochain_util = { version = "0.9.0-dev.4", default-features = false, features = [
   "jsonschema",
 ] }
 kitsune2_api = "0.6.0-dev.1"
@@ -32,7 +32,7 @@ url2 = "0.0.6"
 holochain_keystore = { version = "^0.8.0-dev.6", path = "../holochain_keystore" }
 shrinkwraprs = "0.3.0"
 indexmap = { version = "2.6.0", features = ["serde"] }
-schemars = "0.9"
+schemars = "1.2"
 num_cpus = "1.17.0"
 nanoid = "0.4"
 serde_with = "3.12.0"
@@ -52,7 +52,7 @@ matches = { version = "0.1.8" }
 holochain_trace = { version = "^0.8.0-dev.0", path = "../holochain_trace" }
 pretty_assertions = "1.4"
 jsonschema = "0.45"
-fixt = { version = "=0.9.0-dev.4" }
+fixt = { version = "0.9.0-dev.4" }
 
 [lints]
 workspace = true
