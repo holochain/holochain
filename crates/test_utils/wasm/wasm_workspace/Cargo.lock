@@ -657,7 +657,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.8.0-dev.4"
+version = "0.8.0-dev.5"
 dependencies = [
  "hdk",
  "holochain_serialized_bytes",
