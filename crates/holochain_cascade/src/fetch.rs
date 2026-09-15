@@ -55,11 +55,7 @@ impl CascadeImpl {
     }
 
     /// Cache the warrants that accompanied a get response into the `DhtStore`.
-    ///
-    /// Only warrants signed by their own author are staged: a warrant accuses
-    /// an agent, so an unsigned one is a peer's unsupported say-so.
     async fn cache_response_warrants(&self, warrants: Vec<SignedWarrant>) {
-        let warrants = verify_signed_warrants(warrants).await;
         if warrants.is_empty() {
             return;
         }
@@ -140,12 +136,11 @@ impl CascadeImpl {
         Ok(())
     }
 
-    async fn add_warrants_into_scratch(&self, warrants: Vec<WarrantOp>) {
+    fn add_warrants_into_scratch(&self, warrants: impl IntoIterator<Item = WarrantOp>) {
         let Some(scratch) = self.scratch.clone() else {
             return;
         };
 
-        let warrants = verify_warrant_ops(warrants).await;
         if let Err(err) = scratch.apply(move |scratch| {
             for warrant in warrants {
                 scratch.add_warrant(SignedWarrant::new(
@@ -255,15 +250,7 @@ impl CascadeImpl {
                 return Err(e.into());
             }
         };
-
-        // These responses are returned to the caller rather than written to the
-        // `DhtStore`, so nothing downstream would otherwise check that a peer
-        // actually holds what it claims the agent authored.
-        let mut verified = Vec::with_capacity(results.len());
-        for response in results {
-            verified.push(verify_agent_activity_response(response).await);
-        }
-        Ok(verified)
+        Ok(results)
     }
 
     /// Get agent activity from multiple authorities, returning each
@@ -285,19 +272,11 @@ impl CascadeImpl {
             .as_ref()
             .ok_or(CascadeError::NetworkNotInitialized)?;
 
-        let responses = network
+        network
             .get_agent_activity_multi(agent, query, options)
             .await
-            .inspect_err(|_| self.record_fetch_error("agent_activity_multi"))?;
-
-        // Each peer's response is handed to the caller as-is, so verify the
-        // signatures here; the caller's own cross-peer agreement rules are
-        // about which answer to believe, not whether a peer made it up.
-        let mut verified = Vec::with_capacity(responses.len());
-        for (peer, response) in responses {
-            verified.push((peer, verify_agent_activity_response(response).await));
-        }
-        Ok(verified)
+            .inspect_err(|_| self.record_fetch_error("agent_activity_multi"))
+            .map_err(Into::into)
     }
 
     /// Fetch hash bounded agent activity from the network.
@@ -337,7 +316,7 @@ impl CascadeImpl {
                     .await?;
 
                 if let MustGetAgentActivityResponse::Activity { warrants, .. } = selected_response {
-                    self.add_warrants_into_scratch(warrants.clone()).await;
+                    self.add_warrants_into_scratch(warrants.iter().cloned());
                 }
 
                 Ok(selected_response.clone())

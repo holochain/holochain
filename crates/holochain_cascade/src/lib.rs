@@ -51,10 +51,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Instant;
 use tracing::*;
-use verify::{
-    rejected_without_warrant, verify_activity_signatures, verify_agent_activity_response,
-    verify_rendered_ops_batch, verify_signed_warrants, verify_warrant_ops,
-};
+use verify::{rejected_without_warrant, verify_activity_signatures, verify_rendered_ops_batch};
 
 /// Get an item from an option
 /// or return early from the function

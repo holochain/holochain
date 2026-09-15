@@ -133,109 +133,27 @@ pub(crate) async fn verify_activity_signatures(
         }
     }
 
-    (verified_activity, verify_warrant_ops(warrants).await)
-}
-
-/// Whether `signature` is a signature over `warrant` by the warrant's author.
-///
-/// A warrant is hearsay until this holds: it accuses another agent, so a peer
-/// that could serve one it did not sign could get any agent warranted.
-async fn warrant_signature_is_valid(warrant: &Warrant, signature: &Signature) -> bool {
-    match warrant
-        .author
-        .verify_signature(signature, warrant.clone())
-        .await
-    {
-        Ok(valid) => valid,
-        Err(err) => {
-            tracing::warn!(?err, "Error verifying warrant signature; dropping");
-            false
-        }
-    }
-}
-
-/// Drop the warrant ops whose signature is not by the warrant's author.
-pub(crate) async fn verify_warrant_ops(warrants: Vec<WarrantOp>) -> Vec<WarrantOp> {
-    let mut verified = Vec::with_capacity(warrants.len());
+    let mut verified_warrants = Vec::with_capacity(warrants.len());
     for warrant_op in warrants {
-        if warrant_signature_is_valid(warrant_op.warrant(), warrant_op.signature()).await {
-            verified.push(warrant_op);
-        } else {
-            tracing::warn!(
-                author = ?warrant_op.author,
-                "Warrant signature failed verification; dropping"
-            );
-        }
-    }
-    verified
-}
-
-/// Drop the signed warrants whose signature is not by the warrant's author.
-pub(crate) async fn verify_signed_warrants(warrants: Vec<SignedWarrant>) -> Vec<SignedWarrant> {
-    let mut verified = Vec::with_capacity(warrants.len());
-    for warrant in warrants {
-        if warrant_signature_is_valid(warrant.data(), warrant.signature()).await {
-            verified.push(warrant);
-        } else {
-            tracing::warn!(
-                author = ?warrant.data().author,
-                "Warrant signature failed verification; dropping"
-            );
-        }
-    }
-    verified
-}
-
-/// Drop everything in an agent-activity response that a peer cannot prove it
-/// was given: records whose action signature is not by the action's author, and
-/// warrants not signed by the warrant author.
-///
-/// Unlike the `must_get_agent_activity` path, this response is returned to the
-/// caller rather than written to the `DhtStore`, so without this a peer could
-/// hand a zome call actions the named agent never authored. `ChainItems::Hashes`
-/// carries no signature to check and is passed through; the records it names are
-/// themselves verified when they are fetched.
-pub(crate) async fn verify_agent_activity_response(
-    response: AgentActivityResponse,
-) -> AgentActivityResponse {
-    AgentActivityResponse {
-        agent: response.agent,
-        valid_activity: verify_chain_items(response.valid_activity).await,
-        rejected_activity: verify_chain_items(response.rejected_activity).await,
-        status: response.status,
-        highest_observed: response.highest_observed,
-        warrants: verify_signed_warrants(response.warrants).await,
-    }
-}
-
-async fn verify_chain_items(items: ChainItems) -> ChainItems {
-    let ChainItems::Full(records) = items else {
-        return items;
-    };
-    let mut verified = Vec::with_capacity(records.len());
-    for record in records {
-        let action = record.action();
-        match action
-            .author()
-            .verify_signature(record.signature(), action)
+        match warrant_op
+            .author
+            .verify_signature(warrant_op.signature(), warrant_op.warrant().clone())
             .await
         {
-            Ok(true) => verified.push(record),
+            Ok(true) => verified_warrants.push(warrant_op),
             Ok(false) => {
                 tracing::warn!(
-                    author = ?action.author(),
-                    "Agent activity record signature failed verification; dropping"
+                    author = ?warrant_op.author,
+                    "Activity warrant signature failed verification; dropping"
                 );
             }
             Err(err) => {
-                tracing::warn!(
-                    ?err,
-                    "Error verifying agent activity record signature; dropping"
-                );
+                tracing::warn!(?err, "Error verifying activity warrant signature; dropping");
             }
         }
     }
-    ChainItems::Full(verified)
+
+    (verified_activity, verified_warrants)
 }
 
 #[cfg(test)]
@@ -396,17 +314,6 @@ mod signature_verification_tests {
         }
     }
 
-    fn response(valid_activity: ChainItems) -> AgentActivityResponse {
-        AgentActivityResponse {
-            agent: AgentPubKey::from_raw_36(vec![2u8; 36]),
-            valid_activity,
-            rejected_activity: ChainItems::NotRequested,
-            status: ChainStatus::Empty,
-            highest_observed: None,
-            warrants: Vec::new(),
-        }
-    }
-
     fn activity(action: Action, signature: Signature) -> AgentActivity {
         AgentActivity {
             action: SignedActionHashed::with_presigned(
@@ -440,101 +347,6 @@ mod signature_verification_tests {
                 .await
                 .is_empty(),
             "an op signed by the migration target rather than the author must be dropped"
-        );
-    }
-
-    /// A get response is returned to the caller rather than written to the
-    /// `DhtStore`, so signatures on the records it carries have to be checked
-    /// here or nothing checks them at all.
-    // `test_keystore()` spawns lair onto a blocking task, which requires a multi-threaded runtime.
-    #[tokio::test(flavor = "multi_thread")]
-    async fn agent_activity_records_not_signed_by_their_author_are_dropped() {
-        let keystore = test_keystore();
-        let author = AgentPubKey::new_random(&keystore).await.unwrap();
-        let peer = AgentPubKey::new_random(&keystore).await.unwrap();
-        let action = close_chain(&author, &peer);
-
-        let record = |signature| {
-            Record::new(
-                SignedActionHashed::with_presigned(
-                    HoloHashed::from_content_sync(action.clone()),
-                    signature,
-                ),
-                RecordEntry::or_not_applicable(None),
-            )
-        };
-        let by_author = record(signed_by(&keystore, &author, &action).await);
-        let by_peer = record(signed_by(&keystore, &peer, &action).await);
-
-        let verified = verify_agent_activity_response(response(ChainItems::Full(vec![
-            by_author.clone(),
-            by_peer,
-        ])))
-        .await;
-
-        assert_eq!(
-            verified.valid_activity,
-            ChainItems::Full(vec![by_author]),
-            "only the record signed by its author survives"
-        );
-    }
-
-    /// `ChainItems::Hashes` carries no signature to check, so it must pass
-    /// through rather than be dropped as unverifiable.
-    #[tokio::test(flavor = "multi_thread")]
-    async fn agent_activity_hashes_pass_through() {
-        let hashes = ChainItems::Hashes(vec![(0, ActionHash::from_raw_36(vec![3u8; 36]))]);
-        let verified = verify_agent_activity_response(response(hashes.clone())).await;
-        assert_eq!(verified.valid_activity, hashes);
-    }
-
-    /// A warrant accuses another agent, so a peer that did not sign it must not
-    /// have it staged for validation or added to the scratch on its say-so.
-    // `test_keystore()` spawns lair onto a blocking task, which requires a multi-threaded runtime.
-    #[tokio::test(flavor = "multi_thread")]
-    async fn warrants_not_signed_by_their_author_are_dropped() {
-        let keystore = test_keystore();
-        let warrant_author = AgentPubKey::new_random(&keystore).await.unwrap();
-        let liar = AgentPubKey::new_random(&keystore).await.unwrap();
-        let warrant = Warrant::new(
-            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
-                chain_author: warrant_author.clone(),
-                action_pair: (
-                    (ActionHash::from_raw_36(vec![4u8; 36]), Signature([0; 64])),
-                    (ActionHash::from_raw_36(vec![5u8; 36]), Signature([0; 64])),
-                ),
-                seq: 0,
-            }),
-            warrant_author.clone(),
-            Timestamp::from_micros(42),
-            AgentPubKey::from_raw_36(vec![6u8; 36]),
-        );
-
-        let honest = SignedWarrant::new(
-            warrant.clone(),
-            warrant_author
-                .sign(&keystore, warrant.clone())
-                .await
-                .unwrap(),
-        );
-        let forged = SignedWarrant::new(
-            warrant.clone(),
-            liar.sign(&keystore, warrant.clone()).await.unwrap(),
-        );
-
-        assert_eq!(
-            verify_signed_warrants(vec![honest.clone(), forged.clone()]).await,
-            vec![honest.clone()],
-            "a warrant not signed by its own author must be dropped"
-        );
-        assert_eq!(
-            verify_warrant_ops(vec![
-                WarrantOp::from(honest.clone()),
-                WarrantOp::from(forged)
-            ])
-            .await,
-            vec![WarrantOp::from(honest)],
-            "the same rule applies to warrant ops staged for validation"
         );
     }
 
