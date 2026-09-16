@@ -2,7 +2,7 @@ use holo_hash::ActionHash;
 use holochain::sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::Record;
-use rand::{rng, Rng};
+use rand::{rng, RngExt};
 
 // Intended to keep https://github.com/holochain/holochain/issues/3028 fixed.
 // ensure that multiple `must_get_agent_activity` calls do not oversaturate the

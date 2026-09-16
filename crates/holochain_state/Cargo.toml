@@ -17,7 +17,7 @@ chrono = { version = "0.4.22", default-features = false, features = [
   "serde",
 ] }
 derive_more = { version = "2.0", features = ["display", "deref", "deref_mut"] }
-holo_hash = { version = "=0.9.0-dev.4", features = ["full"] }
+holo_hash = { version = "=0.9.0-dev.9", features = ["full"] }
 fallible-iterator = "0.3.0"
 holochain_data = { version = "^0.8.0-dev.7", path = "../holochain_data" }
 holochain_conductor_api = { version = "^0.8.0-dev.7", path = "../holochain_conductor_api" }
@@ -25,10 +25,10 @@ holochain_keystore = { version = "^0.8.0-dev.7", path = "../holochain_keystore" 
 holochain_serialized_bytes = "=0.0.57"
 sqlx = { version = "0.9.0" }
 holochain_types = { version = "^0.8.0-dev.7", path = "../holochain_types" }
-holochain_zome_types = { version = "=0.9.0-dev.0", features = ["full"] }
+holochain_zome_types = { version = "=0.9.0-dev.3", features = ["full"] }
 holochain_state_types = { version = "^0.8.0-dev.4", path = "../holochain_state_types" }
-holochain_nonce = { version = "=0.9.0-dev.0" }
-holochain_timestamp = { version = "=0.9.0-dev.4", optional = true }
+holochain_nonce = { version = "=0.9.0-dev.3" }
+holochain_timestamp = { version = "=0.9.0-dev.9", optional = true }
 one_err = "0.0.8"
 shrinkwraprs = "0.3.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -40,7 +40,7 @@ cron = "0.15"
 async-recursion = "1.1"
 bytes = "1"
 
-kitsune2_api = "0.5.0"
+kitsune2_api = "0.6.0-dev.1"
 
 tempfile = { version = "3.3", optional = true }
 base64 = { version = "0.22", optional = true }
@@ -49,14 +49,14 @@ nanoid = { version = "0.4", optional = true }
 [dev-dependencies]
 holochain_state = { path = ".", features = ["test_utils"] }
 
-fixt = { version = "=0.9.0-dev.4" }
+fixt = { version = "=0.9.0-dev.9" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm", features = [
   "build",
 ] }
 holochain_trace = { version = "^0.8.0-dev.0", path = "../holochain_trace" }
 matches = "0.1.8"
 tempfile = "3.3"
-rand = "0.9"
+rand = "0.10"
 test-case = "3.3"
 
 [lints]

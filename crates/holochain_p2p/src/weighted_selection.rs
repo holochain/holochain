@@ -35,7 +35,7 @@ pub(crate) fn select_weighted_urls(store: &LatencyData, urls: &[Url], count: usi
 
     if known_weights.is_empty() {
         return selectable
-            .choose_multiple(&mut rand::rng(), count)
+            .sample(&mut rand::rng(), count)
             .cloned()
             .collect();
     }
@@ -49,13 +49,13 @@ pub(crate) fn select_weighted_urls(store: &LatencyData, urls: &[Url], count: usi
     };
 
     selectable
-        .choose_multiple_weighted(&mut rand::rng(), count, |url| {
+        .sample_weighted(&mut rand::rng(), count, |url| {
             store.get_weight(url).unwrap_or(median_weight)
         })
         .map(|selection| selection.cloned().collect())
         .unwrap_or_else(|_| {
             selectable
-                .choose_multiple(&mut rand::rng(), count)
+                .sample(&mut rand::rng(), count)
                 .cloned()
                 .collect()
         })

@@ -35,7 +35,7 @@ pub fn simple_create_read_zome() -> InlineIntegrityZome {
 /// An InlineZome with a function to create many random entries at once,
 /// and a function to read the entry at a hash
 pub fn batch_create_zome() -> InlineIntegrityZome {
-    use rand::Rng;
+    use rand::RngExt;
 
     #[derive(Copy, Clone, Debug, Serialize, Deserialize, SerializedBytes)]
     struct RandNum(u64);

@@ -1,7 +1,6 @@
 use crate::conductor::error::{ConductorError, ConductorResult};
 use holochain_conductor_api::AppAuthenticationToken;
 use holochain_types::prelude::InstalledAppId;
-use rand::RngCore;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::time::SystemTime;
@@ -28,7 +27,7 @@ impl AppAuthTokenStore {
         single_use: bool,
     ) -> (AppAuthenticationToken, Option<SystemTime>) {
         let mut token = [0u8; 64];
-        rand::thread_rng().fill_bytes(&mut token);
+        rand::fill(&mut token);
         let token = token.to_vec();
 
         let expires_at = if expiry_seconds > 0 {

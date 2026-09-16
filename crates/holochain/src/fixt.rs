@@ -31,7 +31,7 @@ use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use rand::rng;
 use rand::seq::IteratorRandom;
-use rand::Rng;
+use rand::RngExt;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
