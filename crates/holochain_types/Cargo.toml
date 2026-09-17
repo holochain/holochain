@@ -17,14 +17,14 @@ base64 = "0.22"
 derive_builder = "0.20"
 derive_more = { version = "2.0", features = ["constructor", "into_iterator"] }
 futures = "0.3"
-holo_hash = { version = "=0.9.0-dev.9", features = ["encoding", "schema"] }
-holochain_nonce = { version = "=0.9.0-dev.3" }
+holo_hash = { version = "=0.9.0-dev.4", features = ["encoding", "schema"] }
+holochain_nonce = { version = "=0.9.0-dev.0" }
 holochain_serialized_bytes = "=0.0.57"
 holochain_trace = { version = "^0.8.0-dev.0", path = "../holochain_trace" }
-holochain_util = { version = "=0.9.0-dev.9", features = ["backtrace"] }
-holochain_zome_types = { version = "=0.9.0-dev.3", features = ["full"] }
-holochain_timestamp = { version = "=0.9.0-dev.9" }
-kitsune2_api = "0.6.0-dev.1"
+holochain_util = { version = "=0.9.0-dev.4", features = ["backtrace"] }
+holochain_zome_types = { version = "=0.9.0-dev.0", features = ["full"] }
+holochain_timestamp = { version = "=0.9.0-dev.4" }
+kitsune2_api = "0.5.0"
 itertools = { version = "0.14" }
 mr_bundle = { path = "../mr_bundle", features = [
   "fs",
@@ -32,7 +32,7 @@ mr_bundle = { path = "../mr_bundle", features = [
 must_future = "0.1.1"
 nanoid = "0.4"
 parking_lot = "0.12"
-rand = "0.10"
+rand = "0.9"
 regex = "1.4"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
@@ -41,17 +41,17 @@ serde_json = "1.0"
 serde_with = "3.7.0"
 yaml_serde = "0.10"
 shrinkwraprs = "0.3.0"
-strum = "0.28"
-strum_macros = "0.28"
+strum = "0.27"
+strum_macros = "0.27"
 tempfile = "3"
 thiserror = "2.0"
 tokio = { version = "1.27", features = ["rt"] }
 tracing = "0.1.26"
 indexmap = { version = "2.6.0", features = ["serde"] }
-schemars = "1.2"
+schemars = "0.9"
 bytes = { version = "1.10.1", features = ["serde"] }
 
-fixt = { version = "=0.9.0-dev.9", optional = true }
+fixt = { version = "=0.9.0-dev.4", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 

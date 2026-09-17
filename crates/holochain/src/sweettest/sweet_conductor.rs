@@ -26,7 +26,7 @@ use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::*;
 use kitsune2_api::DhtArc;
 use nanoid::nanoid;
-use rand::RngExt;
+use rand::Rng;
 use std::collections::HashMap;
 use std::net::ToSocketAddrs;
 use std::path::Path;
