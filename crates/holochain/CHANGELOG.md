@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- **BREAKING CHANGE**: Fix a `CloseChain` action with an agent migration target being signed and verified with the target key instead of the chain author's key. This let any agent publish a `CloseChain` in another agent's name and fork their chain. Every action is now signed by and verified against its author. A `CloseChain` with an agent migration target that was authored before this release was signed with the target key, so it is now indistinguishable from a forgery: it is dropped as counterfeit on arrival, along with the rest of the batch it arrives in, and there is no automatic remediation. An agent migration target is now an unverified claim by the chain author, rather than something the named agent has signed for; an app that treats it as proof of the target agent's consent must check that consent itself. \#5981
+- **BREAKING CHANGE**: Fix a `CloseChain` action with an agent migration target being signed and verified with the target key instead of the chain author's key. This let any agent publish a `CloseChain` in another agent's name and fork their chain. Every action is now signed by and verified against its author. \#5981
 
 ## 0.8.0-dev.7
 
