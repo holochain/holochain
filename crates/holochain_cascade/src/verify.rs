@@ -55,14 +55,14 @@ async fn verify_rendered_ops_signatures(rendered: &RenderedOps) -> bool {
         let sa = &op.action;
         let action = &sa.hashed.content;
         match action
-            .signer()
+            .author()
             .verify_signature(sa.signature(), action)
             .await
         {
             Ok(true) => {}
             Ok(false) => {
                 tracing::warn!(
-                    signer = ?action.signer(),
+                    author = ?action.author(),
                     "Rendered op signature failed verification; dropping batch"
                 );
                 return false;
@@ -116,14 +116,14 @@ pub(crate) async fn verify_activity_signatures(
         // Verify over the signed action — the same bytes it was signed over.
         let action = &ra.action.hashed.content;
         let verified = action
-            .signer()
+            .author()
             .verify_signature(ra.action.signature(), action)
             .await;
         match verified {
             Ok(true) => verified_activity.push(ra),
             Ok(false) => {
                 tracing::warn!(
-                    signer = ?ra.action.hashed.content.signer(),
+                    author = ?ra.action.hashed.content.author(),
                     "Activity record signature failed verification; dropping"
                 );
             }
@@ -266,5 +266,108 @@ mod rejected_warrant_invariant_tests {
                 fixt!(AgentPubKey)
             )]
         ));
+    }
+}
+
+#[cfg(test)]
+mod signature_verification_tests {
+    use super::*;
+    use holo_hash::{AgentPubKey, HoloHashed};
+    use holochain_keystore::{test_keystore, MetaLairClient};
+
+    /// A `CloseChain` naming `target` as its agent migration target, authored
+    /// by `author`. Signing it with `target`'s key rather than `author`'s is
+    /// the forgery that let a third party fork another agent's chain (#5981).
+    fn close_chain(author: &AgentPubKey, target: &AgentPubKey) -> Action {
+        Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(42),
+                action_seq: 5,
+                prev_action: Some(ActionHash::from_raw_36(vec![1u8; 36])),
+            },
+            data: ActionData::CloseChain(CloseChainData {
+                new_target: Some(MigrationTarget::Agent(target.clone())),
+            }),
+        }
+    }
+
+    async fn signed_by(
+        keystore: &MetaLairClient,
+        signer: &AgentPubKey,
+        action: &Action,
+    ) -> Signature {
+        signer.sign(keystore, action).await.unwrap()
+    }
+
+    fn rendered(action: Action, signature: Signature) -> RenderedOps {
+        RenderedOps {
+            entry: None,
+            ops: vec![RenderedOp::new(
+                action,
+                signature,
+                Some(ValidationStatus::Valid),
+                ChainOpType::AgentActivity,
+            )
+            .unwrap()],
+            warrant: None,
+        }
+    }
+
+    fn activity(action: Action, signature: Signature) -> AgentActivity {
+        AgentActivity {
+            action: SignedActionHashed::with_presigned(
+                HoloHashed::from_content_sync(action),
+                signature,
+            ),
+            cached_entry: None,
+        }
+    }
+
+    // `test_keystore()` spawns lair onto a blocking task, which requires a multi-threaded runtime.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn rendered_ops_signed_by_the_migration_target_are_dropped() {
+        let keystore = test_keystore();
+        let author = AgentPubKey::new_random(&keystore).await.unwrap();
+        let target = AgentPubKey::new_random(&keystore).await.unwrap();
+        let action = close_chain(&author, &target);
+
+        let by_author = signed_by(&keystore, &author, &action).await;
+        assert_eq!(
+            verify_rendered_ops_batch(vec![rendered(action.clone(), by_author)])
+                .await
+                .len(),
+            1,
+            "an op signed by its author must be kept"
+        );
+
+        let by_target = signed_by(&keystore, &target, &action).await;
+        assert!(
+            verify_rendered_ops_batch(vec![rendered(action, by_target)])
+                .await
+                .is_empty(),
+            "an op signed by the migration target rather than the author must be dropped"
+        );
+    }
+
+    // `test_keystore()` spawns lair onto a blocking task, which requires a multi-threaded runtime.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn activity_signed_by_the_migration_target_is_dropped() {
+        let keystore = test_keystore();
+        let author = AgentPubKey::new_random(&keystore).await.unwrap();
+        let target = AgentPubKey::new_random(&keystore).await.unwrap();
+        let action = close_chain(&author, &target);
+
+        let by_author = signed_by(&keystore, &author, &action).await;
+        let (kept, _) =
+            verify_activity_signatures(vec![activity(action.clone(), by_author)], vec![]).await;
+        assert_eq!(kept.len(), 1, "a record signed by its author must be kept");
+
+        let by_target = signed_by(&keystore, &target, &action).await;
+        let (kept, _) = verify_activity_signatures(vec![activity(action, by_target)], vec![]).await;
+        assert!(
+            kept.is_empty(),
+            "a record signed by the migration target rather than the author must be dropped"
+        );
     }
 }
