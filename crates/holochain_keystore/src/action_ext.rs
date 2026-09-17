@@ -59,7 +59,7 @@ impl SignedActionHashedExt for SignedActionHashed {
 
 #[cfg(test)]
 mod test {
-    use crate::SignedActionHashedExt;
+    use crate::{test_keystore, AgentPubKeyExt, KeystoreError, SignedActionHashedExt};
     use holo_hash::{AgentPubKey, HoloHashed};
     use holochain_types::prelude::*;
     use holochain_zome_types::prelude::{SignedAction, SignedActionHashed};
@@ -92,5 +92,45 @@ mod test {
         );
         assert_eq!(shh.hashed.content, action);
         assert_eq!(shh.signature, signature);
+    }
+
+    /// A `CloseChain` with an agent target must be signed by its author.
+    ///
+    /// Accepting the target's signature would let it close another agent's
+    /// chain in that agent's name (#5981).
+    // `test_keystore()` spawns lair onto a blocking task, which requires a
+    // multi-threaded runtime.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn close_chain_with_agent_target_is_signed_by_author() {
+        let keystore = test_keystore();
+        let author = AgentPubKey::new_random(&keystore).await.unwrap();
+        let new_agent = AgentPubKey::new_random(&keystore).await.unwrap();
+
+        let mut action = sample_action();
+        action.header.author = author.clone();
+        action.data = ActionData::CloseChain(CloseChainData {
+            new_target: Some(MigrationTarget::Agent(new_agent.clone())),
+        });
+        let hashed: HoloHashed<Action> = HoloHashed::from_content_sync(action.clone());
+
+        let signed = SignedActionHashed::sign(&keystore, hashed.clone())
+            .await
+            .unwrap();
+        assert!(author
+            .verify_signature(signed.signature(), &action)
+            .await
+            .unwrap());
+        assert!(!new_agent
+            .verify_signature(signed.signature(), &action)
+            .await
+            .unwrap());
+        signed.verify_signature().await.unwrap();
+
+        let forged_signature = new_agent.sign(&keystore, &action).await.unwrap();
+        let forged = SignedActionHashed::with_presigned(hashed, forged_signature);
+        assert!(matches!(
+            forged.verify_signature().await,
+            Err(KeystoreError::InvalidSignature(..))
+        ));
     }
 }
