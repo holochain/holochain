@@ -14,6 +14,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260921.025729
+
+## [hcterm-0.8.0-dev.8](crates/hcterm/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_cli-0.8.0-dev.8](crates/holochain_cli/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_cli\_bundle-0.8.0-dev.8](crates/holochain_cli_bundle/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_cli\_client-0.8.0-dev.8](crates/holochain_cli_client/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_cli\_sandbox-0.8.0-dev.8](crates/holochain_cli_sandbox/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_client-0.10.0-dev.8](crates/holochain_client/CHANGELOG.md#0.10.0-dev.8)
+
+## [holochain-0.8.0-dev.8](crates/holochain/CHANGELOG.md#0.8.0-dev.8)
+
+- **BREAKING CHANGE**: Fix a `CloseChain` action with an agent migration target being signed and verified with the target key instead of the chain author’s key. This let any agent publish a `CloseChain` in another agent’s name and fork their chain. Every action is now signed by and verified against its author. \#5981
+
+## [holochain\_cascade-0.8.0-dev.8](crates/holochain_cascade/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_conductor\_config-0.8.0-dev.8](crates/holochain_conductor_config/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_wasm\_test\_utils-0.8.0-dev.8](crates/holochain_wasm_test_utils/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_websocket-0.8.0-dev.8](crates/holochain_websocket/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_p2p-0.8.0-dev.8](crates/holochain_p2p/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_state-0.8.0-dev.8](crates/holochain_state/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_data-0.8.0-dev.8](crates/holochain_data/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_conductor\_api-0.8.0-dev.8](crates/holochain_conductor_api/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_keystore-0.8.0-dev.8](crates/holochain_keystore/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_types-0.8.0-dev.8](crates/holochain_types/CHANGELOG.md#0.8.0-dev.8)
+
 # 20260914.030009
 
 ## [hcterm-0.8.0-dev.7](crates/hcterm/CHANGELOG.md#0.8.0-dev.7)
