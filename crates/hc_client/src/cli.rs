@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 
-use crate::{calls, zome_call};
+use crate::{calls, membrane_proofs, zome_call};
 
 /// Client commands that can be executed.
 #[derive(Debug, Subcommand)]
@@ -13,6 +13,9 @@ pub enum ClientCommand {
     /// Make a zome call against a running conductor.
     #[command(name = "zome-call")]
     ZomeCall(zome_call::ZomeCall),
+    /// Provide membrane proofs to an app installed with deferred proofs.
+    #[command(name = "provide-memproofs")]
+    ProvideMemproofs(membrane_proofs::ProvideMemproofs),
 }
 
 /// Execution context for running CLI commands.
@@ -36,6 +39,27 @@ impl HcClient {
             ClientCommand::Call(call) => calls::call(call).await,
             ClientCommand::ZomeCallAuth(auth) => zome_call::zome_call_auth(auth).await,
             ClientCommand::ZomeCall(call) => zome_call::zome_call(call).await,
+            ClientCommand::ProvideMemproofs(args) => membrane_proofs::provide_memproofs(args).await,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HcClient;
+    use clap::Parser;
+
+    #[test]
+    fn deferred_membrane_proofs_command_accepts_file_flags() {
+        let parsed = HcClient::try_parse_from([
+            "hc-client",
+            "provide-memproofs",
+            "--port",
+            "12345",
+            "my-app",
+            "--membrane-proof",
+            "role-1=proof.bin",
+        ]);
+        assert!(parsed.is_ok(), "{parsed:?}");
     }
 }

@@ -19,6 +19,8 @@ pub(crate) use msg;
 pub mod calls;
 /// CLI entry points for the `hc-client` binary.
 pub mod cli;
+/// Membrane-proof submission for applications that defer genesis.
+pub mod membrane_proofs;
 pub mod zome_call;
 
 pub use cli::HcClient;

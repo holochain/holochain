@@ -1,13 +1,13 @@
 use holochain_cli_sandbox::cli::LaunchInfo;
 use holochain_client::{AdminWebsocket, AllowedOrigins};
 use holochain_conductor_api::{
-    AdminInterfaceConfig, AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest,
-    InterfaceDriver,
+    AdminInterfaceConfig, AdminRequest, AdminResponse, AppAuthenticationRequest, AppInfo,
+    AppRequest, InterfaceDriver,
 };
 use holochain_conductor_api::{AppResponse, AppStatusFilter, CellInfo};
 use holochain_conductor_config::config::{read_config, write_config};
 use holochain_types::app::InstalledAppId;
-use holochain_types::prelude::{SerializedBytes, SerializedBytesError, YamlProperties};
+use holochain_types::prelude::{ActionData, SerializedBytes, SerializedBytesError, YamlProperties};
 use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
     WebsocketSender,
@@ -104,6 +104,45 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
     .unwrap_or_else(|_| {
         panic!("Timeout waiting for the sandbox to install the app {installed_app_id}")
     })
+}
+
+async fn assert_sandbox_role_proof(
+    admin_ws: &AdminWebsocket,
+    app_info: &AppInfo,
+    role: &str,
+    expected: &[u8],
+    should_have_proof: bool,
+) {
+    let cells = app_info
+        .cell_info
+        .get(role)
+        .unwrap_or_else(|| panic!("role {role} missing from app info"));
+    let CellInfo::Provisioned(cell) = cells
+        .first()
+        .unwrap_or_else(|| panic!("role {role} has no provisioned cell"))
+    else {
+        panic!("role {role} does not have a provisioned cell");
+    };
+    let dump = admin_ws
+        .dump_full_state(cell.cell_id.clone(), None, None)
+        .await
+        .unwrap();
+    let proof =
+        dump.source_chain_dump
+            .records
+            .iter()
+            .find_map(|record| match &record.action.data {
+                ActionData::AgentValidationPkg(pkg) => pkg
+                    .membrane_proof
+                    .as_ref()
+                    .map(|proof| proof.bytes().to_vec()),
+                _ => None,
+            });
+    if should_have_proof {
+        assert_eq!(proof.as_deref(), Some(expected));
+    } else {
+        assert!(proof.is_none(), "role {role} unexpectedly has a proof");
+    }
 }
 
 async fn check_timeout<T>(response: impl Future<Output = WebsocketResult<T>>) -> T {
@@ -535,6 +574,104 @@ async fn generate_sandbox_with_roles_settings_override() {
     shutdown_sandbox(hc_admin).await;
 }
 
+/// Generates a sandbox with membrane proofs supplied through both explicit YAML
+/// byte-source forms and verifies the bytes stored in each role's genesis.
+#[tokio::test(flavor = "multi_thread")]
+async fn generate_sandbox_with_membrane_proof_sources() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let source = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app");
+    let fixture_dir = temp_dir.path().join("membrane-proof-fixture");
+    let dna_dir = fixture_dir.join("dna");
+    let zomes_dir = dna_dir.join("zomes");
+    std::fs::create_dir_all(&zomes_dir).unwrap();
+    copy_fixture_file(&source.join("happ.yaml"), &fixture_dir.join("happ.yaml"));
+    copy_fixture_file(&source.join("dna/dna.yaml"), &dna_dir.join("dna.yaml"));
+    copy_fixture_file(
+        &source.join("dna/zomes/test_wasm_foo.wasm"),
+        &zomes_dir.join("test_wasm_foo.wasm"),
+    );
+    let manifest = std::fs::read_to_string(fixture_dir.join("happ.yaml"))
+        .unwrap()
+        .replacen("\"0123456\"", "\"sandbox-proof-role-1\"", 1)
+        .replacen("\"0123456\"", "\"sandbox-proof-role-2\"", 1)
+        .replace(
+            "should remain untouched by roles settings test",
+            "sandbox-proof-role-3",
+        );
+    std::fs::write(fixture_dir.join("happ.yaml"), manifest).unwrap();
+    run_hc_pack("dna", &dna_dir).await;
+    run_hc_pack("app", &fixture_dir).await;
+
+    let role_1_proof = [0x00, 0xff, 0x80, 0x0a];
+    let role_2_proof = [0x7f, 0x00, 0xfe, 0x0d];
+    std::fs::write(fixture_dir.join("proof-role-2.bin"), role_2_proof).unwrap();
+    let settings_path = fixture_dir.join("roles-settings.yaml");
+    std::fs::write(
+        &settings_path,
+        "role-1:\n  type: provisioned\n  membrane_proof:\n    base64: AP+ACg==\n  modifiers:\n    network_seed: sandbox-proof-role-1\nrole-2:\n  type: provisioned\n  membrane_proof:\n    path: proof-role-2.bin\n  modifiers:\n    network_seed: sandbox-proof-role-2\nrole-3:\n  type: provisioned\n  modifiers:\n    network_seed: sandbox-proof-role-3\n",
+    )
+    .unwrap();
+
+    holochain_trace::test_run();
+    let local_network = TestBootstrapSrv::new(false).await;
+    let local_network_url = local_network.addr().to_string();
+    let command_dir = temp_dir.path().join("different-working-directory");
+    std::fs::create_dir_all(&command_dir).unwrap();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--roles-settings")
+        .arg(&settings_path)
+        .arg("--in-process-lair")
+        .arg("--run=0")
+        .arg(fixture_dir.join("my-fixture-app.happ"))
+        .arg("network")
+        .arg(format!("--bootstrap={local_network_url}"))
+        .arg("quic")
+        .arg(&local_network_url)
+        .current_dir(&command_dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
+    let app_info = get_app_info(
+        launch_info.admin_port,
+        "test-app".into(),
+        *launch_info.app_ports.first().expect("No app ports found"),
+    )
+    .await;
+    let AppResponse::AppInfo(Some(app_info)) = app_info else {
+        panic!("expected app info response");
+    };
+    let admin_ws = admin_client_from_launch(&launch_info).await;
+    assert_sandbox_role_proof(&admin_ws, &app_info, "role-1", &role_1_proof, true).await;
+    assert_sandbox_role_proof(&admin_ws, &app_info, "role-2", &role_2_proof, true).await;
+    assert_sandbox_role_proof(&admin_ws, &app_info, "role-3", &[], false).await;
+
+    let role_3 = app_info
+        .manifest
+        .app_roles()
+        .into_iter()
+        .find(|role| role.name == "role-3")
+        .expect("role-3 missing from manifest");
+    assert_eq!(
+        role_3.dna.modifiers.network_seed.as_deref(),
+        Some("sandbox-proof-role-3")
+    );
+
+    shutdown_sandbox(hc_admin).await;
+}
+
 /// Generates a new sandbox, setting the iroh relay URL via
 /// the quic argument and verifies that conductor config file has
 /// been written correctly.
@@ -902,6 +1039,52 @@ async fn dna_hash_with_overrides_matches_installed_cells() {
     )
     .await;
     assert_eq!(role_1_hash, cli_hash);
+
+    let missing_proof_settings = temp_dir.path().join("dna-role-settings-missing-proof.yaml");
+    std::fs::write(
+        &missing_proof_settings,
+        concat!(
+            "type: provisioned\n",
+            "membrane_proof:\n  path: does-not-exist.bin\n",
+            "modifiers:\n",
+            "  network_seed: some random network seed\n",
+            "  properties: some properties in the manifest\n",
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        role_1_hash,
+        dna_hash_cli(
+            &fixture.dna_bundle,
+            "cli seed override",
+            &missing_proof_settings,
+        )
+        .await
+    );
+
+    let invalid_base64_settings = temp_dir
+        .path()
+        .join("dna-role-settings-invalid-base64.yaml");
+    std::fs::write(
+        &invalid_base64_settings,
+        concat!(
+            "type: provisioned\n",
+            "membrane_proof:\n  base64: 'not valid !!!'\n",
+            "modifiers:\n",
+            "  network_seed: some random network seed\n",
+            "  properties: some properties in the manifest\n",
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        role_1_hash,
+        dna_hash_cli(
+            &fixture.dna_bundle,
+            "cli seed override",
+            &invalid_base64_settings,
+        )
+        .await
+    );
 
     // role-3: untouched by roles-settings, so it got the generate-level
     // network seed plus the properties baked into happ.yaml.
