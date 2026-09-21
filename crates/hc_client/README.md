@@ -76,6 +76,10 @@ role-2:
   path: ./proof.bin
 ```
 
+A `path` entry in this file is resolved relative to the file itself, not to the
+current working directory. The `--membrane-proof ROLE=PATH` flags are resolved
+relative to the current working directory.
+
 `--port` selects the conductor's admin websocket. The command uses it to find
 the app, checks that the app is awaiting proofs, and then connects to an app
 interface using the `sandbox` origin. It reuses a compatible existing
