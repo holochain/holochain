@@ -120,7 +120,7 @@ pub(crate) async fn get_entries_by_hashes(
 
 /// Decode an `Entry` blob, mapping a deserialization failure to the same
 /// [`sqlx::Error::Decode`] shape that [`get_entry`] uses.
-fn decode_entry_blob(blob: &[u8]) -> sqlx::Result<Entry> {
+pub(super) fn decode_entry_blob(blob: &[u8]) -> sqlx::Result<Entry> {
     holochain_serialized_bytes::decode::<_, Entry>(blob).map_err(|e| {
         sqlx::Error::Decode(Box::new(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
