@@ -3,7 +3,11 @@
 //! This module keeps YAML deserialization free of filesystem access. Explicit
 //! base64 and path sources are resolved only when a caller loads settings for
 //! installation, while legacy strings and integer arrays retain their original
-//! byte meanings.
+//! byte meanings. "Legacy" here means the format role-settings YAML used
+//! before the `base64`/`path` source forms existed: a bare YAML string or
+//! integer array supplied directly as the value of a field such as
+//! `membrane_proof`, with no `base64:`/`path:` wrapper. That older shape is
+//! still accepted so existing YAML files keep working unchanged.
 
 use super::{RoleSettings, RoleSettingsMap};
 use base64::Engine;
@@ -31,8 +35,16 @@ pub enum OpaqueBytesSource {
         path: PathBuf,
     },
     /// Preserve a legacy YAML byte array exactly.
+    ///
+    /// Matches a bare `[u8, ...]` value written directly where this source
+    /// is expected, predating the `base64`/`path` wrapper forms. Kept for
+    /// backward compatibility with existing role-settings YAML.
     Bytes(Vec<u8>),
     /// Preserve a legacy YAML string as its UTF-8 bytes.
+    ///
+    /// Matches a bare string value written directly where this source is
+    /// expected, predating the `base64`/`path` wrapper forms. Kept for
+    /// backward compatibility with existing role-settings YAML.
     Text(String),
 }
 
@@ -375,10 +387,13 @@ mod tests {
         let yaml = dir.path().join("roles.yaml");
         std::fs::write(
             &yaml,
-            concat!(
-                "role-1:\n  type: provisioned\n  membrane_proof:\n",
-                "    path: proof.bin\n  init_properties:\n    base64: AQID\n",
-            ),
+            r#"role-1:
+  type: provisioned
+  membrane_proof:
+    path: proof.bin
+  init_properties:
+    base64: AQID
+"#,
         )
         .unwrap();
         let mut roles = read_role_settings_yaml(&yaml).unwrap();
@@ -402,21 +417,25 @@ mod tests {
         let base64_yaml = dir.path().join("base64.yaml");
         std::fs::write(
             &base64_yaml,
-            concat!(
-                "role-1:\n  type: provisioned\n",
-                "  membrane_proof:\n    base64: AQID\n",
-                "  init_properties:\n    path: init.bin\n",
-            ),
+            r#"role-1:
+  type: provisioned
+  membrane_proof:
+    base64: AQID
+  init_properties:
+    path: init.bin
+"#,
         )
         .unwrap();
         let path_yaml = dir.path().join("path.yaml");
         std::fs::write(
             &path_yaml,
-            concat!(
-                "role-1:\n  type: provisioned\n",
-                "  membrane_proof:\n    path: proof.bin\n",
-                "  init_properties:\n    base64: CgsM\n",
-            ),
+            r#"role-1:
+  type: provisioned
+  membrane_proof:
+    path: proof.bin
+  init_properties:
+    base64: CgsM
+"#,
         )
         .unwrap();
 
@@ -454,17 +473,25 @@ mod tests {
         std::fs::write(
             &yaml_path,
             format!(
-                concat!(
-                    "role-null:\n  type: provisioned\n  membrane_proof: null\n",
-                    "  init_properties: null\n",
-                    "role-omitted:\n  type: provisioned\n",
-                    "role-empty:\n  type: provisioned\n",
-                    "  membrane_proof:\n    base64: \"\"\n",
-                    "  init_properties:\n    path: empty.bin\n",
-                    "role-absolute:\n  type: provisioned\n",
-                    "  membrane_proof:\n    path: {}\n",
-                    "  modifiers:\n    network_seed: preserved-seed\n",
-                ),
+                r#"role-null:
+  type: provisioned
+  membrane_proof: null
+  init_properties: null
+role-omitted:
+  type: provisioned
+role-empty:
+  type: provisioned
+  membrane_proof:
+    base64: ""
+  init_properties:
+    path: empty.bin
+role-absolute:
+  type: provisioned
+  membrane_proof:
+    path: {}
+  modifiers:
+    network_seed: preserved-seed
+"#,
                 empty_path.display()
             ),
         )
@@ -629,11 +656,14 @@ mod tests {
         std::fs::write(&flag_proof, &expected).unwrap();
         std::fs::write(
             &settings_path,
-            concat!(
-                "role-1:\n  type: provisioned\n  membrane_proof: null\n",
-                "  modifiers:\n    network_seed: preserved-seed\n",
-                "  init_properties:\n    base64: AQID\n",
-            ),
+            r#"role-1:
+  type: provisioned
+  membrane_proof: null
+  modifiers:
+    network_seed: preserved-seed
+  init_properties:
+    base64: AQID
+"#,
         )
         .unwrap();
         let flag_path = flag_proof.strip_prefix(&current_dir).unwrap();
