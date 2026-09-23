@@ -136,6 +136,41 @@ hc sandbox generate \
     network quic
 ```
 
+### Membrane proofs
+
+Pass role settings to `hc sandbox generate` when an app needs membrane proofs
+at installation time. Proof sources can be raw binary files or illustrative
+base64 values:
+
+```yaml
+role-1:
+  type: provisioned
+  membrane_proof:
+    path: ./proof.bin
+role-2:
+  type: provisioned
+  membrane_proof:
+    base64: AQID
+```
+
+```shell
+hc sandbox generate --roles-settings ./roles.yaml ./app.happ
+```
+
+`AQID` is illustrative data, not a valid proof for every application. Paths in
+role settings are resolved relative to the YAML file, and the bytes are passed
+unchanged to genesis. Omit `membrane_proof`, or set it to `null`, when a role
+does not need a proof. The same `base64` and `path` source forms are available
+for `init_properties`.
+
+Existing bare strings remain literal UTF-8 bytes for compatibility, and a
+bare string that looks like base64 is not decoded. YAML `!!binary` values also
+retain their existing literal-byte behavior; use the explicit `base64` form
+when decoding base64 is intended. For proofs issued for a particular agent,
+see the [client's agent-bound proof workflow](../hc_client/README.md#agent-bound-proofs).
+For apps generated with `allow_deferred_memproofs`, see the [deferred client
+workflow](../hc_client/README.md#deferred-membrane-proofs).
+
 #### Create
 
 Creates 'empty' sandboxes; that is, sandboxes with no apps installed. This can be useful for testing the implementation of a program that controls the conductor via the admin API, such as an application launcher. Most of the options for `hc generate` also work with `hc create`:

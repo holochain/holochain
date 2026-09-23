@@ -13,6 +13,7 @@
 mod app_bundle;
 mod app_manifest;
 mod error;
+mod role_settings_yaml;
 
 use crate::{dna::DnaBundle, prelude::*};
 pub use app_bundle::*;
@@ -28,6 +29,11 @@ use holochain_zome_types::cell::CloneId;
 use holochain_zome_types::prelude::*;
 use indexmap::IndexMap;
 use itertools::Itertools;
+#[doc(inline)]
+pub use role_settings_yaml::{
+    read_role_settings_yaml, read_role_settings_yaml_with_proofs, OpaqueBytesSource,
+    OpaqueBytesSourceError, RoleSettingsMapYaml, RoleSettingsYaml, RoleSettingsYamlError,
+};
 use std::{collections::HashMap, path::PathBuf};
 
 /// The unique identifier for an installed app in this conductor
@@ -211,9 +217,6 @@ holo_hash::ts_alias!(
     deps: [RoleSettings]
 );
 
-/// Alias
-pub type RoleSettingsMapYaml = HashMap<RoleName, RoleSettingsYaml>;
-
 /// Settings for a Role that may be passed on installation of an app
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
@@ -272,58 +275,6 @@ impl RoleSettings {
             Self::Provisioned { modifiers, .. } => modifiers.as_ref(),
         }
     }
-}
-
-impl From<RoleSettingsYaml> for RoleSettings {
-    fn from(role_settings: RoleSettingsYaml) -> Self {
-        match role_settings {
-            RoleSettingsYaml::Provisioned {
-                membrane_proof,
-                modifiers,
-                init_properties,
-            } => Self::Provisioned {
-                membrane_proof,
-                modifiers,
-                init_properties,
-            },
-            #[allow(deprecated)]
-            RoleSettingsYaml::UseExisting { cell_id } => Self::UseExisting { cell_id },
-        }
-    }
-}
-
-/// A version of RoleSettings that serializes to YAML without the content attribute
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum RoleSettingsYaml {
-    #[deprecated(
-        since = "0.6.0-dev.17",
-        note = "For late binding, update the coordinators of a DNA. For calling cells of other apps, use bridge calls."
-    )]
-    /// If the role has the UseExisting strategy defined in the app manifest
-    /// the cell id to use needs to be specified here.
-    UseExisting {
-        /// Existing cell id to use
-        cell_id: CellId,
-    },
-    /// Optional settings for a normally provisioned cell
-    Provisioned {
-        /// When the app being installed has the `allow_deferred_memproofs` manifest flag set,
-        /// passing `None` for this field for all roles in the app will allow the app to enter
-        /// the "deferred membrane proofs" state, so that memproofs can be provided later.
-        /// If `Some` is used here, whatever memproofs are
-        /// provided will be used, and the app will be installed as normal.
-        membrane_proof: Option<MembraneProof>,
-        /// Overwrites the dna modifiers from the dna manifest. Only
-        /// modifier fields for which `Some(T)` is provided will be overwritten.
-        modifiers: Option<DnaModifiersOpt<YamlProperties>>,
-        /// Opaque, app-defined bytes made available to the cell during `init`.
-        ///
-        /// Not interpreted by the conductor and never written to the DHT. The bytes are persisted
-        /// conductor-side at install time and read back during `init` via the
-        /// `hdk::migrate::get_init_properties` host function.
-        init_properties: Option<InitProperties>,
-    },
 }
 
 /// The possible locations of an AppBundle
@@ -1272,6 +1223,62 @@ mod tests {
             serde_json::to_string(&role_settings).unwrap(),
             "{\"type\":\"provisioned\",\"value\":{\"membrane_proof\":null,\"modifiers\":null,\"init_properties\":null}}"
         );
+    }
+
+    #[test]
+    fn role_settings_accept_inline_membrane_proof() {
+        let yaml = "role-1:\n  type: provisioned\n  membrane_proof:\n    base64: AQID\n";
+        let parsed = yaml_serde::from_str::<RoleSettingsMapYaml>(yaml);
+        assert!(parsed.is_ok(), "{parsed:?}");
+    }
+
+    #[test]
+    fn role_settings_preserve_legacy_yaml_bytes() {
+        for (source, expected) in [
+            ("[1, 2, 3]", vec![1, 2, 3]),
+            ("AQID", b"AQID".to_vec()),
+            ("!!binary AQID", b"AQID".to_vec()),
+        ] {
+            for field in ["membrane_proof", "init_properties"] {
+                let yaml = format!("role-1:\n  type: provisioned\n  {field}: {source}\n");
+                let mut settings = yaml_serde::from_str::<RoleSettingsMapYaml>(&yaml).unwrap();
+                let RoleSettingsYaml::Provisioned {
+                    membrane_proof,
+                    init_properties,
+                    ..
+                } = settings.remove("role-1").unwrap()
+                else {
+                    panic!("expected a provisioned role");
+                };
+                let RoleSettings::Provisioned {
+                    membrane_proof,
+                    init_properties,
+                    ..
+                } = RoleSettingsYaml::Provisioned {
+                    membrane_proof,
+                    modifiers: None,
+                    init_properties,
+                }
+                .resolve(std::path::Path::new("."))
+                .unwrap()
+                else {
+                    panic!("expected a provisioned role");
+                };
+                let actual = match field {
+                    "membrane_proof" => membrane_proof.unwrap().bytes().to_vec(),
+                    "init_properties" => init_properties.unwrap().0.bytes().to_vec(),
+                    _ => unreachable!("test only covers known fields"),
+                };
+                assert_eq!(actual, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn role_settings_yaml_non_null_bytes_serialize() {
+        let yaml = "role-1:\n  type: provisioned\n  membrane_proof: [1, 2, 3]\n";
+        let parsed = yaml_serde::from_str::<RoleSettingsMapYaml>(yaml).unwrap();
+        assert!(yaml_serde::to_string(&parsed).is_ok());
     }
 
     #[test]

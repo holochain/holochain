@@ -308,7 +308,9 @@ async fn generate_signing_credentials(
     Ok((auth, ed25519_dalek::SigningKey::from_bytes(&hash)))
 }
 
-async fn get_app_client(
+/// Connect to an app websocket, using no signing credentials when `credentials`
+/// is `None`.
+pub(crate) async fn get_app_client(
     admin_client: &AdminWebsocket,
     installed_app_id: InstalledAppId,
     credentials: Option<Vec<(CellId, SigningCredentials)>>,

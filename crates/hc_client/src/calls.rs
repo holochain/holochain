@@ -13,9 +13,8 @@ use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::PeerMetaInfo;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
 use holochain_conductor_api::{AppStatusFilter, DhtOpsCursor, OpTimingsCursor, SourceChainCursor};
+use holochain_types::app::read_role_settings_yaml_with_proofs;
 use holochain_types::app::AppManifest;
-use holochain_types::app::RoleSettingsMap;
-use holochain_types::app::RoleSettingsMapYaml;
 use holochain_types::prelude::NetworkSeed;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
@@ -149,12 +148,10 @@ pub struct AddAppWs {
     pub installed_app_id: Option<InstalledAppId>,
 }
 
-/// Calls [`AdminWebsocket::install_app`]
-/// and installs a new app.
+/// Calls [`AdminWebsocket::install_app`] and installs a new app.
 ///
-/// Setting properties and membrane proofs is not
-/// yet supported.
-/// RoleNames are set to `my-app-0`, `my-app-1` etc.
+/// Role settings may be supplied as a YAML file, and raw membrane-proof files
+/// may be supplied with repeatable `--membrane-proof ROLE=PATH` flags.
 #[derive(Debug, Args, Clone)]
 pub struct InstallApp {
     /// Sets the InstalledAppId.
@@ -179,6 +176,16 @@ pub struct InstallApp {
     /// See <https://github.com/holochain/holochain/tree/develop/crates/hc_sandbox/tests/fixtures/roles-settings.yaml>
     /// for an example of such a yaml file.
     pub roles_settings: Option<PathBuf>,
+
+    /// Read raw membrane-proof bytes for a role; may be repeated for distinct roles.
+    ///
+    /// Flag paths are resolved relative to the current working directory.
+    #[arg(
+        long = "membrane-proof",
+        value_name = "ROLE=PATH",
+        value_parser = parse_membrane_proof
+    )]
+    pub membrane_proofs: Vec<(String, PathBuf)>,
 }
 
 /// Calls [`AdminWebsocket::uninstall_app`]
@@ -565,7 +572,9 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
 }
 
 /// Convert an [`AppInfo`] to JSON with extra base64 conversion of `agent_pub_key` and `cell_id` fields.
-fn app_info_to_base64_json(app_info: AppInfo) -> Result<serde_json::Value, serde_json::Error> {
+pub(crate) fn app_info_to_base64_json(
+    app_info: AppInfo,
+) -> Result<serde_json::Value, serde_json::Error> {
     let value = serde_json::to_value(&app_info)?;
     let serde_json::Value::Object(mut app_info_map) = value else {
         return Err(serde::de::Error::custom(
@@ -692,20 +701,11 @@ pub async fn install_app_bundle(
         path,
         network_seed,
         roles_settings,
+        membrane_proofs,
     } = args;
 
-    let roles_settings = match roles_settings {
-        Some(path) => {
-            let yaml_string = std::fs::read_to_string(path)?;
-            let roles_settings_yaml = yaml_serde::from_str::<RoleSettingsMapYaml>(&yaml_string)?;
-            let mut roles_settings: RoleSettingsMap = HashMap::new();
-            for (k, v) in roles_settings_yaml.into_iter() {
-                roles_settings.insert(k, v.into());
-            }
-            Some(roles_settings)
-        }
-        None => None,
-    };
+    let roles_settings =
+        read_role_settings_yaml_with_proofs(roles_settings.as_deref(), &membrane_proofs)?;
 
     let payload = InstallAppPayload {
         installed_app_id: app_id.clone(),
@@ -758,6 +758,15 @@ async fn request_agent_info(
     }
 
     Ok(out)
+}
+
+pub(crate) fn parse_membrane_proof(arg: &str) -> anyhow::Result<(String, PathBuf)> {
+    let (role, path) = arg
+        .split_once('=')
+        .ok_or_else(|| anyhow::anyhow!("expected ROLE=PATH"))?;
+    anyhow::ensure!(!role.is_empty(), "membrane proof role must not be empty");
+    anyhow::ensure!(!path.is_empty(), "membrane proof path must not be empty");
+    Ok((role.to_owned(), PathBuf::from(path)))
 }
 
 fn parse_agent_key(arg: &str) -> anyhow::Result<AgentPubKey> {
@@ -860,6 +869,39 @@ mod tests {
 
     fn test_agent_key(bytes: u8) -> AgentPubKey {
         AgentPubKey::from_raw_36(vec![bytes; 36])
+    }
+
+    #[test]
+    fn install_app_parses_repeated_membrane_proof_flags() {
+        let call = Call::try_parse_from([
+            "call",
+            "--port",
+            "12345",
+            "install-app",
+            "app.happ",
+            "--membrane-proof",
+            "role-1=proof one.bin",
+            "--membrane-proof",
+            "role-2=a=b.bin",
+        ])
+        .unwrap();
+        let AdminRequestCli::InstallApp(args) = call.call else {
+            panic!("expected install-app");
+        };
+        assert_eq!(
+            args.membrane_proofs,
+            vec![
+                ("role-1".into(), PathBuf::from("proof one.bin")),
+                ("role-2".into(), PathBuf::from("a=b.bin")),
+            ]
+        );
+    }
+
+    #[test]
+    fn membrane_proof_parser_rejects_missing_role_or_path() {
+        for argument in ["role", "=proof.bin", "role="] {
+            assert!(parse_membrane_proof(argument).is_err());
+        }
     }
 
     #[test]

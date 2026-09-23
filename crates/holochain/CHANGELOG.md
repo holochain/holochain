@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Support membrane proofs and init properties from base64 or binary files in CLI role settings, add `hc client call install-app --membrane-proof`, and add `hc client provide-memproofs` for deferred installation. `RoleSettingsYaml` byte fields now use `OpaqueBytesSource`, and `From<RoleSettingsYaml> for RoleSettings` is removed. Use `RoleSettingsYaml::resolve(base_dir)` instead. Refs \#1613
+
 ## 0.8.0-dev.8
 
 - **BREAKING CHANGE**: Fix a `CloseChain` action with an agent migration target being signed and verified with the target key instead of the chain author’s key. This let any agent publish a `CloseChain` in another agent’s name and fork their chain. Every action is now signed by and verified against its author. \#5981
