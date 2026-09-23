@@ -455,6 +455,11 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
             }
 
             let signal: DirectSignal = decode(&signal).map_err(HolochainP2pError::other)?;
+            if signal.signal.len() > DIRECT_SIGNAL_MAX_SIZE {
+                return Err(HolochainP2pError::other(
+                    "Received direct signal that was too long",
+                ));
+            }
 
             // The secret arrives inside the signed bytes, so it is bound to the payload and to
             // `from_agent` by the signature checked above.

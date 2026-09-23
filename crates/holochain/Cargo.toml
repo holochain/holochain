@@ -34,17 +34,17 @@ holochain_p2p = { version = "^0.8.0-dev.8", default-features = false, path = "..
 holochain_serialized_bytes = "=0.0.57"
 holochain_state = { version = "^0.8.0-dev.8", path = "../holochain_state" }
 holochain_types = { version = "^0.8.0-dev.8", path = "../holochain_types" }
-holochain_util = { version = "0.9.0-dev.7" }
-holo_hash = { version = "0.9.0-dev.7", features = ["full"] }
+holochain_util = { version = "=0.9.0-dev.7" }
+holo_hash = { version = "=0.9.0-dev.7", features = ["full"] }
 holochain_wasmer_host = { version = "=0.0.103", default-features = false, features = [
   "error-as-host",
 ] }
 holochain_websocket = { version = "^0.8.0-dev.8", path = "../holochain_websocket" }
-holochain_zome_types = { version = "0.9.0-dev.2", features = ["full"] }
-holochain_nonce = { version = "0.9.0-dev.2" }
-holochain_secure_primitive = { version = "0.9.0-dev.7" }
+holochain_zome_types = { version = "=0.9.0-dev.2", features = ["full"] }
+holochain_nonce = { version = "=0.9.0-dev.2" }
+holochain_secure_primitive = { version = "=0.9.0-dev.7" }
 holochain_conductor_config = { version = "^0.8.0-dev.8", path = "../holochain_conductor_config", default-features = false }
-holochain_timestamp = { version = "0.9.0-dev.7" }
+holochain_timestamp = { version = "=0.9.0-dev.7" }
 human-panic = "2.0"
 itertools = { version = "0.14" }
 kitsune2_api = "0.6.0-dev.1"
@@ -91,9 +91,9 @@ wasmer = { version = "=7.1.0", default-features = false }
 wasmer-middlewares = { version = "=7.1.0", optional = true, default-features = false }
 
 # Dependencies for test_utils / other optional deps
-fixt = { version = "0.9.0-dev.7", optional = true }
+fixt = { version = "=0.9.0-dev.7", optional = true }
 diff = { version = "0.1", optional = true }
-hdk = { version = "0.9.0-dev.2", optional = true }
+hdk = { version = "=0.9.0-dev.2", optional = true }
 matches = { version = "0.1.8", optional = true }
 holochain_wasm_test_utils = { version = "^0.8.0-dev.8", path = "../test_utils/wasm", optional = true }
 holochain_test_wasm_common = { version = "^0.8.0-dev.5", path = "../test_utils/wasm_common", optional = true }
@@ -129,7 +129,7 @@ rand_dalek = { version = "0.8", package = "rand" }
 url2 = "0.0.6"
 
 [build-dependencies]
-hdk = { version = "0.9.0-dev.2" }
+hdk = { version = "=0.9.0-dev.2" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.51" }
 chrono = { version = "0.4.6", features = ["serde"] }

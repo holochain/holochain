@@ -7,8 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- **BREAKING CHANGE**: Capability grants are restructured to make room for capabilities other than zome calls. A grant is now `CapGrantEntry { tag, constraint, capability }`: `constraint` (formerly `access`) says who may claim the grant, and `capability` says what it grants: `Capability::ZomeCall(ZomeCallGrant { functions })` or `Capability::DirectSignal` — build those shapes with `CapGrant::new_zome_call_grant` and `CapGrant::new_direct_signal_grant`. A grant only authorizes the capability it was issued for, and the chain author's implicit access covers zome calls only, so a direct signal needs an explicit grant even for the authoring agent. The admin API follows: `GrantZomeCallCapability`'s `cap_grant` is now a `GrantZomeCallCapabilityGrant { tag, constraint, grant: { functions } }` rather than a whole grant, so it can only ever grant zome calls, and `ListCapabilityGrants` reports the new grant shape. Capability grants already on a source chain cannot be read by this version and must be re-issued. Types are renamed to match: `ZomeCallCapGrant` → `CapGrant`, the old `CapGrant` enum → `CapAccess`, `CapAccess` → `GrantConstraint`, `DesensitizedZomeCallCapGrant` → `DesensitizedCapGrant`, `CapAccessInfo` → `GrantConstraintInfo`. \#5820
-- **BREAKING CHANGE**: Direct signals now require a capability grant. To receive them an agent must commit a `Capability::DirectSignal` grant permitting the sender, built with `CapGrant::new_direct_signal_grant`; there is no implicit access, so a grant is needed even to signal yourself. `AppRequest::SendDirectSignal` takes a new `cap_secret`, for grants that carry one. The signed payload encoding changed, so direct signals between conductors with and without this change are dropped by the receiver — upgrade both ends. \#5820
+- **BREAKING CHANGE**: Receiving direct signals now requires an explicit
+  `Capability::DirectSignal` grant, including signals from the receiving agent
+  itself. Create grants with `CapGrant::new_direct_signal_grant` and supply
+  `cap_secret` when sending against an assigned or transferable grant. The direct
+  signal network encoding has changed, so sending and receiving peers must upgrade
+  together. \#5820
 
 - **BREAKING CHANGE**: Support membrane proofs and init properties from base64 or binary files in CLI role settings, add `hc client call install-app --membrane-proof`, and add `hc client provide-memproofs` for deferred installation. `RoleSettingsYaml` byte fields now use `OpaqueBytesSource`, and `From<RoleSettingsYaml> for RoleSettings` is removed. Use `RoleSettingsYaml::resolve(base_dir)` instead. Refs \#1613
 

@@ -97,11 +97,11 @@ pub const DIRECT_SIGNAL_MAX_ENCODED_SIZE: usize = DIRECT_SIGNAL_MAX_SIZE + 128;
 /// [`DIRECT_SIGNAL_MAX_SIZE`]. Signing the encoding is what binds `cap_secret` to `signal`: a
 /// relaying peer cannot strip or swap the secret without invalidating the signature.
 ///
-/// The encoding is a msgpack map, as a signed zome call's parameters are. The two cannot be
-/// confused for one another because their field sets are disjoint: `ZomeCallParams` has no
-/// `signal` field, and this struct has none of `cell_id`, `zome_name`, `fn_name`, `provenance`,
-/// `nonce` or `expires_at`, so neither encoding deserializes as the other type. Keep the field
-/// sets disjoint when adding to either struct.
+/// The encoding is a msgpack map, as a signed zome call's parameters are. Canonical encodings
+/// produced by the typed signing APIs cannot deserialize as the other type: `ZomeCallParams`
+/// lacks `signal`, and this struct lacks required zome call fields. This is not a restriction on
+/// arbitrary maps, because deserialization ignores unknown fields. Keep the canonical field
+/// sets distinct when adding to either struct.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct DirectSignal {
     /// The payload, opaque to Holochain.
@@ -211,8 +211,7 @@ mod tests {
         assert_ne!(granted, encode(None));
     }
 
-    /// Both types encode as a msgpack map, so they are kept apart by having disjoint field sets
-    /// rather than by their shape. Neither encoding may deserialize as the other type.
+    /// Canonical encodings from the typed signing APIs must not decode as the other protocol.
     #[test]
     fn direct_signal_and_zome_call_params_do_not_decode_as_each_other() {
         let signal = DirectSignal {

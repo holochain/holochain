@@ -362,9 +362,9 @@ checksum = "d45db016d36b838f563236e9193d0ee6ce38f3f68b6c94e914b4929c96bbb890"
 
 [[package]]
 name = "fixt"
-version = "0.9.0-dev.9"
+version = "0.9.0-dev.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c05a60e4c73cfaf8e278f9ae93cc6b4e1d2a9ef36a55f447e7feaf50eb1989dd"
+checksum = "9fdf9242df7ab1ec7894c44d3d0d0e7ac2bc215e6862ede7c1a1c5bc814425d4"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -372,8 +372,8 @@ dependencies = [
  "paste",
  "rand 0.10.3",
  "serde",
- "strum 0.28.0",
- "strum_macros 0.28.0",
+ "strum",
+ "strum_macros",
 ]
 
 [[package]]
@@ -513,9 +513,9 @@ checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 
 [[package]]
 name = "hdi"
-version = "0.9.0-dev.9"
+version = "0.9.0-dev.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08a9a548e9509d83e01482772bae232b7bb62bae82c51bd16fdb23c4346f7d20"
+checksum = "4d4e2dcc71cdeadd1020dde37a9b89a8651fe44f4572e5bb6de4699c506c75bb"
 dependencies = [
  "getrandom 0.3.4",
  "hdk_derive",
@@ -533,9 +533,9 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.9.0-dev.4"
+version = "0.9.0-dev.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "176cfe2f7d119ef3f27591f656955635ca77ce5e71d19471da6bfb1523f15d8b"
+checksum = "6e29e4a5868575aa5e58f79c791b563fb61ab9dc982b67b7746d6b98f140388f"
 dependencies = [
  "getrandom 0.3.4",
  "hdi",
@@ -552,9 +552,9 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.9.0-dev.9"
+version = "0.9.0-dev.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "734991940800043d28edb7dda69c85ce3905af80a03fd2e8510ed45788464683"
+checksum = "d8b20a611daca7f560bb008a0e5ede61c79859b27e772b456f5634f8d7331602"
 dependencies = [
  "darling 0.24.1",
  "heck",
@@ -574,9 +574,9 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "holo_hash"
-version = "0.9.0-dev.9"
+version = "0.9.0-dev.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12d55f6c33ff16de2b127c214b40c073bec9e2746b1c6a0d06ba543337fc12f2"
+checksum = "13843a1a7926ddbb688b0472d87c7cd6dc51cd1b51f0cdccb11da5e54420096a"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -738,8 +738,8 @@ dependencies = [
  "serde",
  "serde_bytes",
  "shrinkwraprs",
- "strum 0.27.2",
- "strum_macros 0.27.2",
+ "strum",
+ "strum_macros",
  "subtle",
  "thiserror 2.0.20",
  "tracing",
@@ -1324,28 +1324,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
 
 [[package]]
-name = "strum"
-version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9628de9b8791db39ceda2b119bbe13134770b56c138ec1d3af810d045c04f9bd"
-
-[[package]]
 name = "strum_macros"
 version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7695ce3845ea4b33927c055a39dc438a45b059f7c1b3d91d38d10355fb8cbca7"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "strum_macros"
-version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab85eea0270ee17587ed4156089e10b9e6880ee688791d45a905f5b1ca36f664"
 dependencies = [
  "heck",
  "proc-macro2",

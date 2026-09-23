@@ -20,11 +20,11 @@ ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 event-emitter-rs = "0.1"
 
 holochain_conductor_api = { version = "^0.8.0-dev.8", path = "../holochain_conductor_api" }
-holo_hash = { version = "0.9.0-dev.7", features = ["encoding"] }
-holochain_nonce = { version = "0.9.0-dev.2" }
+holo_hash = { version = "=0.9.0-dev.7", features = ["encoding"] }
+holochain_nonce = { version = "=0.9.0-dev.2" }
 holochain_types = { version = "^0.8.0-dev.8", path = "../holochain_types" }
 holochain_websocket = { version = "^0.8.0-dev.8", path = "../holochain_websocket" }
-holochain_zome_types = "0.9.0-dev.2"
+holochain_zome_types = "=0.9.0-dev.2"
 holochain_serialized_bytes = "0.0.57"
 kitsune2_api = "0.6.0-dev.1"
 lair_keystore_api = { version = "0.7.1", optional = true }

@@ -327,8 +327,10 @@ pub enum AppRequest {
     ///
     /// Each recipient only accepts the signal if they have committed a `Capability::DirectSignal`
     /// grant that permits the sending agent, so an app that wants to receive direct signals must
-    /// commit one — typically from its `init` callback. A recipient whose grant carries a secret
-    /// additionally requires `cap_secret` to match. Signals to a recipient with no matching grant
+    /// commit one, for example from its `init` callback. Initialization is lazy: the receiving app
+    /// must make a zome call to run `init` before it can receive signals using that grant. Direct
+    /// signals do not run `init` themselves. A recipient whose grant carries a secret additionally
+    /// requires `cap_secret` to match. Signals to a recipient with no matching grant
     /// are dropped by that recipient, which the sender is not told about; sending is best effort
     /// either way.
     SendDirectSignal {

@@ -69,6 +69,8 @@ opt-level = "z"
 lto = true
 
 [patch.crates-io]
+# Member manifests pin the HDI/HDK prereleases together: newer prereleases can
+# change shared dependency types incompatibly, even within the same minor version.
 # HDI crate group, https://github.com/holochain/holochain-hdi
 # fixt = { path = "../holochain-hdi/crates/fixt" }
 # hdi = { path = "../holochain-hdi/crates/hdi" }
