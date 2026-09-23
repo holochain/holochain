@@ -261,6 +261,51 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn restores_chain_head_when_gossip_has_already_staged_actions() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let author = fixt!(AgentPubKey);
+        let dna = dna_record(&author);
+        let create = create_record(
+            &author,
+            dna.action_address().clone(),
+            EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            app_entry(1),
+        );
+        let head_hash = create.action_address().clone();
+        let records = vec![dna, create];
+
+        // Gossip can stage the actions before restore verifies and writes the chain.
+        for record in &records {
+            store
+                .db()
+                .insert_action(record.signed_action(), None)
+                .await
+                .unwrap();
+        }
+        assert!(store
+            .as_read()
+            .chain_head_for_author(&author)
+            .await
+            .unwrap()
+            .is_none());
+
+        store.write_restored_chain(&author, records).await.unwrap();
+
+        let head = store
+            .as_read()
+            .chain_head_for_author(&author)
+            .await
+            .unwrap()
+            .expect("a completed restore must make the chain available for authoring");
+        assert_eq!(head.action, head_hash);
+        assert_eq!(head.seq, 1);
+    }
+
     /// Crash recovery for a cell whose chain was partially written before the crash.
     #[tokio::test]
     async fn write_restored_chain_is_idempotent_when_replayed() {

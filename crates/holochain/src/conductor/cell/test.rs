@@ -18,6 +18,65 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 
 #[tokio::test(flavor = "multi_thread")]
+async fn direct_signal_receiver_rejects_oversized_payload() {
+    use crate::sweettest::{SweetConductor, SweetDnaFile, SweetInlineZomes};
+    use holochain_keystore::AgentPubKeyExt;
+    use holochain_p2p::event::HcP2pHandler;
+    use holochain_types::signal::{
+        DirectSignal, DIRECT_SIGNAL_MAX_ENCODED_SIZE, DIRECT_SIGNAL_MAX_SIZE,
+    };
+
+    let zomes = SweetInlineZomes::new(vec![], 0).function("grant", |api, (): ()| {
+        let action = api.create(CreateInput::new(
+            EntryDefLocation::CapGrant,
+            EntryVisibility::Private,
+            Entry::CapGrant(CapGrant::new_direct_signal_grant(
+                "direct-signal".into(),
+                GrantConstraint::Unrestricted,
+            )),
+            ChainTopOrdering::default(),
+        ))?;
+        Ok(action)
+    });
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let mut conductor = SweetConductor::standard().await;
+    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+    let sweet_cell = &app.cells()[0];
+    let _: ActionHash = conductor
+        .call(&sweet_cell.zome(SweetInlineZomes::COORDINATOR), "grant", ())
+        .await;
+    let cell = conductor.cell_by_id(sweet_cell.cell_id()).await.unwrap();
+    let agent = sweet_cell.agent_pubkey();
+
+    for payload_len in [DIRECT_SIGNAL_MAX_SIZE, DIRECT_SIGNAL_MAX_SIZE + 1] {
+        let bytes = holochain_serialized_bytes::encode(&DirectSignal {
+            signal: vec![0; payload_len],
+            cap_secret: None,
+        })
+        .unwrap();
+        assert!(bytes.len() <= DIRECT_SIGNAL_MAX_ENCODED_SIZE);
+        let signature = agent
+            .sign_raw(&conductor.keystore(), holo_hash::sha2_512(&bytes).into())
+            .await
+            .unwrap();
+        let result = cell
+            .handle_remote_signal_direct(
+                sweet_cell.dna_hash().clone(),
+                agent.clone(),
+                bytes,
+                agent.clone(),
+                signature,
+            )
+            .await;
+        if payload_len == DIRECT_SIGNAL_MAX_SIZE {
+            result.unwrap();
+        } else {
+            assert!(result.unwrap_err().to_string().contains("too long"));
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
     test_run();
     let keystore = holochain_keystore::test_keystore();

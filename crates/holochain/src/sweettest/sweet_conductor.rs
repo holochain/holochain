@@ -11,7 +11,7 @@ use crate::conductor::{
 use crate::core::ribosome::inline_ribosome::InlineZomeStore;
 use crate::retry_until_timeout;
 use crate::test_utils::retry_fn_until_timeout;
-use ::fixt::prelude::StdRng;
+use ::fixt::prelude::{RngExt, StdRng};
 use hdk::prelude::*;
 use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, CellInfo, ProvisionedCell,
@@ -26,7 +26,6 @@ use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::*;
 use kitsune2_api::DhtArc;
 use nanoid::nanoid;
-use rand::Rng;
 use std::collections::HashMap;
 use std::net::ToSocketAddrs;
 use std::path::Path;
