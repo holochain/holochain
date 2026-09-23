@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix source-chain restore reporting completion while the chain still appears
+  empty when gossip has already staged its actions for validation.
 - **BREAKING CHANGE**: Receiving direct signals now requires an explicit
   `Capability::DirectSignal` grant, including signals from the receiving agent
   itself. Create grants with `CapGrant::new_direct_signal_grant` and supply
