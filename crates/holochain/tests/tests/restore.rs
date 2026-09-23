@@ -2342,16 +2342,18 @@ async fn restore_from_stale_head_then_authoring_produces_a_detectable_fork() {
 
     let mut forked_status = None;
     holochain::retry_until_timeout!(30_000, 200, {
-        let activity: AgentActivityStatus = conductor_c_witness
-            .call(
+        let activity: Result<AgentActivityStatus, _> = conductor_c_witness
+            .call_fallible(
                 &cell_c_witness.zome(SweetInlineZomes::COORDINATOR),
                 "get_agent_activity",
                 agent.clone(),
             )
             .await;
-        if matches!(activity.status, ChainStatus::Forked(_)) {
-            forked_status = Some(activity.status);
-            break;
+        if let Ok(a) = activity {
+            if matches!(a.status, ChainStatus::Forked(_)) {
+                forked_status = Some(a.status);
+                break;
+            }
         }
     });
     assert!(matches!(forked_status, Some(ChainStatus::Forked(_))));
