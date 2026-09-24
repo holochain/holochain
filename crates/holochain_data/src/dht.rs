@@ -46,6 +46,7 @@ mod tests {
         CapGrant, GrantConstraint, GrantConstraintType, GrantedFunctions,
     };
     use holochain_integrity_types::entry::Entry;
+    use holochain_integrity_types::entry_def::EntryVisibility;
     use holochain_integrity_types::record::SignedHashed;
     use holochain_integrity_types::signature::Signature;
     use holochain_timestamp::Timestamp;
@@ -206,6 +207,36 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(fetched, Some(entry));
+    }
+
+    #[tokio::test]
+    async fn entry_lookup_reports_storage_visibility() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let (public_hash, public_entry) = sample_entry(12);
+        let (private_hash, private_entry) = sample_entry(13);
+        let author = AgentPubKey::from_raw_36(vec![3u8; 36]);
+        db.insert_entry(&public_hash, &public_entry).await.unwrap();
+        db.insert_entry(&private_hash, &private_entry)
+            .await
+            .unwrap();
+        db.insert_private_entry(&private_hash, &author, &private_entry)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db.as_ref()
+                .get_entry_with_visibility(public_hash, Some(&author))
+                .await
+                .unwrap(),
+            Some((public_entry, EntryVisibility::Public))
+        );
+        assert_eq!(
+            db.as_ref()
+                .get_entry_with_visibility(private_hash, Some(&author))
+                .await
+                .unwrap(),
+            Some((private_entry, EntryVisibility::Private))
+        );
     }
 
     #[tokio::test]

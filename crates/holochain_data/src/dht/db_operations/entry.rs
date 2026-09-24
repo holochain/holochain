@@ -5,6 +5,7 @@ use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
 use holo_hash::{AgentPubKey, EntryHash};
 use holochain_integrity_types::entry::Entry;
+use holochain_integrity_types::entry_def::EntryVisibility;
 use std::collections::HashMap;
 
 impl DbWrite<Dht> {
@@ -32,6 +33,20 @@ impl DbRead<Dht> {
     ) -> sqlx::Result<Option<Entry>> {
         let mut conn = self.timed_conn().await?;
         entry::get_entry(&mut *conn, hash, author).await
+    }
+
+    /// Reads an entry and reports whether it came from public or private
+    /// storage.
+    ///
+    /// When `author` is present, that author's private entry is preferred over
+    /// a same-hash public entry.
+    pub async fn get_entry_with_visibility(
+        &self,
+        hash: EntryHash,
+        author: Option<&AgentPubKey>,
+    ) -> sqlx::Result<Option<(Entry, EntryVisibility)>> {
+        let mut conn = self.timed_conn().await?;
+        entry::get_entry_with_visibility(&mut *conn, hash, author).await
     }
 
     /// Batch-reads entries by hash in a single query per chunk, keyed by entry

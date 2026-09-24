@@ -547,27 +547,26 @@ impl DhtStore<DbRead<Dht>> {
         Ok(None)
     }
 
-    /// Retrieve the entry for `hash` if present. `author = Some` includes that
-    /// agent's private entry; `None` returns public entries only.
-    /// Capability grants are returned only from the author's private entries.
+    /// Retrieve the entry for `hash` if present and stored with valid
+    /// visibility. `author = Some` includes that agent's private entry; `None`
+    /// returns public entries only.
     pub async fn retrieve_entry(
         &self,
         hash: &holo_hash::EntryHash,
         author: Option<&holo_hash::AgentPubKey>,
     ) -> StateQueryResult<Option<holochain_types::prelude::Entry>> {
-        let entry = self.db().get_entry(hash.clone(), author).await?;
-        // A hash-only lookup has no action declaring the entry type. Once a
-        // grant is identified, resolve it through the private-only query.
-        match (entry, author) {
-            (Some(Entry::CapGrant(_)), Some(author)) => {
-                Ok(self.get_cap_grant(hash, author).await?.map(Entry::CapGrant))
-            }
-            (Some(Entry::CapGrant(_)), None) => Ok(None),
-            (entry, _) => Ok(entry),
-        }
+        let Some((entry, visibility)) = self
+            .db()
+            .get_entry_with_visibility(hash.clone(), author)
+            .await?
+        else {
+            return Ok(None);
+        };
+        Ok(entry_storage_is_valid(&entry, visibility).then_some(entry))
     }
 
-    /// Read an action's visible entry, using only private storage for grants.
+    /// Read an action's visible entry without applying entry-type-specific
+    /// storage queries.
     async fn retrieve_action_entry(
         &self,
         action: &Action,
@@ -578,12 +577,6 @@ impl DhtStore<DbRead<Dht>> {
         };
         if !private_entry_visible_to(action, author) {
             return Ok(None);
-        }
-        if action_entry_type(action) == Some(&EntryType::CapGrant) {
-            return Ok(self
-                .get_cap_grant(hash, action.author())
-                .await?
-                .map(Entry::CapGrant));
         }
         self.retrieve_entry(hash, author).await
     }
@@ -2436,6 +2429,19 @@ impl DhtStore<DbRead<Dht>> {
         Ok(deletes
             .iter()
             .any(|sah| &sah.hashed.content.header.author == author))
+    }
+}
+
+/// Whether an entry variant may come from storage with `visibility`.
+///
+/// Application and countersigned entries take their visibility from their
+/// action, which is unavailable to hash-only reads. System entry variants have
+/// fixed visibility and can be checked directly.
+fn entry_storage_is_valid(entry: &Entry, visibility: EntryVisibility) -> bool {
+    match entry {
+        Entry::Agent(_) => visibility == EntryVisibility::Public,
+        Entry::CapClaim(_) | Entry::CapGrant(_) => visibility == EntryVisibility::Private,
+        Entry::App(_) | Entry::CounterSign(_, _) => true,
     }
 }
 

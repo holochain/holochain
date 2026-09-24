@@ -2,6 +2,7 @@
 
 use holo_hash::{AgentPubKey, EntryHash};
 use holochain_integrity_types::entry::Entry;
+use holochain_integrity_types::entry_def::EntryVisibility;
 use sqlx::{Executor, QueryBuilder, Sqlite, SqliteConnection};
 use std::collections::{HashMap, HashSet};
 
@@ -23,8 +24,8 @@ where
     Ok(())
 }
 
-/// Reads an entry. Looks up `Entry` (public) first; if `author` is `Some`,
-/// also looks up `PrivateEntry` for that author. Returns the first match.
+/// Reads an entry. If `author` is `Some`, the author's private entry is
+/// preferred over a same-hash public entry.
 pub(crate) async fn get_entry<'e, E>(
     executor: E,
     hash: EntryHash,
@@ -33,18 +34,47 @@ pub(crate) async fn get_entry<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
+    Ok(get_entry_with_visibility(executor, hash, author)
+        .await?
+        .map(|(entry, _)| entry))
+}
+
+/// Reads an entry together with the visibility of the table that supplied it.
+///
+/// When `author` is present, that author's private entry is preferred over a
+/// same-hash public entry. Entry hashes identify content, so both rows should
+/// decode to the same entry; preferring the private row preserves its storage
+/// provenance for callers that enforce visibility rules.
+pub(crate) async fn get_entry_with_visibility<'e, E>(
+    executor: E,
+    hash: EntryHash,
+    author: Option<&AgentPubKey>,
+) -> sqlx::Result<Option<(Entry, EntryVisibility)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
     let author_bytes = author.map(|a| a.get_raw_36().to_vec());
-    let row: Option<(Vec<u8>,)> = sqlx::query_as(
-        "SELECT blob FROM Entry WHERE hash = ?1
+    let row: Option<(Vec<u8>, bool)> = sqlx::query_as(
+        "SELECT blob, TRUE FROM PrivateEntry
+         WHERE hash = ?1 AND ?2 IS NOT NULL AND author = ?2
          UNION ALL
-         SELECT blob FROM PrivateEntry WHERE hash = ?1 AND ?2 IS NOT NULL AND author = ?2
+         SELECT blob, FALSE FROM Entry WHERE hash = ?1
+         ORDER BY 2 DESC
          LIMIT 1",
     )
     .bind(hash.get_raw_36())
     .bind(author_bytes)
     .fetch_optional(executor)
     .await?;
-    row.map(|(blob,)| decode_entry_blob(&blob)).transpose()
+    row.map(|(blob, is_private)| {
+        let visibility = if is_private {
+            EntryVisibility::Private
+        } else {
+            EntryVisibility::Public
+        };
+        Ok((decode_entry_blob(&blob)?, visibility))
+    })
+    .transpose()
 }
 
 /// Batch-reads entries by hash, mirroring [`get_entry`]'s visibility rules but
