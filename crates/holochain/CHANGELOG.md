@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix capability grants being looked up in the public entry table before the author's private entries. Cap grants are always private and are now read only from the chain author's private entries, at every place the conductor resolves them.
 - Fix a failed `create_clone_cell` call leaving the clone cell in the conductor state without genesis, which made every later conductor startup fail with `CellWithoutGenesis`. Genesis now runs before the clone cell is added to the app, as it does when an app is installed, and clone cell creation runs one call at a time.
 - Fix warrants that failed validation being returned in local queries through `get_agent_activity`, `must_get_agent_activity`.
 - Fix publishing agent info for one space overwriting the connection preflight's infos for all other spaces.
