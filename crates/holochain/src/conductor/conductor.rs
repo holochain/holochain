@@ -2886,28 +2886,33 @@ mod misc_impls {
             )
             .await?;
 
-            // find entry by the action hash
+            // Find the grant's Create/Update action on this chain by action
+            // hash, then read the grant itself through the private-only query.
             let grant_query = ChainQueryFilter::new()
-                .include_entries(true)
+                .include_entries(false)
                 .entry_type(EntryType::CapGrant);
 
-            let cap_grant_entry = workspace
+            let grant_entry_hash = workspace
                 .source_chain()
-                .query(grant_query.clone())
+                .query(grant_query)
                 .await?
                 .into_iter()
-                .find_map(|record| {
-                    if record.action_address() == &action_hash {
-                        match record.entry {
-                            RecordEntry::Present(entry) => Some(entry),
-                            _ => None,
-                        }
-                    } else {
-                        None
-                    }
-                })
+                .find(|record| record.action_address() == &action_hash)
+                .and_then(|record| record.action().entry_hash().cloned())
                 .ok_or_else(|| ConductorApiError::other("No cap grant found for action hash"))?;
-            let entry_hash = EntryHash::with_data_sync(&cap_grant_entry);
+
+            let entry_hash = match workspace
+                .source_chain()
+                .get_cap_grant(&grant_entry_hash)
+                .await?
+            {
+                Some(_) => grant_entry_hash,
+                None => {
+                    return Err(ConductorApiError::other(
+                        "No cap grant found for action hash",
+                    ))
+                }
+            };
 
             let action_data = ActionData::Delete(DeleteData {
                 deletes_address: action_hash,
@@ -2946,7 +2951,7 @@ mod misc_impls {
         ) -> ConductorApiResult<AppCapGrantInfo> {
             let mut grant_info: Vec<(CellId, Vec<CapGrantInfo>)> = Vec::new();
             let grant_query = ChainQueryFilter::new()
-                .include_entries(true)
+                .include_entries(false)
                 .entry_type(EntryType::CapGrant);
             let delete_query: ChainQueryFilter = ChainQueryFilter::new()
                 .include_entries(true)
@@ -3004,8 +3009,14 @@ mod misc_impls {
                             .map(|time| time.to_owned())
                     }
 
-                    let zome_cap_grant = match grant_record.entry.to_grant_option() {
-                        Some(zome_cap_grant) => DesensitizedCapGrant::from(zome_cap_grant.clone()),
+                    // Read the grant through the private-only query; a grant
+                    // action whose private entry is missing is skipped, as an
+                    // absent entry was before.
+                    let Some(grant_entry_hash) = grant_record.action().entry_hash() else {
+                        continue;
+                    };
+                    let zome_cap_grant = match chain.get_cap_grant(grant_entry_hash).await? {
+                        Some(grant) => DesensitizedCapGrant::from(grant),
                         None => continue,
                     };
 

@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix capability grants being looked up in the public entry table before the
+  author's private entries. Cap grants are always private and are now read only
+  from the chain author's private entries, at every place the conductor
+  resolves them. \#5995
 - **BREAKING CHANGE**: Support membrane proofs and init properties from base64 or binary files in CLI role settings, add `hc client call install-app --membrane-proof`, and add `hc client provide-memproofs` for deferred installation. `RoleSettingsYaml` byte fields now use `OpaqueBytesSource`, and `From<RoleSettingsYaml> for RoleSettings` is removed. Use `RoleSettingsYaml::resolve(base_dir)` instead. Refs \#1613
 
 ## 0.8.0-dev.8

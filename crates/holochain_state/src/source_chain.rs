@@ -848,6 +848,23 @@ where
         Ok(None)
     }
 
+    /// This chain's capability grant stored as a private entry, if any.
+    ///
+    /// Reads only the chain author's `PrivateEntry` row for `entry_hash`
+    /// through [`DhtStore::get_cap_grant`](crate::dht_store::DhtStore::get_cap_grant).
+    /// The scratch is not overlaid: a grant that has been `put` but not yet
+    /// flushed is not visible here.
+    pub async fn get_cap_grant(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> SourceChainResult<Option<CapGrant>> {
+        Ok(self
+            .dht_store
+            .as_read()
+            .get_cap_grant(entry_hash, self.agent_pubkey())
+            .await?)
+    }
+
     /// Query Actions in the source chain.
     ///
     /// This returns a Vec rather than an iterator because it is intended to be
