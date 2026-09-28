@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Verify validation receipt signatures before storing and counting receipts, preventing forged receipts from stopping publication of authored DHT ops. \#5781
 - Fix capability grants being looked up in the public entry table before the
   author's private entries. Cap grants are always private and are now read only
   from the chain author's private entries, at every place the conductor
