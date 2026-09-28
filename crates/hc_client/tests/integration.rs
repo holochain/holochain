@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
 use std::time::Duration;
 
@@ -6,9 +7,11 @@ use anyhow::{ensure, Result};
 use holo_hash::{ActionHash, AgentPubKey, AgentPubKeyB64, DhtOpHash, DnaHash, DnaHashB64, HasHash};
 use holochain::{sweettest::*, test_utils::inline_zomes::simple_crud_zome};
 use holochain_client::AdminWebsocket;
-use holochain_conductor_api::{AdminInterfaceConfig, DhtOpsCursor, FullStateDump, InterfaceDriver};
+use holochain_conductor_api::{
+    AdminInterfaceConfig, AppInfo, CellInfo, DhtOpsCursor, FullStateDump, InterfaceDriver,
+};
 use holochain_types::op::{DhtOp, DhtOpHashed};
-use holochain_types::prelude::CellId;
+use holochain_types::prelude::{ActionData, AppStatus, CellId, DisabledAppReason};
 use holochain_types::websocket::AllowedOrigins;
 use std::collections::{BTreeMap, HashSet};
 use tokio::io::AsyncWriteExt;
@@ -503,6 +506,542 @@ async fn install_app() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn install_app_membrane_proof_flags_reach_genesis() -> Result<()> {
+    let conductor = SweetConductor::standard().await;
+    let admin_port = conductor
+        .get_arbitrary_admin_websocket_port()
+        .expect("admin port");
+    let temp_dir = tempfile::TempDir::new()?;
+    let fixture = package_membrane_proof_fixture(temp_dir.path(), false).await?;
+
+    let new_agent = TokioCommand::new(get_target("hc-client"))
+        .args(["call", "--port", &admin_port.to_string(), "new-agent"])
+        .output()
+        .await?;
+    ensure!(
+        new_agent.status.success(),
+        "new-agent failed: {}",
+        String::from_utf8_lossy(&new_agent.stderr)
+    );
+    let agent_key_text: String = serde_json::from_slice(&new_agent.stdout)?;
+    let agent_key: AgentPubKey = agent_key_text.parse::<AgentPubKeyB64>()?.into();
+
+    let role_1_proof = vec![0x00, 0xff, 0x80, 0x0a];
+    let role_2_proof = vec![0x7f, 0x00, 0xfe, 0x0d];
+    fs::write(&fixture.flag_role_1_proof, &role_1_proof)?;
+    fs::write(&fixture.flag_role_2_proof, &role_2_proof)?;
+
+    let install = TokioCommand::new(get_target("hc-client"))
+        .args([
+            "call",
+            "--port",
+            &admin_port.to_string(),
+            "install-app",
+            "--app-id",
+            "proof-flags",
+            "--agent-key",
+            &agent_key.to_string(),
+            "--membrane-proof",
+            "role-1=flag-role-1.bin",
+            "--membrane-proof",
+            "role-2=flag-role-2.bin",
+            fixture.app_bundle.to_str().unwrap(),
+        ])
+        .current_dir(temp_dir.path())
+        .output()
+        .await?;
+    ensure!(
+        install.status.success(),
+        "install-app with membrane proofs failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+    let app_json: serde_json::Value = serde_json::from_slice(&install.stdout)?;
+    assert_eq!(app_json["installed_app_id"], "proof-flags");
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None).await?;
+    let app_info = admin_ws
+        .list_apps(None)
+        .await?
+        .into_iter()
+        .find(|app| app.installed_app_id == "proof-flags")
+        .ok_or_else(|| anyhow::anyhow!("installed app missing from admin list"))?;
+    assert_eq!(app_info.agent_pub_key, agent_key);
+
+    assert_role_proof(&admin_ws, &app_info, "role-1", &role_1_proof, true).await?;
+    assert_role_proof(&admin_ws, &app_info, "role-2", &role_2_proof, true).await?;
+    assert_role_proof(&admin_ws, &app_info, "role-3", &[], false).await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn install_app_membrane_proof_yaml_sources_and_errors() -> Result<()> {
+    let conductor = SweetConductor::standard().await;
+    let admin_port = conductor
+        .get_arbitrary_admin_websocket_port()
+        .expect("admin port");
+    let temp_dir = tempfile::TempDir::new()?;
+    let fixture = package_membrane_proof_fixture(temp_dir.path(), false).await?;
+    let role_1_proof = vec![0x01, 0xff, 0x80, 0x0b];
+    let role_2_proof = vec![0x02, 0xfe, 0x81, 0x0c];
+    fs::write(&fixture.yaml_role_2_proof, &role_2_proof)?;
+    let command_dir = temp_dir.path().join("different-working-directory");
+    fs::create_dir_all(&command_dir)?;
+    fs::write(
+        &fixture.roles_settings,
+        "role-1:\n  type: provisioned\n  membrane_proof:\n    base64: Af+ACw==\n  modifiers:\n    network_seed: yaml-role-1\nrole-2:\n  type: provisioned\n  membrane_proof:\n    path: yaml-role-2.bin\n  modifiers:\n    network_seed: yaml-role-2\nrole-3:\n  type: provisioned\n  modifiers:\n    network_seed: yaml-role-3\n",
+    )?;
+
+    let install = TokioCommand::new(get_target("hc-client"))
+        .args([
+            "call",
+            "--port",
+            &admin_port.to_string(),
+            "install-app",
+            "--app-id",
+            "proof-yaml",
+            fixture.app_bundle.to_str().unwrap(),
+            "global-yaml-seed",
+            fixture.roles_settings.to_str().unwrap(),
+        ])
+        .current_dir(&command_dir)
+        .output()
+        .await?;
+    ensure!(
+        install.status.success(),
+        "install-app with YAML proofs failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+    let app_json: serde_json::Value = serde_json::from_slice(&install.stdout)?;
+    assert_eq!(app_json["installed_app_id"], "proof-yaml");
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None).await?;
+    let app_info = admin_ws
+        .list_apps(None)
+        .await?
+        .into_iter()
+        .find(|app| app.installed_app_id == "proof-yaml")
+        .ok_or_else(|| anyhow::anyhow!("installed app missing from admin list"))?;
+    assert_role_proof(&admin_ws, &app_info, "role-1", &role_1_proof, true).await?;
+    assert_role_proof(&admin_ws, &app_info, "role-2", &role_2_proof, true).await?;
+    assert_role_proof(&admin_ws, &app_info, "role-3", &[], false).await?;
+
+    let invalid_settings = fixture.fixture_dir.join("invalid-roles.yaml");
+    fs::write(
+        &invalid_settings,
+        "role-1:\n  type: provisioned\n  membrane_proof:\n    base64: not valid !!!\n",
+    )?;
+    let invalid = TokioCommand::new(get_target("hc-client"))
+        .args([
+            "call",
+            "--port",
+            &admin_port.to_string(),
+            "install-app",
+            "--app-id",
+            "proof-invalid",
+            fixture.app_bundle.to_str().unwrap(),
+            "invalid-seed",
+            invalid_settings.to_str().unwrap(),
+        ])
+        .current_dir(temp_dir.path())
+        .output()
+        .await?;
+    assert!(!invalid.status.success());
+    let invalid_stderr = String::from_utf8_lossy(&invalid.stderr);
+    assert!(invalid_stderr.contains("membrane_proof"));
+    assert!(invalid_stderr.contains("role-1"));
+
+    let conflict_settings = fixture.fixture_dir.join("conflict-roles.yaml");
+    fs::write(
+        &conflict_settings,
+        "role-1:\n  type: provisioned\n  membrane_proof:\n    base64: AQID\n",
+    )?;
+    fs::write(temp_dir.path().join("conflict-proof.bin"), [0x01, 0x02])?;
+    let conflict = TokioCommand::new(get_target("hc-client"))
+        .args([
+            "call",
+            "--port",
+            &admin_port.to_string(),
+            "install-app",
+            "--app-id",
+            "proof-conflict",
+            "--membrane-proof",
+            "role-1=conflict-proof.bin",
+            fixture.app_bundle.to_str().unwrap(),
+            "conflict-seed",
+            conflict_settings.to_str().unwrap(),
+        ])
+        .current_dir(temp_dir.path())
+        .output()
+        .await?;
+    assert!(!conflict.status.success());
+    let conflict_stderr = String::from_utf8_lossy(&conflict.stderr);
+    assert!(
+        conflict_stderr.contains("membrane proof") || conflict_stderr.contains("proof"),
+        "unexpected conflict error: {conflict_stderr}"
+    );
+
+    let apps = admin_ws.list_apps(None).await?;
+    assert!(apps
+        .iter()
+        .all(|app| app.installed_app_id != "proof-invalid"));
+    assert!(apps
+        .iter()
+        .all(|app| app.installed_app_id != "proof-conflict"));
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn deferred_membrane_proofs_cli() -> Result<()> {
+    let conductor = SweetConductor::standard().await;
+    let admin_port = conductor
+        .get_arbitrary_admin_websocket_port()
+        .expect("admin port");
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None).await?;
+    let temp_dir = tempfile::TempDir::new()?;
+    let fixture = package_membrane_proof_fixture(temp_dir.path(), true).await?;
+    let role_1_proof = vec![0x00, 0xff, 0x80, 0x0a];
+    let role_2_proof = vec![0x7f, 0x00, 0xfe, 0x0d];
+    fs::write(temp_dir.path().join("flag-role-1.bin"), &role_1_proof)?;
+    fs::write(temp_dir.path().join("flag-role-2.bin"), &role_2_proof)?;
+
+    let deferred_app_id = "deferred-flags";
+    let install = run_client_command(
+        vec![
+            "call".into(),
+            "--port".into(),
+            admin_port.to_string(),
+            "install-app".into(),
+            "--app-id".into(),
+            deferred_app_id.into(),
+            fixture.app_bundle.to_str().unwrap().into(),
+        ],
+        temp_dir.path(),
+    )
+    .await?;
+    ensure!(
+        install.status.success(),
+        "deferred install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+    let original_info = app_from_admin(&admin_ws, deferred_app_id).await?;
+    assert_eq!(original_info.status, AppStatus::AwaitingMemproofs);
+    let original_agent = original_info.agent_pub_key.clone();
+
+    let interfaces_before_errors = admin_ws.list_app_interfaces().await?;
+    let missing = run_client_command(
+        vec![
+            "provide-memproofs".into(),
+            "--port".into(),
+            admin_port.to_string(),
+            deferred_app_id.into(),
+            "--membrane-proof".into(),
+            "role-1=missing.bin".into(),
+        ],
+        temp_dir.path(),
+    )
+    .await?;
+    assert!(!missing.status.success());
+    assert!(String::from_utf8_lossy(&missing.stderr).contains("membrane_proof"));
+    assert_eq!(
+        admin_ws.list_app_interfaces().await?.len(),
+        interfaces_before_errors.len()
+    );
+    assert_eq!(
+        app_from_admin(&admin_ws, deferred_app_id).await?.status,
+        AppStatus::AwaitingMemproofs
+    );
+
+    let invalid_yaml = temp_dir.path().join("invalid-proofs.yaml");
+    fs::write(&invalid_yaml, "role-1:\n  base64: invalid base64 !!!\n")?;
+    let invalid = run_client_command(
+        vec![
+            "provide-memproofs".into(),
+            "--port".into(),
+            admin_port.to_string(),
+            deferred_app_id.into(),
+            "--membrane-proofs".into(),
+            invalid_yaml.to_str().unwrap().into(),
+        ],
+        temp_dir.path(),
+    )
+    .await?;
+    assert!(!invalid.status.success());
+    let invalid_stderr = String::from_utf8_lossy(&invalid.stderr);
+    assert!(
+        invalid_stderr.contains("base64") || invalid_stderr.contains("proof"),
+        "unexpected invalid proof error: {invalid_stderr}"
+    );
+    assert_eq!(
+        admin_ws.list_app_interfaces().await?.len(),
+        interfaces_before_errors.len()
+    );
+
+    let unknown_role_yaml = temp_dir.path().join("unknown-role.yaml");
+    fs::write(&unknown_role_yaml, "unknown-role:\n  base64: AQID\n")?;
+    let unknown_role = run_client_command(
+        vec![
+            "provide-memproofs".into(),
+            "--port".into(),
+            admin_port.to_string(),
+            deferred_app_id.into(),
+            "--membrane-proofs".into(),
+            unknown_role_yaml.to_str().unwrap().into(),
+        ],
+        temp_dir.path(),
+    )
+    .await?;
+    assert!(!unknown_role.status.success());
+    assert!(String::from_utf8_lossy(&unknown_role.stderr).contains("unknown membrane proof role"));
+    assert_eq!(
+        admin_ws.list_app_interfaces().await?.len(),
+        interfaces_before_errors.len()
+    );
+
+    let wrong_app_interface = admin_ws
+        .attach_app_interface(
+            0,
+            None,
+            AllowedOrigins::Origins(vec!["sandbox".to_string()].into_iter().collect()),
+            Some("another-app".to_string()),
+        )
+        .await?;
+    let interfaces_before_flags = admin_ws.list_app_interfaces().await?;
+    let flags = run_client_command(
+        vec![
+            "provide-memproofs".into(),
+            "--port".into(),
+            admin_port.to_string(),
+            deferred_app_id.into(),
+            "--membrane-proof".into(),
+            "role-1=flag-role-1.bin".into(),
+            "--membrane-proof".into(),
+            "role-2=flag-role-2.bin".into(),
+        ],
+        temp_dir.path(),
+    )
+    .await?;
+    ensure!(
+        flags.status.success(),
+        "provide-memproofs failed: {}",
+        String::from_utf8_lossy(&flags.stderr)
+    );
+    let flags_output: serde_json::Value = serde_json::from_slice(&flags.stdout)?;
+    assert_eq!(flags_output["installed_app_id"], deferred_app_id);
+    assert_eq!(flags_output["status"]["type"], "disabled");
+    assert_eq!(
+        flags_output["status"]["value"]["type"],
+        "not_started_after_providing_memproofs"
+    );
+    let after_flags = app_from_admin(&admin_ws, deferred_app_id).await?;
+    assert_eq!(
+        after_flags.status,
+        AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs)
+    );
+    assert_eq!(after_flags.agent_pub_key, original_agent);
+    let interfaces_after_flags = admin_ws.list_app_interfaces().await?;
+    assert_eq!(
+        interfaces_after_flags.len(),
+        interfaces_before_flags.len() + 1
+    );
+    assert!(interfaces_after_flags
+        .iter()
+        .any(|interface| interface.port != wrong_app_interface));
+
+    let second_submission = run_client_command(
+        vec![
+            "provide-memproofs".into(),
+            "--port".into(),
+            admin_port.to_string(),
+            deferred_app_id.into(),
+            "--membrane-proof".into(),
+            "role-1=flag-role-1.bin".into(),
+        ],
+        temp_dir.path(),
+    )
+    .await?;
+    assert!(!second_submission.status.success());
+    assert!(String::from_utf8_lossy(&second_submission.stderr).contains("not awaiting"));
+    assert_eq!(
+        admin_ws.list_app_interfaces().await?.len(),
+        interfaces_after_flags.len()
+    );
+
+    let enable = run_client_command(
+        vec![
+            "call".into(),
+            "--port".into(),
+            admin_port.to_string(),
+            "enable-app".into(),
+            deferred_app_id.into(),
+        ],
+        temp_dir.path(),
+    )
+    .await?;
+    ensure!(
+        enable.status.success(),
+        "enable-app failed: {}",
+        String::from_utf8_lossy(&enable.stderr)
+    );
+    assert_eq!(
+        app_from_admin(&admin_ws, deferred_app_id).await?.status,
+        AppStatus::Enabled
+    );
+    assert!(!temp_dir.path().join(".hc_auth").exists());
+    let enabled_flags = app_from_admin(&admin_ws, deferred_app_id).await?;
+    assert_role_proof(&admin_ws, &enabled_flags, "role-1", &role_1_proof, true).await?;
+    assert_role_proof(&admin_ws, &enabled_flags, "role-2", &role_2_proof, true).await?;
+    assert_role_proof(&admin_ws, &enabled_flags, "role-3", &[], false).await?;
+
+    let yaml_app_id = "deferred-yaml";
+    let yaml_proof_path = temp_dir.path().join("yaml-role-2.bin");
+    fs::write(&yaml_proof_path, [0x11, 0xee, 0x82, 0x0e])?;
+    let yaml_settings = temp_dir.path().join("deferred-proofs.yaml");
+    fs::write(
+        &yaml_settings,
+        "role-1:\n  base64: Af+ACw==\nrole-2:\n  path: yaml-role-2.bin\n",
+    )?;
+    let yaml_install = run_client_command(
+        vec![
+            "call".into(),
+            "--port".into(),
+            admin_port.to_string(),
+            "install-app".into(),
+            "--app-id".into(),
+            yaml_app_id.into(),
+            fixture.app_bundle.to_str().unwrap().into(),
+        ],
+        temp_dir.path(),
+    )
+    .await?;
+    ensure!(yaml_install.status.success());
+    let yaml_before = app_from_admin(&admin_ws, yaml_app_id).await?;
+    let yaml_interfaces_before = admin_ws.list_app_interfaces().await?;
+    let target_interface = admin_ws
+        .attach_app_interface(
+            0,
+            None,
+            AllowedOrigins::Origins(vec!["sandbox".to_string()].into_iter().collect()),
+            Some(yaml_app_id.to_string()),
+        )
+        .await?;
+    let yaml = run_client_command(
+        vec![
+            "provide-memproofs".into(),
+            "--port".into(),
+            admin_port.to_string(),
+            yaml_app_id.into(),
+            "--membrane-proofs".into(),
+            yaml_settings.to_str().unwrap().into(),
+        ],
+        temp_dir.path(),
+    )
+    .await?;
+    ensure!(
+        yaml.status.success(),
+        "YAML provide-memproofs failed: {}",
+        String::from_utf8_lossy(&yaml.stderr)
+    );
+    let yaml_after = app_from_admin(&admin_ws, yaml_app_id).await?;
+    assert_eq!(
+        yaml_after.status,
+        AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs)
+    );
+    let yaml_enable = run_client_command(
+        vec![
+            "call".into(),
+            "--port".into(),
+            admin_port.to_string(),
+            "enable-app".into(),
+            yaml_app_id.into(),
+        ],
+        temp_dir.path(),
+    )
+    .await?;
+    ensure!(yaml_enable.status.success());
+    let yaml_after = app_from_admin(&admin_ws, yaml_app_id).await?;
+    assert_eq!(yaml_after.status, AppStatus::Enabled);
+    assert_ne!(yaml_after.cell_info, after_flags.cell_info);
+    assert_eq!(yaml_after.agent_pub_key, yaml_before.agent_pub_key);
+    assert_role_proof(
+        &admin_ws,
+        &yaml_after,
+        "role-1",
+        &[0x01, 0xff, 0x80, 0x0b],
+        true,
+    )
+    .await?;
+    assert_role_proof(
+        &admin_ws,
+        &yaml_after,
+        "role-2",
+        &[0x11, 0xee, 0x82, 0x0e],
+        true,
+    )
+    .await?;
+    assert_role_proof(&admin_ws, &yaml_after, "role-3", &[], false).await?;
+    let yaml_interfaces_after = admin_ws.list_app_interfaces().await?;
+    assert_eq!(
+        yaml_interfaces_after.len(),
+        yaml_interfaces_before.len() + 1
+    );
+    assert!(yaml_interfaces_after
+        .iter()
+        .any(|interface| interface.port == target_interface));
+
+    let unknown_app = run_client_command(
+        vec![
+            "provide-memproofs".into(),
+            "--port".into(),
+            admin_port.to_string(),
+            "missing-app".into(),
+            "--membrane-proof".into(),
+            "role-1=flag-role-1.bin".into(),
+        ],
+        temp_dir.path(),
+    )
+    .await?;
+    assert!(!unknown_app.status.success());
+    assert!(String::from_utf8_lossy(&unknown_app.stderr).contains("app not found"));
+
+    let empty_app_id = "deferred-empty";
+    let empty_install = run_client_command(
+        vec![
+            "call".into(),
+            "--port".into(),
+            admin_port.to_string(),
+            "install-app".into(),
+            "--app-id".into(),
+            empty_app_id.into(),
+            fixture.app_bundle.to_str().unwrap().into(),
+        ],
+        temp_dir.path(),
+    )
+    .await?;
+    ensure!(empty_install.status.success());
+    let empty_yaml = temp_dir.path().join("empty-proofs.yaml");
+    fs::write(&empty_yaml, "{}\n")?;
+    let empty = run_client_command(
+        vec![
+            "provide-memproofs".into(),
+            "--port".into(),
+            admin_port.to_string(),
+            empty_app_id.into(),
+            "--membrane-proofs".into(),
+            empty_yaml.to_str().unwrap().into(),
+        ],
+        temp_dir.path(),
+    )
+    .await?;
+    ensure!(empty.status.success());
+    assert_eq!(
+        app_from_admin(&admin_ws, empty_app_id).await?.status,
+        AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs)
+    );
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn uninstall_app() -> Result<()> {
     let conductor = SweetConductor::standard().await;
 
@@ -582,6 +1121,126 @@ fn fixture_root() -> Result<PathBuf> {
 fn fixture_path(parts: impl IntoIterator<Item = &'static str>) -> Result<PathBuf> {
     let root = fixture_root()?;
     Ok(parts.into_iter().fold(root, |acc, part| acc.join(part)))
+}
+
+struct MembraneProofFixture {
+    fixture_dir: PathBuf,
+    app_bundle: PathBuf,
+    roles_settings: PathBuf,
+    yaml_role_2_proof: PathBuf,
+    flag_role_1_proof: PathBuf,
+    flag_role_2_proof: PathBuf,
+}
+
+async fn package_membrane_proof_fixture(
+    temp_dir: &Path,
+    allow_deferred_memproofs: bool,
+) -> Result<MembraneProofFixture> {
+    let source = fixture_path(["my-app"])?;
+    let fixture_dir = temp_dir.join("membrane-proof-fixture");
+    let dna_dir = fixture_dir.join("dna");
+    let zomes_dir = dna_dir.join("zomes");
+    fs::create_dir_all(&zomes_dir)?;
+
+    fs::copy(source.join("dna/dna.yaml"), dna_dir.join("dna.yaml"))?;
+    fs::copy(
+        source.join("dna/zomes/test_wasm_foo.wasm"),
+        zomes_dir.join("test_wasm_foo.wasm"),
+    )?;
+    let mut manifest = fs::read_to_string(source.join("happ.yaml"))?
+        .replacen("\"0123456\"", "\"proof-flag-role-1\"", 1)
+        .replacen("\"0123456\"", "\"proof-flag-role-2\"", 1)
+        .replace(
+            "should remain untouched by roles settings test",
+            "proof-flag-role-3",
+        );
+    if allow_deferred_memproofs {
+        manifest = manifest.replace(
+            "allow_deferred_memproofs: false",
+            "allow_deferred_memproofs: true",
+        );
+    }
+    fs::write(fixture_dir.join("happ.yaml"), manifest)?;
+
+    let hc_bin = get_hc_command();
+    let dna_status = TokioCommand::new(&hc_bin)
+        .args(["dna", "pack"])
+        .arg(&dna_dir)
+        .status()
+        .await?;
+    ensure!(dna_status.success(), "failed to pack membrane proof DNA");
+    let app_status = TokioCommand::new(&hc_bin)
+        .args(["app", "pack"])
+        .arg(&fixture_dir)
+        .status()
+        .await?;
+    ensure!(app_status.success(), "failed to pack membrane proof hApp");
+
+    Ok(MembraneProofFixture {
+        app_bundle: fixture_dir.join("my-fixture-app.happ"),
+        roles_settings: fixture_dir.join("roles.yaml"),
+        yaml_role_2_proof: fixture_dir.join("yaml-role-2.bin"),
+        flag_role_1_proof: temp_dir.join("flag-role-1.bin"),
+        flag_role_2_proof: temp_dir.join("flag-role-2.bin"),
+        fixture_dir,
+    })
+}
+
+async fn assert_role_proof(
+    admin_ws: &AdminWebsocket,
+    app_info: &AppInfo,
+    role: &str,
+    expected: &[u8],
+    should_have_proof: bool,
+) -> Result<()> {
+    let cells = app_info
+        .cell_info
+        .get(role)
+        .ok_or_else(|| anyhow::anyhow!("role {role} missing from app info"))?;
+    let CellInfo::Provisioned(cell) = cells
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("role {role} has no provisioned cell"))?
+    else {
+        anyhow::bail!("role {role} does not have a provisioned cell");
+    };
+    let dump = admin_ws
+        .dump_full_state(cell.cell_id.clone(), None, None)
+        .await?;
+    let proof =
+        dump.source_chain_dump
+            .records
+            .iter()
+            .find_map(|record| match &record.action.data {
+                ActionData::AgentValidationPkg(pkg) => pkg
+                    .membrane_proof
+                    .as_ref()
+                    .map(|proof| proof.bytes().to_vec()),
+                _ => None,
+            });
+    if should_have_proof {
+        assert_eq!(proof.as_deref(), Some(expected));
+    } else {
+        assert!(proof.is_none(), "role {role} unexpectedly has a proof");
+    }
+    Ok(())
+}
+
+async fn run_client_command(args: Vec<String>, current_dir: &Path) -> Result<std::process::Output> {
+    Ok(TokioCommand::new(get_target("hc-client"))
+        .args(args)
+        .current_dir(current_dir)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .await?)
+}
+
+async fn app_from_admin(admin_ws: &AdminWebsocket, app_id: &str) -> Result<AppInfo> {
+    admin_ws
+        .list_apps(None)
+        .await?
+        .into_iter()
+        .find(|app| app.installed_app_id == app_id)
+        .ok_or_else(|| anyhow::anyhow!("installed app missing from admin list: {app_id}"))
 }
 
 async fn ensure_fixture_packaged() -> Result<()> {

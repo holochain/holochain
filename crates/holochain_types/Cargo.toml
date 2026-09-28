@@ -12,6 +12,7 @@ edition = "2021"
 # reminder - do not use workspace deps
 [dependencies]
 anyhow = "1.0"
+base64 = "0.22"
 backtrace = "0.3.27"
 derive_builder = "0.20"
 derive_more = { version = "2.0", features = ["constructor", "into_iterator"] }

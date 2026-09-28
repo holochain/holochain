@@ -6,11 +6,10 @@ use holochain_client::AdminWebsocket;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::AppInfo;
 use holochain_trace::Output;
-use holochain_types::app::{AppManifest, RoleSettingsMap, RoleSettingsMapYaml};
+use holochain_types::app::{read_role_settings_yaml, AppManifest};
 use holochain_types::prelude::{
     AgentPubKey, AppBundleSource, InstallAppPayload, InstalledAppId, NetworkSeed,
 };
-use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -48,18 +47,10 @@ async fn install_app_bundle(
         roles_settings,
     } = args;
 
-    let roles_settings = match roles_settings {
-        Some(path) => {
-            let yaml_string = std::fs::read_to_string(path)?;
-            let roles_settings_yaml = yaml_serde::from_str::<RoleSettingsMapYaml>(&yaml_string)?;
-            let mut roles_settings: RoleSettingsMap = HashMap::new();
-            for (k, v) in roles_settings_yaml.into_iter() {
-                roles_settings.insert(k, v.into());
-            }
-            Some(roles_settings)
-        }
-        None => None,
-    };
+    let roles_settings = roles_settings
+        .as_deref()
+        .map(read_role_settings_yaml)
+        .transpose()?;
 
     let payload = InstallAppPayload {
         installed_app_id: app_id.clone(),

@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Support membrane proofs and init properties from base64
+  or binary files in CLI role settings, add `hc client call install-app
+  --membrane-proof`, and add `hc client provide-memproofs` for deferred
+  installation. `RoleSettingsYaml` byte fields now use `OpaqueBytesSource`, and
+  `From<RoleSettingsYaml> for RoleSettings` is removed. Use
+  `RoleSettingsYaml::resolve(base_dir)` instead. Refs #1613
+
 ## 0.7.1-rc.1
 
 ## 0.7.1-rc.0
