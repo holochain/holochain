@@ -56,12 +56,16 @@ flowchart TB
     %% holochain-client-js
     JSClient --> HcSpin
     JSClient --> Kangaroo
+    JSClient --> RuntimeTauri[runtime-tauri]
 
     %% hc-spin
     HcSpin --> AppLibsComplete
 
     %% kangaroo
     Kangaroo --> AppLibsComplete
+
+    %% runtime-tauri
+    RuntimeTauri --> AppLibsComplete
 
     %% app libraries complete
     AppLibsComplete{App Libraries Complete!}
@@ -193,6 +197,23 @@ Assigned to @
   - Update to use new holochain version.
   - `[optional]` Create new branch `main-X`.
 
+- [ ] `runtime-tauri`
+  - Update nix flake. For a new release series, change `holonix.url` to
+    `main-X` first.
+  - Update the holochain crates in the top-level `Cargo.toml`, and `hdk`,
+    `hdi` and `holochain_serialized_bytes` in
+    `crates/test-happ/zomes/Cargo.toml`, to the versions the new holochain
+    uses. The test suites build their own hApp from those zomes, so no
+    prebuilt `.happ` has to be regenerated.
+  - Update `@holochain/client` in the example app UI.
+  - Update the `create-holochain-tauri` templates: the holochain version in
+    `templates/src-tauri/Cargo.toml.tmpl` and `HOLONIX_URL` in
+    `lib/flake.js`.
+  - `npm run ci` passes.
+  - `[optional]` Create new branch `main-X`.
+  - Bump the crate versions, add a `CHANGELOG.md` entry, then tag and
+    release.
+
 **App Libraries Complete**
 
 ### Stage 5
@@ -228,7 +249,7 @@ Assigned to @
 
 - [ ] Documentation (`docs-pages` repo)
   - Write or update App Upgrade Guide for new holochain version.
-  - Update Compatibility Table to add new tool versions compatible with new holochain version.
+  - Update Compatibility Table to add new tool versions compatible with new holochain version, including `runtime-tauri`.
     - `[optional]` For major releases, add a new compatibility table file and link from `pages/resources/compatibility/index.md`.
   - Update Developer Portal to use code examples and explanations for new holochain version.
     - Tip: search the repo for `TODO(upgrade)` -- this will help you discover places that need to be routinely updated for point releases or major releases.
@@ -237,6 +258,11 @@ Assigned to @
 ### Stage 8
 
 Assigned to @
+
+- [ ] `runtime-tauri`
+  - `[optional]` Regenerate the example app's `apps/holochain-runtime-example/forum.happ`
+    with the new `hc-scaffold`. Only the example app uses it, so this does not
+    block the release above.
 
 - [ ] `dino-adventure-kangaroo`
   - Selectively merge changes from upstream repo, to use version compatible with holochain version.
