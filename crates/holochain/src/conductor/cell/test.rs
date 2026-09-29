@@ -261,9 +261,10 @@ async fn validation_receipts_require_valid_signatures() {
         .num_still_needing_publish(&agent)
         .await
         .unwrap();
+    assert_eq!(stored_receipts.len(), 0);
     assert_eq!(
-        (stored_receipts.len(), publishable_op_count_after_receipts),
-        (0, publishable_op_count)
+        publishable_op_count_after_receipts,
+        publishable_op_count
     );
 
     // Real signatures should work even when their order differs from the validator list.
