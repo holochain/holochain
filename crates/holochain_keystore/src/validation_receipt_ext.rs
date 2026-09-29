@@ -99,7 +99,7 @@ impl SignedValidationReceiptExt for SignedValidationReceipt {
                 return false;
             }
 
-            true
+            unmatched_signatures.is_empty()
         })
     }
 }
