@@ -5,8 +5,8 @@ use anyhow::Context;
 use clap::{Parser, Subcommand};
 use holochain_types::dna::DnaBundle;
 use holochain_types::prelude::{
-    AppManifest, DnaManifest, DnaModifiersOpt, RoleSettings, RoleSettingsYaml,
-    ValidatedDnaManifest, YamlProperties,
+    AppManifest, DnaManifest, DnaModifiersOpt, RoleSettingsYaml, ValidatedDnaManifest,
+    YamlProperties,
 };
 use holochain_types::web_app::WebAppManifest;
 use holochain_util::ffs;
@@ -371,7 +371,6 @@ impl HcDnaBundleSubcommand {
                     let yaml = ffs::read_to_string(&path).await?;
                     let settings: RoleSettingsYaml = yaml_serde::from_str(&yaml)
                         .context("Failed to parse the role settings file")?;
-                    let settings = RoleSettings::from(settings);
                     let overrides = settings.modifiers().context(
                         "the role settings file does not contain a `modifiers` block, \
                          so there is nothing to override",

@@ -3503,6 +3503,7 @@ version = "0.7.1-rc.1"
 dependencies = [
  "anyhow",
  "backtrace",
+ "base64 0.22.1",
  "bytes",
  "derive_builder",
  "derive_more",
