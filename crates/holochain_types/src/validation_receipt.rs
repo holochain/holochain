@@ -8,9 +8,8 @@ use std::vec::IntoIter;
 
 /// Validation receipt content - to be signed.
 ///
-/// Note that verification re-encodes this value to check its signatures, so fields must
+/// The validation receipt doesn't contain the original message. Therefore verification re-encodes this value to check its signatures, so fields must
 /// encode identically on the same messagepack version (i.e. no unordered map fields).
-/// See <https://github.com/holochain/holochain/pull/2848#discussion_r1346160783>
 #[derive(
     Debug,
     Clone,
