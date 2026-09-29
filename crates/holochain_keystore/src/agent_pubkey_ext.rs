@@ -145,12 +145,12 @@ mod tests {
         };
 
         // Sign over the action, as the source chain does.
-        let signature = action.signer().sign(&keystore, &action).await.unwrap();
+        let signature = action.author().sign(&keystore, &action).await.unwrap();
 
         // Verify, exactly as `verify_action_signature` does, over the same bytes.
         assert!(
             action
-                .signer()
+                .author()
                 .verify_signature(&signature, &action)
                 .await
                 .unwrap(),

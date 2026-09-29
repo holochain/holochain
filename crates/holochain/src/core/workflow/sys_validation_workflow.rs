@@ -114,7 +114,7 @@ use futures::StreamExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
-use holochain_keystore::{AgentPubKeyExt, MetaLairClient, WarrantOpExt};
+use holochain_keystore::{MetaLairClient, WarrantOpExt};
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
@@ -1065,25 +1065,6 @@ async fn validate_chain_op(
     }
 }
 
-/// Verify `sig` against the action content already carried by `signed_action`
-/// — the same bytes it was signed over. Used by the warrant checks below, which
-/// hold their dependency actions as `SignedActionHashed` and so verify directly
-/// rather than going through [`verify_action_signature`] (which takes a bare
-/// `Action`).
-async fn verify_signed_action_signature(
-    sig: &Signature,
-    signed_action: &SignedActionHashed,
-) -> SysValidationResult<()> {
-    let action = &signed_action.hashed.content;
-    if action.signer().verify_signature(sig, action).await? {
-        Ok(())
-    } else {
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::CounterfeitAction(sig.clone(), Box::new(action.clone())),
-        ))
-    }
-}
-
 async fn validate_warrant_op(
     op: &holochain_types::warrant::WarrantOp,
     validation_dependencies: SysValDeps,
@@ -1122,7 +1103,7 @@ async fn validate_warrant_op(
                     }
                     (signed_action.clone(), validation_status)
                 };
-                verify_signed_action_signature(action_sig, &action).await?;
+                verify_action_signature(action_sig, &action.hashed.content).await?;
 
                 match validation_status {
                     ValidationStatus::Valid => {
@@ -1216,8 +1197,8 @@ async fn validate_warrant_op(
                     (signed_action1.clone(), signed_action2.clone())
                 };
 
-                verify_signed_action_signature(a1_sig, &action1).await?;
-                verify_signed_action_signature(a2_sig, &action2).await?;
+                verify_action_signature(a1_sig, &action1.hashed.content).await?;
+                verify_action_signature(a2_sig, &action2.hashed.content).await?;
 
                 Ok(())
             }
@@ -1228,7 +1209,7 @@ async fn validate_warrant_op(
 /// Verify a freshly authored record's signature, checked directly against its
 /// action content, before running [`sys_validate_record`] on it.
 pub async fn counterfeit_check_authored_record(record: &Record) -> SysValidationOutcome<()> {
-    match verify_signed_action_signature(record.signature(), record.signed_action()).await {
+    match verify_action_signature(record.signature(), record.action()).await {
         Ok(()) => Ok(()),
         Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
             validation_outcome.into_outcome()
@@ -1326,9 +1307,7 @@ pub async fn counterfeit_check_action(
     signature: &Signature,
     action: &Action,
 ) -> SysValidationResult<()> {
-    let hashed = holo_hash::HoloHashed::from_content_sync(action.clone());
-    let signed_action = SignedActionHashed::with_presigned(hashed, signature.clone());
-    verify_signed_action_signature(signature, &signed_action).await
+    verify_action_signature(signature, action).await
 }
 
 /// Check if the warrant op has valid signature and author.

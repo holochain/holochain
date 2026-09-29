@@ -32,7 +32,7 @@ pub const MAX_TAG_SIZE: usize = 1000;
 ///
 /// Signatures are computed and checked over the `Action` bytes.
 pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysValidationResult<()> {
-    if action.signer().verify_signature(sig, action).await? {
+    if action.author().verify_signature(sig, action).await? {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
