@@ -7,6 +7,9 @@ use holochain_zome_types::prelude::*;
 use std::vec::IntoIter;
 
 /// Validation receipt content - to be signed.
+///
+/// The validation receipt doesn't contain the original message. Therefore verification re-encodes this value to check its signatures, so fields must
+/// encode identically on the same messagepack version (i.e. no unordered map fields).
 #[derive(
     Debug,
     Clone,
@@ -47,12 +50,10 @@ pub struct ValidationReceipt {
     SerializedBytes,
 )]
 pub struct SignedValidationReceipt {
-    /// the content of the validation receipt.
+    /// Content of the validation receipt.
     pub receipt: ValidationReceipt,
 
-    // TODO This is just the signature and not the original message, should this be a full signature and get validated
-    //      when it is received? https://github.com/holochain/holochain/pull/2848#discussion_r1346160783
-    /// the signature of the remote validator.
+    /// Signatures of the remote validators.
     pub validators_signatures: Vec<Signature>,
 }
 

@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Verify validation receipt signatures before storing and counting receipts, preventing forged receipts from stopping publication of authored DHT ops. \#5781
 - **BREAKING CHANGE**: Fix a `CloseChain` action with an agent migration target
   being signed and verified with the target key instead of the chain author's
   key. This let any agent publish a `CloseChain` in another agent's name and
