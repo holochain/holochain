@@ -1,9 +1,10 @@
-//! Extension trait definition [`ValidationReceiptExt`].
+//! Extension trait definitions for validation receipts.
 
 use crate::{AgentPubKeyExt, LairResult, MetaLairClient};
 use futures::{Stream, StreamExt, TryStreamExt};
 use holochain_types::prelude::{SignedValidationReceipt, ValidationReceipt};
 use must_future::MustBoxFuture;
+use std::{collections::HashSet, sync::Arc};
 
 /// Extension for keystore operations on a [`ValidationReceipt`].
 pub trait ValidationReceiptExt {
@@ -47,6 +48,58 @@ impl ValidationReceiptExt for ValidationReceipt {
                 receipt: self,
                 validators_signatures: signatures,
             }))
+        })
+    }
+}
+
+/// Extension for keystore operations on a [`SignedValidationReceipt`].
+pub trait SignedValidationReceiptExt {
+    /// Verify that the receipt has a distinct signature from every validator.
+    fn verify(&self) -> MustBoxFuture<'_, bool>;
+}
+
+impl SignedValidationReceiptExt for SignedValidationReceipt {
+    fn verify(&self) -> MustBoxFuture<'_, bool> {
+        MustBoxFuture::new(async move {
+            let validators = &self.receipt.validators;
+            let signatures = &self.validators_signatures;
+            if validators.is_empty() || validators.len() != signatures.len() {
+                return false;
+            }
+            let mut unique_validators = HashSet::with_capacity(validators.len());
+            if validators
+                .iter()
+                .any(|validator| !unique_validators.insert(validator))
+            {
+                return false;
+            }
+
+            let Ok(receipt_bytes) = holochain_serialized_bytes::encode(&self.receipt) else {
+                return false;
+            };
+            let receipt_bytes: Arc<[u8]> = receipt_bytes.into();
+
+            // To match each validator to a distinct and unused signature,
+            // we need to loop through the list of validators and list of signatures,
+            // as they may not be in the same order.
+            let mut unmatched_signatures = signatures.iter().collect::<Vec<_>>();
+            'validators: for validator in validators {
+                for (index, signature) in unmatched_signatures.iter().enumerate() {
+                    let Ok(matches) = validator
+                        .verify_signature_raw(signature, receipt_bytes.clone())
+                        .await
+                    else {
+                        return false;
+                    };
+                    if matches {
+                        unmatched_signatures.remove(index);
+                        continue 'validators;
+                    }
+                }
+                return false;
+            }
+
+            unmatched_signatures.is_empty()
         })
     }
 }
