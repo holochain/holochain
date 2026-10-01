@@ -18,6 +18,7 @@ use crate::core::ribosome::ZomesToInvoke;
 use crate::test_utils::fake_genesis_for_agent_with_store;
 use crate::test_utils::fake_genesis_with_store;
 use ::fixt::prelude::*;
+use ::fixt::rng;
 pub use holo_hash::fixt::*;
 use holo_hash::WasmHash;
 use holochain_keystore::test_keystore;
@@ -29,9 +30,6 @@ use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 pub use holochain_types::fixt::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use rand::rng;
-use rand::seq::IteratorRandom;
-use rand::Rng;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
@@ -54,7 +52,7 @@ fixturator!(
     WasmMap;
     curve Empty BTreeMap::new().into();
     curve Unpredictable {
-        let mut rng = rand::rng();
+        let mut rng = rng();
         let number_of_wasms = rng.random_range(0..5);
 
         let mut wasms = BTreeMap::new();
