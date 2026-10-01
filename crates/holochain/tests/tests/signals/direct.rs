@@ -17,10 +17,10 @@ use holochain_types::signal::DIRECT_SIGNAL_MAX_SIZE;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::{ReceiveMessage, WebsocketReceiver, WebsocketSender};
 
-/// A DNA whose coordinator can commit the capability grants these tests need.
+/// A DNA whose coordinator can commit grants for the zome-authored grant tests.
 ///
-/// Receiving a direct signal requires a committed `Capability::DirectSignal` grant, and the only
-/// way to commit one is from a coordinator zome, so these tests cannot use an empty DNA.
+/// Tests that exercise coordinator-authored grants cannot use an empty DNA. The app and admin
+/// interfaces can commit grants without a coordinator zome.
 async fn dna_with_grant_zome() -> DnaFile {
     let zomes = SweetInlineZomes::new(vec![], 0)
         .function("grant_direct_signal", |api, constraint: GrantConstraint| {
@@ -788,4 +788,108 @@ async fn direct_signal_with_an_assigned_grant_checks_the_assignee() {
         .expect("Bob did not receive the direct signal from his assignee");
     assert_eq!(&from_agent, alice_app.agent());
     assert_eq!(signal, b"from alice");
+}
+
+/// Commit a direct signal grant on `cell_id` over an authenticated app socket and return the
+/// response.
+async fn grant_direct_signal_over_app_api(
+    tx: &WebsocketSender,
+    cell_id: CellId,
+    constraint: GrantConstraint,
+) -> AppResponse {
+    tx.request(AppRequest::GrantDirectSignalCapability {
+        cell_id,
+        tag: "direct-signal".into(),
+        constraint,
+    })
+    .await
+    .unwrap()
+}
+
+/// #5986: a grant committed over the app interface authorizes delivery the same way a grant
+/// committed from a coordinator zome does.
+#[tokio::test(flavor = "multi_thread")]
+async fn direct_signal_grant_over_app_api_permits_delivery() {
+    holochain_trace::test_run();
+    let mut agents = TwoAgents::setup().await;
+
+    // Bob's observing socket is read for signals only, so it never delivers a response. Requests
+    // on Bob's behalf go over a second, polled socket.
+    let (bob_tx, bob_rx) = connect_app_ws(&agents.conductor, "bob-app").await;
+    let _bob_rx = WsPollRecv::new::<AppResponse>(bob_rx);
+
+    agents.alice_sends(b"ungranted", Some(secret(7))).await;
+    agents
+        .assert_bob_receives_nothing("before a grant was made over the app API")
+        .await;
+
+    let response = grant_direct_signal_over_app_api(
+        &bob_tx,
+        agents.bob.cell_id().clone(),
+        GrantConstraint::Transferable { secret: secret(7) },
+    )
+    .await;
+    assert!(
+        matches!(response, AppResponse::DirectSignalCapabilityGranted(_)),
+        "unexpected response: {response:?}"
+    );
+
+    agents.alice_sends(b"granted", Some(secret(7))).await;
+    agents.assert_bob_receives(b"granted").await;
+}
+
+/// Verifies that the app interface can commit a grant for a DNA without zomes.
+#[tokio::test(flavor = "multi_thread")]
+async fn direct_signal_to_dna_without_zomes_with_app_api_grant() {
+    holochain_trace::test_run();
+
+    let mut conductor = SweetConductor::standard().await;
+    let dna = SweetDnaFile::unique_empty().await;
+
+    let alice_app = conductor
+        .setup_app("alice-app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
+    let bob_app = conductor
+        .setup_app("bob-app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
+
+    let dna_hash = dna.dna_hash().clone();
+    let bob_agent = bob_app.agent().clone();
+    let bob_cell_id = bob_app.cells()[0].cell_id().clone();
+
+    wait_for_agent_url(&conductor, &dna_hash, &bob_agent).await;
+
+    let (alice_tx, alice_rx) = connect_app_ws(&conductor, "alice-app").await;
+    let _alice_rx = WsPollRecv::new::<AppResponse>(alice_rx);
+    let (bob_grant_tx, bob_grant_rx) = connect_app_ws(&conductor, "bob-app").await;
+    let _bob_grant_rx = WsPollRecv::new::<AppResponse>(bob_grant_rx);
+    let (_bob_tx, mut bob_rx) = connect_app_ws(&conductor, "bob-app").await;
+
+    let response = grant_direct_signal_over_app_api(
+        &bob_grant_tx,
+        bob_cell_id.clone(),
+        GrantConstraint::Unrestricted,
+    )
+    .await;
+    assert!(
+        matches!(response, AppResponse::DirectSignalCapabilityGranted(_)),
+        "unexpected response: {response:?}"
+    );
+
+    let payload = b"hello zomeless bob".to_vec();
+    let response =
+        send_direct_signal(&alice_tx, dna_hash, vec![bob_agent], payload.clone(), None).await;
+    assert!(
+        matches!(response, AppResponse::Ok),
+        "unexpected response: {response:?}"
+    );
+
+    let (cell_id, from_agent, signal) = try_recv_direct_signal(&mut bob_rx, DELIVERY_TIMEOUT)
+        .await
+        .expect("Bob did not receive the direct signal");
+    assert_eq!(cell_id, bob_cell_id);
+    assert_eq!(&from_agent, alice_app.agent());
+    assert_eq!(signal, payload);
 }

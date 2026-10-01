@@ -1,5 +1,5 @@
 use common::make_agent;
-use holo_hash::DnaHash;
+use holo_hash::{AgentPubKey, DnaHash};
 use holochain::{
     prelude::{AppBundleSource, Signal},
     sweettest::SweetConductor,
@@ -14,7 +14,9 @@ use holochain_types::{
     websocket::AllowedOrigins,
 };
 use holochain_websocket::ConnectRequest;
-use holochain_zome_types::prelude::ExternIO;
+use holochain_zome_types::prelude::{
+    CapSecret, CellId, ExternIO, GrantConstraint, CAP_SECRET_BYTES,
+};
 use kitsune2_api::{AgentInfoSigned, Url};
 use kitsune2_core::Ed25519Verifier;
 use serde::{Deserialize, Serialize};
@@ -769,4 +771,144 @@ async fn call_zome_with_options_custom_timeout() {
         ),
         "Expected a timeout error, got: {result:?}"
     );
+}
+
+/// Install the fixture app under `app_id`, enable it and connect an app client to it.
+async fn connect_fixture_app(admin_ws: &AdminWebsocket, app_id: &str) -> AppWebsocket {
+    let app_id: InstalledAppId = app_id.into();
+    admin_ws
+        .install_app(InstallAppPayload {
+            agent_key: None,
+            installed_app_id: Some(app_id.clone()),
+            network_seed: None,
+            roles_settings: None,
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
+            ignore_genesis_failure: false,
+            restore_from_dht: false,
+        })
+        .await
+        .unwrap();
+    admin_ws.enable_app(app_id.clone()).await.unwrap();
+
+    let app_ws_port = admin_ws
+        .attach_app_interface(0, None, AllowedOrigins::Any, None)
+        .await
+        .unwrap();
+    let token_issued = admin_ws.issue_app_auth_token(app_id.into()).await.unwrap();
+    AppWebsocket::connect(
+        (Ipv4Addr::LOCALHOST, app_ws_port),
+        token_issued.token,
+        ClientAgentSigner::default().into(),
+        None,
+    )
+    .await
+    .unwrap()
+}
+
+/// Bob grants the direct signal capability and Alice signals him, all through the client. Two
+/// apps from the same bundle on one conductor share a DNA, so they are peers on one network.
+#[tokio::test(flavor = "multi_thread")]
+async fn direct_signal_with_capability_grant() {
+    let conductor = SweetConductor::standard().await;
+    let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
+    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port), None)
+        .await
+        .unwrap();
+
+    let alice_ws = connect_fixture_app(&admin_ws, "alice-app").await;
+    let bob_ws = connect_fixture_app(&admin_ws, "bob-app").await;
+
+    let bob_cells = bob_ws
+        .app_info()
+        .await
+        .unwrap()
+        .unwrap()
+        .cell_info
+        .into_values()
+        .next()
+        .unwrap();
+    let bob_cell_id: CellId = match bob_cells[0].clone() {
+        CellInfo::Provisioned(c) => c.cell_id,
+        _ => panic!("Invalid cell type"),
+    };
+    let dna_hash = bob_cell_id.dna_hash().clone();
+    let alice_agent: AgentPubKey = alice_ws.my_pub_key.clone();
+    let bob_agent: AgentPubKey = bob_ws.my_pub_key.clone();
+
+    let (signal_tx, mut signal_rx) = tokio::sync::mpsc::unbounded_channel();
+    bob_ws
+        .on_signal(move |signal| {
+            if let Signal::AppDirect {
+                cell_id,
+                from_agent,
+                signal,
+            } = signal
+            {
+                signal_tx.send((cell_id, from_agent, signal)).unwrap();
+            }
+        })
+        .await;
+
+    // A direct signal to an agent whose URL is unknown is silently dropped, so wait until the
+    // conductor can resolve Bob's.
+    let bob_k2_agent = bob_agent.to_k2_agent();
+    holochain::retry_until_timeout!(60_000, 200, {
+        let known = alice_ws
+            .agent_info(Some(vec![dna_hash.clone()]))
+            .await
+            .unwrap()
+            .iter()
+            .any(|info| {
+                let info = AgentInfoSigned::decode(&Ed25519Verifier, info.as_bytes()).unwrap();
+                info.agent == bob_k2_agent && info.url.is_some()
+            });
+        if known {
+            break;
+        }
+    });
+
+    let secret = CapSecret::from([7; CAP_SECRET_BYTES]);
+    bob_ws
+        .grant_direct_signal_capability(
+            bob_cell_id.clone(),
+            "direct-signal".into(),
+            GrantConstraint::Transferable { secret },
+        )
+        .await
+        .unwrap();
+
+    // The wrong secret is accepted for sending but refused by the receiver.
+    alice_ws
+        .send_direct_signal(
+            dna_hash.clone(),
+            vec![bob_agent.clone()],
+            b"wrong secret".to_vec(),
+            Some(CapSecret::from([8; CAP_SECRET_BYTES])),
+        )
+        .await
+        .unwrap();
+    assert!(
+        tokio::time::timeout(Duration::from_secs(3), signal_rx.recv())
+            .await
+            .is_err(),
+        "a direct signal was delivered with the wrong secret"
+    );
+
+    alice_ws
+        .send_direct_signal(
+            dna_hash,
+            vec![bob_agent],
+            b"right secret".to_vec(),
+            Some(secret),
+        )
+        .await
+        .unwrap();
+    let (cell_id, from_agent, signal) =
+        tokio::time::timeout(Duration::from_secs(30), signal_rx.recv())
+            .await
+            .expect("Bob did not receive the direct signal")
+            .unwrap();
+    assert_eq!(cell_id, bob_cell_id);
+    assert_eq!(from_agent, alice_agent);
+    assert_eq!(signal, b"right secret".to_vec());
 }

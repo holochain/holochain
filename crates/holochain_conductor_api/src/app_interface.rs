@@ -356,6 +356,33 @@ pub enum AppRequest {
         #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
         cap_secret: Option<CapSecret>,
     },
+
+    /// Grant other agents the capability to send direct signals to a cell of this app.
+    ///
+    /// A direct signal sent with [`AppRequest::SendDirectSignal`] is only delivered when the
+    /// receiving agent has committed a `Capability::DirectSignal` grant that permits the sender.
+    /// This request commits such a grant to the source chain of `cell_id`, without needing a
+    /// coordinator zome to do it. A grant whose constraint carries a secret is only satisfied by a
+    /// `SendDirectSignal` request offering that secret as `cap_secret`.
+    ///
+    /// The cell must belong to the app this connection is authenticated for; a request for any
+    /// other cell is rejected with an error and commits nothing.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::DirectSignalCapabilityGranted`]
+    GrantDirectSignalCapability {
+        /// The cell that will accept direct signals under this grant.
+        cell_id: CellId,
+
+        /// A string by which to later query for saved grants.
+        ///
+        /// This does not need to be unique within a source chain.
+        tag: String,
+
+        /// Specifies who may send direct signals under this grant, and by what means.
+        constraint: GrantConstraint,
+    },
 }
 
 /// Represents the possible responses to an [`AppRequest`].
@@ -451,6 +478,11 @@ pub enum AppResponse {
 
     /// All the wasm host functions supported by this conductor.
     ListWasmHostFunctions(Vec<String>),
+
+    /// The successful response to an [`AppRequest::GrantDirectSignalCapability`].
+    ///
+    /// Returns the [`ActionHash`] of the capability grant.
+    DirectSignalCapabilityGranted(ActionHash),
 
     /// Operation successful, no payload.
     Ok,
@@ -702,6 +734,7 @@ pub struct AppAuthenticationRequest {
 mod tests {
     use crate::{AppRequest, AppResponse};
     use holochain_types::app::{AppStatus, DisabledAppReason};
+    use holochain_types::prelude::{CellId, GrantConstraint};
     use serde::Deserialize;
 
     #[test]
@@ -840,5 +873,39 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    /// Pins the wire names clients rely on for the direct signal grant request and response.
+    #[test]
+    fn grant_direct_signal_capability_wire_shape() {
+        use holo_hash::{ActionHash, AgentPubKey, DnaHash};
+
+        let cell_id = CellId::new(
+            DnaHash::from_raw_36(vec![1; 36]),
+            AgentPubKey::from_raw_36(vec![2; 36]),
+        );
+
+        let request: AppRequest = serde_json::from_value(serde_json::json!({
+            "type": "grant_direct_signal_capability",
+            "value": {
+                "cell_id": cell_id,
+                "tag": "direct-signal",
+                "constraint": GrantConstraint::Unrestricted,
+            }
+        }))
+        .unwrap();
+        assert!(matches!(
+            request,
+            AppRequest::GrantDirectSignalCapability {
+                constraint: GrantConstraint::Unrestricted,
+                ..
+            }
+        ));
+
+        let response = serde_json::to_value(AppResponse::DirectSignalCapabilityGranted(
+            ActionHash::from_raw_36(vec![3; 36]),
+        ))
+        .unwrap();
+        assert_eq!(response["type"], "direct_signal_capability_granted");
     }
 }
