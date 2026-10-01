@@ -198,15 +198,10 @@ Assigned to @
   - `[optional]` Create new branch `main-X`.
 
 - [ ] `runtime-tauri`
-  - Update nix flake. For a new release series, change `holonix.url` to
-    `main-X` first.
-  - Update the holochain crates in the top-level `Cargo.toml`, and `hdk`,
-    `hdi` and `holochain_serialized_bytes` in
-    `crates/test-happ/zomes/Cargo.toml`, to the versions the new holochain
-    uses. The test suites build their own hApp from those zomes, so no
-    prebuilt `.happ` has to be regenerated.
+  - Update nix flake.
+  - Update `hdk`, `hdi` and `holochain_serialized_bytes`.
   - Update `@holochain/client` in the example app UI.
-  - Update the `create-holochain-tauri` templates: the holochain version in
+  - Update the holochain version in
     `templates/src-tauri/Cargo.toml.tmpl` and `HOLONIX_URL` in
     `lib/flake.js`.
   - `npm run ci` passes.
