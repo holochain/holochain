@@ -70,13 +70,12 @@ committing.
 - **Compiler warnings are not OK** in shared code (CONTRIBUTING.md). Fix, surgically `#[allow(...)]`, or escalate — don't disable globally.
 - **Public API docs**: `///` rustdoc on public items; module/crate docs should describe structure. Follow [rustdoc's guidance](https://doc.rust-lang.org/rustdoc/how-to-write-documentation.html#documenting-components): keep the first line a short, one-sentence summary — everything up to the first blank `///` line is reused as the summary in module/search listings — then a blank `///` line before any further detail.
 - **Commits**: Conventional Commits (`feat:`, `fix:`, `refactor:`, etc.), bodies wrapped near 72 chars.
-- **Changelog**: Write changelog entries only to
-  `crates/holochain/CHANGELOG.md`, under `## Unreleased`. Include only
-  information relevant to end users; omit internal implementation details and
-  changes with no user-visible impact. A new entry goes at the **top** of the
-  `## Unreleased` list, above the entries already there, not appended at the
-  bottom — newest first, matching the ordering of the release sections
-  themselves.
+- **Changelog**:
+  - Write changelog entries only to `crates/holochain/CHANGELOG.md`, under `## Unreleased`.
+  - Include only information relevant to end users; omit internal implementation details and changes with no user-visible impact; INTERNAL changes MUST be flagged in review.
+  - A new entry goes at the **top** of the `## Unreleased` list, above the entries already there, not appended at the bottom — newest first, matching the ordering of the release sections themselves.
+  - Reference issues and PRs with an escaped hash, `\#1234`, at the end of the entry.
+  - list items MUST ALWAYS be written on a SINGLE LINE; NEVER split an entry on multiple lines.
 - **PRs**: branch off `develop`; changes are squash merged into `develop`; changes go from `develop` → `main` at release time and `main` should always be ignored for development.
 
 ### ts_rs client export

@@ -270,6 +270,16 @@ impl AdminInterfaceApi {
                 .await
                 .map(AdminResponse::ZomeCallCapabilityGranted),
 
+            GrantDirectSignalCapability {
+                cell_id,
+                tag,
+                constraint,
+            } => self
+                .conductor_handle
+                .grant_direct_signal_capability(cell_id, tag, constraint)
+                .await
+                .map(AdminResponse::DirectSignalCapabilityGranted),
+
             RevokeZomeCallCapability {
                 action_hash,
                 cell_id,

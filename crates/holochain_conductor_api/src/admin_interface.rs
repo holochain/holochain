@@ -405,6 +405,28 @@ pub enum AdminRequest {
     /// [`AdminResponse::ZomeCallCapabilityGranted`]
     GrantZomeCallCapability(Box<GrantZomeCallCapabilityPayload>),
 
+    /// Request capability grant for sending direct signals to a cell.
+    ///
+    /// A direct signal sent with `AppRequest::SendDirectSignal` is only delivered when the
+    /// receiving agent has committed a `Capability::DirectSignal` grant that permits the sender.
+    /// This request commits such a grant to the source chain of `cell_id`.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::DirectSignalCapabilityGranted`]
+    GrantDirectSignalCapability {
+        /// The cell that will accept direct signals under this grant.
+        cell_id: CellId,
+
+        /// A string by which to later query for saved grants.
+        ///
+        /// This does not need to be unique within a source chain.
+        tag: String,
+
+        /// Specifies who may send direct signals under this grant, and by what means.
+        constraint: GrantConstraint,
+    },
+
     /// Revoke a capability grant.
     ///
     /// You have to provide the [`ActionHash`] of the capability grant to revoke and the [`CellId`] of the cell
@@ -615,6 +637,11 @@ pub enum AdminResponse {
     ///
     /// Returns the [`ActionHash`] of the capability grant.
     ZomeCallCapabilityGranted(ActionHash),
+
+    /// The successful response to an [`AdminRequest::GrantDirectSignalCapability`].
+    ///
+    /// Returns the [`ActionHash`] of the capability grant.
+    DirectSignalCapabilityGranted(ActionHash),
 
     /// The successful response to an [`AdminRequest::RevokeZomeCallCapability`].
     ZomeCallCapabilityRevoked,
@@ -1006,5 +1033,40 @@ mod ts_rs_smoke_test {
         let ts = AdminRequest::export_to_string(&cfg).unwrap();
         assert!(ts.contains("\"type\""));
         assert!(ts.contains("\"value\""));
+    }
+
+    /// Pins the wire names clients rely on for the direct signal grant request and response.
+    #[test]
+    fn grant_direct_signal_capability_wire_shape() {
+        use holo_hash::ActionHash;
+        use holochain_zome_types::prelude::GrantConstraint;
+
+        let cell_id = CellId::new(
+            DnaHash::from_raw_36(vec![1; 36]),
+            AgentPubKey::from_raw_36(vec![2; 36]),
+        );
+
+        let request: AdminRequest = serde_json::from_value(serde_json::json!({
+            "type": "grant_direct_signal_capability",
+            "value": {
+                "cell_id": cell_id,
+                "tag": "direct-signal",
+                "constraint": GrantConstraint::Unrestricted,
+            }
+        }))
+        .unwrap();
+        assert!(matches!(
+            request,
+            AdminRequest::GrantDirectSignalCapability {
+                constraint: GrantConstraint::Unrestricted,
+                ..
+            }
+        ));
+
+        let response = serde_json::to_value(AdminResponse::DirectSignalCapabilityGranted(
+            ActionHash::from_raw_36(vec![3; 36]),
+        ))
+        .unwrap();
+        assert_eq!(response["type"], "direct_signal_capability_granted");
     }
 }
