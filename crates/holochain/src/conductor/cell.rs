@@ -30,6 +30,7 @@ use error::CellError;
 use futures::future::FutureExt;
 use holo_hash::*;
 use holochain_cascade::authority;
+use holochain_keystore::SignedValidationReceiptExt;
 use holochain_nonce::fresh_nonce;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pError, HolochainP2pResult};
@@ -590,6 +591,14 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         let fut = async move {
             for receipt in receipts.into_iter() {
                 debug!(from = ?receipt.receipt.validators, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
+                if !receipt.verify().await {
+                    warn!(
+                        validators = ?receipt.receipt.validators,
+                        hash = ?receipt.receipt.dht_op_hash,
+                        "Dropping invalid validation receipt"
+                    );
+                    continue;
+                }
 
                 // Get the action for this op so we can check the entry type.
                 let hash = receipt.receipt.dht_op_hash.clone();
