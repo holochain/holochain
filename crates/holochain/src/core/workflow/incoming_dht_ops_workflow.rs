@@ -1,7 +1,9 @@
 //! The workflow and queue consumer for DhtOp integration
 
-use super::sys_validation_workflow::counterfeit_check_action;
-use super::{error::WorkflowResult, sys_validation_workflow::counterfeit_check_warrant};
+use super::error::WorkflowResult;
+use super::sys_validation_workflow::{
+    counterfeit_check_action, counterfeit_check_entry, counterfeit_check_warrant,
+};
 use crate::{conductor::space::Space, core::queue_consumer::TriggerSender};
 use holo_hash::DhtOpHash;
 use holochain_types::op::{DhtOp, DhtOpHashed};
@@ -114,7 +116,7 @@ pub async fn incoming_dht_ops_workflow(
     let num_ops = ops.len();
     let mut filter_ops = Vec::with_capacity(num_ops);
     for op in ops {
-        // It's cheaper to check if the signature is valid before proceeding to open a write transaction.
+        // It's cheaper to check the signature and entry hash before opening a write transaction.
         let keeper = should_keep(&op.op.content).await;
         match keeper {
             Ok(()) => filter_ops.push(op),
@@ -200,13 +202,18 @@ pub async fn incoming_dht_ops_workflow(
         .map_err(|_| super::error::WorkflowError::RecvError)?
 }
 
-/// If this op fails the counterfeit check it should be dropped
+/// If this op fails the counterfeit checks it should be dropped.
+///
+/// Chain ops must carry a valid author signature and, when they ship an
+/// entry, that entry must hash to the entry hash named by the action.
+/// Warrant ops must carry a valid signature.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(op)))]
 async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
     match op {
         DhtOp::ChainOp(op) => {
             let signed_action = op.signed_action();
             counterfeit_check_action(signed_action.signature(), signed_action.data()).await?;
+            counterfeit_check_entry(op)?;
         }
         DhtOp::WarrantOp(op) => counterfeit_check_warrant(op).await?,
     }
