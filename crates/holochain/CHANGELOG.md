@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix network-received entries being stored without checking that they hash to the entry hash named by their action. An op received through publish or gossip, and a `get` response fetched from a peer, are now dropped when the entry does not match the action, before anything is written. The action's author is not warranted, since the entry is not covered by the action signature and may have been swapped by a third party. \#5994
+
 ## 0.8.0-dev.10
 
 - Add `GrantDirectSignalCapability` to the app and admin interfaces, so the capability grant that direct signals require can be created without a coordinator zome. On the app interface the grant is restricted to cells of the connected app. The Rust client gains `AppWebsocket::send_direct_signal`, `AppWebsocket::grant_direct_signal_capability` and `AdminWebsocket::grant_direct_signal_capability`. \#5986
