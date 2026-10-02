@@ -256,6 +256,23 @@ impl AppInterfaceApi {
 
                 Ok(AppResponse::Ok)
             }
+            AppRequest::GrantDirectSignalCapability {
+                cell_id,
+                tag,
+                constraint,
+            } => {
+                let action_hash = self
+                    .conductor_handle
+                    .grant_direct_signal_capability_for_app(
+                        &installed_app_id,
+                        cell_id,
+                        tag,
+                        constraint,
+                    )
+                    .await?;
+
+                Ok(AppResponse::DirectSignalCapabilityGranted(action_hash))
+            }
         }
     }
 }

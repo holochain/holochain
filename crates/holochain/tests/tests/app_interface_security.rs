@@ -4,7 +4,7 @@ use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, AppAuthenticationToken, AppRequest,
     AppResponse, IssueAppAuthenticationTokenPayload,
 };
-use holochain_types::prelude::InstalledAppId;
+use holochain_types::prelude::{GrantConstraint, InstalledAppId};
 use holochain_types::websocket::AllowedOrigins;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::{
@@ -388,6 +388,130 @@ async fn app_interface_add_agent_info_respects_app_boundaries() {
         .await
         .unwrap();
     assert!(matches!(admin_response, AdminResponse::AgentInfoAdded));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_interface_grant_direct_signal_capability_respects_app_boundaries() {
+    holochain_trace::test_run();
+
+    let mut conductor = SweetConductor::standard().await;
+    let dna_file = SweetDnaFile::unique_empty().await;
+
+    let app_1 = conductor
+        .setup_app("test-app-1", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+    let app_2 = conductor
+        .setup_app("test-app-2", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
+
+    let app_1_port = conductor
+        .clone()
+        .add_app_interface(
+            Either::Left(0),
+            None,
+            AllowedOrigins::Any,
+            Some("test-app-1".to_string()),
+        )
+        .await
+        .unwrap();
+
+    let token_1 = create_token(&conductor, "test-app-1".into()).await;
+
+    let (app_1_tx, app_1_rx) = websocket_client_by_port(app_1_port).await.unwrap();
+    let _app_1_rx = WsPollRecv::new::<AppResponse>(app_1_rx);
+    app_1_tx
+        .authenticate(AppAuthenticationRequest {
+            token: token_1.clone(),
+        })
+        .await
+        .unwrap();
+
+    let ok_response: AppResponse = app_1_tx
+        .request(AppRequest::GrantDirectSignalCapability {
+            cell_id: app_1.cells()[0].cell_id().clone(),
+            tag: "direct-signal".into(),
+            constraint: GrantConstraint::Unrestricted,
+        })
+        .await
+        .unwrap();
+    assert!(matches!(
+        ok_response,
+        AppResponse::DirectSignalCapabilityGranted(_)
+    ));
+
+    // A grant for a cell of another app must be rejected by the app interface, and the rejected
+    // request must not commit anything to that cell's source chain.
+    let err_response: AppResponse = app_1_tx
+        .request(AppRequest::GrantDirectSignalCapability {
+            cell_id: app_2.cells()[0].cell_id().clone(),
+            tag: "direct-signal".into(),
+            constraint: GrantConstraint::Unrestricted,
+        })
+        .await
+        .unwrap();
+    assert!(matches!(err_response, AppResponse::Error(_)));
+
+    let (admin_tx, _admin_rx) = conductor.admin_ws_client::<AdminResponse>().await;
+    let grants: AdminResponse = admin_tx
+        .request(AdminRequest::ListCapabilityGrants {
+            installed_app_id: "test-app-2".to_string(),
+            include_revoked: true,
+        })
+        .await
+        .unwrap();
+    match grants {
+        AdminResponse::CapabilityGrantsInfo(info) => {
+            // Cells without grants may be left out of the listing, so only check that no grant
+            // is listed for app 2's cell.
+            let app_2_cell_id = app_2.cells()[0].cell_id();
+            assert!(
+                info.0
+                    .iter()
+                    .filter(|(cell_id, _)| cell_id == app_2_cell_id)
+                    .all(|(_, grants)| grants.is_empty()),
+                "rejected grant must not be committed to app 2's cell, got {info:?}"
+            );
+        }
+        other => panic!("expected capability grants info, got {other:?}"),
+    }
+
+    // The admin interface is unrestricted and may grant for any cell.
+    let admin_response: AdminResponse = admin_tx
+        .request(AdminRequest::GrantDirectSignalCapability {
+            cell_id: app_2.cells()[0].cell_id().clone(),
+            tag: "direct-signal".into(),
+            constraint: GrantConstraint::Unrestricted,
+        })
+        .await
+        .unwrap();
+    assert!(matches!(
+        admin_response,
+        AdminResponse::DirectSignalCapabilityGranted(_)
+    ));
+
+    // Exactly one grant now exists on app 2's cell: the admin one, not the rejected request.
+    let grants: AdminResponse = admin_tx
+        .request(AdminRequest::ListCapabilityGrants {
+            installed_app_id: "test-app-2".to_string(),
+            include_revoked: true,
+        })
+        .await
+        .unwrap();
+    match grants {
+        AdminResponse::CapabilityGrantsInfo(info) => {
+            let app_2_cell_id = app_2.cells()[0].cell_id();
+            let count: usize = info
+                .0
+                .iter()
+                .filter(|(cell_id, _)| cell_id == app_2_cell_id)
+                .map(|(_, grants)| grants.len())
+                .sum();
+            assert_eq!(count, 1, "unexpected grants: {info:?}");
+        }
+        other => panic!("expected capability grants info, got {other:?}"),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]

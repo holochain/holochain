@@ -8,7 +8,7 @@ use holochain_client::{
 };
 use holochain_conductor_api::{CellInfo, StorageBlob};
 use holochain_types::websocket::AllowedOrigins;
-use holochain_zome_types::prelude::ExternIO;
+use holochain_zome_types::prelude::{Capability, ExternIO, GrantConstraint};
 use kitsune2_api::Url;
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddr};
@@ -409,4 +409,57 @@ async fn connect_multiple_addresses() {
     // Just to check we are connected and can get a response.
     let apps = admin_ws.list_apps(None).await.unwrap();
     assert!(apps.is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn grant_direct_signal_capability() {
+    let conductor = SweetConductor::standard().await;
+    let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
+        .await
+        .unwrap();
+
+    let app_id: InstalledAppId = "test-app".into();
+    let app_info = admin_ws
+        .install_app(InstallAppPayload {
+            agent_key: None,
+            installed_app_id: Some(app_id.clone()),
+            network_seed: None,
+            roles_settings: None,
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
+            ignore_genesis_failure: false,
+            restore_from_dht: false,
+        })
+        .await
+        .unwrap();
+    admin_ws.enable_app(app_id.clone()).await.unwrap();
+
+    let cells = app_info.cell_info.into_values().next().unwrap();
+    let cell_id = match cells[0].clone() {
+        CellInfo::Provisioned(c) => c.cell_id,
+        _ => panic!("Invalid cell type"),
+    };
+
+    let action_hash = admin_ws
+        .grant_direct_signal_capability(
+            cell_id.clone(),
+            "direct-signal".into(),
+            GrantConstraint::Unrestricted,
+        )
+        .await
+        .unwrap();
+
+    let grants = admin_ws
+        .list_capability_grants(app_id, false)
+        .await
+        .unwrap();
+    let direct_signal_grants: Vec<_> = grants
+        .0
+        .into_iter()
+        .filter(|(grant_cell_id, _)| *grant_cell_id == cell_id)
+        .flat_map(|(_, grants)| grants)
+        .filter(|info| info.cap_grant.capability == Capability::DirectSignal)
+        .collect();
+    assert_eq!(direct_signal_grants.len(), 1);
+    assert_eq!(direct_signal_grants[0].action_hash, action_hash);
 }
