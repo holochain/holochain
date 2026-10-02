@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix network-received entries being stored without checking that they hash
+  to the entry hash named by their action. An op received through publish or
+  gossip, and a `get` response fetched from a peer, are now dropped when the
+  entry does not match the action, before anything is written. The action's
+  author is not warranted, since the entry is not covered by the action
+  signature and may have been swapped by a third party. \#5994
 - Fix source-chain restore reporting completion while the chain still appears
   empty when gossip has already staged its actions for validation.
 - **BREAKING CHANGE**: Capability grants are restructured to make room for capabilities other than zome calls. A grant is now `CapGrantEntry { tag, constraint, capability }`: `constraint` (formerly `access`) says who may claim the grant, and `capability` says what it grants: `Capability::ZomeCall(ZomeCallGrant { functions })` or `Capability::DirectSignal` — build those shapes with `CapGrant::new_zome_call_grant` and `CapGrant::new_direct_signal_grant`. A grant only authorizes the capability it was issued for, and the chain author's implicit access covers zome calls only, so a direct signal needs an explicit grant even for the authoring agent. The admin API follows: `GrantZomeCallCapability`'s `cap_grant` is now a `GrantZomeCallCapabilityGrant { tag, constraint, grant: { functions } }` rather than a whole grant, so it can only ever grant zome calls, and `ListCapabilityGrants` reports the new grant shape. Capability grants already on a source chain cannot be read by this version and must be re-issued. Types are renamed to match: `ZomeCallCapGrant` → `CapGrant`, the old `CapGrant` enum → `CapAccess`, `CapAccess` → `GrantConstraint`, `DesensitizedZomeCallCapGrant` → `DesensitizedCapGrant`, `CapAccessInfo` → `GrantConstraintInfo`. #5820
