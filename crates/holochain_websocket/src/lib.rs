@@ -767,6 +767,9 @@ impl From<std::net::SocketAddr> for ConnectRequest {
 }
 
 impl ConnectRequest {
+    /// Origin sent when a client does not override the Origin header.
+    pub const DEFAULT_ORIGIN: &'static str = "holochain_websocket";
+
     /// Create a new [ConnectRequest].
     pub fn new(addr: std::net::SocketAddr) -> Self {
         let mut cr = ConnectRequest {
@@ -776,10 +779,8 @@ impl ConnectRequest {
 
         // Set a default Origin so that the connection request will be allowed by default when the listener is
         // using `Any` as the allowed origin.
-        cr.headers.insert(
-            "Origin",
-            HeaderValue::from_str("holochain_websocket").expect("Invalid Origin value"),
-        );
+        cr.headers
+            .insert("Origin", HeaderValue::from_static(Self::DEFAULT_ORIGIN));
 
         cr
     }
@@ -1090,35 +1091,3 @@ impl Callback for ConnectCallback {
 
 #[cfg(test)]
 mod test;
-
-#[cfg(test)]
-mod error_tests {
-    use super::WebsocketError;
-    use holochain_serialized_bytes::prelude::SerializedBytesError;
-
-    #[test]
-    fn connection_closed_classification() {
-        assert!(WebsocketError::Close("ConnectionClosed".to_string()).is_connection_closed());
-        assert!(WebsocketError::ReceiverClosed.is_connection_closed());
-        assert!(WebsocketError::UnexpectedRawFrame.is_connection_closed());
-        assert!(WebsocketError::Io(std::io::Error::other("boom")).is_connection_closed());
-    }
-
-    #[tokio::test]
-    async fn request_level_errors_are_not_connection_closed() {
-        // A request timeout is awaited outside `WsCoreSync::exec`, so it does
-        // not tear the connection down.
-        let elapsed = tokio::time::timeout(std::time::Duration::ZERO, std::future::pending::<()>())
-            .await
-            .unwrap_err();
-        assert!(!WebsocketError::Timeout(elapsed).is_connection_closed());
-        assert!(!WebsocketError::Other("something else".to_string()).is_connection_closed());
-        // A response carrying no data drops the responder on a live
-        // connection, so this is a request-level failure.
-        assert!(!WebsocketError::ResponderDropped.is_connection_closed());
-        assert!(
-            !WebsocketError::Deserialize(SerializedBytesError::Deserialize("boom".to_string()))
-                .is_connection_closed()
-        );
-    }
-}

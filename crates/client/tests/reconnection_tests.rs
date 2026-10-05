@@ -112,6 +112,16 @@ async fn app_interface_discovery_finds_a_matching_interface() {
     .unwrap();
     assert_eq!(found, attached_port);
 
+    // An unset origin sends ConnectRequest's default Origin header.
+    // An interface restricted to a different origin cannot accept it.
+    let err = holochain_client::discover_app_interface_port_for_test(&admin_ws, &app_id, None)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        ConductorApiError::AppInterfaceNotFound { .. }
+    ));
+
     // An origin the interface does not allow finds nothing.
     let err = holochain_client::discover_app_interface_port_for_test(
         &admin_ws,
@@ -124,6 +134,20 @@ async fn app_interface_discovery_finds_a_matching_interface() {
         matches!(err, ConductorApiError::AppInterfaceNotFound { .. }),
         "got {err:?}"
     );
+
+    let compatible_port = admin_ws
+        .attach_app_interface(
+            0,
+            None,
+            holochain_client::AllowedOrigins::Any,
+            Some(app_id.clone()),
+        )
+        .await
+        .unwrap();
+    let found = holochain_client::discover_app_interface_port_for_test(&admin_ws, &app_id, None)
+        .await
+        .unwrap();
+    assert_eq!(found, compatible_port);
 
     drop(conductor);
 }

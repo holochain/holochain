@@ -21,9 +21,10 @@ pub async fn discover_app_interface_port(
             Some(bound) => bound == installed_app_id,
             None => true,
         })
-        .filter(|interface| match origin {
-            Some(origin) => interface.allowed_origins.is_allowed(origin),
-            None => true,
+        .filter(|interface| {
+            interface
+                .allowed_origins
+                .is_allowed(origin.unwrap_or(holochain_websocket::ConnectRequest::DEFAULT_ORIGIN))
         })
         .map(|interface| interface.port)
         .min()
