@@ -68,8 +68,14 @@ mod tests {
         tx.send(SignalEvent::Signal(a_signal(1))).unwrap();
         tx.send(SignalEvent::Signal(a_signal(2))).unwrap();
 
-        assert!(matches!(stream.next().await, Some(SignalEvent::Signal(_))));
-        assert!(matches!(stream.next().await, Some(SignalEvent::Signal(_))));
+        assert!(matches!(
+            stream.next().await,
+            Some(SignalEvent::Signal(signal)) if signal == a_signal(1)
+        ));
+        assert!(matches!(
+            stream.next().await,
+            Some(SignalEvent::Signal(signal)) if signal == a_signal(2)
+        ));
     }
 
     #[tokio::test]
