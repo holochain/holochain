@@ -31,6 +31,7 @@ pub struct ReconnectingAppWebsocketBuilder {
     signer: DynAgentSigner,
     origin: Option<String>,
     reconnect_config: ReconnectConfig,
+    websocket_config: Arc<WebsocketConfig>,
 }
 
 impl ReconnectingAppWebsocketBuilder {
@@ -48,6 +49,17 @@ impl ReconnectingAppWebsocketBuilder {
     /// Sets the backoff applied between reconnect attempts.
     pub fn reconnect_config(mut self, config: ReconnectConfig) -> Self {
         self.reconnect_config = config;
+        self
+    }
+
+    /// Sets the app websocket configuration for the initial connection and
+    /// every reconnection. Defaults to [`WebsocketConfig::CLIENT_DEFAULT`].
+    ///
+    /// For example, `default_request_timeout` applies to requests on each
+    /// connection. This does not change the admin websocket configuration or
+    /// retry requests that fail while disconnected.
+    pub fn websocket_config(mut self, config: Arc<WebsocketConfig>) -> Self {
+        self.websocket_config = config;
         self
     }
 
@@ -74,6 +86,7 @@ impl ReconnectingAppWebsocketBuilder {
             &self.installed_app_id,
             self.origin.as_deref(),
             self.signer.clone(),
+            self.websocket_config.clone(),
         )
         .await?;
 
@@ -109,6 +122,7 @@ impl ReconnectingAppWebsocketBuilder {
                     &self.installed_app_id,
                     self.origin.as_deref(),
                     self.signer.clone(),
+                    self.websocket_config.clone(),
                 )
             })
             .await;
@@ -138,6 +152,7 @@ impl ReconnectingAppWebsocketBuilder {
             let origin = self.origin.clone();
             let signer = self.signer.clone();
             let config = self.reconnect_config.clone();
+            let websocket_config = self.websocket_config.clone();
             async move {
                 let mut closed = closed;
                 let mut flaps: u32 = 0;
@@ -172,6 +187,7 @@ impl ReconnectingAppWebsocketBuilder {
                                 &installed_app_id,
                                 origin.as_deref(),
                                 signer.clone(),
+                                websocket_config.clone(),
                             )
                         })
                         .await;
@@ -243,6 +259,7 @@ impl ReconnectingAppWebsocket {
             signer,
             origin: None,
             reconnect_config: ReconnectConfig::default(),
+            websocket_config: Arc::new(WebsocketConfig::CLIENT_DEFAULT),
         }
     }
 
@@ -383,6 +400,7 @@ async fn connect_app(
     installed_app_id: &InstalledAppId,
     origin: Option<&str>,
     signer: DynAgentSigner,
+    websocket_config: Arc<WebsocketConfig>,
 ) -> ConductorApiResult<(AppWebsocket, ClosedNotify)> {
     let admin: AdminWebsocket = admin_ws.current()?;
 
@@ -403,11 +421,5 @@ async fn connect_app(
         None => addr.into(),
     };
 
-    AppWebsocket::connect_with_notify(
-        request,
-        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        token,
-        signer,
-    )
-    .await
+    AppWebsocket::connect_with_notify(request, websocket_config, token, signer).await
 }
