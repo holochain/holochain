@@ -2,7 +2,7 @@ use crate::app_websocket_inner::AppWebsocketInner;
 use crate::signing::DynAgentSigner;
 use crate::{signing::sign_zome_call, ConductorApiError, ConductorApiResult};
 use anyhow::{anyhow, Result};
-use holo_hash::{AgentPubKey, DnaHash};
+use holo_hash::{ActionHash, AgentPubKey, DnaHash};
 use holochain_conductor_api::{
     AppAuthenticationToken, AppInfo, AppRequest, AppResponse, CellInfo, OpTimingsCursor,
     OpTimingsDump, PeerMetaInfo, ProvisionedCell, ZomeCallParamsSigned,
@@ -16,7 +16,10 @@ use holochain_types::prelude::{CloneId, Signal};
 use holochain_websocket::{ConnectRequest, WebsocketConfig};
 use holochain_zome_types::{
     clone::ClonedCell,
-    prelude::{CellId, ExternIO, FunctionName, RoleName, Timestamp, ZomeCallParams, ZomeName},
+    prelude::{
+        CapSecret, CellId, ExternIO, FunctionName, GrantConstraint, RoleName, Timestamp,
+        ZomeCallParams, ZomeName,
+    },
 };
 use kitsune2_api::Url;
 use std::collections::BTreeMap;
@@ -512,6 +515,73 @@ impl AppWebsocket {
         match response {
             AppResponse::AgentInfoAdded => Ok(()),
             _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
+
+    /// Sends a signal directly to agents without running WASM.
+    ///
+    /// The agents must be on the network of `dna_hash`. Each recipient only accepts the signal if
+    /// they have granted the direct signal capability to this app's agent, see
+    /// [`AppWebsocket::grant_direct_signal_capability`]. `cap_secret` is the secret of the
+    /// recipients' grant, if their grant carries one. Sending is best effort: `Ok` means the
+    /// conductor accepted the request, not that any recipient got the signal.
+    ///
+    /// Recipients get the payload as [`Signal::AppDirect`] through [`AppWebsocket::on_signal`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent or the conductor rejects it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the conductor returns a response other than [`AppResponse::Ok`].
+    pub async fn send_direct_signal(
+        &self,
+        dna_hash: DnaHash,
+        agents: Vec<AgentPubKey>,
+        signal: Vec<u8>,
+        cap_secret: Option<CapSecret>,
+    ) -> ConductorApiResult<()> {
+        let msg = AppRequest::SendDirectSignal {
+            dna_hash,
+            agents,
+            signal,
+            cap_secret,
+        };
+        let response = self.inner.send(msg).await?;
+        match response {
+            AppResponse::Ok => Ok(()),
+            _ => unreachable!("Unexpected response {response:?}"),
+        }
+    }
+
+    /// Grants agents the capability to send direct signals to a cell of this app.
+    ///
+    /// Returns the action hash of the committed capability grant.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent or the conductor rejects the grant.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the conductor returns a response other than
+    /// [`AppResponse::DirectSignalCapabilityGranted`].
+    pub async fn grant_direct_signal_capability(
+        &self,
+        cell_id: CellId,
+        tag: String,
+        constraint: GrantConstraint,
+    ) -> ConductorApiResult<ActionHash> {
+        let msg = AppRequest::GrantDirectSignalCapability {
+            cell_id,
+            tag,
+            constraint,
+        };
+        let response = self.inner.send(msg).await?;
+        match response {
+            AppResponse::DirectSignalCapabilityGranted(action_hash) => Ok(action_hash),
+            _ => unreachable!("Unexpected response {response:?}"),
         }
     }
 
