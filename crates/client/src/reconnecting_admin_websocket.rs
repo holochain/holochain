@@ -19,10 +19,125 @@ use holochain_websocket::{ConnectRequest, WebsocketConfig};
 use holochain_zome_types::prelude::{DnaDef, GrantZomeCallCapabilityPayload};
 use kitsune2_api::Url;
 use parking_lot::RwLock;
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::Formatter;
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::Arc;
+
+/// An owned admin-interface address that can be resolved again on reconnection.
+///
+/// Hostnames are kept unresolved so every connection attempt can see new DNS
+/// records. Concrete addresses and address lists are used as supplied. Unlike
+/// the former `ToSocketAddrs` argument, arbitrary custom implementations of
+/// that trait are not accepted; pass a hostname or convert to a concrete list.
+#[derive(Debug, Clone)]
+pub enum ReconnectAdminAddress {
+    /// A concrete socket address.
+    Socket(SocketAddr),
+    /// Concrete socket addresses, tried in order.
+    Sockets(Vec<SocketAddr>),
+    /// A hostname with a port, such as `"localhost:12345"`.
+    Hostname(String),
+    /// A hostname and port supplied separately.
+    HostPort(String, u16),
+}
+
+impl From<SocketAddr> for ReconnectAdminAddress {
+    fn from(addr: SocketAddr) -> Self {
+        Self::Socket(addr)
+    }
+}
+
+impl From<SocketAddrV4> for ReconnectAdminAddress {
+    fn from(addr: SocketAddrV4) -> Self {
+        Self::Socket(addr.into())
+    }
+}
+
+impl From<SocketAddrV6> for ReconnectAdminAddress {
+    fn from(addr: SocketAddrV6) -> Self {
+        Self::Socket(addr.into())
+    }
+}
+
+impl From<(IpAddr, u16)> for ReconnectAdminAddress {
+    fn from((ip, port): (IpAddr, u16)) -> Self {
+        Self::Socket(SocketAddr::new(ip, port))
+    }
+}
+
+impl From<(Ipv4Addr, u16)> for ReconnectAdminAddress {
+    fn from((ip, port): (Ipv4Addr, u16)) -> Self {
+        Self::Socket(SocketAddr::new(ip.into(), port))
+    }
+}
+
+impl From<(Ipv6Addr, u16)> for ReconnectAdminAddress {
+    fn from((ip, port): (Ipv6Addr, u16)) -> Self {
+        Self::Socket(SocketAddr::new(ip.into(), port))
+    }
+}
+
+impl From<Vec<SocketAddr>> for ReconnectAdminAddress {
+    fn from(addrs: Vec<SocketAddr>) -> Self {
+        Self::Sockets(addrs)
+    }
+}
+
+impl From<&[SocketAddr]> for ReconnectAdminAddress {
+    fn from(addrs: &[SocketAddr]) -> Self {
+        Self::Sockets(addrs.to_vec())
+    }
+}
+
+impl<const N: usize> From<[SocketAddr; N]> for ReconnectAdminAddress {
+    fn from(addrs: [SocketAddr; N]) -> Self {
+        Self::Sockets(addrs.into())
+    }
+}
+
+impl<const N: usize> From<&[SocketAddr; N]> for ReconnectAdminAddress {
+    fn from(addrs: &[SocketAddr; N]) -> Self {
+        Self::Sockets(addrs.to_vec())
+    }
+}
+
+impl From<String> for ReconnectAdminAddress {
+    fn from(hostname: String) -> Self {
+        Self::Hostname(hostname)
+    }
+}
+
+impl From<&str> for ReconnectAdminAddress {
+    fn from(hostname: &str) -> Self {
+        Self::Hostname(hostname.to_owned())
+    }
+}
+
+impl From<&String> for ReconnectAdminAddress {
+    fn from(hostname: &String) -> Self {
+        Self::Hostname(hostname.clone())
+    }
+}
+
+impl From<(String, u16)> for ReconnectAdminAddress {
+    fn from((hostname, port): (String, u16)) -> Self {
+        Self::HostPort(hostname, port)
+    }
+}
+
+impl From<(&str, u16)> for ReconnectAdminAddress {
+    fn from((hostname, port): (&str, u16)) -> Self {
+        Self::HostPort(hostname.to_owned(), port)
+    }
+}
+
+impl From<(&String, u16)> for ReconnectAdminAddress {
+    fn from((hostname, port): (&String, u16)) -> Self {
+        Self::HostPort(hostname.clone(), port)
+    }
+}
 
 /// An admin websocket that re-establishes itself after the conductor restarts.
 ///
@@ -50,42 +165,55 @@ impl ReconnectingAdminWebsocket {
     ///
     /// The initial connection is attempted once per resolved address and fails
     /// if none of them accept, so that a typo'd port or a rejected origin is
-    /// reported rather than retried silently. Use
-    /// [`ReconnectingAdminWebsocket::connect_with_retry`] to wait for a
+    /// reported rather than retried silently. Hostnames are looked up without
+    /// blocking the runtime and re-resolved on every later connection attempt.
+    /// Use [`ReconnectingAdminWebsocket::connect_with_retry`] to wait for a
     /// conductor that has not started yet. Once this returns, connection
     /// failures are repaired instead of reported.
     pub async fn connect(
-        socket_addr: impl ToSocketAddrs,
+        socket_addr: impl Into<ReconnectAdminAddress>,
         origin: Option<String>,
         config: ReconnectConfig,
     ) -> ConductorApiResult<Self> {
-        let addrs = resolve(socket_addr)?;
-        let connected = connect_once(&addrs, &origin).await?;
-        Ok(Self::start(addrs, origin, config, connected))
+        let address = socket_addr.into();
+        let connected = connect_address(&address, &origin).await?;
+        Ok(Self::start(address, origin, config, connected))
     }
 
     /// Connects to a conductor admin interface, waiting for it to accept.
     ///
     /// Unlike [`ReconnectingAdminWebsocket::connect`] this retries the initial
     /// connection with the same backoff used for reconnection, so it is the
-    /// right choice when the conductor may not have started yet. It never
-    /// gives up; bound it by wrapping the call in [`tokio::time::timeout`],
-    /// which works because the retry loop is cancel safe.
+    /// right choice when the conductor may not have started yet. Resolution
+    /// errors (including an empty address list) are reported immediately;
+    /// subsequent retries re-resolve hostnames. It never gives up after a
+    /// connection failure; bound it by wrapping the call in
+    /// [`tokio::time::timeout`], which works because the retry loop is cancel
+    /// safe.
     pub async fn connect_with_retry(
-        socket_addr: impl ToSocketAddrs,
+        socket_addr: impl Into<ReconnectAdminAddress>,
         origin: Option<String>,
         config: ReconnectConfig,
     ) -> ConductorApiResult<Self> {
-        let addrs = resolve(socket_addr)?;
+        let address = socket_addr.into();
+        let first_addrs = std::cell::RefCell::new(Some(resolve(&address).await?));
         let connected = connect_with_backoff("holochain_client::admin", &config, || {
-            connect_once(&addrs, &origin)
+            let first_addrs = first_addrs.borrow_mut().take();
+            async {
+                let addrs = match first_addrs {
+                    Some(addrs) => addrs,
+                    None => resolve(&address).await?,
+                };
+                connect_once(&addrs, &origin).await
+            }
         })
         .await;
-        Ok(Self::start(addrs, origin, config, connected))
+        drop(first_addrs);
+        Ok(Self::start(address, origin, config, connected))
     }
 
     fn start(
-        addrs: Vec<SocketAddr>,
+        address: ReconnectAdminAddress,
         origin: Option<String>,
         config: ReconnectConfig,
         connected: (AdminWebsocket, crate::util::ClosedNotify),
@@ -124,7 +252,7 @@ impl ReconnectingAdminWebsocket {
 
                     let (admin_ws, next_closed) =
                         connect_with_backoff("holochain_client::admin", &config, || {
-                            connect_once(&addrs, &origin)
+                            connect_address(&address, &origin)
                         })
                         .await;
 
@@ -310,12 +438,31 @@ impl ReconnectingAdminWebsocket {
     );
 }
 
-fn resolve(socket_addr: impl ToSocketAddrs) -> ConductorApiResult<Vec<SocketAddr>> {
-    let addrs: Vec<SocketAddr> = socket_addr.to_socket_addrs()?.collect();
+async fn resolve(address: &ReconnectAdminAddress) -> ConductorApiResult<Cow<'_, [SocketAddr]>> {
+    let addrs = match address {
+        ReconnectAdminAddress::Socket(addr) => Cow::Borrowed(std::slice::from_ref(addr)),
+        ReconnectAdminAddress::Sockets(addrs) => Cow::Borrowed(addrs.as_slice()),
+        ReconnectAdminAddress::Hostname(hostname) => {
+            Cow::Owned(tokio::net::lookup_host(hostname.as_str()).await?.collect())
+        }
+        ReconnectAdminAddress::HostPort(hostname, port) => Cow::Owned(
+            tokio::net::lookup_host((hostname.as_str(), *port))
+                .await?
+                .collect(),
+        ),
+    };
     if addrs.is_empty() {
         return Err(ConductorApiError::NoAddressesResolved);
     }
     Ok(addrs)
+}
+
+async fn connect_address(
+    address: &ReconnectAdminAddress,
+    origin: &Option<String>,
+) -> ConductorApiResult<(AdminWebsocket, crate::util::ClosedNotify)> {
+    let addrs = resolve(address).await?;
+    connect_once(&addrs, origin).await
 }
 
 async fn connect_once(

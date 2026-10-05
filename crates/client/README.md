@@ -27,6 +27,11 @@ worth reporting, and `connect_with_retry` when you are waiting for one to
 start; the latter never gives up, so bound it with `tokio::time::timeout` if
 you need it to.
 
+Admin connections can use a hostname (for example, `"localhost:30000"`);
+the hostname is resolved again for each reconnect attempt. A concrete socket
+address or address list is reused unchanged. Custom `ToSocketAddrs`
+implementations should be converted to an address list before connecting.
+
 Requests made while a connection is down return
 `ConductorApiError::Disconnected`. Before the client notices a dead connection,
 a request may instead return the underlying websocket error. Neither is

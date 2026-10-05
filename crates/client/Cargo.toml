@@ -32,7 +32,7 @@ parking_lot = "0.12.1"
 rand = { version = "0.8" }
 serde = "1.0"
 thiserror = "2.0"
-tokio = { version = "1.36", features = ["rt", "sync", "time"] }
+tokio = { version = "1.36", features = ["net", "rt", "sync", "time"] }
 tracing = "0.1"
 
 [dev-dependencies]

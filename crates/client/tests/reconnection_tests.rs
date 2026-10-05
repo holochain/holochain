@@ -31,7 +31,7 @@ async fn admin_requests_resume_after_a_conductor_restart() {
     let (mut conductor, admin_port) = common::conductor_with_fixed_admin_port().await;
 
     let admin_ws = holochain_client::ReconnectingAdminWebsocket::connect(
-        (Ipv4Addr::LOCALHOST, admin_port),
+        format!("localhost:{admin_port}"),
         None,
         holochain_client::ReconnectConfig::default(),
     )
@@ -178,7 +178,7 @@ async fn connect_with_retry_waits_for_the_conductor() {
 
     let connecting = tokio::spawn(async move {
         holochain_client::ReconnectingAdminWebsocket::connect_with_retry(
-            (Ipv4Addr::LOCALHOST, port),
+            ("localhost", port),
             None,
             holochain_client::ReconnectConfig::default(),
         )

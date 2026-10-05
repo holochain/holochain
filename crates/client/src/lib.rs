@@ -77,7 +77,7 @@ pub use holochain_zome_types::prelude::{
 };
 pub use kitsune2_api::Url;
 pub use reconnect::ReconnectConfig;
-pub use reconnecting_admin_websocket::ReconnectingAdminWebsocket;
+pub use reconnecting_admin_websocket::{ReconnectAdminAddress, ReconnectingAdminWebsocket};
 pub use reconnecting_app_websocket::{ReconnectingAppWebsocket, ReconnectingAppWebsocketBuilder};
 pub use signal_stream::{SignalEvent, SignalStream};
 pub use signing::client_signing::{ClientAgentSigner, SigningCredentials};
