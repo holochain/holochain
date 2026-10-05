@@ -58,10 +58,10 @@ pub(crate) fn delay_for_attempt(attempt: u32, config: &ReconnectConfig) -> Durat
 pub(crate) async fn connect_with_backoff<F, Fut, T, E>(
     label: &str,
     config: &ReconnectConfig,
-    factory: F,
+    mut factory: F,
 ) -> T
 where
-    F: Fn() -> Fut,
+    F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, E>>,
     E: std::fmt::Display,
 {

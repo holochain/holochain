@@ -196,9 +196,9 @@ impl ReconnectingAdminWebsocket {
         config: ReconnectConfig,
     ) -> ConductorApiResult<Self> {
         let address = socket_addr.into();
-        let first_addrs = std::cell::RefCell::new(Some(resolve(&address).await?));
+        let mut first_addrs = Some(resolve(&address).await?);
         let connected = connect_with_backoff("holochain_client::admin", &config, || {
-            let first_addrs = first_addrs.borrow_mut().take();
+            let first_addrs = first_addrs.take();
             async {
                 let addrs = match first_addrs {
                     Some(addrs) => addrs,
