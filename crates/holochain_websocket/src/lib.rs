@@ -315,7 +315,10 @@ struct WsCore {
 }
 
 #[derive(Clone)]
-struct WsCoreSync(Arc<std::sync::Mutex<Option<WsCore>>>);
+struct WsCoreSync(
+    Arc<std::sync::Mutex<Option<WsCore>>>,
+    tokio::sync::watch::Sender<bool>,
+);
 
 impl PartialEq for WsCoreSync {
     fn eq(&self, other: &Self) -> bool {
@@ -326,6 +329,7 @@ impl PartialEq for WsCoreSync {
 impl WsCoreSync {
     fn close(&self) {
         if let Some(core) = self.0.lock().unwrap().take() {
+            self.1.send_replace(true);
             core.rmap.close();
             tokio::task::spawn(async move {
                 use futures::sink::SinkExt;
@@ -484,6 +488,24 @@ impl WebsocketReceiver {
     }
 
     async fn recv_inner<D>(&mut self) -> WebsocketResult<ReceiveMessage<D>>
+    where
+        D: std::fmt::Debug,
+        SerializedBytes: TryInto<D, Error = SerializedBytesError>,
+    {
+        // The send half can close the core while the peer stays silent.
+        // Subscribe before polling recv so a close cannot be missed.
+        let mut closed = self.0 .1.subscribe();
+        if *closed.borrow() {
+            return Err(WebsocketError::Close("No connection".to_string()));
+        }
+        tokio::select! {
+            biased;
+            _ = closed.changed() => Err(WebsocketError::Close("No connection".to_string())),
+            result = self.recv_frames() => result,
+        }
+    }
+
+    async fn recv_frames<D>(&mut self) -> WebsocketResult<ReceiveMessage<D>>
     where
         D: std::fmt::Debug,
         SerializedBytes: TryInto<D, Error = SerializedBytesError>,
@@ -727,7 +749,8 @@ fn split(
         timeout,
     };
 
-    let core_send = WsCoreSync(Arc::new(std::sync::Mutex::new(Some(core))));
+    let (closed, _) = tokio::sync::watch::channel(false);
+    let core_send = WsCoreSync(Arc::new(std::sync::Mutex::new(Some(core))), closed);
     let core_recv = core_send.clone();
 
     Ok((

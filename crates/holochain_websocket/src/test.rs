@@ -84,19 +84,36 @@ async fn send_timeout_closes_the_connection() {
     let addr = listener.local_addrs().unwrap()[0];
     let connecting = tokio::spawn(connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), addr));
     let (_server_sender, _server_receiver) = listener.accept().await.unwrap();
-    let (sender, _receiver) = connecting.await.unwrap().unwrap();
+    let (sender, mut receiver) = connecting.await.unwrap().unwrap();
 
     // Block sending rather than awaiting a response: only this timeout tears
     // down the websocket, while a response timeout leaves it usable.
-    let WsCoreSync(inner) = &sender.0;
+    let WsCoreSync(inner, _) = &sender.0;
     let core = inner.lock().unwrap().as_ref().unwrap().clone();
     let _send_lock = core.send.lock().await;
+    // The peer sends nothing. Ensure recv is actually pending on its frame
+    // stream before the send half times out, including after cancellation.
+    let mut receive = Box::pin(receiver.recv::<Request>());
+    assert!(futures::poll!(receive.as_mut()).is_pending());
+    drop(receive);
+    let mut receive = Box::pin(receiver.recv::<Request>());
+    assert!(futures::poll!(receive.as_mut()).is_pending());
     let err = sender
         .request_timeout::<_, Request>(Request, std::time::Duration::from_millis(10))
         .await
         .unwrap_err();
     assert!(matches!(err, WebsocketError::SendTimeout(_)));
     assert!(err.is_connection_closed());
+    let receive_err = tokio::time::timeout(std::time::Duration::from_secs(1), receive.as_mut())
+        .await
+        .expect("receiver remained blocked after sender closed")
+        .unwrap_err();
+    assert!(matches!(receive_err, WebsocketError::Close(_)));
+    drop(receive);
+    assert!(matches!(
+        receiver.recv::<Request>().await,
+        Err(WebsocketError::Close(_))
+    ));
     assert!(matches!(
         sender.signal(Request).await,
         Err(WebsocketError::Close(_))
@@ -117,7 +134,9 @@ async fn response_timeout_preserves_the_connection() {
     let addr = listener.local_addrs().unwrap()[0];
     let connecting = tokio::spawn(connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), addr));
     let (_server_sender, _server_receiver) = listener.accept().await.unwrap();
-    let (sender, _receiver) = connecting.await.unwrap().unwrap();
+    let (sender, mut receiver) = connecting.await.unwrap().unwrap();
+    let mut receive = Box::pin(receiver.recv::<Request>());
+    assert!(futures::poll!(receive.as_mut()).is_pending());
 
     let err = sender
         .request_timeout::<_, Request>(Request, std::time::Duration::from_millis(10))
@@ -125,6 +144,8 @@ async fn response_timeout_preserves_the_connection() {
         .unwrap_err();
     assert!(matches!(err, WebsocketError::Timeout(_)));
     assert!(!err.is_connection_closed());
+    assert!(futures::poll!(receive.as_mut()).is_pending());
+    drop(receive);
     sender.signal(Request).await.unwrap();
 }
 
