@@ -267,8 +267,10 @@ async fn signals_resume_on_the_same_subscription_after_a_restart() {
     // requested port. The subscription still resumes.
     let interrupted = tokio::time::timeout(Duration::from_secs(90), async {
         loop {
-            if let Some(holochain_client::SignalEvent::Interrupted) = signals.next().await {
-                return;
+            match signals.next().await {
+                Some(holochain_client::SignalEvent::Interrupted) => return,
+                Some(holochain_client::SignalEvent::Signal(_)) => {}
+                None => panic!("signal subscription closed before reconnection"),
             }
         }
     })
@@ -426,6 +428,7 @@ async fn a_connection_that_drops_immediately_is_backed_off() {
                     }
                     Err(_) => {
                         rejected.fetch_add(1, Ordering::SeqCst);
+                        break;
                     }
                 }
             }
