@@ -96,7 +96,9 @@ async fn app_interface_discovery_finds_a_matching_interface() {
             0,
             None,
             holochain_client::AllowedOrigins::Origins(
-                vec![common::FIXTURE_ORIGIN.to_string()].into_iter().collect(),
+                vec![common::FIXTURE_ORIGIN.to_string()]
+                    .into_iter()
+                    .collect(),
             ),
             Some(app_id.clone()),
         )
@@ -244,6 +246,36 @@ async fn app_requests_fail_fast_while_disconnected() {
             }
         }
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn custom_app_websocket_config_limits_response_size() {
+    let common::FixtureApp {
+        conductor: _conductor,
+        admin_port,
+        app_id,
+        signer,
+        ..
+    } = common::install_fixture_app_with_fixed_admin_port().await;
+
+    let config = Arc::new(WebsocketConfig {
+        max_message_size: 1,
+        ..WebsocketConfig::CLIENT_DEFAULT
+    });
+    let result = holochain_client::ReconnectingAppWebsocket::builder(
+        SocketAddr::new(Ipv4Addr::LOCALHOST.into(), admin_port),
+        app_id,
+        signer,
+    )
+    .origin(common::FIXTURE_ORIGIN)
+    .websocket_config(config)
+    .connect()
+    .await;
+
+    assert!(
+        matches!(result, Err(ConductorApiError::WebsocketError(_))),
+        "expected an oversized app response to fail, got {result:?}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
