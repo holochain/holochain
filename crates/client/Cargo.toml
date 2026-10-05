@@ -37,7 +37,13 @@ tracing = "0.1"
 
 [dev-dependencies]
 bytes = "1.10.1"
-tokio = { version = "1.36", features = ["macros", "net", "rt-multi-thread", "test-util", "time"] }
+tokio = { version = "1.36", features = [
+  "macros",
+  "net",
+  "rt-multi-thread",
+  "test-util",
+  "time",
+] }
 mr_bundle = { version = "^0.8.0-dev.5", path = "../mr_bundle" }
 holochain = { version = "^0.8.0-dev.9", path = "../holochain", default-features = false, features = [
   "sweettest",
