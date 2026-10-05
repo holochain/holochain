@@ -1,6 +1,6 @@
 use crate::app_connect::discover_app_interface_port;
 use crate::error::{ConductorApiError, ConductorApiResult};
-use crate::reconnect::{connect_with_backoff, delay_for_attempt, delegate, ReconnectConfig};
+use crate::reconnect::{connect_with_backoff, delegate, reconnect_after_close, ReconnectConfig};
 use crate::signal_stream::{signal_stream, SignalEvent, SignalStream, SIGNAL_CHANNEL_CAPACITY};
 use crate::util::{AbortOnDropHandle, ClosedNotify};
 use crate::{AdminWebsocket, AppWebsocket, DynAgentSigner, ReconnectingAdminWebsocket};
@@ -157,30 +157,15 @@ impl ReconnectingAppWebsocketBuilder {
                 let mut closed = closed;
                 let mut flaps: u32 = 0;
                 loop {
-                    let connected_at = std::time::Instant::now();
-                    closed.closed().await;
-                    current.write().take();
-
-                    // A connection accepted and then dropped straight away
-                    // would otherwise reconnect with no delay, because the
-                    // backoff counter only advances on failed connects. Count
-                    // a short-lived connection as a failed attempt.
-                    if connected_at.elapsed() < config.initial_delay {
-                        let delay = delay_for_attempt(flaps, &config);
-                        tracing::warn!(
-                            target: "holochain_client::app",
-                            flaps,
-                            ?delay,
-                            "connection closed shortly after connecting, backing off before reconnecting"
-                        );
-                        flaps = flaps.saturating_add(1);
-                        tokio::time::sleep(delay).await;
-                    } else {
-                        flaps = 0;
-                    }
-
-                    let (app_ws, next_closed) =
-                        connect_with_backoff("holochain_client::app", &config, || {
+                    let (app_ws, next_closed) = reconnect_after_close(
+                        closed,
+                        &mut flaps,
+                        "holochain_client::app",
+                        &config,
+                        || {
+                            current.write().take();
+                        },
+                        || {
                             connect_app(
                                 &admin_ws,
                                 admin_addr,
@@ -189,8 +174,9 @@ impl ReconnectingAppWebsocketBuilder {
                                 signer.clone(),
                                 websocket_config.clone(),
                             )
-                        })
-                        .await;
+                        },
+                    )
+                    .await;
 
                     // Install the forwarder before reporting recovery. Signals
                     // received before `Interrupted` may be followed by a

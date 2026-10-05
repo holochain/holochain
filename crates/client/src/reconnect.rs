@@ -1,6 +1,6 @@
 use rand::Rng;
 use std::future::Future;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Controls how a resilient connection backs off between reconnect attempts.
 ///
@@ -92,6 +92,47 @@ where
             }
         }
     }
+}
+
+/// Waits for a live connection to close, clears it, and retries with backoff.
+///
+/// `on_disconnected` must remove the dead socket before any delay or retry, so
+/// requests fail fast while reconnecting. Publishing the replacement remains
+/// the caller's responsibility (app signals need a forwarder first).
+pub(crate) async fn reconnect_after_close<F, Fut, T, E>(
+    closed: crate::util::ClosedNotify,
+    flaps: &mut u32,
+    label: &str,
+    config: &ReconnectConfig,
+    on_disconnected: impl FnOnce(),
+    factory: F,
+) -> T
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<T, E>>,
+    E: std::fmt::Display,
+{
+    let connected_at = Instant::now();
+    closed.closed().await;
+    on_disconnected();
+
+    // A connection accepted and then dropped straight away would otherwise
+    // reconnect with no delay: failed connects are backed off separately.
+    if connected_at.elapsed() < config.initial_delay {
+        let delay = delay_for_attempt(*flaps, config);
+        tracing::warn!(
+            connection = label,
+            flaps = *flaps,
+            ?delay,
+            "connection closed shortly after connecting, backing off before reconnecting"
+        );
+        *flaps = (*flaps).saturating_add(1);
+        tokio::time::sleep(delay).await;
+    } else {
+        *flaps = 0;
+    }
+
+    connect_with_backoff(label, config, factory).await
 }
 
 /// Defines a method on a reconnecting wrapper that forwards to the live socket.
