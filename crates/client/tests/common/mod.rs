@@ -54,6 +54,9 @@ pub async fn conductor_on_admin_port(port: u16) -> SweetConductor {
     SweetConductor::from_config_rendezvous(config, SweetLocalRendezvous::new().await).await
 }
 
+/// Origin permitted by the fixture app interface.
+pub const FIXTURE_ORIGIN: &str = "my-service";
+
 /// The zome the fixture app exposes.
 pub const FIXTURE_ZOME_NAME: &str = "foo";
 
@@ -109,7 +112,7 @@ pub async fn install_fixture_app_with_fixed_admin_port() -> FixtureApp {
         .attach_app_interface(
             0,
             None,
-            AllowedOrigins::Origins(vec!["my-service".to_string()].into_iter().collect()),
+            AllowedOrigins::Origins(vec![FIXTURE_ORIGIN.to_string()].into_iter().collect()),
             Some(app_id.clone()),
         )
         .await
@@ -123,7 +126,7 @@ pub async fn install_fixture_app_with_fixed_admin_port() -> FixtureApp {
     let port = holochain_client::discover_app_interface_port_for_test(
         &admin_ws,
         &app_id,
-        Some("my-service"),
+        Some(FIXTURE_ORIGIN),
     )
     .await
     .unwrap();
@@ -133,7 +136,7 @@ pub async fn install_fixture_app_with_fixed_admin_port() -> FixtureApp {
         (Ipv4Addr::LOCALHOST, port),
         token,
         signer.clone().into(),
-        Some("my-service".to_string()),
+        Some(FIXTURE_ORIGIN.to_string()),
     )
     .await
     .unwrap();
@@ -164,7 +167,7 @@ pub async fn discover_fixture_app_port(admin_port: u16, app_id: &InstalledAppId)
         .await
         .unwrap();
 
-    holochain_client::discover_app_interface_port_for_test(&admin_ws, app_id, Some("my-service"))
+    holochain_client::discover_app_interface_port_for_test(&admin_ws, app_id, Some(FIXTURE_ORIGIN))
         .await
         .unwrap()
 }

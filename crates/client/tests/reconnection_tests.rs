@@ -96,7 +96,7 @@ async fn app_interface_discovery_finds_a_matching_interface() {
             0,
             None,
             holochain_client::AllowedOrigins::Origins(
-                vec!["my-service".to_string()].into_iter().collect(),
+                vec![common::FIXTURE_ORIGIN.to_string()].into_iter().collect(),
             ),
             Some(app_id.clone()),
         )
@@ -106,7 +106,7 @@ async fn app_interface_discovery_finds_a_matching_interface() {
     let found = holochain_client::discover_app_interface_port_for_test(
         &admin_ws,
         &app_id,
-        Some("my-service"),
+        Some(common::FIXTURE_ORIGIN),
     )
     .await
     .unwrap();
@@ -222,7 +222,7 @@ async fn app_requests_fail_fast_while_disconnected() {
         app_id,
         signer,
     )
-    .origin("my-service")
+    .origin(common::FIXTURE_ORIGIN)
     .connect()
     .await
     .unwrap();
@@ -261,7 +261,7 @@ async fn signals_resume_on_the_same_subscription_after_a_restart() {
         app_id.clone(),
         signer,
     )
-    .origin("my-service")
+    .origin(common::FIXTURE_ORIGIN)
     .connect()
     .await
     .unwrap();
