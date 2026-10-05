@@ -32,6 +32,11 @@ the hostname is resolved again for each reconnect attempt. A concrete socket
 address or address list is reused unchanged. Custom `ToSocketAddrs`
 implementations should be converted to an address list before connecting.
 
+Set `ReconnectingAppWebsocket::builder(...).websocket_config(config)` to use
+a custom `Arc<WebsocketConfig>` for the initial app connection and every
+reconnect. This controls app transport limits and request timeouts; it does
+not change the admin connection's configuration.
+
 Requests made while a connection is down return
 `ConductorApiError::Disconnected`. Before the client notices a dead connection,
 a request may instead return the underlying websocket error. Neither is
