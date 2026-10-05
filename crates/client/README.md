@@ -28,9 +28,10 @@ start; the latter never gives up, so bound it with `tokio::time::timeout` if
 you need it to.
 
 Requests made while a connection is down return
-`ConductorApiError::Disconnected`; retry them once the connection is back.
-Zome calls are never retried for you, because re-signing one mints a fresh
-nonce and could write to the source chain twice.
+`ConductorApiError::Disconnected`. Before the client notices a dead connection,
+a request may instead return the underlying websocket error. Neither is
+retried automatically: a failed zome call may already have written to the
+source chain, and re-signing it would mint a new nonce and risk a second write.
 
 Signals emitted while a client is disconnected are lost — Holochain has no
 signal replay. A `SignalStream` therefore reports `SignalEvent::Interrupted`
