@@ -130,6 +130,10 @@ impl ReconnectingAppWebsocketBuilder {
         Ok(self.start(admin_ws, connected).await)
     }
 
+    /// Starts signal forwarding and the background reconnection task.
+    ///
+    /// On recovery, the replacement socket's forwarder is installed before
+    /// the socket is published and subscribers receive `Interrupted`.
     async fn start(
         self,
         admin_ws: ReconnectingAdminWebsocket,
@@ -214,6 +218,11 @@ impl ReconnectingAppWebsocketBuilder {
 /// [`ReconnectingAppWebsocket::signals`] survive reconnects.
 ///
 /// Reconnection never gives up. Drop every clone of this handle to stop it.
+///
+/// The admin interface must remain reachable for the lifetime of this handle:
+/// each app reconnection uses it to find the current app interface and issue
+/// a fresh authentication token. Keep that privileged interface accessible
+/// only to trusted processes.
 #[derive(Clone)]
 pub struct ReconnectingAppWebsocket {
     current: Arc<RwLock<Option<AppWebsocket>>>,
@@ -372,6 +381,10 @@ impl ReconnectingAppWebsocket {
     );
 }
 
+/// Forwards signals from the current app socket to long-lived subscriptions.
+///
+/// A new callback is installed on every replacement socket; subscribers keep
+/// receiving from the same broadcast channel.
 async fn forward_signals(app_ws: &AppWebsocket, signal_tx: broadcast::Sender<SignalEvent>) {
     app_ws
         .on_signal(move |signal| {
@@ -380,6 +393,10 @@ async fn forward_signals(app_ws: &AppWebsocket, signal_tx: broadcast::Sender<Sig
         .await;
 }
 
+/// Discovers the app interface and authenticates with a freshly issued token.
+///
+/// Both steps are repeated on every reconnect because the app port can change
+/// and authentication tokens do not survive a conductor restart.
 async fn connect_app(
     admin_ws: &ReconnectingAdminWebsocket,
     admin_addr: SocketAddr,

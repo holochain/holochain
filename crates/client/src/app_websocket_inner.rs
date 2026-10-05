@@ -61,6 +61,9 @@ impl AppWebsocketInner {
     }
 
     /// Connect to a Conductor API app websocket with a custom [WebsocketConfig] and [ConnectRequest].
+    ///
+    /// A background receiver dispatches signals and resolves the returned
+    /// `ClosedNotify` when the connection ends.
     pub async fn connect_with_config_and_request(
         websocket_config: Arc<WebsocketConfig>,
         request: ConnectRequest,

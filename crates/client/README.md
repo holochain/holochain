@@ -27,6 +27,11 @@ worth reporting, and `connect_with_retry` when you are waiting for one to
 start; the latter never gives up, so bound it with `tokio::time::timeout` if
 you need it to.
 
+`ReconnectingAppWebsocket` needs a reachable admin interface throughout its
+lifetime, not just at setup: after a restart it must rediscover the app
+interface and issue a new app authentication token. Use it only from a trusted
+process allowed ongoing access to the conductor's privileged admin interface.
+
 Admin connections can use a hostname (for example, `"localhost:30000"`);
 the hostname is resolved again for each reconnect attempt. A concrete socket
 address or address list is reused unchanged. Custom `ToSocketAddrs`

@@ -212,6 +212,9 @@ impl ReconnectingAdminWebsocket {
         Ok(Self::start(address, origin, config, connected))
     }
 
+    /// Starts the task that clears a closed socket and publishes its replacement.
+    ///
+    /// The task keeps retrying until the last wrapper clone is dropped.
     fn start(
         address: ReconnectAdminAddress,
         origin: Option<String>,
@@ -422,6 +425,10 @@ impl ReconnectingAdminWebsocket {
     );
 }
 
+/// Resolves hostname inputs on this attempt without copying concrete addresses.
+///
+/// An empty concrete list or DNS result returns `NoAddressesResolved` before
+/// any connection attempt.
 async fn resolve(address: &ReconnectAdminAddress) -> ConductorApiResult<Cow<'_, [SocketAddr]>> {
     let addrs = match address {
         ReconnectAdminAddress::Socket(addr) => Cow::Borrowed(std::slice::from_ref(addr)),
@@ -441,6 +448,10 @@ async fn resolve(address: &ReconnectAdminAddress) -> ConductorApiResult<Cow<'_, 
     Ok(addrs)
 }
 
+/// Resolves the current address and tries its endpoints in order.
+///
+/// Repeating this for each attempt lets hostname-based handles follow DNS
+/// changes while a supplied list of concrete addresses remains unchanged.
 async fn connect_address(
     address: &ReconnectAdminAddress,
     origin: &Option<String>,
@@ -449,6 +460,10 @@ async fn connect_address(
     connect_once(&addrs, origin).await
 }
 
+/// Opens the first accepting admin endpoint from a resolved address list.
+///
+/// If all attempts fail, returns the last connection error; an empty list
+/// returns `NoAddressesResolved`.
 async fn connect_once(
     addrs: &[SocketAddr],
     origin: &Option<String>,

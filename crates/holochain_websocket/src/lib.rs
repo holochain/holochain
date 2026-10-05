@@ -327,6 +327,10 @@ impl PartialEq for WsCoreSync {
 }
 
 impl WsCoreSync {
+    /// Closes the shared core and wakes receivers even when the peer is silent.
+    ///
+    /// Pending request responders are failed immediately; the sink close runs
+    /// separately so a blocked send lock cannot delay the notification.
     fn close(&self) {
         if let Some(core) = self.0.lock().unwrap().take() {
             self.1.send_replace(true);
@@ -487,6 +491,10 @@ impl WebsocketReceiver {
         }
     }
 
+    /// Receives a frame or wakes when the send half closes the shared core.
+    ///
+    /// Subscribing before polling frames prevents a close from being missed
+    /// when the peer does not send a final frame.
     async fn recv_inner<D>(&mut self) -> WebsocketResult<ReceiveMessage<D>>
     where
         D: std::fmt::Debug,
@@ -505,6 +513,10 @@ impl WebsocketReceiver {
         }
     }
 
+    /// Dispatches responses and control frames until a request or signal arrives.
+    ///
+    /// A response completes its pending sender, while ping frames are answered
+    /// here instead of being yielded to the caller.
     async fn recv_frames<D>(&mut self) -> WebsocketResult<ReceiveMessage<D>>
     where
         D: std::fmt::Debug,

@@ -9,6 +9,11 @@
 //! identified by the admin address and the installed app id rather than by an
 //! app interface port.
 //!
+//! [`ReconnectingAppWebsocket`] retains access to the admin interface for its
+//! entire lifetime: each reconnect discovers the app interface and issues a
+//! new authentication token. Use it only in trusted processes allowed ongoing
+//! admin access.
+//!
 //! `connect` fails if the conductor does not accept, which suits a CLI.
 //! `connect_with_retry` waits for a conductor that has not started yet; bound
 //! it with [`tokio::time::timeout`] if you do not want to wait forever.
