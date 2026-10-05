@@ -152,7 +152,7 @@ async fn app_interface_discovery_finds_a_matching_interface() {
     drop(conductor);
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn connect_fails_fast_when_nothing_is_listening() {
     let port = common::free_port();
 
@@ -395,7 +395,7 @@ async fn dropping_the_connection_stops_reconnecting() {
     acceptor.abort();
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn a_connection_that_drops_immediately_is_backed_off() {
     // A peer that completes the websocket handshake and then closes drives the
     // uptime guard, which the handshake-failing paths do not reach because
