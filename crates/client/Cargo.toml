@@ -1,6 +1,6 @@
 [package]
 name = "holochain_client"
-version = "0.10.0-dev.8"
+version = "0.10.0-dev.9"
 description = "A Rust client for the Holochain Conductor API"
 authors = [
   "Holochain Core Dev Team <devcore@holochain.org>",
@@ -19,11 +19,11 @@ async-trait = "0.1"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 event-emitter-rs = "0.1"
 
-holochain_conductor_api = { version = "^0.8.0-dev.8", path = "../holochain_conductor_api" }
+holochain_conductor_api = { version = "^0.8.0-dev.9", path = "../holochain_conductor_api" }
 holo_hash = { version = "0.9.0-dev.7", features = ["encoding"] }
 holochain_nonce = { version = "0.9.0-dev.2" }
-holochain_types = { version = "^0.8.0-dev.8", path = "../holochain_types" }
-holochain_websocket = { version = "^0.8.0-dev.8", path = "../holochain_websocket" }
+holochain_types = { version = "^0.8.0-dev.9", path = "../holochain_types" }
+holochain_websocket = { version = "^0.8.0-dev.9", path = "../holochain_websocket" }
 holochain_zome_types = "0.9.0-dev.2"
 holochain_serialized_bytes = "0.0.57"
 kitsune2_api = "0.6.0-dev.1"
@@ -36,11 +36,11 @@ tokio = { version = "1.36", features = ["rt"] }
 
 [dev-dependencies]
 bytes = "1.10.1"
-mr_bundle = { version = "^0.8.0-dev.4", path = "../mr_bundle" }
-holochain = { version = "^0.8.0-dev.8", path = "../holochain", default-features = false, features = [
+mr_bundle = { version = "^0.8.0-dev.5", path = "../mr_bundle" }
+holochain = { version = "^0.8.0-dev.9", path = "../holochain", default-features = false, features = [
   "sweettest",
 ] }
-holochain_wasm_test_utils = { version = "^0.8.0-dev.8", path = "../test_utils/wasm" }
+holochain_wasm_test_utils = { version = "^0.8.0-dev.9", path = "../test_utils/wasm" }
 
 kitsune2_core = "0.6.0-dev.1"
 kitsune2_test_utils = "0.6.0-dev.1"
