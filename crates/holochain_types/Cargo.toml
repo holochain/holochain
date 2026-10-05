@@ -28,7 +28,7 @@ kitsune2_api = "0.6.0-dev.1"
 itertools = { version = "0.14" }
 mr_bundle = { path = "../mr_bundle", features = [
   "fs",
-], version = "^0.8.0-dev.5"}
+], version = "^0.8.0-dev.5" }
 must_future = "0.1.1"
 nanoid = "0.4"
 parking_lot = "0.12"
