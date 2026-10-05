@@ -176,15 +176,13 @@ impl ReconnectingAppWebsocketBuilder {
                         })
                         .await;
 
-                    // The connection is published before the gap is
-                    // reported, so a consumer woken by `Interrupted` re-syncs
-                    // against a live connection. A signal arriving before the
-                    // forwarder is registered is dropped, which is what the
-                    // `Interrupted` that precedes it tells the consumer to
-                    // recover.
-                    current.write().replace(app_ws.clone());
-                    let _ = signal_tx.send(SignalEvent::Interrupted);
+                    // Install the forwarder before reporting recovery. Signals
+                    // received before `Interrupted` may be followed by a
+                    // re-sync, but no signal can be silently lost after the
+                    // consumer starts re-syncing against the published socket.
                     forward_signals(&app_ws, signal_tx.clone()).await;
+                    current.write().replace(app_ws);
+                    let _ = signal_tx.send(SignalEvent::Interrupted);
 
                     closed = next_closed;
                 }
