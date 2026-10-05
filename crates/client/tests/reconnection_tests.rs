@@ -209,8 +209,13 @@ async fn connect_with_retry_waits_for_the_conductor() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_requests_fail_fast_while_disconnected() {
-    let (mut conductor, admin_port, app_id, signer, _app_port) =
-        common::install_fixture_app_with_fixed_admin_port().await;
+    let common::FixtureApp {
+        mut conductor,
+        admin_port,
+        app_id,
+        signer,
+        ..
+    } = common::install_fixture_app_with_fixed_admin_port().await;
 
     let app_ws = holochain_client::ReconnectingAppWebsocket::builder(
         SocketAddr::new(Ipv4Addr::LOCALHOST.into(), admin_port),
@@ -243,8 +248,13 @@ async fn app_requests_fail_fast_while_disconnected() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn signals_resume_on_the_same_subscription_after_a_restart() {
-    let (mut conductor, admin_port, app_id, signer, app_port) =
-        common::install_fixture_app_with_fixed_admin_port().await;
+    let common::FixtureApp {
+        mut conductor,
+        admin_port,
+        app_id,
+        signer,
+        app_port,
+    } = common::install_fixture_app_with_fixed_admin_port().await;
 
     let app_ws = holochain_client::ReconnectingAppWebsocket::builder(
         SocketAddr::new(Ipv4Addr::LOCALHOST.into(), admin_port),

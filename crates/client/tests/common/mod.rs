@@ -64,10 +64,23 @@ pub const FIXTURE_EMIT_FN_NAME: &str = "emitter";
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TestString(pub String);
 
+/// An installed app and the addresses and signer used by reconnection tests.
+pub struct FixtureApp {
+    /// Conductor that hosts the fixture app.
+    pub conductor: SweetConductor,
+    /// Stable admin interface port.
+    pub admin_port: u16,
+    /// Installed app identifier.
+    pub app_id: InstalledAppId,
+    /// Signer authorized to call the fixture zome.
+    pub signer: DynAgentSigner,
+    /// Initial app interface port, which may change on restart.
+    pub app_port: u16,
+}
+
 /// Installs the fixture app on a conductor whose admin port survives a restart,
-/// and returns a signer authorized to call its zomes.
-pub async fn install_fixture_app_with_fixed_admin_port(
-) -> (SweetConductor, u16, InstalledAppId, DynAgentSigner, u16) {
+/// and returns its connection details and authorized signer.
+pub async fn install_fixture_app_with_fixed_admin_port() -> FixtureApp {
     let (conductor, admin_port) = conductor_with_fixed_admin_port().await;
 
     let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port), None)
@@ -136,7 +149,13 @@ pub async fn install_fixture_app_with_fixed_admin_port(
         .unwrap();
     signer.add_credentials(cell_id, credentials);
 
-    (conductor, admin_port, app_id, signer.into(), port)
+    FixtureApp {
+        conductor,
+        admin_port,
+        app_id,
+        signer: signer.into(),
+        app_port: port,
+    }
 }
 
 /// Discovers the port the fixture app's interface is currently listening on.
