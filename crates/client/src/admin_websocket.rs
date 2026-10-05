@@ -387,6 +387,37 @@ impl AdminWebsocket {
         }
     }
 
+    /// Grants agents the capability to send direct signals to a cell.
+    ///
+    /// Returns the action hash of the committed capability grant.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent or the conductor rejects the grant.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the conductor returns a response other than
+    /// [`AdminResponse::DirectSignalCapabilityGranted`].
+    pub async fn grant_direct_signal_capability(
+        &self,
+        cell_id: CellId,
+        tag: String,
+        constraint: GrantConstraint,
+    ) -> ConductorApiResult<ActionHash> {
+        let msg = AdminRequest::GrantDirectSignalCapability {
+            cell_id,
+            tag,
+            constraint,
+        };
+        let response = self.send(msg).await?;
+
+        match response {
+            AdminResponse::DirectSignalCapabilityGranted(action_hash) => Ok(action_hash),
+            _ => unreachable!("Unexpected response {response:?}"),
+        }
+    }
+
     pub async fn list_capability_grants(
         &self,
         installed_app_id: String,

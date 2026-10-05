@@ -2790,6 +2790,58 @@ mod misc_impls {
         ) -> ConductorApiResult<ActionHash> {
             let GrantZomeCallCapabilityPayload { cell_id, cap_grant } = payload;
 
+            self.commit_cap_grant(cell_id, cap_grant.into()).await
+        }
+
+        /// Grants the capability to send direct signals to a cell.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the cell cannot initialize or the grant cannot be committed.
+        pub async fn grant_direct_signal_capability(
+            self: &Arc<Self>,
+            cell_id: CellId,
+            tag: String,
+            constraint: GrantConstraint,
+        ) -> ConductorApiResult<ActionHash> {
+            self.commit_cap_grant(cell_id, CapGrant::new_direct_signal_grant(tag, constraint))
+                .await
+        }
+
+        /// Grants the capability to send direct signals to a cell of the given app.
+        ///
+        /// Fails without committing anything when the cell does not belong to the app.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the app or cell is unavailable, the cell does not belong to the
+        /// app, initialization fails, or the grant cannot be committed.
+        pub async fn grant_direct_signal_capability_for_app(
+            self: &Arc<Self>,
+            installed_app_id: &InstalledAppId,
+            cell_id: CellId,
+            tag: String,
+            constraint: GrantConstraint,
+        ) -> ConductorApiResult<ActionHash> {
+            let state = self.get_state().await?;
+            let installed_app = state.get_app(installed_app_id)?;
+            // `all_cells()` borrows from `state`; binding the result forces the
+            // iterator to drop before `state` does (E0597).
+            let belongs_to_app = installed_app.all_cells().any(|id| id == cell_id);
+            if !belongs_to_app {
+                return Err(ConductorApiError::Other("Cell not found in app".into()));
+            }
+
+            self.grant_direct_signal_capability(cell_id, tag, constraint)
+                .await
+        }
+
+        /// Commit a capability grant to the source chain of a cell, returning its action hash.
+        async fn commit_cap_grant(
+            self: &Arc<Self>,
+            cell_id: CellId,
+            cap_grant: CapGrant,
+        ) -> ConductorApiResult<ActionHash> {
             // Must init before committing a grant
             let cell = self.cell_by_id(&cell_id).await?;
             cell.check_or_run_zome_init().await?;
@@ -2801,7 +2853,7 @@ mod misc_impls {
             )
             .await?;
 
-            let cap_grant_entry = Entry::CapGrant(cap_grant.into());
+            let cap_grant_entry = Entry::CapGrant(cap_grant);
             let entry_hash = EntryHash::with_data_sync(&cap_grant_entry);
             let action_data = ActionData::Create(CreateData {
                 entry_type: EntryType::CapGrant,
