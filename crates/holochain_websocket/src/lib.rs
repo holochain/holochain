@@ -253,9 +253,12 @@ pub enum WebsocketError {
     /// A websocket error from the underlying tungstenite library.
     #[error("Websocket error: {0}")]
     Websocket(#[from] Box<tokio_tungstenite::tungstenite::Error>),
-    /// A timeout occurred.
+    /// Waiting for a response timed out; the connection remains usable.
     #[error("Timeout")]
     Timeout(#[from] tokio::time::error::Elapsed),
+    /// Sending timed out and closed the connection.
+    #[error("Timed out sending on websocket: {0}")]
+    SendTimeout(tokio::time::error::Elapsed),
     /// An IO error occurred.
     #[error("IO error: {0}")]
     Io(#[from] Error),
@@ -276,10 +279,10 @@ pub enum WebsocketError {
 impl WebsocketError {
     /// Returns `true` if this error means the connection is no longer usable.
     ///
-    /// Errors raised inside `WsCoreSync::exec` tear the connection down and
-    /// return `true`. A request timeout, a dropped responder and a
-    /// deserialization failure are all raised outside `exec`, leave the
-    /// connection viable, and return `false`.
+    /// Errors raised inside `WsCoreSync::exec`, including send timeouts,
+    /// tear the connection down and return `true`. A response timeout,
+    /// a dropped responder and a deserialization failure happen outside
+    /// `exec`, leave the connection viable, and return `false`.
     pub fn is_connection_closed(&self) -> bool {
         matches!(
             self,
@@ -287,6 +290,7 @@ impl WebsocketError {
                 | WebsocketError::Websocket(_)
                 | WebsocketError::Io(_)
                 | WebsocketError::ReceiverClosed
+                | WebsocketError::SendTimeout(_)
                 | WebsocketError::UnexpectedRawFrame
         )
     }
@@ -389,7 +393,8 @@ impl WebsocketRespond {
                     core.send.lock().await.send(s).await.map_err(Box::new)?;
                     Ok(())
                 })
-                .await?
+                .await
+                .map_err(WebsocketError::SendTimeout)?
             })
             .await
     }
@@ -589,7 +594,8 @@ impl WebsocketSender {
                     core.send.lock().await.send(s).await.map_err(Box::new)?;
                     Ok(())
                 })
-                .await?
+                .await
+                .map_err(WebsocketError::SendTimeout)?
             })
             .await
     }
@@ -649,7 +655,8 @@ impl WebsocketSender {
 
                     Ok(drop)
                 })
-                .await?
+                .await
+                .map_err(WebsocketError::SendTimeout)?
             })
             .await?;
 
@@ -694,7 +701,8 @@ impl WebsocketSender {
                     core.send.lock().await.send(s).await.map_err(Box::new)?;
                     Ok(())
                 })
-                .await?
+                .await
+                .map_err(WebsocketError::SendTimeout)?
             })
             .await
     }
