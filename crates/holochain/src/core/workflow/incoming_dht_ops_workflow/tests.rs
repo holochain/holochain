@@ -376,3 +376,48 @@ async fn update_op_with_entry_not_matching_its_action_is_dropped() {
     .unwrap();
     verify_ops_present(&dht_store, vec![hash], true).await;
 }
+
+/// An op with a mismatching entry is dropped on its own: valid ops delivered
+/// in the same batch are still stored.
+#[tokio::test(flavor = "multi_thread")]
+async fn op_with_bad_entry_does_not_drop_valid_ops_in_batch() {
+    holochain_trace::test_run();
+
+    let space = TestSpace::new(fixt!(DnaHash));
+    let dht_store = space.space.dht_store.clone();
+    let keystore = test_keystore();
+    let (sys_validation_trigger, _) = TriggerSender::new();
+    let author = keystore.new_sign_keypair_random().await.unwrap();
+
+    let entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
+        vec![1, 3, 5],
+    ))));
+
+    let mut bad_action = fixt!(Action, CreateAction);
+    bad_action.header.author = author.clone();
+    *bad_action.entry_hash_mut().unwrap() = fixt!(EntryHash);
+    let signature = author.sign(&keystore, &bad_action).await.unwrap();
+    let bad_op: DhtOp = ChainOp::CreateEntry(
+        SignedAction::new(bad_action, signature),
+        OpEntry::Present(entry.clone()),
+    )
+    .into();
+    let bad_hash = DhtOpHash::with_data_sync(&bad_op);
+
+    let mut good_action = fixt!(Action, CreateLinkAction);
+    good_action.header.author = author.clone();
+    let signature = author.sign(&keystore, &good_action).await.unwrap();
+    let good_op: DhtOp = ChainOp::CreateLink(SignedAction::new(good_action, signature)).into();
+    let good_hash = DhtOpHash::with_data_sync(&good_op);
+
+    incoming_dht_ops_workflow(
+        space.space.clone(),
+        sys_validation_trigger,
+        vec![(bad_op, true), (good_op, true)],
+    )
+    .await
+    .unwrap();
+
+    verify_ops_present(&dht_store, vec![good_hash], true).await;
+    verify_ops_present(&dht_store, vec![bad_hash], false).await;
+}
