@@ -1887,6 +1887,142 @@ mod tests {
         Ok(())
     }
 
+    /// Commit `grant` to `author`'s chain and return its action hash.
+    async fn commit_cap_grant(
+        dht_store: &DhtStore,
+        keystore: &MetaLairClient,
+        author: &AgentPubKey,
+        grant: CapGrant,
+    ) -> SourceChainResult<ActionHash> {
+        let chain = SourceChain::new(dht_store.clone(), keystore.clone(), author.clone()).await?;
+        let (entry, entry_hash) =
+            EntryHashed::from_content_sync(Entry::CapGrant(grant)).into_inner();
+        let action = chain
+            .put(
+                ActionData::Create(CreateData {
+                    entry_type: EntryType::CapGrant,
+                    entry_hash,
+                }),
+                Some(entry),
+                ChainTopOrdering::default(),
+            )
+            .await?;
+        chain.flush(vec![DhtArc::Empty]).await.unwrap();
+        Ok(action)
+    }
+
+    /// A direct signal grant is matched on all three of capability, constraint and grant author.
+    ///
+    /// Unlike a zome call, the chain author gets no implicit access, so alice needs a committed
+    /// grant to be signalled even by herself.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn direct_signal_grant_validity() -> SourceChainResult<()> {
+        let TestCase {
+            agent_key: alice,
+            dht_store,
+            keystore,
+            ..
+        } = TestCase::new().await;
+
+        let bob = keystore.new_sign_keypair_random().await.unwrap();
+        let carol = keystore.new_sign_keypair_random().await.unwrap();
+        let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
+        let other_secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
+
+        let granted = |from: AgentPubKey, check_secret: Option<CapSecret>| {
+            let (dht_store, alice) = (dht_store.clone(), alice.clone());
+            async move {
+                dht_store
+                    .as_read()
+                    .valid_direct_signal_grant(&alice, &from, check_secret.as_ref())
+                    .await
+                    .unwrap()
+            }
+        };
+
+        // Nothing is committed, so nobody may signal alice — alice included.
+        assert_eq!(granted(bob.clone(), None).await, None);
+        assert_eq!(granted(alice.clone(), None).await, None);
+
+        // An unrestricted zome call grant must not authorize a direct signal.
+        commit_cap_grant(
+            &dht_store,
+            &keystore,
+            &alice,
+            CapGrant::new_zome_call_grant(
+                "zome-call".into(),
+                GrantConstraint::Unrestricted,
+                GrantedFunctions::All,
+            ),
+        )
+        .await?;
+        assert_eq!(granted(bob.clone(), None).await, None);
+
+        // An assigned direct signal grant admits its assignee holding the secret, and nobody else.
+        let assigned = CapGrant::new_direct_signal_grant(
+            "assigned".into(),
+            GrantConstraint::Assigned {
+                secret,
+                assignees: [bob.clone()].into_iter().collect(),
+            },
+        );
+        let assigned_action =
+            commit_cap_grant(&dht_store, &keystore, &alice, assigned.clone()).await?;
+
+        assert_eq!(
+            granted(bob.clone(), Some(secret)).await,
+            Some(assigned.into())
+        );
+        assert_eq!(granted(bob.clone(), Some(other_secret)).await, None);
+        assert_eq!(granted(bob.clone(), None).await, None);
+        assert_eq!(granted(carol.clone(), Some(secret)).await, None);
+
+        // Revoking it withdraws the access.
+        {
+            let chain =
+                SourceChain::new(dht_store.clone(), keystore.clone(), alice.clone()).await?;
+            let entry_hash =
+                EntryHashed::from_content_sync(Entry::CapGrant(CapGrant::new_direct_signal_grant(
+                    "assigned".into(),
+                    GrantConstraint::Assigned {
+                        secret,
+                        assignees: [bob.clone()].into_iter().collect(),
+                    },
+                )))
+                .into_hash();
+            chain
+                .put(
+                    ActionData::Delete(DeleteData {
+                        deletes_address: assigned_action,
+                        deletes_entry_address: entry_hash,
+                    }),
+                    None,
+                    ChainTopOrdering::default(),
+                )
+                .await?;
+            chain.flush(vec![DhtArc::Empty]).await.unwrap();
+        }
+        assert_eq!(granted(bob.clone(), Some(secret)).await, None);
+
+        // An unrestricted grant admits anyone signalling without a secret. Offering a secret
+        // narrows the candidates to the secret-bearing grants, as it does for a zome call.
+        let unrestricted =
+            CapGrant::new_direct_signal_grant("unrestricted".into(), GrantConstraint::Unrestricted);
+        commit_cap_grant(&dht_store, &keystore, &alice, unrestricted.clone()).await?;
+
+        assert_eq!(
+            granted(carol.clone(), None).await,
+            Some(unrestricted.clone().into())
+        );
+        assert_eq!(
+            granted(alice.clone(), None).await,
+            Some(unrestricted.into())
+        );
+        assert_eq!(granted(carol.clone(), Some(secret)).await, None);
+
+        Ok(())
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         holochain_trace::test_run();

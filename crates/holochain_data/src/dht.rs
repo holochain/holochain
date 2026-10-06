@@ -98,6 +98,57 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn action_reinsertion_promotes_pending_but_preserves_decided_validity() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let action = sample_action(0);
+        let author = action.action().author();
+
+        db.insert_action(&action, None).await.unwrap();
+        db.insert_action(&action, Some(RecordValidity::Accepted))
+            .await
+            .unwrap();
+        assert!(db
+            .as_ref()
+            .chain_head_for_author(author)
+            .await
+            .unwrap()
+            .is_some());
+
+        db.insert_action(&action, None).await.unwrap();
+        db.insert_action(&action, Some(RecordValidity::Rejected))
+            .await
+            .unwrap();
+        assert!(db
+            .as_ref()
+            .chain_head_for_author(author)
+            .await
+            .unwrap()
+            .is_some());
+
+        let rejected = sample_action(1);
+        db.insert_action(&rejected, Some(RecordValidity::Rejected))
+            .await
+            .unwrap();
+        db.insert_action(&rejected, Some(RecordValidity::Accepted))
+            .await
+            .unwrap();
+        let head = db
+            .as_ref()
+            .chain_head_for_author(author)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(head.0, *action.as_hash());
+        let rejected_status: Option<i64> =
+            sqlx::query_scalar("SELECT record_validity FROM Action WHERE hash = ?")
+                .bind(rejected.as_hash().get_raw_36())
+                .fetch_one(db.pool())
+                .await
+                .unwrap();
+        assert_eq!(rejected_status, Some(i64::from(RecordValidity::Rejected)));
+    }
+
+    #[tokio::test]
     async fn actions_by_author() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let inserted: Vec<_> = (0..3u8).map(sample_action).collect();
