@@ -2790,6 +2790,58 @@ mod misc_impls {
         ) -> ConductorApiResult<ActionHash> {
             let GrantZomeCallCapabilityPayload { cell_id, cap_grant } = payload;
 
+            self.commit_cap_grant(cell_id, cap_grant.into()).await
+        }
+
+        /// Grants the capability to send direct signals to a cell.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the cell cannot initialize or the grant cannot be committed.
+        pub async fn grant_direct_signal_capability(
+            self: &Arc<Self>,
+            cell_id: CellId,
+            tag: String,
+            constraint: GrantConstraint,
+        ) -> ConductorApiResult<ActionHash> {
+            self.commit_cap_grant(cell_id, CapGrant::new_direct_signal_grant(tag, constraint))
+                .await
+        }
+
+        /// Grants the capability to send direct signals to a cell of the given app.
+        ///
+        /// Fails without committing anything when the cell does not belong to the app.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the app or cell is unavailable, the cell does not belong to the
+        /// app, initialization fails, or the grant cannot be committed.
+        pub async fn grant_direct_signal_capability_for_app(
+            self: &Arc<Self>,
+            installed_app_id: &InstalledAppId,
+            cell_id: CellId,
+            tag: String,
+            constraint: GrantConstraint,
+        ) -> ConductorApiResult<ActionHash> {
+            let state = self.get_state().await?;
+            let installed_app = state.get_app(installed_app_id)?;
+            // `all_cells()` borrows from `state`; binding the result forces the
+            // iterator to drop before `state` does (E0597).
+            let belongs_to_app = installed_app.all_cells().any(|id| id == cell_id);
+            if !belongs_to_app {
+                return Err(ConductorApiError::Other("Cell not found in app".into()));
+            }
+
+            self.grant_direct_signal_capability(cell_id, tag, constraint)
+                .await
+        }
+
+        /// Commit a capability grant to the source chain of a cell, returning its action hash.
+        async fn commit_cap_grant(
+            self: &Arc<Self>,
+            cell_id: CellId,
+            cap_grant: CapGrant,
+        ) -> ConductorApiResult<ActionHash> {
             // Must init before committing a grant
             let cell = self.cell_by_id(&cell_id).await?;
             cell.check_or_run_zome_init().await?;
@@ -3005,9 +3057,7 @@ mod misc_impls {
                     }
 
                     let zome_cap_grant = match grant_record.entry.to_grant_option() {
-                        Some(zome_cap_grant) => {
-                            DesensitizedZomeCallCapGrant::from(zome_cap_grant.clone())
-                        }
+                        Some(zome_cap_grant) => DesensitizedCapGrant::from(zome_cap_grant.clone()),
                         None => continue,
                     };
 
@@ -3464,12 +3514,16 @@ mod misc_impls {
         }
 
         /// Send a signal directly to the specified agents, bypassing WASM execution
+        ///
+        /// `cap_secret` is offered to every recipient; each one checks it against their own
+        /// `Capability::DirectSignal` grants and drops the signal if none match.
         pub async fn send_direct_signal(
             &self,
             installed_app_id: InstalledAppId,
             dna_hash: DnaHash,
             agents: Vec<AgentPubKey>,
             signal: Vec<u8>,
+            cap_secret: Option<CapSecret>,
         ) -> ConductorResult<()> {
             if agents.is_empty() {
                 return Err(ConductorError::Other("No agents to signal".into()));
@@ -3503,10 +3557,12 @@ mod misc_impls {
                 return Err(ConductorError::Other(format!("Attempted to send to DNA hash {dna_hash:?} but it was not found in app {installed_app_id}").into()));
             }
 
-            let signal_bytes = holochain_serialized_bytes::encode(&DirectSignal(signal))?;
+            let signal_bytes =
+                holochain_serialized_bytes::encode(&DirectSignal { signal, cap_secret })?;
 
             // Sign the hash, not the bytes: lair signing frames are capped at 8 KiB while
-            // payloads go up to `DIRECT_SIGNAL_MAX_SIZE`. The receiver verifies through
+            // payloads go up to `DIRECT_SIGNAL_MAX_SIZE`. Signing the encoded struct is what
+            // binds the secret to the payload. The receiver verifies through
             // `is_valid_signature`, which hashes the received bytes the same way.
             let hash = holo_hash::sha2_512(&signal_bytes);
             let sig = app_info

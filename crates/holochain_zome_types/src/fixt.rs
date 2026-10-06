@@ -225,11 +225,11 @@ fixturator!(
 );
 
 fixturator!(
-    ZomeCallCapGrant;
+    CapGrant;
     curve Empty {
-        ZomeCallCapGrant::new(
+        CapGrant::new_zome_call_grant(
             StringFixturator::new(Empty).next().unwrap(),
-            CapAccessFixturator::new(Empty).next().unwrap(),
+            GrantConstraintFixturator::new(Empty).next().unwrap(),
             {
                 let mut rng = rng();
                 let number_of_zomes = rng.random_range(0..5);
@@ -243,9 +243,9 @@ fixturator!(
         )
     };
     curve Unpredictable {
-        ZomeCallCapGrant::new(
+        CapGrant::new_zome_call_grant(
             StringFixturator::new(Unpredictable).next().unwrap(),
-            CapAccessFixturator::new(Unpredictable).next().unwrap(),
+            GrantConstraintFixturator::new(Unpredictable).next().unwrap(),
             {
                 let mut rng = rand::rng();
                 let number_of_zomes = rng.random_range(0..5);
@@ -264,11 +264,11 @@ fixturator!(
         )
     };
     curve Predictable {
-        ZomeCallCapGrant::new(
+        CapGrant::new_zome_call_grant(
             StringFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
                 .unwrap(),
-            CapAccessFixturator::new_indexed(Predictable, get_fixt_index!())
+            GrantConstraintFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
                 .unwrap(),
             {
@@ -287,15 +287,15 @@ fixturator!(
 );
 
 fixturator!(
-    CapAccess;
+    GrantConstraint;
 
     enum [ Unrestricted Transferable Assigned ];
 
     curve Empty {
-        match CapAccessVariant::random() {
-            CapAccessVariant::Unrestricted => CapAccess::from(()),
-            CapAccessVariant::Transferable => CapAccess::from(CapSecretFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()),
-            CapAccessVariant::Assigned => CapAccess::from((
+        match GrantConstraintVariant::random() {
+            GrantConstraintVariant::Unrestricted => GrantConstraint::from(()),
+            GrantConstraintVariant::Transferable => GrantConstraint::from(CapSecretFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()),
+            GrantConstraintVariant::Assigned => GrantConstraint::from((
                 CapSecretFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
                 BTreeSet::new()
             ))
@@ -303,16 +303,16 @@ fixturator!(
     };
 
     curve Unpredictable {
-        match CapAccessVariant::random() {
-            CapAccessVariant::Unrestricted => CapAccess::from(()),
-            CapAccessVariant::Transferable => {
-                CapAccess::from(CapSecretFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap())
+        match GrantConstraintVariant::random() {
+            GrantConstraintVariant::Unrestricted => GrantConstraint::from(()),
+            GrantConstraintVariant::Transferable => {
+                GrantConstraint::from(CapSecretFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap())
             },
-            CapAccessVariant::Assigned => {
+            GrantConstraintVariant::Assigned => {
                 let mut rng = rand::rng();
                 let number_of_assigned = rng.random_range(0..5);
 
-                CapAccess::from((
+                GrantConstraint::from((
                     CapSecretFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
                     {
                         let mut set: BTreeSet<AgentPubKey> = BTreeSet::new();
@@ -327,10 +327,10 @@ fixturator!(
     };
 
     curve Predictable {
-        match CapAccessVariant::nth(get_fixt_index!()) {
-            CapAccessVariant::Unrestricted => CapAccess::from(()),
-            CapAccessVariant::Transferable => CapAccess::from(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
-            CapAccessVariant::Assigned => CapAccess::from((
+        match GrantConstraintVariant::nth(get_fixt_index!()) {
+            GrantConstraintVariant::Unrestricted => GrantConstraint::from(()),
+            GrantConstraintVariant::Transferable => GrantConstraint::from(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
+            GrantConstraintVariant::Assigned => GrantConstraint::from((
                 CapSecretFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
             {
                 let mut set: BTreeSet<AgentPubKey> = BTreeSet::new();
@@ -344,8 +344,8 @@ fixturator!(
 );
 
 fixturator!(
-    CapGrant;
-    variants [ ChainAuthor(AgentPubKey) RemoteAgent(ZomeCallCapGrant) ];
+    CapAccess;
+    variants [ ChainAuthor(AgentPubKey) RemoteAgent(CapGrant) ];
 );
 
 pub fn record_with_no_entry(signature: Signature, action: Action) -> Record {
@@ -362,7 +362,7 @@ fixturator!(
         Agent(AgentPubKey)
         App(AppEntryBytes)
         CapClaim(CapClaim)
-        CapGrant(ZomeCallCapGrant)
+        CapGrant(CapGrant)
     ];
 
     curve AppEntry {

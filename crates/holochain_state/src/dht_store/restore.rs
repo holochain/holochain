@@ -112,7 +112,8 @@ mod tests {
     use holo_hash::{ActionHash, DnaHash, EntryHash};
     use holochain_serialized_bytes::UnsafeBytes;
     use holochain_types::prelude::{
-        AppEntryBytes, AppEntryDef, CapAccess, EntryType, GrantedFunctions, ZomeCallCapGrant,
+        AppEntryBytes, AppEntryDef, EntryType, GrantConstraint, GrantConstraintType,
+        GrantedFunctions,
     };
     use holochain_zome_types::prelude::*;
     use std::sync::Arc;
@@ -258,6 +259,51 @@ mod tests {
             publish_row.is_some(),
             "a ChainOpPublish row should exist for the restored op"
         );
+    }
+
+    #[tokio::test]
+    async fn restores_chain_head_when_gossip_has_already_staged_actions() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let author = fixt!(AgentPubKey);
+        let dna = dna_record(&author);
+        let create = create_record(
+            &author,
+            dna.action_address().clone(),
+            EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            app_entry(1),
+        );
+        let head_hash = create.action_address().clone();
+        let records = vec![dna, create];
+
+        // Gossip can stage the actions before restore verifies and writes the chain.
+        for record in &records {
+            store
+                .db()
+                .insert_action(record.signed_action(), None)
+                .await
+                .unwrap();
+        }
+        assert!(store
+            .as_read()
+            .chain_head_for_author(&author)
+            .await
+            .unwrap()
+            .is_none());
+
+        store.write_restored_chain(&author, records).await.unwrap();
+
+        let head = store
+            .as_read()
+            .chain_head_for_author(&author)
+            .await
+            .unwrap()
+            .expect("a completed restore must make the chain available for authoring");
+        assert_eq!(head.action, head_hash);
+        assert_eq!(head.seq, 1);
     }
 
     /// Crash recovery for a cell whose chain was partially written before the crash.
@@ -505,8 +551,11 @@ mod tests {
         let author = fixt!(AgentPubKey);
 
         let dna = dna_record(&author);
-        let grant =
-            ZomeCallCapGrant::new("tag".into(), CapAccess::Unrestricted, GrantedFunctions::All);
+        let grant = CapGrant::new_zome_call_grant(
+            "tag".into(),
+            GrantConstraint::Unrestricted,
+            GrantedFunctions::All,
+        );
         let create = create_record(
             &author,
             dna.action_address().clone(),
@@ -522,7 +571,7 @@ mod tests {
         let rows = store
             .db()
             .as_ref()
-            .get_cap_grants_by_access(author, 0)
+            .get_cap_grants_by_access(author, GrantConstraintType::Unrestricted.into())
             .await
             .unwrap();
         assert_eq!(rows.len(), 1);

@@ -9,20 +9,22 @@ use matches::assert_matches;
 use std::collections::{BTreeSet, HashSet};
 
 /// Build the cap grant used by the closed-chain tests.
-fn test_cap_grant() -> ZomeCallCapGrant {
+fn test_cap_grant() -> GrantZomeCallCapabilityGrant {
     let mut functions = HashSet::new();
     let granted_function: GrantedFunction = ("create_entry".into(), "get_entry".into());
     functions.insert(granted_function);
     let mut assignees = BTreeSet::new();
     assignees.insert(fixt!(AgentPubKey, ::fixt::Predictable, 1));
 
-    ZomeCallCapGrant {
+    GrantZomeCallCapabilityGrant {
         tag: "signing_key".into(),
-        access: CapAccess::Assigned {
+        constraint: GrantConstraint::Assigned {
             secret: [0; 64].into(),
             assignees,
         },
-        functions: GrantedFunctions::Listed(functions),
+        grant: ZomeCallGrant {
+            functions: GrantedFunctions::Listed(functions),
+        },
     }
 }
 

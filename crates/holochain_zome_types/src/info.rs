@@ -1,6 +1,6 @@
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holochain_integrity_types::prelude::{CapGrant, FunctionName};
+use holochain_integrity_types::prelude::{CapAccess, FunctionName};
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
 
@@ -37,5 +37,5 @@ pub struct CallInfo {
     /// This will not change within a call even if the chain is written to.
     pub as_at: (ActionHash, u32, Timestamp),
     /// The capability grant used to authorize the call.
-    pub cap_grant: CapGrant,
+    pub cap_grant: CapAccess,
 }

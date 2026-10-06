@@ -42,6 +42,7 @@ mod tests {
     use holochain_integrity_types::action::{
         Action, ActionData, ActionHeader, DnaData, InitZomesCompleteData, RecordValidity,
     };
+    use holochain_integrity_types::capability::GrantConstraintType;
     use holochain_integrity_types::entry::Entry;
     use holochain_integrity_types::record::SignedHashed;
     use holochain_integrity_types::signature::Signature;
@@ -94,6 +95,57 @@ mod tests {
             .expect("action not found");
 
         assert_eq!(fetched, action);
+    }
+
+    #[tokio::test]
+    async fn action_reinsertion_promotes_pending_but_preserves_decided_validity() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let action = sample_action(0);
+        let author = action.action().author();
+
+        db.insert_action(&action, None).await.unwrap();
+        db.insert_action(&action, Some(RecordValidity::Accepted))
+            .await
+            .unwrap();
+        assert!(db
+            .as_ref()
+            .chain_head_for_author(author)
+            .await
+            .unwrap()
+            .is_some());
+
+        db.insert_action(&action, None).await.unwrap();
+        db.insert_action(&action, Some(RecordValidity::Rejected))
+            .await
+            .unwrap();
+        assert!(db
+            .as_ref()
+            .chain_head_for_author(author)
+            .await
+            .unwrap()
+            .is_some());
+
+        let rejected = sample_action(1);
+        db.insert_action(&rejected, Some(RecordValidity::Rejected))
+            .await
+            .unwrap();
+        db.insert_action(&rejected, Some(RecordValidity::Accepted))
+            .await
+            .unwrap();
+        let head = db
+            .as_ref()
+            .chain_head_for_author(author)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(head.0, *action.as_hash());
+        let rejected_status: Option<i64> =
+            sqlx::query_scalar("SELECT record_validity FROM Action WHERE hash = ?")
+                .bind(rejected.as_hash().get_raw_36())
+                .fetch_one(db.pool())
+                .await
+                .unwrap();
+        assert_eq!(rejected_status, Some(i64::from(RecordValidity::Rejected)));
     }
 
     #[tokio::test]
@@ -362,13 +414,17 @@ mod tests {
 
         let author = action.hashed.content.header.author.clone();
         let action_hash = action.as_hash().clone();
-        db.insert_cap_grant(&action_hash, 1 /* Transferable */, Some("my-tag"))
-            .await
-            .unwrap();
+        db.insert_cap_grant(
+            &action_hash,
+            GrantConstraintType::Transferable.into(),
+            Some("my-tag"),
+        )
+        .await
+        .unwrap();
 
         let by_access = db
             .as_ref()
-            .get_cap_grants_by_access(author.clone(), 1)
+            .get_cap_grants_by_access(author.clone(), GrantConstraintType::Transferable.into())
             .await
             .unwrap();
         assert_eq!(by_access.len(), 1);
@@ -390,15 +446,19 @@ mod tests {
         for seed in [3u8, 1, 2] {
             let action = sample_action(seed);
             db.insert_action(&action, None).await.unwrap();
-            db.insert_cap_grant(action.as_hash(), 1, Some("shared-tag"))
-                .await
-                .unwrap();
+            db.insert_cap_grant(
+                action.as_hash(),
+                GrantConstraintType::Transferable.into(),
+                Some("shared-tag"),
+            )
+            .await
+            .unwrap();
         }
 
         let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
         let by_access = db
             .as_ref()
-            .get_cap_grants_by_access(author.clone(), 1)
+            .get_cap_grants_by_access(author.clone(), GrantConstraintType::Transferable.into())
             .await
             .unwrap();
         assert_eq!(by_access.len(), 3);
@@ -448,7 +508,7 @@ mod tests {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let missing = ActionHash::from_raw_36(vec![42u8; 36]);
         let err = db
-            .insert_cap_grant(&missing, 0, None)
+            .insert_cap_grant(&missing, GrantConstraintType::Unrestricted.into(), None)
             .await
             .unwrap_err()
             .to_string();

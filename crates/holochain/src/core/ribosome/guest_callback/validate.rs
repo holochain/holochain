@@ -128,7 +128,6 @@ mod test {
     use ::fixt::prelude::*;
     use holochain_types::prelude::*;
     use holochain_zome_types::fixt::{ActionFixturator, CreateLinkAction};
-    use rand::seq::SliceRandom;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn validate_callback_result_fold() {

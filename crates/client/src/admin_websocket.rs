@@ -17,8 +17,9 @@ use holochain_types::{
     },
 };
 use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketSender};
+use holochain_zome_types::capability::GrantZomeCallCapabilityGrant;
 use holochain_zome_types::prelude::{
-    CapAccess, DnaDef, GrantZomeCallCapabilityPayload, GrantedFunctions, ZomeCallCapGrant,
+    DnaDef, GrantConstraint, GrantZomeCallCapabilityPayload, GrantedFunctions, ZomeCallGrant,
     CAP_SECRET_BYTES,
 };
 use kitsune2_api::Url;
@@ -386,6 +387,37 @@ impl AdminWebsocket {
         }
     }
 
+    /// Grants agents the capability to send direct signals to a cell.
+    ///
+    /// Returns the action hash of the committed capability grant.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent or the conductor rejects the grant.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the conductor returns a response other than
+    /// [`AdminResponse::DirectSignalCapabilityGranted`].
+    pub async fn grant_direct_signal_capability(
+        &self,
+        cell_id: CellId,
+        tag: String,
+        constraint: GrantConstraint,
+    ) -> ConductorApiResult<ActionHash> {
+        let msg = AdminRequest::GrantDirectSignalCapability {
+            cell_id,
+            tag,
+            constraint,
+        };
+        let response = self.send(msg).await?;
+
+        match response {
+            AdminResponse::DirectSignalCapabilityGranted(action_hash) => Ok(action_hash),
+            _ => unreachable!("Unexpected response {response:?}"),
+        }
+    }
+
     pub async fn list_capability_grants(
         &self,
         installed_app_id: String,
@@ -617,13 +649,15 @@ impl AdminWebsocket {
 
         self.grant_zome_call_capability(GrantZomeCallCapabilityPayload {
             cell_id: request.cell_id,
-            cap_grant: ZomeCallCapGrant {
+            cap_grant: GrantZomeCallCapabilityGrant {
                 tag: "zome-call-signing-key".to_string(),
-                access: CapAccess::Assigned {
+                constraint: GrantConstraint::Assigned {
                     secret: cap_secret.into(),
                     assignees: BTreeSet::from([signing_agent_key.clone()]),
                 },
-                functions: request.functions.unwrap_or(GrantedFunctions::All),
+                grant: ZomeCallGrant {
+                    functions: request.functions.unwrap_or(GrantedFunctions::All),
+                },
             },
         })
         .await?;

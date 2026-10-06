@@ -236,13 +236,31 @@ impl AppInterfaceApi {
                 dna_hash,
                 agents,
                 signal,
+                cap_secret,
             } => {
                 self.conductor_handle
                     .clone()
-                    .send_direct_signal(installed_app_id, dna_hash, agents, signal)
+                    .send_direct_signal(installed_app_id, dna_hash, agents, signal, cap_secret)
                     .await?;
 
                 Ok(AppResponse::Ok)
+            }
+            AppRequest::GrantDirectSignalCapability {
+                cell_id,
+                tag,
+                constraint,
+            } => {
+                let action_hash = self
+                    .conductor_handle
+                    .grant_direct_signal_capability_for_app(
+                        &installed_app_id,
+                        cell_id,
+                        tag,
+                        constraint,
+                    )
+                    .await?;
+
+                Ok(AppResponse::DirectSignalCapabilityGranted(action_hash))
             }
         }
     }
