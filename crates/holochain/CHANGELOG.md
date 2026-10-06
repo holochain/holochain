@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.8.0-dev.10
+
 - Add `GrantDirectSignalCapability` to the app and admin interfaces, so the capability grant that direct signals require can be created without a coordinator zome. On the app interface the grant is restricted to cells of the connected app. The Rust client gains `AppWebsocket::send_direct_signal`, `AppWebsocket::grant_direct_signal_capability` and `AdminWebsocket::grant_direct_signal_capability`. \#5986
 
 ## 0.8.0-dev.9
