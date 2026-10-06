@@ -7184,4 +7184,243 @@ mod tests {
             .unwrap();
         assert_eq!(grants, vec![CapAccess::RemoteAgent(Box::new(grant))]);
     }
+
+    /// Measures the store-only `must_get_agent_activity` and record fetch
+    /// cost against the size of the whole DHT store, for
+    /// <https://github.com/holochain/holochain/issues/6007>.
+    ///
+    /// One author gets a chain of `MGAA_CHAIN_LENGTH` actions (default 2000),
+    /// held as both its `AgentActivity` and its `CreateRecord` ops. Filler
+    /// authors with short chains then grow the store to each level in
+    /// `MGAA_STORE_OPS` (default `20000,100000,300000,1000000`), and at each
+    /// level the four walk shapes used by the Unyt DNA, and the store path of
+    /// `must_get_valid_record` (validator-local and authority-serving), are timed
+    /// on the measured author's chain. The
+    /// store is on disk and encrypted, as in a deployed conductor.
+    ///
+    /// This is a measurement, not a regression test. Run it with
+    ///
+    /// ```text
+    /// cargo test --release -p holochain_state --features test_utils,encryption \
+    ///   must_get_agent_activity_store_scan_cost -- --ignored --nocapture
+    /// ```
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "performance measurement for holochain#6007, run explicitly with --ignored --nocapture"]
+    async fn must_get_agent_activity_store_scan_cost() {
+        use std::time::Instant;
+
+        fn env_list(name: &str, default: &[u64]) -> Vec<u64> {
+            std::env::var(name)
+                .ok()
+                .map(|v| v.split(',').filter_map(|s| s.trim().parse().ok()).collect())
+                .unwrap_or_else(|| default.to_vec())
+        }
+        let chain_length: u32 = env_list("MGAA_CHAIN_LENGTH", &[2000])[0] as u32;
+        let levels = env_list("MGAA_STORE_OPS", &[20_000, 100_000, 300_000, 1_000_000]);
+        let reps = env_list("MGAA_STORE_REPS", &[7])[0] as usize;
+        const FILLER_CHAIN: u32 = 100;
+        const BATCH: usize = 5_000;
+
+        let dir = tempfile::tempdir().unwrap();
+        let db = holochain_data::open_db(
+            dir.path(),
+            dht_id(),
+            holochain_data::HolochainDataConfig::default()
+                .with_key(holochain_data::DbKey::default()),
+        )
+        .await
+        .unwrap();
+        let store = crate::dht_store::DhtStore::new(db);
+
+        async fn integrate_many(
+            store: &crate::dht_store::DhtStore<DbWrite<Dht>>,
+            ops: Vec<DhtOpHashed>,
+        ) {
+            for chunk in ops.chunks(BATCH) {
+                let hashes: Vec<DhtOpHash> = chunk.iter().map(|op| op.as_hash().clone()).collect();
+                store
+                    .record_incoming_ops(chunk.iter().map(|op| (op.clone(), false)).collect())
+                    .await
+                    .unwrap();
+                store
+                    .record_chain_op_sys_validation_outcomes(
+                        hashes
+                            .iter()
+                            .map(|h| (h.clone(), SysOutcome::Accepted))
+                            .collect(),
+                    )
+                    .await
+                    .unwrap();
+                store
+                    .record_app_validation_outcomes(
+                        hashes
+                            .into_iter()
+                            .map(|h| (h, AppOutcome::Accepted))
+                            .collect(),
+                    )
+                    .await
+                    .unwrap();
+                store.integrate_ready_ops(Timestamp::now()).await.unwrap();
+            }
+        }
+
+        // The measured author's chain, as both its `AgentActivity` and its
+        // `CreateRecord` ops, so the record fetch validation does for every
+        // app entry on the chain can be timed too.
+        let author = AgentPubKey::from_raw_36(vec![71u8; 36]);
+        let mut ops = Vec::new();
+        let mut hashes = Vec::new();
+        let mut prev_hash = ActionHash::from_raw_36(vec![0u8; 36]);
+        for seq in 0..chain_length {
+            let entry = holochain_types::prelude::Entry::app(
+                holochain_serialized_bytes::SerializedBytes::from(
+                    holochain_serialized_bytes::UnsafeBytes::from(seq.to_be_bytes().to_vec()),
+                ),
+            )
+            .unwrap();
+            let action = Action {
+                header: ActionHeader {
+                    author: author.clone(),
+                    timestamp: Timestamp::from_micros((seq as i64 + 1) * 1000),
+                    action_seq: seq,
+                    prev_action: Some(prev_hash.clone()),
+                },
+                data: ActionData::Create(CreateData {
+                    entry_type: EntryType::App(AppEntryDef::new(
+                        0.into(),
+                        0.into(),
+                        EntryVisibility::Public,
+                    )),
+                    entry_hash: EntryHash::with_data_sync(&entry),
+                }),
+            };
+            let action_hash = ActionHash::with_data_sync(&action);
+            let signed = SignedAction::new(action, Signature::from([seq as u8; 64]));
+            ops.push(DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
+                ChainOp::AgentActivity(signed.clone()),
+            ))));
+            ops.push(DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
+                ChainOp::CreateRecord(signed, OpEntry::Present(entry)),
+            ))));
+            prev_hash = action_hash.clone();
+            hashes.push(action_hash);
+        }
+        integrate_many(&store, ops).await;
+        let top = hashes[chain_length as usize - 1].clone();
+        let prev = hashes[chain_length as usize - 2].clone();
+        let mid = hashes[chain_length as usize / 2].clone();
+
+        let filters = [
+            ("to_genesis", ChainFilter::new(top.clone())),
+            ("take(2)", ChainFilter::take(top.clone(), 2)),
+            (
+                "until_hash(top,top)",
+                ChainFilter::until_hash(top.clone(), top.clone()),
+            ),
+            (
+                "until_hash(top,prev)",
+                ChainFilter::until_hash(top.clone(), prev.clone()),
+            ),
+        ];
+        let ms = |d: std::time::Duration| d.as_secs_f64() * 1000.0;
+        let row = |store_ops: u64,
+                   name: &str,
+                   returned: usize,
+                   durations: &mut Vec<std::time::Duration>| {
+            durations.sort();
+            println!(
+                "{:>10} {:>8} {:<22} {:>8} {:>9.2} {:>9.2} {:>9.2}",
+                store_ops,
+                chain_length,
+                name,
+                returned,
+                ms(durations[0]),
+                ms(durations[durations.len() / 2]),
+                ms(durations[durations.len() - 1])
+            );
+        };
+
+        println!(
+            "{:>10} {:>8} {:<22} {:>8} {:>9} {:>9} {:>9}",
+            "store_ops", "chain", "walk", "returned", "min_ms", "median_ms", "max_ms"
+        );
+        let mut filler_author = 0u32;
+        for level in levels {
+            // Grow the store with short filler chains until it holds `level` ops.
+            let fill_started = Instant::now();
+            let before = store.as_read().count_all_ops().await.unwrap();
+            loop {
+                let have = store.as_read().count_all_ops().await.unwrap();
+                if have >= level {
+                    break;
+                }
+                let want = ((level - have) as usize)
+                    .div_ceil(FILLER_CHAIN as usize)
+                    .min(BATCH / FILLER_CHAIN as usize);
+                let mut ops = Vec::with_capacity(want * FILLER_CHAIN as usize);
+                for _ in 0..want {
+                    filler_author += 1;
+                    let mut raw = vec![1u8; 36];
+                    raw[..4].copy_from_slice(&filler_author.to_be_bytes());
+                    let (chain, _) =
+                        make_activity_chain(&AgentPubKey::from_raw_36(raw), FILLER_CHAIN);
+                    ops.extend(chain);
+                }
+                integrate_many(&store, ops).await;
+            }
+            let store_ops = store.as_read().count_all_ops().await.unwrap();
+            println!(
+                "[fill] {} -> {} ops in {:.1}s ({:.0} ops/s)",
+                before,
+                store_ops,
+                fill_started.elapsed().as_secs_f64(),
+                (store_ops - before) as f64 / fill_started.elapsed().as_secs_f64().max(1e-9)
+            );
+
+            // The store path of `must_get_valid_record` for one action.
+            let mut durations = Vec::with_capacity(reps);
+            for _ in 0..reps {
+                let start = Instant::now();
+                let found = store
+                    .as_read()
+                    .get_authority_store_record(&mid)
+                    .await
+                    .unwrap();
+                durations.push(start.elapsed());
+                assert!(found.is_some(), "record of a mid-chain action not found");
+            }
+            row(store_ops, "authority_record(mid)", 1, &mut durations);
+
+            // The validator-local path of `must_get_valid_record` for one action.
+            let mut durations = Vec::with_capacity(reps);
+            for _ in 0..reps {
+                let start = Instant::now();
+                let found = store.as_read().retrieve_record(&mid, None).await.unwrap();
+                durations.push(start.elapsed());
+                assert!(found.is_some(), "record of a mid-chain action not found");
+            }
+            row(store_ops, "local_record(mid)", 1, &mut durations);
+
+            for (name, filter) in &filters {
+                let mut durations = Vec::with_capacity(reps);
+                let mut returned = 0;
+                for _ in 0..reps {
+                    let start = Instant::now();
+                    let resp = store
+                        .as_read()
+                        .must_get_agent_activity(&author, filter)
+                        .await
+                        .unwrap();
+                    durations.push(start.elapsed());
+                    match resp {
+                        MustGetAgentActivityResponse::Activity { activity, .. } => {
+                            returned = activity.len()
+                        }
+                        other => panic!("{name} did not complete: {other:?}"),
+                    }
+                }
+                row(store_ops, name, returned, &mut durations);
+            }
+        }
+    }
 }

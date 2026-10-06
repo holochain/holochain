@@ -20,6 +20,7 @@ mod lair_in_proc_restart;
 mod metrics;
 mod migration;
 mod multi_conductor;
+mod must_get_agent_activity_chain_growth;
 mod new_lair;
 mod paths;
 mod publish;
