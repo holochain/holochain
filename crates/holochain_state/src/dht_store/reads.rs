@@ -1650,6 +1650,12 @@ impl DhtStore<DbRead<Dht>> {
             }
         }
 
+        // A take of `n` needs only the `n` actions below the chain top: every
+        // valid chain lowers seq by exactly one per step.
+        if let (Some(take), None) = (filter.get_take(), resolved_until_seq) {
+            resolved_until_seq = Some(chain_top_seq.saturating_sub(take - 1));
+        }
+
         // Scan the bounded range (already ordered seq DESC, hash DESC).
         let mut activity: Vec<AgentActivity> = self
             .db()
@@ -1794,6 +1800,12 @@ impl DhtStore<DbRead<Dht>> {
                     ));
                 }
             }
+        }
+
+        // A take of `n` needs only the `n` actions below the chain top: every
+        // valid chain lowers seq by exactly one per step.
+        if let (Some(take), None) = (filter.get_take(), resolved_until_seq) {
+            resolved_until_seq = Some(chain_top_seq.saturating_sub(take - 1));
         }
 
         // Scan the store bounded range.
