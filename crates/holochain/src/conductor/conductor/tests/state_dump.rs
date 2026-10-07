@@ -4,7 +4,7 @@ use crate::{
         full_integration_dump,
     },
     retry_until_timeout,
-    sweettest::{SweetConductor, SweetDnaFile, SweetZome},
+    sweettest::{await_consistency, SweetConductor, SweetConductorConfig, SweetDnaFile, SweetZome},
 };
 use holo_hash::{ActionHash, DhtOpHash, HasHash};
 use holochain_conductor_api::{FullIntegrationStateDump, FullStateDump, OpTimingsCursor};
@@ -57,7 +57,7 @@ async fn dump_full_state() {
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd])
         .await
         .0;
-    let app = conductor.setup_app("", &[dna_file]).await.unwrap();
+    let app = conductor.setup_app("", [&dna_file]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
     let _: ActionHash = conductor
         .call(
@@ -79,14 +79,39 @@ async fn dump_full_state() {
 
     let dht_store = conductor.get_dht_store(cell_id.dna_hash()).unwrap();
 
-    // Wait for publishing to quiesce so the two dumps below observe the same
-    // `published_ops_count`. The publish workflow runs in the background and
-    // raises that count as it records publish times, so building the expected
-    // and actual dumps a moment apart would otherwise race it. With a recency
-    // window wide enough to exclude anything published during the test, an op
-    // only remains in `get_ops_to_publish` until it has been published at least
-    // once; an empty result therefore means every publishable op has a recorded
-    // publish time and the count is stable.
+    // The comparisons below need a stable `published_ops_count`. Add a remote
+    // storage recipient so the ops can be published; without one they correctly
+    // remain pending and the wait never finishes. State dumps themselves do not
+    // require remote peers.
+    let mut remote = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::standard(),
+        conductor.rendezvous().unwrap().clone(),
+    )
+    .await;
+    let remote_app = remote.setup_app("", [&dna_file]).await.unwrap();
+    for peer in [&conductor, &remote] {
+        peer.declare_full_storage_arcs(cell_id.dna_hash()).await;
+    }
+    retry_until_timeout!({
+        if SweetConductor::exchange_peer_info([&conductor, &remote]).await {
+            break;
+        }
+    });
+    conductor
+        .raw_handle()
+        .get_cell_triggers(cell_id)
+        .await
+        .unwrap()
+        .publish_dht_ops
+        .trigger(&"dump_full_state");
+
+    // The remote agent's genesis ops must also settle before comparing dumps.
+    await_consistency([&app.cells()[0], &remote_app.cells()[0]])
+        .await
+        .unwrap();
+
+    // An hour-long recency window excludes anything published during the test,
+    // so an empty queue means the publication count is stable.
     retry_until_timeout!(30_000, 100, {
         let pending = dht_store
             .as_read()
