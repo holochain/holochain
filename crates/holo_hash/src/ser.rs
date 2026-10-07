@@ -51,7 +51,7 @@ impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
     where
         A: serde::de::SeqAccess<'de>,
     {
-        let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+        let mut vec = Vec::with_capacity(crate::HOLO_HASH_FULL_LEN);
 
         while let Some(b) = seq.next_element()? {
             vec.push(b);
@@ -109,6 +109,7 @@ impl<T: HashType> std::convert::TryFrom<SerializedBytes> for HoloHash<T> {
 mod tests {
     use crate::*;
     use holochain_serialized_bytes::prelude::*;
+    use serde::de::value::SeqDeserializer;
     use std::convert::TryInto;
 
     #[derive(serde::Deserialize, Debug)]
@@ -317,5 +318,51 @@ mod tests {
         let h = ActionHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]);
         g.put(&h);
         assert_eq!(h, g.get());
+    }
+
+    /// Claims `usize::MAX` items whatever it holds, as a msgpack array header
+    /// can claim more than a 32-bit target can allocate. `SeqDeserializer`
+    /// passes the claim on only when both bounds agree.
+    struct OverstatedLen(std::vec::IntoIter<u8>);
+
+    impl Iterator for OverstatedLen {
+        type Item = u8;
+
+        fn next(&mut self) -> Option<u8> {
+            self.0.next()
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            (usize::MAX, Some(usize::MAX))
+        }
+    }
+
+    fn overstated_seq(bytes: Vec<u8>) -> SeqDeserializer<OverstatedLen, serde::de::value::Error> {
+        SeqDeserializer::new(OverstatedLen(bytes.into_iter()))
+    }
+
+    #[test]
+    fn hash_seq_ignores_declared_len() {
+        let h = ActionHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]);
+        assert_eq!(
+            ActionHash::deserialize(overstated_seq(h.get_raw_39().to_vec())),
+            Ok(h)
+        );
+    }
+
+    #[test]
+    fn hash_type_seq_ignores_declared_len() {
+        let prefix = hash_type::Action::new().get_prefix();
+        assert_eq!(
+            hash_type::Action::deserialize(overstated_seq(prefix.to_vec())),
+            Ok(hash_type::Action)
+        );
+    }
+
+    #[test]
+    fn msgpack_array_declaring_more_than_it_carries_is_an_error() {
+        // array32 header declaring u32::MAX elements, none of which follow
+        let buf = [0xdd, 0xff, 0xff, 0xff, 0xff];
+        assert!(holochain_serialized_bytes::decode::<_, ActionHash>(&buf).is_err());
     }
 }

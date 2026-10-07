@@ -50,7 +50,7 @@ pub fn holo_hash_decode_unchecked(s: &str) -> Result<Vec<u8>, HoloHashError> {
     if s.len() != 53 {
         return Err(HoloHashError::BadSize);
     }
-    if &s[..1] != "u" {
+    if !s.starts_with("u") {
         return Err(HoloHashError::NoU);
     }
     let b = match URL_SAFE_NO_PAD.decode(&s[1..]) {
@@ -73,7 +73,7 @@ pub fn holo_hash_decode_unchecked(s: &str) -> Result<Vec<u8>, HoloHashError> {
 
 /// internal PARSE for holo hash REPR
 pub fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError> {
-    if &s[..1] != "u" {
+    if !s.starts_with("u") {
         return Err(HoloHashError::NoU);
     }
     let b = match URL_SAFE_NO_PAD.decode(&s[1..]) {
@@ -149,4 +149,40 @@ pub fn sha2_512(data: &[u8]) -> Vec<u8> {
     hasher.update(data);
     let result = hasher.finalize();
     result.to_vec()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ActionHash;
+
+    /// Each is 53 bytes, an encoded hash's length, so
+    /// `holo_hash_decode_unchecked` reaches its `u` check.
+    fn strings_with_multi_byte_first_char() -> impl Iterator<Item = String> {
+        ["é", "€", "😀"]
+            .into_iter()
+            .map(|c| format!("{c}{}", "A".repeat(53 - c.len())))
+    }
+
+    #[test]
+    fn decode_empty_string_is_an_error() {
+        assert_eq!(ActionHash::try_from(""), Err(HoloHashError::NoU));
+    }
+
+    #[test]
+    fn decode_multi_byte_first_char_is_an_error() {
+        for s in strings_with_multi_byte_first_char() {
+            assert_eq!(ActionHash::try_from(s.as_str()), Err(HoloHashError::NoU));
+            assert_eq!(holo_hash_decode_unchecked(&s), Err(HoloHashError::NoU));
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "serialization")]
+    fn deserialize_multi_byte_first_char_is_an_error() {
+        for s in strings_with_multi_byte_first_char() {
+            let buf = holochain_serialized_bytes::encode(&s).unwrap();
+            assert!(holochain_serialized_bytes::decode::<_, ActionHash>(&buf).is_err());
+        }
+    }
 }

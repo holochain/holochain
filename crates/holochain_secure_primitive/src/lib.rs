@@ -51,7 +51,7 @@ macro_rules! fixed_array_serialization {
                 where
                     A: $crate::serde::de::SeqAccess<'de>,
                 {
-                    let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+                    let mut vec = Vec::with_capacity($len);
 
                     while let Some(b) = seq.next_element()? {
                         vec.push(b);
@@ -184,4 +184,37 @@ macro_rules! secure_primitive {
             }
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use serde::de::value::{Error, SeqDeserializer};
+    use serde::Deserialize;
+
+    #[derive(Debug, PartialEq)]
+    struct Bytes4([u8; 4]);
+    crate::fixed_array_serialization!(Bytes4, 4);
+
+    /// Claims `usize::MAX` items whatever it holds, as a msgpack array header
+    /// can claim more than a 32-bit target can allocate. `SeqDeserializer`
+    /// passes the claim on only when both bounds agree.
+    struct OverstatedLen(std::vec::IntoIter<u8>);
+
+    impl Iterator for OverstatedLen {
+        type Item = u8;
+
+        fn next(&mut self) -> Option<u8> {
+            self.0.next()
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            (usize::MAX, Some(usize::MAX))
+        }
+    }
+
+    #[test]
+    fn seq_ignores_declared_len() {
+        let seq = SeqDeserializer::<_, Error>::new(OverstatedLen(vec![1, 2, 3, 4].into_iter()));
+        assert_eq!(Bytes4::deserialize(seq), Ok(Bytes4([1, 2, 3, 4])));
+    }
 }
