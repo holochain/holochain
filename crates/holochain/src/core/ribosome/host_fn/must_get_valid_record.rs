@@ -154,7 +154,7 @@ mod tests {
     use ::fixt::prelude::*;
     use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
+    use holochain_zome_types::fixt::{ActionFixturator, AppEntryBytesFixturator, CreateAction};
 
     // This test ensures the ValidationStatus::Rejected arm is hit and returns a
     // HostShortCircuit carrying ValidateCallbackResult::Invalid with the expected message.
@@ -162,7 +162,9 @@ mod tests {
     async fn must_get_valid_record_short_circuit_when_invalid_record_found() {
         holochain_trace::test_run();
 
+        // Keep the cells and their database directory alive through the host call.
         let RibosomeTestFixture {
+            conductor: _conductor,
             alice_host_fn_caller,
             alice_cell,
             ..
@@ -172,8 +174,12 @@ mod tests {
         let mut create_action = fixt!(Action, CreateAction);
         // Set author to the cell's agent to keep data coherent.
         create_action.header.author = alice_cell.agent_pubkey().clone();
-        let create_entry = fixt!(Entry);
-        let create_entry_hash = create_action.entry_hash().unwrap().clone();
+        // The rejected record must still be readable. Capability entries cannot
+        // be read from the public cache, so use a matching public App entry.
+        let create_entry = EntryHashed::from_content_sync(Entry::App(fixt!(AppEntryBytes)));
+        *create_action.entry_type_mut().unwrap() =
+            EntryType::App(AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public));
+        *create_action.entry_hash_mut().unwrap() = create_entry.as_hash().clone();
 
         // Cache the CreateRecord record into the new DhtStore (integrated, as a
         // fetched op would be) and mark it Rejected, so the cascade's
@@ -187,10 +193,7 @@ mod tests {
         .unwrap();
         let create_op_hash = rendered.op_hash.clone();
         let rendered_ops = holochain_types::wire_ops::RenderedOps {
-            entry: Some(holochain_types::prelude::EntryHashed::with_pre_hashed(
-                create_entry,
-                create_entry_hash,
-            )),
+            entry: Some(create_entry),
             ops: vec![rendered],
             warrant: None,
         };
