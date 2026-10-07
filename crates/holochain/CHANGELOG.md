@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Decoding or encoding hashes no longer panics. Invalid hashes could panic or overallocate memory.
 - Add `GrantDirectSignalCapability` to the app and admin interfaces, so the capability grant that direct signals require can be created without a coordinator zome. On the app interface the grant is restricted to cells of the connected app. The Rust client gains `AppWebsocket::send_direct_signal`, `AppWebsocket::grant_direct_signal_capability` and `AdminWebsocket::grant_direct_signal_capability`. \#5986
 - **BREAKING CHANGE**: Fix `SendDirectSignal` failing with `FrameOverflow` for payloads over 8 KiB. Payloads up to the documented 1 MiB limit are now delivered. The signature scheme and wire encoding changed, so direct signals sent between conductors with and without this fix are dropped by the receiver — upgrade both ends. \#5937
 - **BREAKING CHANGE**: Receiving direct signals now requires an explicit `Capability::DirectSignal` grant, including signals from the receiving agent itself. Create grants with `CapGrant::new_direct_signal_grant` and supply `cap_secret` when sending against an assigned or transferable grant. The direct signal network encoding has changed, so sending and receiving peers must upgrade together. \#5820
