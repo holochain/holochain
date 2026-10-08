@@ -6,7 +6,7 @@
 //! and `HC_DATA_BENCH_EXTRA_SQL=<file>` to apply extra statements (for
 //! example candidate indexes) after the fixture is built.
 
-mod fixture;
+pub mod fixture;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use std::sync::OnceLock;
@@ -22,6 +22,12 @@ fn runtime() -> &'static tokio::runtime::Runtime {
 }
 
 fn smoke(c: &mut Criterion) {
+    let cfg = fixture::FixtureConfig {
+        actions: 1_000,
+        seed: 42,
+    };
+    let g = fixture::generate(cfg);
+    fixture::check_generated(cfg, &g);
     let rt = runtime();
     c.bench_function("smoke/noop", |b| b.to_async(rt).iter(|| async {}));
 }
