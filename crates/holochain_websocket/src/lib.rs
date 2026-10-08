@@ -242,6 +242,7 @@ impl RMap {
 /// It is intended to capture all the errors that a caller might want to handle. Other errors that
 /// are unlikely to be recoverable are mapped to [WebsocketError::Other].
 #[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
 pub enum WebsocketError {
     /// The websocket has been closed by the other side.
     #[error("Websocket closed: {0}")]
@@ -252,15 +253,47 @@ pub enum WebsocketError {
     /// A websocket error from the underlying tungstenite library.
     #[error("Websocket error: {0}")]
     Websocket(#[from] Box<tokio_tungstenite::tungstenite::Error>),
-    /// A timeout occurred.
+    /// Waiting for a response timed out; the connection remains usable.
     #[error("Timeout")]
     Timeout(#[from] tokio::time::error::Elapsed),
+    /// Sending timed out and closed the connection.
+    #[error("Timed out sending on websocket: {0}")]
+    SendTimeout(tokio::time::error::Elapsed),
     /// An IO error occurred.
     #[error("IO error: {0}")]
     Io(#[from] Error),
+    /// The receive half of the connection has closed.
+    #[error("Receiver closed")]
+    ReceiverClosed,
+    /// The responder for a request was dropped before a response arrived.
+    #[error("Responder dropped")]
+    ResponderDropped,
+    /// A raw websocket frame arrived where a complete message was expected.
+    #[error("Unexpected raw frame")]
+    UnexpectedRawFrame,
     /// Some other error occurred.
     #[error("Other error: {0}")]
     Other(String),
+}
+
+impl WebsocketError {
+    /// Returns `true` if this error means the connection is no longer usable.
+    ///
+    /// Errors raised inside `WsCoreSync::exec`, including send timeouts,
+    /// tear the connection down and return `true`. A response timeout,
+    /// a dropped responder and a deserialization failure happen outside
+    /// `exec`, leave the connection viable, and return `false`.
+    pub fn is_connection_closed(&self) -> bool {
+        matches!(
+            self,
+            WebsocketError::Close(_)
+                | WebsocketError::Websocket(_)
+                | WebsocketError::Io(_)
+                | WebsocketError::ReceiverClosed
+                | WebsocketError::SendTimeout(_)
+                | WebsocketError::UnexpectedRawFrame
+        )
+    }
 }
 
 /// A result type, with the error type [WebsocketError].
@@ -282,7 +315,10 @@ struct WsCore {
 }
 
 #[derive(Clone)]
-struct WsCoreSync(Arc<std::sync::Mutex<Option<WsCore>>>);
+struct WsCoreSync(
+    Arc<std::sync::Mutex<Option<WsCore>>>,
+    tokio::sync::watch::Sender<bool>,
+);
 
 impl PartialEq for WsCoreSync {
     fn eq(&self, other: &Self) -> bool {
@@ -291,8 +327,13 @@ impl PartialEq for WsCoreSync {
 }
 
 impl WsCoreSync {
+    /// Closes the shared core and wakes receivers even when the peer is silent.
+    ///
+    /// Pending request responders are failed immediately; the sink close runs
+    /// separately so a blocked send lock cannot delay the notification.
     fn close(&self) {
         if let Some(core) = self.0.lock().unwrap().take() {
+            self.1.send_replace(true);
             core.rmap.close();
             tokio::task::spawn(async move {
                 use futures::sink::SinkExt;
@@ -360,7 +401,8 @@ impl WebsocketRespond {
                     core.send.lock().await.send(s).await.map_err(Box::new)?;
                     Ok(())
                 })
-                .await?
+                .await
+                .map_err(WebsocketError::SendTimeout)?
             })
             .await
     }
@@ -449,7 +491,33 @@ impl WebsocketReceiver {
         }
     }
 
+    /// Receives a frame or wakes when the send half closes the shared core.
+    ///
+    /// Subscribing before polling frames prevents a close from being missed
+    /// when the peer does not send a final frame.
     async fn recv_inner<D>(&mut self) -> WebsocketResult<ReceiveMessage<D>>
+    where
+        D: std::fmt::Debug,
+        SerializedBytes: TryInto<D, Error = SerializedBytesError>,
+    {
+        // The send half can close the core while the peer stays silent.
+        // Subscribe before polling recv so a close cannot be missed.
+        let mut closed = self.0 .1.subscribe();
+        if *closed.borrow() {
+            return Err(WebsocketError::Close("No connection".to_string()));
+        }
+        tokio::select! {
+            biased;
+            _ = closed.changed() => Err(WebsocketError::Close("No connection".to_string())),
+            result = self.recv_frames() => result,
+        }
+    }
+
+    /// Dispatches responses and control frames until a request or signal arrives.
+    ///
+    /// A response completes its pending sender, while ping frames are answered
+    /// here instead of being yielded to the caller.
+    async fn recv_frames<D>(&mut self) -> WebsocketResult<ReceiveMessage<D>>
     where
         D: std::fmt::Debug,
         SerializedBytes: TryInto<D, Error = SerializedBytesError>,
@@ -466,9 +534,7 @@ impl WebsocketReceiver {
                         .await
                         .next()
                         .await
-                        .ok_or::<WebsocketError>(WebsocketError::Other(
-                            "ReceiverClosed".to_string(),
-                        ))?
+                        .ok_or::<WebsocketError>(WebsocketError::ReceiverClosed)?
                         .map_err(Box::new)?;
                     let msg = match msg {
                         Message::Text(s) => s.as_bytes().to_vec(),
@@ -486,9 +552,7 @@ impl WebsocketReceiver {
                         Message::Close(frame) => {
                             return Err(WebsocketError::Close(format!("{frame:?}")));
                         }
-                        Message::Frame(_) => {
-                            return Err(WebsocketError::Other("UnexpectedRawFrame".to_string()))
-                        }
+                        Message::Frame(_) => return Err(WebsocketError::UnexpectedRawFrame),
                     };
                     match WireMessage::try_from_bytes(msg)? {
                         WireMessage::Authenticate { data } => {
@@ -564,7 +628,8 @@ impl WebsocketSender {
                     core.send.lock().await.send(s).await.map_err(Box::new)?;
                     Ok(())
                 })
-                .await?
+                .await
+                .map_err(WebsocketError::SendTimeout)?
             })
             .await
     }
@@ -624,7 +689,8 @@ impl WebsocketSender {
 
                     Ok(drop)
                 })
-                .await?
+                .await
+                .map_err(WebsocketError::SendTimeout)?
             })
             .await?;
 
@@ -636,7 +702,7 @@ impl WebsocketSender {
             // await the response
             let resp = resp_r
                 .await
-                .map_err(|_| WebsocketError::Other("ResponderDropped".to_string()))??;
+                .map_err(|_| WebsocketError::ResponderDropped)??;
 
             // decode the response
             let res = decode(&Vec::from(UnsafeBytes::from(resp)))?;
@@ -669,7 +735,8 @@ impl WebsocketSender {
                     core.send.lock().await.send(s).await.map_err(Box::new)?;
                     Ok(())
                 })
-                .await?
+                .await
+                .map_err(WebsocketError::SendTimeout)?
             })
             .await
     }
@@ -694,7 +761,8 @@ fn split(
         timeout,
     };
 
-    let core_send = WsCoreSync(Arc::new(std::sync::Mutex::new(Some(core))));
+    let (closed, _) = tokio::sync::watch::channel(false);
+    let core_send = WsCoreSync(Arc::new(std::sync::Mutex::new(Some(core))), closed);
     let core_recv = core_send.clone();
 
     Ok((
@@ -734,6 +802,9 @@ impl From<std::net::SocketAddr> for ConnectRequest {
 }
 
 impl ConnectRequest {
+    /// Origin sent when a client does not override the Origin header.
+    pub const DEFAULT_ORIGIN: &'static str = "holochain_websocket";
+
     /// Create a new [ConnectRequest].
     pub fn new(addr: std::net::SocketAddr) -> Self {
         let mut cr = ConnectRequest {
@@ -743,10 +814,8 @@ impl ConnectRequest {
 
         // Set a default Origin so that the connection request will be allowed by default when the listener is
         // using `Any` as the allowed origin.
-        cr.headers.insert(
-            "Origin",
-            HeaderValue::from_str("holochain_websocket").expect("Invalid Origin value"),
-        );
+        cr.headers
+            .insert("Origin", HeaderValue::from_static(Self::DEFAULT_ORIGIN));
 
         cr
     }

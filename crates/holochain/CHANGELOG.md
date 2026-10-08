@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: `holochain_websocket` reports connection loss precisely. `WebsocketError` carries `ReceiverClosed`, `ResponderDropped`, `UnexpectedRawFrame`, and `SendTimeout` variants. `SendTimeout` means sending closed the connection; `Timeout` means a response was not received, but the connection remains usable. `WebsocketError::is_connection_closed` distinguishes these from request-level failures. `WebsocketError` is `#[non_exhaustive]`, so matches on it need a wildcard arm.
+- Added `ReconnectingAdminWebsocket` and `ReconnectingAppWebsocket` to the Rust client. These re-establish their connection after the conductor restarts, with capped exponential backoff. Their `connect_with_retry` constructors also wait for a conductor that has not started yet, while `connect` reports the failure. Requests made while the connection is down fail with `ConductorApiError::Disconnected` and are never retried automatically. A signal subscription taken from `ReconnectingAppWebsocket::signals` survives reconnects and reports missed signals as `SignalEvent::Interrupted`, because Holochain does not replay signals emitted while a client was disconnected. The app builder accepts a custom `WebsocketConfig` for the initial connection and every reconnect.
+- **BREAKING CHANGE**: `ReconnectingAdminWebsocket` now accepts owned hostname or socket-address inputs instead of arbitrary `ToSocketAddrs` implementations. Hostnames are resolved asynchronously on each connection attempt, so reconnecting follows DNS changes; custom address providers must pass their resolved socket addresses.
 - Fix network-received entries being stored without checking that they hash to the entry hash named by their action. An op received through publish or gossip, and a `get` response fetched from a peer, are now dropped when the entry does not match the action, before anything is written. The action's author is not warranted, since only the entry hash is covered by the action signature, so raw entry bytes may have been swapped by a third party and a signature verification would not catch it. \#5994
 
 ## 0.8.0-dev.10
@@ -46,7 +49,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 0.8.0-dev.4
 
 ## 0.8.0-dev.3
-
 - **BREAKING CHANGE**: Fix `SendDirectSignal` failing with `FrameOverflow` for payloads over 8 KiB. Payloads up to the documented 1 MiB limit are now delivered. The signature scheme and wire encoding changed, so direct signals sent between conductors with and without this fix are dropped by the receiver — upgrade both ends. \#5937
 - Add `hc export-ts-bindings`, a built-in `hc` subcommand that writes the TypeScript type declarations for the conductor’s admin and app API and signals to a directory (`./bindings` by default, `--out-dir` to choose another). If the directory already exists, its contents are replaced; the command refuses to do so when the directory is the root directory, or the working directory or an ancestor of it. Building `hc` with `--features unstable-countersigning` additionally includes the countersigning app API. \#5214
 - Add `AddAgentInfo` to the app interface, allowing apps to add signed agent info to the conductor’s peer store. \#5016

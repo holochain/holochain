@@ -1,11 +1,68 @@
+//! A Rust client for the Holochain Conductor API.
+//!
+//! [`AdminWebsocket`] and [`AppWebsocket`] are single connections that fail
+//! when the conductor goes away. [`ReconnectingAdminWebsocket`] and
+//! [`ReconnectingAppWebsocket`] re-establish themselves instead.
+//!
+//! A conductor restart invalidates every app authentication token and moves
+//! any app interface attached on port 0, so a resilient app connection is
+//! identified by the admin address and the installed app id rather than by an
+//! app interface port.
+//!
+//! [`ReconnectingAppWebsocket`] retains access to the admin interface for its
+//! entire lifetime: each reconnect discovers the app interface and issues a
+//! new authentication token. Use it only in trusted processes allowed ongoing
+//! admin access.
+//!
+//! `connect` fails if the conductor does not accept, which suits a CLI.
+//! `connect_with_retry` waits for a conductor that has not started yet; bound
+//! it with [`tokio::time::timeout`] if you do not want to wait forever.
+//!
+//! ```rust,no_run
+//! # #[tokio::main]
+//! # async fn main() {
+//! use std::net::{Ipv4Addr, SocketAddr};
+//! use holochain_client::{
+//!     ClientAgentSigner, ReconnectingAppWebsocket, SignalEvent,
+//! };
+//!
+//! let app_ws = ReconnectingAppWebsocket::builder(
+//!     SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 30_000),
+//!     "my-app".to_string(),
+//!     ClientAgentSigner::default().into(),
+//! )
+//! .origin("my-service")
+//! .connect_with_retry()
+//! .await
+//! .unwrap();
+//!
+//! let mut signals = app_ws.signals();
+//! while let Some(event) = signals.next().await {
+//!     match event {
+//!         SignalEvent::Signal(signal) => println!("{signal:?}"),
+//!         // Signals were missed while the connection was down. Holochain does
+//!         // not replay them, so re-read any state derived from signals.
+//!         SignalEvent::Interrupted => println!("re-syncing"),
+//!     }
+//! }
+//! # }
+//! ```
+
 mod admin_websocket;
+mod app_connect;
 mod app_websocket;
 mod app_websocket_inner;
 mod error;
+mod reconnect;
+mod reconnecting_admin_websocket;
+mod reconnecting_app_websocket;
+mod signal_stream;
 mod signing;
 mod util;
 
 pub use admin_websocket::{AdminWebsocket, AuthorizeSigningCredentialsPayload, EnableAppResponse};
+#[cfg(feature = "test_utils")]
+pub use app_connect::discover_app_interface_port as discover_app_interface_port_for_test;
 pub use app_websocket::{AppWebsocket, CallZomeOptions, ZomeCallTarget};
 pub use error::{ConductorApiError, ConductorApiResult};
 pub use holochain_conductor_api::{
@@ -24,7 +81,13 @@ pub use holochain_zome_types::prelude::{
     CellId, ClonedCell, ExternIO, GrantedFunctions, Timestamp,
 };
 pub use kitsune2_api::Url;
+pub use reconnect::ReconnectConfig;
+pub use reconnecting_admin_websocket::{ReconnectAdminAddress, ReconnectingAdminWebsocket};
+pub use reconnecting_app_websocket::{ReconnectingAppWebsocket, ReconnectingAppWebsocketBuilder};
+pub use signal_stream::{SignalEvent, SignalStream};
 pub use signing::client_signing::{ClientAgentSigner, SigningCredentials};
 #[cfg(feature = "lair_signing")]
 pub use signing::lair_signing::LairAgentSigner;
 pub use signing::{AgentSigner, DynAgentSigner};
+#[cfg(feature = "test_utils")]
+pub use util::ClosedNotify;

@@ -1,0 +1,524 @@
+use holochain::sweettest::SweetConductor;
+use holochain_client::{AdminWebsocket, ConductorApiError};
+use holochain_websocket::{WebsocketConfig, WebsocketListener};
+use holochain_zome_types::prelude::ExternIO;
+use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+
+mod common;
+mod fixture;
+
+#[tokio::test(flavor = "multi_thread")]
+async fn admin_close_notify_fires_on_conductor_shutdown() {
+    let mut conductor = SweetConductor::standard().await;
+    let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
+
+    let (_admin_ws, closed) = AdminWebsocket::connect_for_test((Ipv4Addr::LOCALHOST, admin_port))
+        .await
+        .unwrap();
+
+    conductor.shutdown().await;
+
+    tokio::time::timeout(Duration::from_secs(10), closed.closed())
+        .await
+        .expect("close notification did not fire within 10s");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn admin_requests_resume_after_a_conductor_restart() {
+    let (mut conductor, admin_port) = common::conductor_with_fixed_admin_port().await;
+
+    let admin_ws = holochain_client::ReconnectingAdminWebsocket::connect(
+        format!("localhost:{admin_port}"),
+        None,
+        holochain_client::ReconnectConfig::default(),
+    )
+    .await
+    .unwrap();
+
+    admin_ws
+        .current()
+        .unwrap()
+        .list_app_interfaces()
+        .await
+        .unwrap();
+
+    conductor.shutdown().await;
+
+    // While down, requests fail rather than blocking. The reconnect task has
+    // to observe the close notification before `current` reports it, so poll
+    // rather than asserting on the first read.
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        match admin_ws.current() {
+            Err(ConductorApiError::Disconnected) => break,
+            other => {
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "never reported Disconnected, last read {other:?}"
+                );
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        }
+    }
+
+    conductor.startup().await;
+
+    // The connection repairs itself without the caller reconnecting.
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    loop {
+        if let Ok(admin) = admin_ws.current() {
+            if admin.list_app_interfaces().await.is_ok() {
+                break;
+            }
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "did not reconnect within 60s"
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_interface_discovery_finds_a_matching_interface() {
+    let (conductor, admin_port) = common::conductor_with_fixed_admin_port().await;
+
+    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port), None)
+        .await
+        .unwrap();
+
+    let app_id: holochain_client::InstalledAppId = "test-app".into();
+    let attached_port = admin_ws
+        .attach_app_interface(
+            0,
+            None,
+            holochain_client::AllowedOrigins::Origins(
+                vec![common::FIXTURE_ORIGIN.to_string()]
+                    .into_iter()
+                    .collect(),
+            ),
+            Some(app_id.clone()),
+        )
+        .await
+        .unwrap();
+
+    let found = holochain_client::discover_app_interface_port_for_test(
+        &admin_ws,
+        &app_id,
+        Some(common::FIXTURE_ORIGIN),
+    )
+    .await
+    .unwrap();
+    assert_eq!(found, attached_port);
+
+    // An unset origin sends ConnectRequest's default Origin header.
+    // An interface restricted to a different origin cannot accept it.
+    let err = holochain_client::discover_app_interface_port_for_test(&admin_ws, &app_id, None)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        ConductorApiError::AppInterfaceNotFound { .. }
+    ));
+
+    // An origin the interface does not allow finds nothing.
+    let err = holochain_client::discover_app_interface_port_for_test(
+        &admin_ws,
+        &app_id,
+        Some("other-service"),
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        matches!(err, ConductorApiError::AppInterfaceNotFound { .. }),
+        "got {err:?}"
+    );
+
+    let compatible_port = admin_ws
+        .attach_app_interface(
+            0,
+            None,
+            holochain_client::AllowedOrigins::Any,
+            Some(app_id.clone()),
+        )
+        .await
+        .unwrap();
+    let found = holochain_client::discover_app_interface_port_for_test(&admin_ws, &app_id, None)
+        .await
+        .unwrap();
+    assert_eq!(found, compatible_port);
+
+    drop(conductor);
+}
+
+#[tokio::test]
+async fn connect_fails_fast_when_nothing_is_listening() {
+    let port = common::free_port();
+
+    let result = tokio::time::timeout(
+        Duration::from_secs(10),
+        holochain_client::ReconnectingAdminWebsocket::connect(
+            (Ipv4Addr::LOCALHOST, port),
+            None,
+            holochain_client::ReconnectConfig::default(),
+        ),
+    )
+    .await
+    .expect("connect hung instead of failing fast");
+
+    assert!(result.is_err());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn connect_with_retry_waits_for_the_conductor() {
+    // Reserve a port, then hand it to a conductor that starts only after the
+    // connect attempt is already retrying.
+    let port = common::free_port();
+
+    let connecting = tokio::spawn(async move {
+        holochain_client::ReconnectingAdminWebsocket::connect_with_retry(
+            ("localhost", port),
+            None,
+            holochain_client::ReconnectConfig::default(),
+        )
+        .await
+    });
+
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    assert!(
+        !connecting.is_finished(),
+        "connected before anything was listening"
+    );
+
+    let _conductor = common::conductor_on_admin_port(port).await;
+
+    let admin_ws = tokio::time::timeout(Duration::from_secs(60), connecting)
+        .await
+        .expect("connect_with_retry did not complete within 60s")
+        .unwrap()
+        .unwrap();
+
+    admin_ws
+        .current()
+        .unwrap()
+        .list_app_interfaces()
+        .await
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_requests_fail_fast_while_disconnected() {
+    let common::FixtureApp {
+        mut conductor,
+        admin_port,
+        app_id,
+        signer,
+        ..
+    } = common::install_fixture_app_with_fixed_admin_port().await;
+
+    let app_ws = holochain_client::ReconnectingAppWebsocket::builder(
+        SocketAddr::new(Ipv4Addr::LOCALHOST.into(), admin_port),
+        app_id,
+        signer,
+    )
+    .origin(common::FIXTURE_ORIGIN)
+    .connect()
+    .await
+    .unwrap();
+
+    app_ws.app_info().await.unwrap();
+
+    conductor.shutdown().await;
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        match app_ws.app_info().await {
+            Err(ConductorApiError::Disconnected) => break,
+            _ => {
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "never reported Disconnected"
+                );
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn custom_app_websocket_config_limits_response_size() {
+    let common::FixtureApp {
+        conductor: _conductor,
+        admin_port,
+        app_id,
+        signer,
+        ..
+    } = common::install_fixture_app_with_fixed_admin_port().await;
+
+    let config = Arc::new(WebsocketConfig {
+        max_message_size: 1,
+        ..WebsocketConfig::CLIENT_DEFAULT
+    });
+    let result = holochain_client::ReconnectingAppWebsocket::builder(
+        SocketAddr::new(Ipv4Addr::LOCALHOST.into(), admin_port),
+        app_id,
+        signer,
+    )
+    .origin(common::FIXTURE_ORIGIN)
+    .websocket_config(config)
+    .connect()
+    .await;
+
+    assert!(
+        matches!(result, Err(ConductorApiError::WebsocketError(_))),
+        "expected an oversized app response to fail, got {result:?}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn signals_resume_on_the_same_subscription_after_a_restart() {
+    let common::FixtureApp {
+        mut conductor,
+        admin_port,
+        app_id,
+        signer,
+        app_port,
+    } = common::install_fixture_app_with_fixed_admin_port().await;
+
+    let app_ws = holochain_client::ReconnectingAppWebsocket::builder(
+        SocketAddr::new(Ipv4Addr::LOCALHOST.into(), admin_port),
+        app_id.clone(),
+        signer,
+    )
+    .origin(common::FIXTURE_ORIGIN)
+    .connect()
+    .await
+    .unwrap();
+
+    // Taken once, never re-registered.
+    let mut signals = app_ws.signals();
+
+    conductor.shutdown().await;
+    conductor.startup().await;
+
+    // The conductor restart moved the app interface port, because
+    // startup_app_interfaces restores an interface on its originally
+    // requested port. The subscription still resumes.
+    let interrupted = tokio::time::timeout(Duration::from_secs(90), async {
+        loop {
+            match signals.next().await {
+                Some(holochain_client::SignalEvent::Interrupted) => return,
+                Some(holochain_client::SignalEvent::Signal(_)) => {}
+                None => panic!("signal subscription closed before reconnection"),
+            }
+        }
+    })
+    .await;
+    assert!(interrupted.is_ok(), "no Interrupted event after restart");
+
+    // The gap is reported only once the connection is live again, so a
+    // consumer re-syncing in response to it finds a usable socket.
+    assert!(
+        app_ws.current().is_ok(),
+        "Interrupted arrived before the connection was published"
+    );
+
+    // The interface was attached on port 0, so the restart puts it on a
+    // different port and the reconnect only succeeds by rediscovering it.
+    let restarted_app_port = common::discover_fixture_app_port(admin_port, &app_id).await;
+    assert_ne!(
+        restarted_app_port, app_port,
+        "app interface port did not move across the restart, so rediscovery is untested"
+    );
+
+    // And real signals flow again on that same subscription.
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    loop {
+        let Ok(app) = app_ws.current() else {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "app never became callable"
+            );
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            continue;
+        };
+        let cell_id = common::provisioned_cell_id(app.cached_app_info());
+        if app_ws
+            .call_zome(
+                cell_id.into(),
+                common::FIXTURE_ZOME_NAME.into(),
+                common::FIXTURE_EMIT_FN_NAME.into(),
+                ExternIO::encode(()).unwrap(),
+            )
+            .await
+            .is_ok()
+        {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "app never became callable"
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+
+    let signal = tokio::time::timeout(Duration::from_secs(30), signals.next())
+        .await
+        .expect("no signal after reconnect");
+    assert!(matches!(
+        signal,
+        Some(holochain_client::SignalEvent::Signal(_))
+    ));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn dropping_the_connection_stops_reconnecting() {
+    let (mut conductor, admin_port) = common::conductor_with_fixed_admin_port().await;
+
+    // Short delays so several reconnect attempts land inside the test.
+    let config = holochain_client::ReconnectConfig {
+        initial_delay: Duration::from_millis(100),
+        max_delay: Duration::from_millis(200),
+        escalate_after: u32::MAX,
+    };
+
+    let admin_ws = holochain_client::ReconnectingAdminWebsocket::connect(
+        (Ipv4Addr::LOCALHOST, admin_port),
+        None,
+        config,
+    )
+    .await
+    .unwrap();
+
+    conductor.shutdown().await;
+
+    // Stand in for the conductor so reconnect attempts are observable. Each
+    // accepted connection is one dial by the client; closing it immediately
+    // fails the client's websocket handshake, so it backs off and dials again.
+    let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, admin_port))
+        .await
+        .unwrap();
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let acceptor = tokio::spawn({
+        let attempts = attempts.clone();
+        async move {
+            while let Ok((stream, _)) = listener.accept().await {
+                attempts.fetch_add(1, Ordering::SeqCst);
+                drop(stream);
+            }
+        }
+    });
+
+    // The client dials repeatedly while the handle is alive.
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    while attempts.load(Ordering::SeqCst) < 3 {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "client never retried the connection"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    drop(admin_ws);
+
+    // Let any dial already in flight finish, then confirm dialling has stopped.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let after_drop = attempts.load(Ordering::SeqCst);
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    assert_eq!(
+        attempts.load(Ordering::SeqCst),
+        after_drop,
+        "reconnect attempts continued after the handle was dropped"
+    );
+
+    acceptor.abort();
+}
+
+#[tokio::test]
+async fn a_connection_that_drops_immediately_is_backed_off() {
+    // A peer that completes the websocket handshake and then closes drives the
+    // uptime guard, which the handshake-failing paths do not reach because
+    // they back off inside `connect_with_backoff` instead.
+    let listener = WebsocketListener::bind(
+        Arc::new(WebsocketConfig::LISTENER_DEFAULT),
+        (Ipv4Addr::LOCALHOST, 0),
+    )
+    .await
+    .unwrap();
+    let port = listener.local_addrs().unwrap()[0].port();
+
+    // Held long enough that the client is certainly connected, and far short
+    // of `initial_delay` so every connection counts as short lived.
+    const HOLD: Duration = Duration::from_millis(200);
+    const INITIAL_DELAY: Duration = Duration::from_secs(2);
+
+    let accepted: Arc<std::sync::Mutex<Vec<std::time::Instant>>> = Arc::default();
+    let rejected = Arc::new(AtomicUsize::new(0));
+    let server = tokio::spawn({
+        let accepted = accepted.clone();
+        let rejected = rejected.clone();
+        async move {
+            loop {
+                match listener.accept().await {
+                    Ok(connection) => {
+                        accepted.lock().unwrap().push(std::time::Instant::now());
+                        tokio::time::sleep(HOLD).await;
+                        drop(connection);
+                    }
+                    Err(_) => {
+                        rejected.fetch_add(1, Ordering::SeqCst);
+                        break;
+                    }
+                }
+            }
+        }
+    });
+
+    let _admin_ws = holochain_client::ReconnectingAdminWebsocket::connect(
+        (Ipv4Addr::LOCALHOST, port),
+        Some("flap-test".to_string()),
+        holochain_client::ReconnectConfig {
+            initial_delay: INITIAL_DELAY,
+            max_delay: INITIAL_DELAY,
+            escalate_after: u32::MAX,
+        },
+    )
+    .await
+    .unwrap();
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    loop {
+        if accepted.lock().unwrap().len() >= 3 {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "client did not reconnect three times"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    // Every dial completed a handshake, so each reconnect followed a live
+    // connection rather than a failed connect.
+    assert_eq!(rejected.load(Ordering::SeqCst), 0);
+
+    // Without the guard the reconnect would follow the close immediately, so
+    // the gaps would be about `HOLD`.
+    let gaps: Vec<Duration> = accepted
+        .lock()
+        .unwrap()
+        .windows(2)
+        .map(|w| w[1] - w[0])
+        .collect();
+    for gap in &gaps {
+        assert!(
+            *gap >= HOLD + INITIAL_DELAY.mul_f64(0.75),
+            "reconnected after {gap:?}, which is too soon to have been delayed by the guard"
+        );
+    }
+
+    server.abort();
+}

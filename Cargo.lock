@@ -3135,6 +3135,7 @@ dependencies = [
  "event-emitter-rs",
  "holo_hash",
  "holochain",
+ "holochain_client",
  "holochain_conductor_api",
  "holochain_nonce",
  "holochain_serialized_bytes",
@@ -3152,6 +3153,7 @@ dependencies = [
  "serde",
  "thiserror 2.0.20",
  "tokio",
+ "tracing",
  "yaml_serde",
 ]
 

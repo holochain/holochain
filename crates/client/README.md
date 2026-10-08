@@ -16,6 +16,42 @@ Types and bindings to connect easily to a running Holochain conductor from Rust.
 
 **Rust client v0.5.x** is compatible with **Holochain v0.3.x**.
 
+## Connection resilience
+
+`AdminWebsocket` and `AppWebsocket` are single connections. When the conductor
+restarts, they stop working and the caller reconnects.
+
+`ReconnectingAdminWebsocket` and `ReconnectingAppWebsocket` repair themselves.
+Use `connect` when the conductor should already be running and a failure is
+worth reporting, and `connect_with_retry` when you are waiting for one to
+start; the latter never gives up, so bound it with `tokio::time::timeout` if
+you need it to.
+
+`ReconnectingAppWebsocket` needs a reachable admin interface throughout its
+lifetime, not just at setup: after a restart it must rediscover the app
+interface and issue a new app authentication token. Use it only from a trusted
+process allowed ongoing access to the conductor's privileged admin interface.
+
+Admin connections can use a hostname (for example, `"localhost:30000"`);
+the hostname is resolved again for each reconnect attempt. A concrete socket
+address or address list is reused unchanged. Custom `ToSocketAddrs`
+implementations should be converted to an address list before connecting.
+
+Set `ReconnectingAppWebsocket::builder(...).websocket_config(config)` to use
+a custom `Arc<WebsocketConfig>` for the initial app connection and every
+reconnect. This controls app transport limits and request timeouts; it does
+not change the admin connection's configuration.
+
+Requests made while a connection is down return
+`ConductorApiError::Disconnected`. Before the client notices a dead connection,
+a request may instead return the underlying websocket error. Neither is
+retried automatically: a failed zome call may already have written to the
+source chain, and re-signing it would mint a new nonce and risk a second write.
+
+Signals emitted while a client is disconnected are lost — Holochain has no
+signal replay. A `SignalStream` therefore reports `SignalEvent::Interrupted`
+when it resumes, so state derived from signals can be re-read.
+
 ## Running the tests
 
 ``` bash

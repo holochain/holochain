@@ -1,0 +1,487 @@
+use crate::error::{ConductorApiError, ConductorApiResult};
+use crate::reconnect::{connect_with_backoff, delegate, reconnect_after_close, ReconnectConfig};
+use crate::util::AbortOnDropHandle;
+use crate::{AdminWebsocket, AuthorizeSigningCredentialsPayload, EnableAppResponse};
+use holo_hash::{ActionHash, DnaHash};
+use holochain_conductor_api::{
+    AdminInterfaceConfig, AppAuthenticationToken, AppAuthenticationTokenIssued, AppInfo,
+    AppInterfaceInfo, AppStatusFilter, DhtOpsCursor, FullStateDump,
+    IssueAppAuthenticationTokenPayload, OpTimingsCursor, OpTimingsDump, PeerMetaInfo,
+    SourceChainCursor, StorageInfo,
+};
+use holochain_types::dna::AgentPubKey;
+use holochain_types::network::HolochainTransportStats;
+use holochain_types::prelude::{
+    AppCapGrantInfo, CellId, DeleteCloneCellPayload, InstallAppPayload, UpdateCoordinatorsPayload,
+};
+use holochain_types::websocket::AllowedOrigins;
+use holochain_websocket::{ConnectRequest, WebsocketConfig};
+use holochain_zome_types::prelude::{DnaDef, GrantZomeCallCapabilityPayload};
+use kitsune2_api::Url;
+use parking_lot::RwLock;
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+use std::fmt::Formatter;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::sync::Arc;
+
+/// An owned admin-interface address that can be resolved again on reconnection.
+///
+/// Hostnames are kept unresolved so every connection attempt can see new DNS
+/// records. Concrete addresses and address lists are used as supplied. Unlike
+/// the former `ToSocketAddrs` argument, arbitrary custom implementations of
+/// that trait are not accepted; pass a hostname or convert to a concrete list.
+#[derive(Debug, Clone)]
+pub enum ReconnectAdminAddress {
+    /// A concrete socket address.
+    Socket(SocketAddr),
+    /// Concrete socket addresses, tried in order.
+    Sockets(Vec<SocketAddr>),
+    /// A hostname with a port, such as `"localhost:12345"`.
+    Hostname(String),
+    /// A hostname and port supplied separately.
+    HostPort(String, u16),
+}
+
+impl From<SocketAddr> for ReconnectAdminAddress {
+    fn from(addr: SocketAddr) -> Self {
+        Self::Socket(addr)
+    }
+}
+
+impl From<SocketAddrV4> for ReconnectAdminAddress {
+    fn from(addr: SocketAddrV4) -> Self {
+        Self::Socket(addr.into())
+    }
+}
+
+impl From<SocketAddrV6> for ReconnectAdminAddress {
+    fn from(addr: SocketAddrV6) -> Self {
+        Self::Socket(addr.into())
+    }
+}
+
+impl From<(IpAddr, u16)> for ReconnectAdminAddress {
+    fn from((ip, port): (IpAddr, u16)) -> Self {
+        Self::Socket(SocketAddr::new(ip, port))
+    }
+}
+
+impl From<(Ipv4Addr, u16)> for ReconnectAdminAddress {
+    fn from((ip, port): (Ipv4Addr, u16)) -> Self {
+        Self::Socket(SocketAddr::new(ip.into(), port))
+    }
+}
+
+impl From<(Ipv6Addr, u16)> for ReconnectAdminAddress {
+    fn from((ip, port): (Ipv6Addr, u16)) -> Self {
+        Self::Socket(SocketAddr::new(ip.into(), port))
+    }
+}
+
+impl From<Vec<SocketAddr>> for ReconnectAdminAddress {
+    fn from(addrs: Vec<SocketAddr>) -> Self {
+        Self::Sockets(addrs)
+    }
+}
+
+impl From<&[SocketAddr]> for ReconnectAdminAddress {
+    fn from(addrs: &[SocketAddr]) -> Self {
+        Self::Sockets(addrs.to_vec())
+    }
+}
+
+impl<const N: usize> From<[SocketAddr; N]> for ReconnectAdminAddress {
+    fn from(addrs: [SocketAddr; N]) -> Self {
+        Self::Sockets(addrs.into())
+    }
+}
+
+impl<const N: usize> From<&[SocketAddr; N]> for ReconnectAdminAddress {
+    fn from(addrs: &[SocketAddr; N]) -> Self {
+        Self::Sockets(addrs.to_vec())
+    }
+}
+
+impl From<String> for ReconnectAdminAddress {
+    fn from(hostname: String) -> Self {
+        Self::Hostname(hostname)
+    }
+}
+
+impl From<&str> for ReconnectAdminAddress {
+    fn from(hostname: &str) -> Self {
+        Self::Hostname(hostname.to_owned())
+    }
+}
+
+impl From<&String> for ReconnectAdminAddress {
+    fn from(hostname: &String) -> Self {
+        Self::Hostname(hostname.clone())
+    }
+}
+
+impl From<(String, u16)> for ReconnectAdminAddress {
+    fn from((hostname, port): (String, u16)) -> Self {
+        Self::HostPort(hostname, port)
+    }
+}
+
+impl From<(&str, u16)> for ReconnectAdminAddress {
+    fn from((hostname, port): (&str, u16)) -> Self {
+        Self::HostPort(hostname.to_owned(), port)
+    }
+}
+
+impl From<(&String, u16)> for ReconnectAdminAddress {
+    fn from((hostname, port): (&String, u16)) -> Self {
+        Self::HostPort(hostname.clone(), port)
+    }
+}
+
+/// An admin websocket that re-establishes itself after the conductor restarts.
+///
+/// Requests made while the connection is down fail with
+/// [`ConductorApiError::Disconnected`] rather than blocking. Between a
+/// connection dying and that being observed, a request can still be issued on
+/// the dead socket and fail with the underlying websocket error instead; both
+/// are retryable and callers need not distinguish them.
+///
+/// Reconnection never gives up; drop every clone of this handle to stop it.
+#[derive(Clone)]
+pub struct ReconnectingAdminWebsocket {
+    current: Arc<RwLock<Option<AdminWebsocket>>>,
+    _task: Arc<AbortOnDropHandle>,
+}
+
+impl std::fmt::Debug for ReconnectingAdminWebsocket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReconnectingAdminWebsocket").finish()
+    }
+}
+
+impl ReconnectingAdminWebsocket {
+    /// Connects to a conductor admin interface and keeps the connection alive.
+    ///
+    /// The initial connection is attempted once per resolved address and fails
+    /// if none of them accept, so that a typo'd port or a rejected origin is
+    /// reported rather than retried silently. Hostnames are looked up without
+    /// blocking the runtime and re-resolved on every later connection attempt.
+    /// Use [`ReconnectingAdminWebsocket::connect_with_retry`] to wait for a
+    /// conductor that has not started yet. Once this returns, connection
+    /// failures are repaired instead of reported.
+    pub async fn connect(
+        socket_addr: impl Into<ReconnectAdminAddress>,
+        origin: Option<String>,
+        config: ReconnectConfig,
+    ) -> ConductorApiResult<Self> {
+        let address = socket_addr.into();
+        let connected = connect_address(&address, &origin).await?;
+        Ok(Self::start(address, origin, config, connected))
+    }
+
+    /// Connects to a conductor admin interface, waiting for it to accept.
+    ///
+    /// Unlike [`ReconnectingAdminWebsocket::connect`] this retries the initial
+    /// connection with the same backoff used for reconnection, so it is the
+    /// right choice when the conductor may not have started yet. Resolution
+    /// errors (including an empty address list) are reported immediately;
+    /// subsequent retries re-resolve hostnames. It never gives up after a
+    /// connection failure; bound it by wrapping the call in
+    /// [`tokio::time::timeout`], which works because the retry loop is cancel
+    /// safe.
+    pub async fn connect_with_retry(
+        socket_addr: impl Into<ReconnectAdminAddress>,
+        origin: Option<String>,
+        config: ReconnectConfig,
+    ) -> ConductorApiResult<Self> {
+        let address = socket_addr.into();
+        let mut first_addrs = Some(resolve(&address).await?);
+        let connected = connect_with_backoff("holochain_client::admin", &config, || {
+            let first_addrs = first_addrs.take();
+            async {
+                let addrs = match first_addrs {
+                    Some(addrs) => addrs,
+                    None => resolve(&address).await?,
+                };
+                connect_once(&addrs, &origin).await
+            }
+        })
+        .await;
+        drop(first_addrs);
+        Ok(Self::start(address, origin, config, connected))
+    }
+
+    /// Starts the task that clears a closed socket and publishes its replacement.
+    ///
+    /// The task keeps retrying until the last wrapper clone is dropped.
+    fn start(
+        address: ReconnectAdminAddress,
+        origin: Option<String>,
+        config: ReconnectConfig,
+        connected: (AdminWebsocket, crate::util::ClosedNotify),
+    ) -> Self {
+        let (admin_ws, closed) = connected;
+
+        let current = Arc::new(RwLock::new(Some(admin_ws)));
+
+        let task = tokio::task::spawn({
+            let current = current.clone();
+            async move {
+                let mut closed = closed;
+                let mut flaps: u32 = 0;
+                loop {
+                    let (admin_ws, next_closed) = reconnect_after_close(
+                        closed,
+                        &mut flaps,
+                        "holochain_client::admin",
+                        &config,
+                        || {
+                            current.write().take();
+                        },
+                        || connect_address(&address, &origin),
+                    )
+                    .await;
+
+                    current.write().replace(admin_ws);
+                    closed = next_closed;
+                }
+            }
+        });
+
+        Self {
+            current,
+            _task: Arc::new(AbortOnDropHandle::new(task.abort_handle())),
+        }
+    }
+
+    /// Returns the live admin websocket.
+    ///
+    /// The returned socket is a snapshot of the connection as it stands, and a
+    /// reconnect replaces it. Call this once per request and drop the result;
+    /// a stored socket stops working at the next reconnect and reports raw
+    /// websocket errors instead of [`ConductorApiError::Disconnected`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConductorApiError::Disconnected`] while the connection is
+    /// being re-established.
+    pub fn current(&self) -> ConductorApiResult<AdminWebsocket> {
+        self.current
+            .read()
+            .clone()
+            .ok_or(ConductorApiError::Disconnected)
+    }
+
+    delegate!(
+        /// Issues an app authentication token for an app.
+        issue_app_auth_token(
+            payload: IssueAppAuthenticationTokenPayload,
+        ) -> AppAuthenticationTokenIssued
+    );
+    delegate!(
+        /// Revokes a previously issued app authentication token.
+        revoke_app_authentication_token(token: AppAuthenticationToken) -> ()
+    );
+    delegate!(
+        /// Generates a new agent public key in the keystore.
+        generate_agent_pub_key() -> AgentPubKey
+    );
+    delegate!(
+        /// Adds admin interfaces to the conductor.
+        add_admin_interfaces(configs: Vec<AdminInterfaceConfig>) -> ()
+    );
+    delegate!(
+        /// Lists the app interfaces attached to the conductor.
+        list_app_interfaces() -> Vec<AppInterfaceInfo>
+    );
+    delegate!(
+        /// Attaches an app interface and returns the port it listens on.
+        attach_app_interface(
+            port: u16,
+            danger_bind_addr: Option<String>,
+            allowed_origins: AllowedOrigins,
+            installed_app_id: Option<String>,
+        ) -> u16
+    );
+    delegate!(
+        /// Lists the installed apps, optionally filtered by status.
+        list_apps(status_filter: Option<AppStatusFilter>) -> Vec<AppInfo>
+    );
+    delegate!(
+        /// Installs an app.
+        install_app(payload: InstallAppPayload) -> AppInfo
+    );
+    delegate!(
+        /// Uninstalls an app.
+        uninstall_app(installed_app_id: String, force: bool) -> ()
+    );
+    delegate!(
+        /// Lists the DNAs registered with the conductor.
+        list_dnas() -> Vec<DnaHash>
+    );
+    delegate!(
+        /// Enables an app.
+        enable_app(installed_app_id: String) -> EnableAppResponse
+    );
+    delegate!(
+        /// Disables an app.
+        disable_app(installed_app_id: String) -> ()
+    );
+    delegate!(
+        /// Lists the cell ids the conductor is running.
+        list_cell_ids() -> Vec<CellId>
+    );
+    delegate!(
+        /// Gets a cell's DNA definition.
+        get_dna_definition(cell_id: CellId) -> DnaDef
+    );
+    delegate!(
+        /// Grants a zome call capability on a cell.
+        grant_zome_call_capability(payload: GrantZomeCallCapabilityPayload) -> ActionHash
+    );
+    delegate!(
+        /// Lists an app's capability grants.
+        list_capability_grants(
+            installed_app_id: String,
+            include_revoked: bool,
+        ) -> AppCapGrantInfo
+    );
+    delegate!(
+        /// Revokes a zome call capability on a cell.
+        revoke_zome_call_capability(cell_id: CellId, action_hash: ActionHash) -> ()
+    );
+    delegate!(
+        /// Deletes a disabled clone cell.
+        delete_clone_cell(payload: DeleteCloneCellPayload) -> ()
+    );
+    delegate!(
+        /// Reports the conductor's storage usage.
+        storage_info() -> StorageInfo
+    );
+    delegate!(
+        /// Dumps network transport statistics.
+        dump_network_stats() -> HolochainTransportStats
+    );
+    delegate!(
+        /// Dumps one page of a cell's source-chain state.
+        dump_state(
+            cell_id: CellId,
+            source_chain_cursor: Option<SourceChainCursor>,
+            limit: Option<u32>,
+        ) -> String
+    );
+    delegate!(
+        /// Dumps the conductor's state.
+        dump_conductor_state() -> String
+    );
+    delegate!(
+        /// Dumps one page of a cell's full state.
+        dump_full_state(
+            cell_id: CellId,
+            dht_ops_cursor: Option<DhtOpsCursor>,
+            limit: Option<u32>,
+        ) -> FullStateDump
+    );
+    delegate!(
+        /// Dumps one page of a DNA's DHT-op lifecycle timings.
+        dump_op_timings(
+            dna_hash: DnaHash,
+            cursor: Option<OpTimingsCursor>,
+            limit: Option<u32>,
+        ) -> OpTimingsDump
+    );
+    delegate!(
+        /// Dumps network metrics.
+        dump_network_metrics(
+            dna_hash: Option<DnaHash>,
+            include_dht_summary: bool,
+        ) -> std::collections::HashMap<DnaHash, holochain_types::network::Kitsune2NetworkMetrics>
+    );
+    delegate!(
+        /// Updates an app's coordinator zomes.
+        update_coordinators(update_coordinators_payload: UpdateCoordinatorsPayload) -> ()
+    );
+    delegate!(
+        /// Lists known peers, optionally restricted to some DNAs.
+        agent_info(dna_hashes: Option<Vec<DnaHash>>) -> Vec<String>
+    );
+    delegate!(
+        /// Adds signed agent info to the conductor's peer store.
+        add_agent_info(agent_infos: Vec<String>) -> ()
+    );
+    delegate!(
+        /// Reads the peer meta store for an agent at a URL.
+        peer_meta_info(
+            url: Url,
+            dna_hashes: Option<Vec<DnaHash>>,
+        ) -> BTreeMap<DnaHash, BTreeMap<String, PeerMetaInfo>>
+    );
+    delegate!(
+        /// Grants a capability to a freshly generated signing keypair.
+        authorize_signing_credentials(
+            request: AuthorizeSigningCredentialsPayload,
+        ) -> crate::signing::client_signing::SigningCredentials
+    );
+}
+
+/// Resolves hostname inputs on this attempt without copying concrete addresses.
+///
+/// An empty concrete list or DNS result returns `NoAddressesResolved` before
+/// any connection attempt.
+async fn resolve(address: &ReconnectAdminAddress) -> ConductorApiResult<Cow<'_, [SocketAddr]>> {
+    let addrs = match address {
+        ReconnectAdminAddress::Socket(addr) => Cow::Borrowed(std::slice::from_ref(addr)),
+        ReconnectAdminAddress::Sockets(addrs) => Cow::Borrowed(addrs.as_slice()),
+        ReconnectAdminAddress::Hostname(hostname) => {
+            Cow::Owned(tokio::net::lookup_host(hostname.as_str()).await?.collect())
+        }
+        ReconnectAdminAddress::HostPort(hostname, port) => Cow::Owned(
+            tokio::net::lookup_host((hostname.as_str(), *port))
+                .await?
+                .collect(),
+        ),
+    };
+    if addrs.is_empty() {
+        return Err(ConductorApiError::NoAddressesResolved);
+    }
+    Ok(addrs)
+}
+
+/// Resolves the current address and tries its endpoints in order.
+///
+/// Repeating this for each attempt lets hostname-based handles follow DNS
+/// changes while a supplied list of concrete addresses remains unchanged.
+async fn connect_address(
+    address: &ReconnectAdminAddress,
+    origin: &Option<String>,
+) -> ConductorApiResult<(AdminWebsocket, crate::util::ClosedNotify)> {
+    let addrs = resolve(address).await?;
+    connect_once(&addrs, origin).await
+}
+
+/// Opens the first accepting admin endpoint from a resolved address list.
+///
+/// If all attempts fail, returns the last connection error; an empty list
+/// returns `NoAddressesResolved`.
+async fn connect_once(
+    addrs: &[SocketAddr],
+    origin: &Option<String>,
+) -> ConductorApiResult<(AdminWebsocket, crate::util::ClosedNotify)> {
+    let websocket_config = Arc::new(WebsocketConfig::CLIENT_DEFAULT);
+
+    let mut last_err = None;
+    for addr in addrs {
+        let request: ConnectRequest = match origin {
+            Some(o) => Into::<ConnectRequest>::into(*addr).try_set_header("Origin", o.as_str())?,
+            None => (*addr).into(),
+        };
+
+        match AdminWebsocket::connect_with_notify(request, websocket_config.clone()).await {
+            Ok(connected) => return Ok(connected),
+            Err(e) => last_err = Some(e),
+        }
+    }
+
+    Err(last_err.unwrap_or(ConductorApiError::NoAddressesResolved))
+}
