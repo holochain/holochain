@@ -2,6 +2,8 @@
 
 mod generate;
 pub use generate::{generate, Generated, GeneratedChain};
+mod write;
+pub use write::{build, Fixture, FixtureKeys};
 
 /// Fixture parameters.
 #[derive(Clone, Copy, Debug)]

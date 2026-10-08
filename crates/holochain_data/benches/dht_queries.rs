@@ -21,15 +21,37 @@ fn runtime() -> &'static tokio::runtime::Runtime {
     })
 }
 
+/// All fixtures, built once per process in ascending size order.
+fn fixtures() -> &'static [fixture::Fixture] {
+    static FX: OnceLock<Vec<fixture::Fixture>> = OnceLock::new();
+    FX.get_or_init(|| {
+        runtime().block_on(async {
+            let mut out = Vec::new();
+            for actions in fixture::sizes() {
+                let started = std::time::Instant::now();
+                let fx = fixture::build(fixture::FixtureConfig { actions, seed: 42 }).await;
+                eprintln!(
+                    "fixture {actions}: {} limbo rows, built in {:?}",
+                    fx.keys.limbo_rows,
+                    started.elapsed()
+                );
+                out.push(fx);
+            }
+            out
+        })
+    })
+}
+
 fn smoke(c: &mut Criterion) {
-    let cfg = fixture::FixtureConfig {
-        actions: 1_000,
-        seed: 42,
-    };
-    let g = fixture::generate(cfg);
-    fixture::check_generated(cfg, &g);
     let rt = runtime();
-    c.bench_function("smoke/noop", |b| b.to_async(rt).iter(|| async {}));
+    for fx in fixtures() {
+        let db = fx.db.as_ref();
+        let author = fx.keys.local_author.clone();
+        c.bench_function(&format!("smoke/chain_head/{}", fx.size), |b| {
+            b.to_async(rt)
+                .iter(|| async { db.chain_head_for_author(&author).await.unwrap() })
+        });
+    }
 }
 
 criterion_group!(benches, smoke);
