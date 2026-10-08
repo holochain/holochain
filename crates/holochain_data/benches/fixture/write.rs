@@ -3,8 +3,8 @@
 use super::{generate, FixtureConfig, Generated};
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DhtOpHash, DnaHash, EntryHash};
 use holochain_data::dht::{
-    InsertChainOp, InsertDeletedLink, InsertDeletedRecord, InsertLimboChainOp, InsertLink,
-    InsertLimboWarrant, InsertUpdatedRecord, InsertWarrant,
+    InsertChainOp, InsertDeletedLink, InsertDeletedRecord, InsertLimboChainOp, InsertLimboWarrant,
+    InsertLink, InsertUpdatedRecord, InsertWarrant,
 };
 use holochain_data::kind::Dht;
 use holochain_data::{open_db, DbWrite, HolochainDataConfig};
@@ -70,9 +70,13 @@ pub async fn build(cfg: FixtureConfig) -> Fixture {
 
     let dir = tempfile::TempDir::new().expect("temp dir");
     let dna_hash = DnaHash::from_raw_36(vec![7u8; 36]);
-    let db = open_db(dir.path(), Dht::new(Arc::new(dna_hash)), HolochainDataConfig::new())
-        .await
-        .expect("open dht db");
+    let db = open_db(
+        dir.path(),
+        Dht::new(Arc::new(dna_hash)),
+        HolochainDataConfig::new(),
+    )
+    .await
+    .expect("open dht db");
 
     let mut keys = FixtureKeys {
         local_author: g.local_author.clone(),
@@ -129,7 +133,12 @@ pub async fn build(cfg: FixtureConfig) -> Fixture {
                 ActionData::Create(c) => {
                     keep(&mut keys.action_hashes, hash, &mut rng, seen_actions);
                     if c.entry_type.visibility() == &EntryVisibility::Public {
-                        keep(&mut keys.entry_hashes, &c.entry_hash, &mut rng, seen_actions);
+                        keep(
+                            &mut keys.entry_hashes,
+                            &c.entry_hash,
+                            &mut rng,
+                            seen_actions,
+                        );
                     }
                     if is_local {
                         local_create_hashes.push(hash.clone());
@@ -335,14 +344,20 @@ pub async fn build(cfg: FixtureConfig) -> Fixture {
         "UPDATE LimboChainOp SET sys_validation_attempts = when_received % 4, \
          app_validation_attempts = when_received % 3",
     ] {
-        sqlx::query(sql).execute(db.pool()).await.expect("limbo spread");
+        sqlx::query(sql)
+            .execute(db.pool())
+            .await
+            .expect("limbo spread");
     }
 
     let (actions,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM Action")
         .fetch_one(db.pool())
         .await
         .expect("count actions");
-    assert!(actions as usize >= cfg.actions * 95 / 100, "actions written: {actions}");
+    assert!(
+        actions as usize >= cfg.actions * 95 / 100,
+        "actions written: {actions}"
+    );
     if cfg.actions >= 100_000 {
         assert!(
             keys.limbo_rows > 10_000,

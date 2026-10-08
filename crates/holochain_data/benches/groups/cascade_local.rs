@@ -22,8 +22,11 @@ pub fn cascade_local(c: &mut Criterion) {
             BenchmarkId::new("get_live_entry_creates", fx.size),
             &fx.size,
             |b, _| {
-                b.to_async(rt)
-                    .iter(|| async { db.get_live_entry_creates(entries.next(), None).await.unwrap() })
+                b.to_async(rt).iter(|| async {
+                    db.get_live_entry_creates(entries.next(), None)
+                        .await
+                        .unwrap()
+                })
             },
         );
         g.bench_with_input(
@@ -31,7 +34,9 @@ pub fn cascade_local(c: &mut Criterion) {
             &fx.size,
             |b, _| {
                 b.to_async(rt).iter(|| async {
-                    db.get_update_actions_for_record(updated.next()).await.unwrap()
+                    db.get_update_actions_for_record(updated.next())
+                        .await
+                        .unwrap()
                 })
             },
         );
@@ -40,7 +45,9 @@ pub fn cascade_local(c: &mut Criterion) {
             &fx.size,
             |b, _| {
                 b.to_async(rt).iter(|| async {
-                    db.get_delete_actions_for_record(deleted.next()).await.unwrap()
+                    db.get_delete_actions_for_record(deleted.next())
+                        .await
+                        .unwrap()
                 })
             },
         );
@@ -65,7 +72,9 @@ pub fn cascade_local(c: &mut Criterion) {
             &fx.size,
             |b, _| {
                 b.to_async(rt).iter(|| async {
-                    db.get_chain_ops_for_action(actions.next().clone()).await.unwrap()
+                    db.get_chain_ops_for_action(actions.next().clone())
+                        .await
+                        .unwrap()
                 })
             },
         );
@@ -73,8 +82,11 @@ pub fn cascade_local(c: &mut Criterion) {
             BenchmarkId::new("get_deleted_records", fx.size),
             &fx.size,
             |b, _| {
-                b.to_async(rt)
-                    .iter(|| async { db.get_deleted_records(deleted.next().clone()).await.unwrap() })
+                b.to_async(rt).iter(|| async {
+                    db.get_deleted_records(deleted.next().clone())
+                        .await
+                        .unwrap()
+                })
             },
         );
     }

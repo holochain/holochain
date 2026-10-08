@@ -50,7 +50,10 @@ pub fn workflow(c: &mut Criterion) {
             },
         );
         g.bench_with_input(
-            BenchmarkId::new("limbo_chain_ops_pending_sys_validation_with_action", fx.size),
+            BenchmarkId::new(
+                "limbo_chain_ops_pending_sys_validation_with_action",
+                fx.size,
+            ),
             &fx.size,
             |b, _| {
                 b.to_async(rt).iter(|| async {
@@ -61,7 +64,10 @@ pub fn workflow(c: &mut Criterion) {
             },
         );
         g.bench_with_input(
-            BenchmarkId::new("limbo_chain_ops_pending_app_validation_with_action", fx.size),
+            BenchmarkId::new(
+                "limbo_chain_ops_pending_app_validation_with_action",
+                fx.size,
+            ),
             &fx.size,
             |b, _| {
                 b.to_async(rt).iter(|| async {

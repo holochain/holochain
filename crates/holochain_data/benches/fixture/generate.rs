@@ -134,7 +134,11 @@ impl ChainBuilder<'_> {
         );
         let create_hash = self.prev.clone().expect("just pushed");
         self.creates.push((create_hash, hash_for_list));
-        self.push(ActionData::InitZomesComplete(InitZomesCompleteData {}), None, None);
+        self.push(
+            ActionData::InitZomesComplete(InitZomesCompleteData {}),
+            None,
+            None,
+        );
     }
 
     fn create(&mut self) {
@@ -293,8 +297,20 @@ pub fn generate(cfg: FixtureConfig) -> Generated {
                 _ => b.delete_link(&pool),
             }
         }
-        let first = b.records.first().expect("genesis").action().timestamp().as_micros();
-        let last = b.records.last().expect("genesis").action().timestamp().as_micros();
+        let first = b
+            .records
+            .first()
+            .expect("genesis")
+            .action()
+            .timestamp()
+            .as_micros();
+        let last = b
+            .records
+            .last()
+            .expect("genesis")
+            .action()
+            .timestamp()
+            .as_micros();
         min_ts = min_ts.min(first);
         max_ts = max_ts.max(last);
         chains.push(GeneratedChain {

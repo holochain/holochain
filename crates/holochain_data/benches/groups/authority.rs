@@ -29,8 +29,11 @@ pub fn authority(c: &mut Criterion) {
             BenchmarkId::new("get_authority_entry_creates", fx.size),
             &fx.size,
             |b, _| {
-                b.to_async(rt)
-                    .iter(|| async { db.get_authority_entry_creates(entries.next()).await.unwrap() })
+                b.to_async(rt).iter(|| async {
+                    db.get_authority_entry_creates(entries.next())
+                        .await
+                        .unwrap()
+                })
             },
         );
         g.bench_with_input(
@@ -54,7 +57,9 @@ pub fn authority(c: &mut Criterion) {
             &fx.size,
             |b, _| {
                 b.to_async(rt).iter(|| async {
-                    db.get_agent_activity(authors.next().clone(), false).await.unwrap()
+                    db.get_agent_activity(authors.next().clone(), false)
+                        .await
+                        .unwrap()
                 })
             },
         );

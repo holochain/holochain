@@ -48,6 +48,7 @@ criterion_group!(
     groups::zome_call::zome_call,
     groups::cascade_local::cascade_local,
     groups::authority::authority,
-    groups::workflow::workflow
+    groups::workflow::workflow,
+    groups::gossip::gossip
 );
 criterion_main!(benches);

@@ -1,8 +1,8 @@
 //! Benchmark groups, one per runtime flow.
 
-pub mod cascade_local;
 pub mod authority;
-// pub mod gossip;
+pub mod cascade_local;
+pub mod gossip;
 pub mod workflow;
 pub mod zome_call;
 
