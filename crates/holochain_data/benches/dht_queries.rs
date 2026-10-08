@@ -46,6 +46,8 @@ fn fixtures() -> &'static [fixture::Fixture] {
 criterion_group!(
     benches,
     groups::zome_call::zome_call,
-    groups::cascade_local::cascade_local
+    groups::cascade_local::cascade_local,
+    groups::authority::authority,
+    groups::workflow::workflow
 );
 criterion_main!(benches);
