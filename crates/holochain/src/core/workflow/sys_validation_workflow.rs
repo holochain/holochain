@@ -1318,6 +1318,31 @@ pub async fn counterfeit_check_warrant(
     Ok(())
 }
 
+/// Check that the entry carried by a chain op hashes to the entry hash named
+/// by its action.
+///
+/// The entry is not covered by the action signature, so a third party can pair
+/// a genuine, signed action with fabricated entry bytes. Ops that fail this
+/// check must be dropped before anything is written and without warranting the
+/// action's author, who may not have produced the entry.
+///
+/// Ops without a `Present` entry pass. An op that carries an entry while its
+/// action names no entry hash is malformed and fails too.
+pub fn counterfeit_check_entry(op: &ChainOp) -> SysValidationResult<()> {
+    let Some(OpEntry::Present(entry)) = op.op_entry() else {
+        return Ok(());
+    };
+    let action = op.signed_action().data();
+    let entry_hash = action.entry_hash().ok_or_else(|| {
+        ValidationOutcome::MalformedDhtOp(
+            Box::new(action.clone()),
+            op.op_type(),
+            "op carries an entry but its action names no entry hash".to_string(),
+        )
+    })?;
+    check_entry_hash(entry_hash, entry)
+}
+
 fn register_agent_activity(
     action: &Action,
     validation_dependencies: SysValDeps,
