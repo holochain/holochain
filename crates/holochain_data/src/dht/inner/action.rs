@@ -313,24 +313,30 @@ pub(crate) async fn get_filtered_agent_activity<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let rows: Vec<ActionRow> = sqlx::query_as(
+    // The lower bound is added only when present: `(? IS NULL OR a.seq >= ?)`
+    // cannot be used as an index range, `a.seq >= ?` can.
+    let mut sql = String::from(
         "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
                 a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity
          FROM ChainOp c
          JOIN Action a ON c.action_hash = a.hash
          WHERE c.op_type = ?
            AND a.author = ?
-           AND a.seq <= ?
-           AND (? IS NULL OR a.seq >= ?)
-         ORDER BY a.seq DESC, a.hash DESC",
-    )
-    .bind(i64::from(ChainOpType::AgentActivity))
-    .bind(author.get_raw_36())
-    .bind(chain_top_seq as i64)
-    .bind(until_seq.map(|s| s as i64))
-    .bind(until_seq.map(|s| s as i64))
-    .fetch_all(executor)
-    .await?;
+           AND a.seq <= ?",
+    );
+    if until_seq.is_some() {
+        sql.push_str(" AND a.seq >= ?");
+    }
+    sql.push_str(" ORDER BY a.seq DESC, a.hash DESC");
+
+    let mut query = sqlx::query_as::<_, ActionRow>(sqlx::AssertSqlSafe(sql))
+        .bind(i64::from(ChainOpType::AgentActivity))
+        .bind(author.get_raw_36())
+        .bind(chain_top_seq as i64);
+    if let Some(until_seq) = until_seq {
+        query = query.bind(until_seq as i64);
+    }
+    let rows = query.fetch_all(executor).await?;
     rows.into_iter().map(row_to_signed_action_hashed).collect()
 }
 
