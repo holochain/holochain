@@ -119,6 +119,104 @@ async fn workflow_handles_publish_errors() {
     assert!(publish_timestamp.is_none());
 }
 
+#[tokio::test]
+async fn partial_publication_keeps_only_failed_groups_eligible() {
+    let dht_store = test_dht_store(fixt!(DnaHash)).await;
+    let agent = fixt!(AgentPubKey);
+    let mut hashes = Vec::new();
+    for sequence in [5, 6] {
+        let mut action = fixt!(Action, CreateAction);
+        action.header.author = agent.clone();
+        action.header.action_seq = sequence;
+        let op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateRecord(
+            SignedAction::new(action, fixt!(Signature)),
+            OpEntry::Hidden,
+        )));
+        hashes.push(op.as_hash().clone());
+        dht_store
+            .test_insert_authored_chain_op(op, None, None, None)
+            .await
+            .unwrap();
+    }
+    let interval = ConductorTuningParams::default().min_publish_interval();
+    let before = dht_store
+        .as_read()
+        .get_ops_to_publish(&agent, interval)
+        .await
+        .unwrap();
+    let failed_group = before
+        .iter()
+        .find(|(_, hash)| hash == &hashes[0])
+        .unwrap()
+        .clone();
+    let failed_hash = hashes[0].clone();
+    let mut network = MockHolochainP2pDnaT::new();
+    network
+        .expect_publish()
+        .returning(move |basis, _, hashes, _| {
+            if hashes.contains(&failed_hash) {
+                Err(holochain_p2p::HolochainP2pError::NoPeersForLocation(
+                    "publish".into(),
+                    basis.get_loc(),
+                ))
+            } else {
+                Ok(())
+            }
+        });
+    let (trigger, mut receiver) =
+        TriggerSender::new_with_loop(Duration::from_secs(60)..Duration::from_secs(300), true);
+    let complete = publish_dht_ops_workflow(
+        dht_store.clone(),
+        Arc::new(network),
+        trigger.clone(),
+        agent.clone(),
+        interval,
+    )
+    .await
+    .unwrap();
+    assert_eq!(complete, WorkComplete::Complete);
+    assert!(!receiver.is_paused());
+    assert_eq!(
+        dht_store
+            .as_read()
+            .get_ops_to_publish(&agent, interval)
+            .await
+            .unwrap(),
+        vec![failed_group],
+        "only the successfully admitted group should be throttled"
+    );
+
+    tokio::time::pause();
+    let start = tokio::time::Instant::now();
+    receiver.listen().await.unwrap();
+    assert!((Duration::from_secs(60)..Duration::from_secs(61)).contains(&start.elapsed()));
+    let start = tokio::time::Instant::now();
+    receiver.listen().await.unwrap();
+    assert!((Duration::from_secs(120)..Duration::from_secs(121)).contains(&start.elapsed()));
+    tokio::time::resume();
+
+    let mut network = MockHolochainP2pDnaT::new();
+    network.expect_publish().returning(|_, _, _, _| Ok(()));
+    publish_dht_ops_workflow(
+        dht_store.clone(),
+        Arc::new(network),
+        trigger,
+        agent.clone(),
+        interval,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        dht_store
+            .as_read()
+            .get_ops_to_publish(&agent, interval)
+            .await
+            .unwrap(),
+        Vec::new(),
+        "the failed group must be publishable without waiting out the throttle"
+    );
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_publish_until_receipts_received() {
     holochain_trace::test_run();
