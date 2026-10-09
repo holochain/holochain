@@ -115,31 +115,20 @@ pub async fn incoming_dht_ops_workflow(
 
     let num_ops = ops.len();
     let mut filter_ops = Vec::with_capacity(num_ops);
-    let mut entry_failure = None;
     for op in ops {
         // It's cheaper to check the signature and entry hash before opening a write transaction.
-        match should_keep(&op.op.content).await {
-            Ok(()) => filter_ops.push(op),
-            // A bad entry is not covered by the action signature, so a relaying peer may be
-            // innocent. Drop only this op and keep the rest of the batch.
-            Err(Counterfeit::Entry(e)) => {
-                tracing::warn!(?op, "Dropping op because its entry failed the hash check");
-                entry_failure.get_or_insert(e);
-            }
-            Err(Counterfeit::Signature(e)) => {
-                tracing::warn!(
-                    ?op,
-                    "Dropping batch of {} ops because the current op failed counterfeit checks",
-                    num_ops,
-                );
-                // TODO we are returning here without blocking this author?
-                return Err(e);
-            }
+        // An honest peer never stores an op that fails these checks, so the peer that sent
+        // this batch is not trusted for any op in it.
+        if let Err(e) = should_keep(&op.op.content).await {
+            tracing::warn!(
+                ?op,
+                "Dropping batch of {} ops because the current op failed counterfeit checks",
+                num_ops,
+            );
+            // TODO we are returning here without blocking this author?
+            return Err(e);
         }
-    }
-
-    if filter_ops.is_empty() {
-        return entry_failure.map_or(Ok(()), Err);
+        filter_ops.push(op);
     }
 
     let (mut maybe_batch, rcv) = incoming_ops_batch.check_insert(filter_ops);
@@ -212,32 +201,20 @@ pub async fn incoming_dht_ops_workflow(
         .map_err(|_| super::error::WorkflowError::RecvError)?
 }
 
-/// Which counterfeit check an op failed.
-enum Counterfeit {
-    /// The signature check failed; the whole batch is dropped.
-    Signature(super::error::WorkflowError),
-    /// The entry hash check failed; only the op is dropped.
-    Entry(super::error::WorkflowError),
-}
-
-/// If this op fails the counterfeit checks it should be dropped.
+/// If this op fails the counterfeit checks it, and the batch it came in, should be dropped.
 ///
 /// Chain ops must carry a valid author signature and, when they ship an
 /// entry, that entry must hash to the entry hash named by the action.
 /// Warrant ops must carry a valid signature.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(op)))]
-async fn should_keep(op: &DhtOp) -> Result<(), Counterfeit> {
+async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
     match op {
         DhtOp::ChainOp(op) => {
             let signed_action = op.signed_action();
-            counterfeit_check_action(signed_action.signature(), signed_action.data())
-                .await
-                .map_err(|e| Counterfeit::Signature(e.into()))?;
-            counterfeit_check_entry(op).map_err(|e| Counterfeit::Entry(e.into()))?;
+            counterfeit_check_action(signed_action.signature(), signed_action.data()).await?;
+            counterfeit_check_entry(op)?;
         }
-        DhtOp::WarrantOp(op) => counterfeit_check_warrant(op)
-            .await
-            .map_err(|e| Counterfeit::Signature(e.into()))?,
+        DhtOp::WarrantOp(op) => counterfeit_check_warrant(op).await?,
     }
     Ok(())
 }

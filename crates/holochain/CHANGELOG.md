@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix an op received through publish or gossip whose entry does not match its action's entry hash being dropped on its own while the rest of the batch was stored. The whole batch is now dropped, just like for an op with an invalid signature, because an honest peer never sends such an op. \#5994
 - Fix authored ops being marked as published when no eligible remote storage peers are available, so they remain eligible for publication after peer discovery. \#6020
 - Add indexes on `Action(author, seq)` and `ChainOp(action_hash, op_type)` to the DHT database, so agent activity walks, record lookups and op integration no longer scan every op held. \#6007
 - `must_get_agent_activity` with `ChainFilter::take(n)` now reads only the `n` actions below the chain top instead of the author's whole chain. \#6007
