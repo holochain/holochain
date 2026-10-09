@@ -1990,6 +1990,13 @@ impl actor::HcP2p for HolochainP2pActor {
             })
             .collect();
 
+            if !op_hash_list.is_empty() && urls.is_empty() {
+                return Err(HolochainP2pError::NoPeersForLocation(
+                    "publish".into(),
+                    basis_hash.get_loc(),
+                ));
+            }
+
             for url in urls {
                 space
                     .publish()

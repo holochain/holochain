@@ -62,6 +62,151 @@ async fn publish() {
     });
 }
 
+/// Ops authored without storage peers stay eligible when a peer is discovered.
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+async fn publish_recovers_after_storage_peer_discovery() {
+    use holochain::core::queue_consumer::{TriggerSender, WorkComplete};
+    use holochain::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
+    use holochain::test_utils::{inline_zomes::simple_create_read_zome, retry_fn_until_timeout};
+    use holochain_p2p::HolochainP2pDna;
+    use holochain_state::dht_store::GetAgentActivityOptions;
+    use holochain_types::activity::ChainItems;
+    use std::{sync::Arc, time::Duration};
+
+    let config = SweetConductorConfig::rendezvous(false).tune_network_config(|nc| {
+        nc.disable_gossip = true;
+    });
+    let min_publish_interval = config.conductor_tuning_params().min_publish_interval();
+    let mut author = SweetConductor::from_config_rendezvous(
+        config
+            .clone()
+            .tune_network_config(|nc| nc.target_arc_factor = 0),
+        SweetLocalRendezvous::new().await,
+    )
+    .await;
+    let (dna, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
+    let author_cell = author
+        .setup_app("app", [&dna])
+        .await
+        .unwrap()
+        .into_cells()
+        .remove(0);
+    let hash: ActionHash = author.call(&author_cell.zome("simple"), "create", ()).await;
+    let author_store = author_cell.dht_store().as_read();
+    let activity = author_store
+        .get_agent_activity(
+            author_cell.agent_pubkey(),
+            &ChainQueryFilter::new(),
+            &GetAgentActivityOptions::default(),
+        )
+        .await
+        .unwrap();
+    let ChainItems::Hashes(chain) = &activity.valid_activity else {
+        panic!("expected authored activity hashes");
+    };
+    assert_eq!(
+        chain.iter().map(|(seq, _)| *seq).collect::<Vec<_>>(),
+        vec![0, 1, 2, 3, 4]
+    );
+
+    let before = author_store
+        .get_ops_to_publish(author_cell.agent_pubkey(), min_publish_interval)
+        .await
+        .unwrap();
+    let (trigger, receiver) =
+        TriggerSender::new_with_loop(Duration::from_secs(60)..Duration::from_secs(300), true);
+    let complete = publish_dht_ops_workflow(
+        author_cell.dht_store().clone(),
+        Arc::new(HolochainP2pDna::new(
+            author.holochain_p2p().clone(),
+            author_cell.dna_hash().clone(),
+        )),
+        trigger,
+        author_cell.agent_pubkey().clone(),
+        min_publish_interval,
+    )
+    .await
+    .unwrap();
+    assert_eq!(complete, WorkComplete::Complete);
+    assert!(
+        !receiver.is_paused(),
+        "unpublished ops must retain the paced retry loop"
+    );
+    assert_eq!(
+        author_store
+            .get_ops_to_publish(author_cell.agent_pubkey(), min_publish_interval)
+            .await
+            .unwrap(),
+        before,
+        "no-destination admission must not impose the publication throttle"
+    );
+
+    let mut storage =
+        SweetConductor::from_config_rendezvous(config, author.rendezvous().unwrap().clone()).await;
+    let storage_cell = storage
+        .setup_app("app", [&dna])
+        .await
+        .unwrap()
+        .into_cells()
+        .remove(0);
+    storage
+        .declare_full_storage_arcs(storage_cell.dna_hash())
+        .await;
+    let storage_store = storage_cell.dht_store().as_read();
+    assert!(!storage_store
+        .has_genesis(author_cell.agent_pubkey())
+        .await
+        .unwrap());
+    retry_fn_until_timeout(
+        || SweetConductor::exchange_peer_info([&author, &storage]),
+        Some(10_000),
+        Some(10),
+    )
+    .await
+    .unwrap();
+    author
+        .raw_handle()
+        .get_cell_triggers(author_cell.cell_id())
+        .await
+        .unwrap()
+        .publish_dht_ops
+        .trigger(&"storage peer discovered");
+
+    retry_fn_until_timeout(
+        || async {
+            let received = storage_store
+                .get_agent_activity(
+                    author_cell.agent_pubkey(),
+                    &ChainQueryFilter::new(),
+                    &GetAgentActivityOptions::default(),
+                )
+                .await
+                .unwrap();
+            received.valid_activity == activity.valid_activity
+                && storage_store
+                    .get_record_details(&hash, None)
+                    .await
+                    .unwrap()
+                    .is_some()
+        },
+        Some(20_000),
+        Some(100),
+    )
+    .await
+    .expect("genesis and later activity must publish without waiting out the throttle");
+    let record = storage_store
+        .retrieve_record(&hash, None)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(record.action_address(), &hash);
+    assert_eq!(record.action().author(), author_cell.agent_pubkey());
+    author.shutdown().await;
+    storage.shutdown().await;
+}
+
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn multi_conductor() -> anyhow::Result<()> {
