@@ -324,3 +324,155 @@ impl CascadeImpl {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ::fixt::fixt;
+    use holo_hash::AgentPubKey;
+    use holochain_keystore::{test_keystore, AgentPubKeyExt};
+    use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
+    use holochain_types::entry::EntryData;
+    use holochain_zome_types::fixt::{ActionFixturator, CreateAction};
+
+    fn app_entry(bytes: Vec<u8>) -> Entry {
+        Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
+            bytes,
+        ))))
+    }
+
+    /// A create action by `author` naming `entry`'s hash, signed by `author`.
+    async fn signed_create_for(
+        keystore: &holochain_keystore::MetaLairClient,
+        author: &AgentPubKey,
+        entry: &Entry,
+    ) -> SignedAction {
+        let mut action = fixt!(Action, CreateAction);
+        action.header.author = author.clone();
+        *action.entry_hash_mut().unwrap() = EntryHash::with_data_sync(entry);
+        let signature = author.sign(keystore, &action).await.unwrap();
+        SignedAction::new(action, signature)
+    }
+
+    async fn empty_cascade() -> (CascadeImpl, holochain_state::dht_store::DhtStore) {
+        let dna_hash = holo_hash::DnaHash::from_raw_36(vec![42u8; 36]);
+        let store = holochain_state::test_utils::test_dht_store(dna_hash).await;
+        (CascadeImpl::empty(store.clone()), store)
+    }
+
+    // `test_keystore()` spawns lair onto a blocking task, which requires a
+    // multi-threaded runtime.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn entry_response_with_fabricated_entry_is_not_cached() {
+        let keystore = test_keystore();
+        let author = AgentPubKey::new_random(&keystore).await.unwrap();
+        let entry = app_entry(vec![1, 3, 5]);
+        let fabricated = app_entry(vec![2, 4, 6]);
+        let create = signed_create_for(&keystore, &author, &entry).await;
+        let action_hash = ActionHash::with_data_sync(create.data());
+        let entry_type = create.data().entry_type().unwrap().clone();
+
+        let response = |entry: Entry| {
+            WireOps::Entry(WireEntryOps {
+                creates: vec![Judged::new(create.clone(), ValidationStatus::Valid)],
+                entry: Some(EntryData {
+                    entry,
+                    entry_type: entry_type.clone(),
+                }),
+                ..Default::default()
+            })
+        };
+
+        let (cascade, store) = empty_cascade().await;
+        cascade
+            .merge_ops_into_cache(vec![response(fabricated.clone())])
+            .await
+            .unwrap();
+        for hash in [
+            EntryHash::with_data_sync(&entry),
+            EntryHash::with_data_sync(&fabricated),
+        ] {
+            assert!(
+                store
+                    .as_read()
+                    .retrieve_entry(&hash, None)
+                    .await
+                    .unwrap()
+                    .is_none(),
+                "a fabricated entry must not be cached"
+            );
+        }
+        assert!(store
+            .as_read()
+            .retrieve_action(&action_hash)
+            .await
+            .unwrap()
+            .is_none());
+
+        cascade
+            .merge_ops_into_cache(vec![response(entry.clone())])
+            .await
+            .unwrap();
+        assert!(store
+            .as_read()
+            .retrieve_entry(&EntryHash::with_data_sync(&entry), None)
+            .await
+            .unwrap()
+            .is_some());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn record_response_with_fabricated_entry_is_not_cached() {
+        let keystore = test_keystore();
+        let author = AgentPubKey::new_random(&keystore).await.unwrap();
+        let entry = app_entry(vec![1, 3, 5]);
+        let fabricated = app_entry(vec![2, 4, 6]);
+        let create = signed_create_for(&keystore, &author, &entry).await;
+        let action_hash = ActionHash::with_data_sync(create.data());
+
+        let response = |entry: Entry| {
+            WireOps::Record(WireRecordOps {
+                action: Some(Judged::new(create.clone(), ValidationStatus::Valid)),
+                entry: Some(entry),
+                ..Default::default()
+            })
+        };
+
+        let (cascade, store) = empty_cascade().await;
+        cascade
+            .merge_ops_into_cache(vec![response(fabricated.clone())])
+            .await
+            .unwrap();
+        for hash in [
+            EntryHash::with_data_sync(&entry),
+            EntryHash::with_data_sync(&fabricated),
+        ] {
+            assert!(
+                store
+                    .as_read()
+                    .retrieve_entry(&hash, None)
+                    .await
+                    .unwrap()
+                    .is_none(),
+                "a fabricated entry must not be cached"
+            );
+        }
+        assert!(store
+            .as_read()
+            .retrieve_action(&action_hash)
+            .await
+            .unwrap()
+            .is_none());
+
+        cascade
+            .merge_ops_into_cache(vec![response(entry.clone())])
+            .await
+            .unwrap();
+        assert!(store
+            .as_read()
+            .retrieve_action(&action_hash)
+            .await
+            .unwrap()
+            .is_some());
+    }
+}

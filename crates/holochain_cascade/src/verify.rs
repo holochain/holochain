@@ -1,6 +1,6 @@
 //! Verification applied to fetched get responses before they are cached:
-//! per-op warrant pairing for rejected records, and signature checks on
-//! rendered ops, warrants, and agent activity.
+//! per-op warrant pairing for rejected records, entry hash checks on rendered
+//! ops, and signature checks on rendered ops, warrants, and agent activity.
 
 use holochain_keystore::AgentPubKeyExt;
 use holochain_state::prelude::*;
@@ -35,12 +35,55 @@ fn rejected_op_has_warrant(op: &RenderedOp, warrants: &[SignedWarrant]) -> bool 
     })
 }
 
-/// Verify the action signatures (and warrant signature, if present) on every
-/// `RenderedOps` in the batch. Batches where any signature fails verification
-/// are logged at warn and dropped.
+/// Whether an op in `rendered` that stores the served entry names a different
+/// entry hash in its action than the served entry actually hashes to.
+///
+/// `rendered.entry` is hashed from the served bytes when the response is
+/// rendered, so its hash is the true hash of what the peer sent, while the
+/// action's entry hash is what the author committed to. The entry is not
+/// covered by the action signature, so a peer can pair a genuine action with
+/// fabricated entry bytes; such a response must not reach the store.
+///
+/// Only the ops whose actions own the served entry are compared:
+/// `CreateEntry` for an entry response and `CreateRecord` for a record
+/// response. Update and delete ops served alongside them refer to the original
+/// entry or record but may name a different entry in their own action. An
+/// owning op whose action has no entry hash cannot be paired with an entry, so
+/// it counts as a mismatch. An entry without an owning op is also a mismatch.
+/// A response without an entry has nothing to compare.
+pub(crate) fn entry_hash_mismatch(rendered: &RenderedOps) -> bool {
+    let Some(entry) = rendered.entry.as_ref() else {
+        return false;
+    };
+    let mut owning_ops = rendered.ops.iter().filter(|op| {
+        matches!(
+            op.op_type,
+            ChainOpType::CreateEntry | ChainOpType::CreateRecord
+        )
+    });
+    let Some(first_owner) = owning_ops.next() else {
+        return true;
+    };
+    first_owner.action.action().entry_hash() != Some(entry.as_hash())
+        || owning_ops.any(|op| op.action.action().entry_hash() != Some(entry.as_hash()))
+}
+
+/// Verify the entry hash and the action signatures (and warrant signature, if
+/// present) on every `RenderedOps` in the batch.
+///
+/// Batches where the served entry does not match the entry hash named by an op
+/// that stores it, or where any signature fails verification, are logged at
+/// warn and dropped. The entry check runs first: it is synchronous and cheaper
+/// than signature verification.
 pub(crate) async fn verify_rendered_ops_batch(rendered_all: Vec<RenderedOps>) -> Vec<RenderedOps> {
     let mut verified = Vec::with_capacity(rendered_all.len());
     for rendered in rendered_all {
+        if entry_hash_mismatch(&rendered) {
+            tracing::warn!(
+                "Rendered entry does not hash to the entry hash named by its action; dropping batch"
+            );
+            continue;
+        }
         if verify_rendered_ops_signatures(&rendered).await {
             verified.push(rendered);
         }
@@ -365,6 +408,228 @@ mod signature_verification_tests {
         assert!(
             kept.is_empty(),
             "a record signed by the migration target must be dropped"
+        );
+    }
+}
+
+#[cfg(test)]
+mod entry_hash_tests {
+    use super::*;
+    use ::fixt::fixt;
+    use holo_hash::AgentPubKey;
+    use holochain_keystore::test_keystore;
+    use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
+    use holochain_zome_types::fixt::{
+        ActionFixturator, CreateAction, CreateLinkAction, UpdateAction,
+    };
+
+    /// A fixed public app entry, hashed from its own bytes the way `render`
+    /// hashes a served entry.
+    fn served_entry() -> EntryHashed {
+        EntryHashed::from_content_sync(Entry::App(AppEntryBytes(SerializedBytes::from(
+            UnsafeBytes::from(vec![1, 3, 5]),
+        ))))
+    }
+
+    /// A create action naming `entry_hash` as its entry.
+    fn create_naming(entry_hash: EntryHash) -> Action {
+        let mut action = fixt!(Action, CreateAction);
+        *action.entry_hash_mut().unwrap() = entry_hash;
+        action
+    }
+
+    /// An update action naming `entry_hash` as its new entry.
+    fn update_naming(entry_hash: EntryHash) -> Action {
+        let mut action = fixt!(Action, UpdateAction);
+        *action.entry_hash_mut().unwrap() = entry_hash;
+        action
+    }
+
+    fn rendered(entry: Option<EntryHashed>, ops: Vec<(Action, ChainOpType)>) -> RenderedOps {
+        RenderedOps {
+            entry,
+            ops: ops
+                .into_iter()
+                .map(|(action, op_type)| {
+                    RenderedOp::new(
+                        action,
+                        fixt!(Signature),
+                        Some(ValidationStatus::Valid),
+                        op_type,
+                    )
+                    .unwrap()
+                })
+                .collect(),
+            warrant: None,
+        }
+    }
+
+    #[test]
+    fn entry_hash_mismatch_cases() {
+        let entry = served_entry();
+        let entry_hash = entry.as_hash().clone();
+        let other_entry = EntryHashed::from_content_sync(Entry::App(AppEntryBytes(
+            SerializedBytes::from(UnsafeBytes::from(vec![2, 4, 6])),
+        )));
+        let other_entry_hash = other_entry.as_hash().clone();
+        assert_ne!(entry_hash, other_entry_hash);
+
+        let create_link = fixt!(Action, CreateLinkAction);
+        assert!(create_link.entry_hash().is_none());
+
+        let cases = [
+            (
+                "entry matching its create action passes",
+                rendered(
+                    Some(entry.clone()),
+                    vec![(create_naming(entry_hash.clone()), ChainOpType::CreateEntry)],
+                ),
+                false,
+            ),
+            (
+                "entry not matching its create action is a mismatch",
+                rendered(
+                    Some(entry.clone()),
+                    vec![(
+                        create_naming(other_entry_hash.clone()),
+                        ChainOpType::CreateEntry,
+                    )],
+                ),
+                true,
+            ),
+            (
+                "update entry naming a replacement is not compared",
+                rendered(
+                    Some(entry.clone()),
+                    vec![
+                        (create_naming(entry_hash.clone()), ChainOpType::CreateEntry),
+                        (
+                            update_naming(other_entry_hash.clone()),
+                            ChainOpType::UpdateEntry,
+                        ),
+                    ],
+                ),
+                false,
+            ),
+            (
+                "entry without any ops is a mismatch",
+                rendered(Some(entry.clone()), vec![]),
+                true,
+            ),
+            (
+                "entry with only an update op is a mismatch",
+                rendered(
+                    Some(entry.clone()),
+                    vec![(
+                        update_naming(other_entry_hash.clone()),
+                        ChainOpType::UpdateEntry,
+                    )],
+                ),
+                true,
+            ),
+            (
+                "create record not matching is a mismatch",
+                rendered(
+                    Some(entry.clone()),
+                    vec![(
+                        create_naming(other_entry_hash.clone()),
+                        ChainOpType::CreateRecord,
+                    )],
+                ),
+                true,
+            ),
+            (
+                "one bad op among good ones is a mismatch",
+                rendered(
+                    Some(entry.clone()),
+                    vec![
+                        (create_naming(entry_hash.clone()), ChainOpType::CreateEntry),
+                        (
+                            create_naming(other_entry_hash.clone()),
+                            ChainOpType::CreateEntry,
+                        ),
+                    ],
+                ),
+                true,
+            ),
+            (
+                "update record naming its own entry is not compared",
+                rendered(
+                    Some(entry.clone()),
+                    vec![
+                        (create_naming(entry_hash.clone()), ChainOpType::CreateRecord),
+                        (
+                            update_naming(other_entry_hash.clone()),
+                            ChainOpType::UpdateRecord,
+                        ),
+                    ],
+                ),
+                false,
+            ),
+            (
+                "record without an entry hash served with an entry is a mismatch",
+                rendered(Some(entry), vec![(create_link, ChainOpType::CreateRecord)]),
+                true,
+            ),
+            (
+                "response without an entry passes",
+                rendered(
+                    None,
+                    vec![(create_naming(other_entry_hash), ChainOpType::CreateEntry)],
+                ),
+                false,
+            ),
+        ];
+
+        for (name, rendered, expected) in cases {
+            assert_eq!(entry_hash_mismatch(&rendered), expected, "{name}");
+        }
+    }
+
+    // `test_keystore()` spawns lair onto a blocking task, which requires a
+    // multi-threaded runtime.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn rendered_ops_with_a_fabricated_entry_are_dropped() {
+        let keystore = test_keystore();
+        let author = AgentPubKey::new_random(&keystore).await.unwrap();
+        let entry = served_entry();
+
+        let mut genuine = create_naming(entry.as_hash().clone());
+        genuine.header.author = author.clone();
+        let signature = author.sign(&keystore, &genuine).await.unwrap();
+        let ops = vec![RenderedOp::new(
+            genuine.clone(),
+            signature,
+            Some(ValidationStatus::Valid),
+            ChainOpType::CreateEntry,
+        )
+        .unwrap()];
+        let kept = verify_rendered_ops_batch(vec![RenderedOps {
+            entry: Some(entry.clone()),
+            ops: ops.clone(),
+            warrant: None,
+        }])
+        .await;
+        assert_eq!(
+            kept.len(),
+            1,
+            "a signed op served with its own entry is kept"
+        );
+
+        // Same signed action, served with different entry bytes.
+        let other_entry = EntryHashed::from_content_sync(Entry::App(AppEntryBytes(
+            SerializedBytes::from(UnsafeBytes::from(vec![2, 4, 6])),
+        )));
+        assert_ne!(other_entry.as_hash(), entry.as_hash());
+        let kept = verify_rendered_ops_batch(vec![RenderedOps {
+            entry: Some(other_entry),
+            ops,
+            warrant: None,
+        }])
+        .await;
+        assert!(
+            kept.is_empty(),
+            "a signed op served with fabricated entry bytes must be dropped"
         );
     }
 }
