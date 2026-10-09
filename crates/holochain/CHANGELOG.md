@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Add indexes on `Action(author, seq)` and `ChainOp(action_hash, op_type)` to the DHT database, so agent activity walks, record lookups and op integration no longer scan every op held. \#6007
+- `must_get_agent_activity` with `ChainFilter::take(n)` now reads only the `n` actions below the chain top instead of the author's whole chain. \#6007
 - Decoding or encoding hashes no longer panics. Invalid hashes could panic or overallocate memory.
 - Add `GrantDirectSignalCapability` to the app and admin interfaces, so the capability grant that direct signals require can be created without a coordinator zome. On the app interface the grant is restricted to cells of the connected app. The Rust client gains `AppWebsocket::send_direct_signal`, `AppWebsocket::grant_direct_signal_capability` and `AdminWebsocket::grant_direct_signal_capability`. \#5986
 - **BREAKING CHANGE**: Fix `SendDirectSignal` failing with `FrameOverflow` for payloads over 8 KiB. Payloads up to the documented 1 MiB limit are now delivered. The signature scheme and wire encoding changed, so direct signals sent between conductors with and without this fix are dropped by the receiver — upgrade both ends. \#5937
