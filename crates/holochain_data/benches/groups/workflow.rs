@@ -15,6 +15,10 @@ pub fn workflow(c: &mut Criterion) {
     for fx in fixtures() {
         let db = fx.db.as_ref();
         let actions = Rotate::new(&fx.keys.action_hashes);
+        let outcome_integrated = Rotate::new(&fx.keys.outcome_integrated);
+        let outcome_limbo_decided = Rotate::new(&fx.keys.outcome_limbo_decided);
+        let outcome_limbo_pending = Rotate::new(&fx.keys.outcome_limbo_pending);
+        let outcome_missing = Rotate::new(&fx.keys.outcome_missing);
         let warrantees = Rotate::new(&fx.keys.warrantees);
         let local = &fx.keys.local_author;
         let local_actions = Rotate::new(&fx.keys.action_hashes);
@@ -115,6 +119,46 @@ pub fn workflow(c: &mut Criterion) {
             |b, _| {
                 b.to_async(rt)
                     .iter(|| async { db.op_validation_outcome(actions.next(), 1).await.unwrap() })
+            },
+        );
+        g.bench_with_input(
+            BenchmarkId::new("op_validation_outcome_integrated", fx.size),
+            &fx.size,
+            |b, _| {
+                b.to_async(rt).iter(|| async {
+                    let sample = outcome_integrated.next();
+                    db.op_validation_outcome(&sample.0, sample.1).await.unwrap()
+                })
+            },
+        );
+        g.bench_with_input(
+            BenchmarkId::new("op_validation_outcome_limbo_decided", fx.size),
+            &fx.size,
+            |b, _| {
+                b.to_async(rt).iter(|| async {
+                    let sample = outcome_limbo_decided.next();
+                    db.op_validation_outcome(&sample.0, sample.1).await.unwrap()
+                })
+            },
+        );
+        g.bench_with_input(
+            BenchmarkId::new("op_validation_outcome_limbo_pending", fx.size),
+            &fx.size,
+            |b, _| {
+                b.to_async(rt).iter(|| async {
+                    let sample = outcome_limbo_pending.next();
+                    db.op_validation_outcome(&sample.0, sample.1).await.unwrap()
+                })
+            },
+        );
+        g.bench_with_input(
+            BenchmarkId::new("op_validation_outcome_missing", fx.size),
+            &fx.size,
+            |b, _| {
+                b.to_async(rt).iter(|| async {
+                    let sample = outcome_missing.next();
+                    db.op_validation_outcome(&sample.0, sample.1).await.unwrap()
+                })
             },
         );
         g.bench_with_input(

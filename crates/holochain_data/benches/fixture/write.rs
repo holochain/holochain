@@ -29,6 +29,10 @@ pub struct FixtureKeys {
     pub create_link_hashes: Vec<ActionHash>,
     pub op_hashes: Vec<DhtOpHash>,
     pub limbo_op_hashes: Vec<DhtOpHash>,
+    pub outcome_integrated: Vec<(ActionHash, i64)>,
+    pub outcome_limbo_decided: Vec<(ActionHash, i64)>,
+    pub outcome_limbo_pending: Vec<(ActionHash, i64)>,
+    pub outcome_missing: Vec<(ActionHash, i64)>,
     pub local_op_hashes: Vec<DhtOpHash>,
     pub warrantees: Vec<AgentPubKey>,
     pub min_timestamp: i64,
@@ -89,6 +93,10 @@ pub async fn build(cfg: FixtureConfig) -> Fixture {
         create_link_hashes: Vec::new(),
         op_hashes: Vec::new(),
         limbo_op_hashes: Vec::new(),
+        outcome_integrated: Vec::new(),
+        outcome_limbo_decided: Vec::new(),
+        outcome_limbo_pending: Vec::new(),
+        outcome_missing: Vec::new(),
         local_op_hashes: Vec::new(),
         warrantees: Vec::new(),
         min_timestamp: g.min_timestamp,
@@ -350,6 +358,168 @@ pub async fn build(cfg: FixtureConfig) -> Fixture {
             .expect("limbo spread");
     }
 
+    keys.outcome_integrated = sqlx::query_as::<_, (Vec<u8>, i64)>(
+        "SELECT action_hash, op_type
+         FROM ChainOp
+         WHERE locally_validated = 1 AND validation_status = 1
+         ORDER BY hash
+         LIMIT ?",
+    )
+    .bind(SAMPLE as i64)
+    .fetch_all(db.pool())
+    .await
+    .expect("integrated outcome samples")
+    .into_iter()
+    .map(|(action_hash, op_type)| (ActionHash::from_raw_36(action_hash), op_type))
+    .collect();
+    keys.outcome_limbo_decided = sqlx::query_as::<_, (Vec<u8>, i64)>(
+        "SELECT action_hash, op_type
+         FROM LimboChainOp
+         WHERE sys_validation_status = 1
+           AND app_validation_status = 1
+           AND NOT EXISTS (
+               SELECT 1
+               FROM ChainOp
+               WHERE ChainOp.action_hash = LimboChainOp.action_hash
+                 AND ChainOp.op_type = LimboChainOp.op_type
+           )
+         ORDER BY hash
+         LIMIT ?",
+    )
+    .bind(SAMPLE as i64)
+    .fetch_all(db.pool())
+    .await
+    .expect("decided limbo outcome samples")
+    .into_iter()
+    .map(|(action_hash, op_type)| (ActionHash::from_raw_36(action_hash), op_type))
+    .collect();
+    keys.outcome_limbo_pending = sqlx::query_as::<_, (Vec<u8>, i64)>(
+        "SELECT action_hash, op_type
+         FROM LimboChainOp
+         WHERE sys_validation_status IS NULL
+           AND NOT EXISTS (
+               SELECT 1
+               FROM ChainOp
+               WHERE ChainOp.action_hash = LimboChainOp.action_hash
+                 AND ChainOp.op_type = LimboChainOp.op_type
+           )
+         ORDER BY hash
+         LIMIT ?",
+    )
+    .bind(SAMPLE as i64)
+    .fetch_all(db.pool())
+    .await
+    .expect("pending limbo outcome samples")
+    .into_iter()
+    .map(|(action_hash, op_type)| (ActionHash::from_raw_36(action_hash), op_type))
+    .collect();
+
+    for (action_hash, op_type) in &keys.outcome_integrated {
+        let mut raw = action_hash.get_raw_36().to_vec();
+        raw[0] ^= 0x80;
+        let missing = ActionHash::from_raw_36(raw);
+        let chain_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM ChainOp WHERE action_hash = ? AND op_type = ?",
+        )
+        .bind(missing.get_raw_36())
+        .bind(*op_type)
+        .fetch_one(db.pool())
+        .await
+        .expect("missing ChainOp collision check");
+        let limbo_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM LimboChainOp WHERE action_hash = ? AND op_type = ?",
+        )
+        .bind(missing.get_raw_36())
+        .bind(*op_type)
+        .fetch_one(db.pool())
+        .await
+        .expect("missing LimboChainOp collision check");
+        assert_eq!(
+            chain_count, 0,
+            "missing outcome collides with ChainOp: {missing:?}/{op_type}"
+        );
+        assert_eq!(
+            limbo_count, 0,
+            "missing outcome collides with LimboChainOp: {missing:?}/{op_type}"
+        );
+        keys.outcome_missing.push((missing, *op_type));
+    }
+
+    for (action_hash, op_type) in &keys.outcome_integrated {
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*)
+             FROM ChainOp
+             WHERE action_hash = ? AND op_type = ?
+               AND locally_validated = 1 AND validation_status = 1",
+        )
+        .bind(action_hash.get_raw_36())
+        .bind(*op_type)
+        .fetch_one(db.pool())
+        .await
+        .expect("integrated outcome membership check");
+        assert_eq!(
+            count, 1,
+            "invalid integrated outcome sample: {action_hash:?}/{op_type}"
+        );
+    }
+    for (action_hash, op_type) in &keys.outcome_limbo_decided {
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*)
+             FROM LimboChainOp
+             WHERE action_hash = ? AND op_type = ?
+               AND sys_validation_status = 1 AND app_validation_status = 1",
+        )
+        .bind(action_hash.get_raw_36())
+        .bind(*op_type)
+        .fetch_one(db.pool())
+        .await
+        .expect("decided limbo outcome membership check");
+        assert_eq!(
+            count, 1,
+            "invalid decided limbo sample: {action_hash:?}/{op_type}"
+        );
+        let integrated_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM ChainOp WHERE action_hash = ? AND op_type = ?",
+        )
+        .bind(action_hash.get_raw_36())
+        .bind(*op_type)
+        .fetch_one(db.pool())
+        .await
+        .expect("decided limbo integrated exclusion check");
+        assert_eq!(
+            integrated_count, 0,
+            "decided limbo sample is also integrated: {action_hash:?}/{op_type}"
+        );
+    }
+    for (action_hash, op_type) in &keys.outcome_limbo_pending {
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*)
+             FROM LimboChainOp
+             WHERE action_hash = ? AND op_type = ? AND sys_validation_status IS NULL",
+        )
+        .bind(action_hash.get_raw_36())
+        .bind(*op_type)
+        .fetch_one(db.pool())
+        .await
+        .expect("pending limbo outcome membership check");
+        assert_eq!(
+            count, 1,
+            "invalid pending limbo sample: {action_hash:?}/{op_type}"
+        );
+        let integrated_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM ChainOp WHERE action_hash = ? AND op_type = ?",
+        )
+        .bind(action_hash.get_raw_36())
+        .bind(*op_type)
+        .fetch_one(db.pool())
+        .await
+        .expect("pending limbo integrated exclusion check");
+        assert_eq!(
+            integrated_count, 0,
+            "pending limbo sample is also integrated: {action_hash:?}/{op_type}"
+        );
+    }
+
     let (actions,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM Action")
         .fetch_one(db.pool())
         .await
@@ -366,6 +536,23 @@ pub async fn build(cfg: FixtureConfig) -> Fixture {
         );
     }
     assert!(!keys.op_hashes.is_empty() && !keys.link_bases.is_empty());
+
+    for (name, samples, expected) in [
+        ("integrated", &keys.outcome_integrated, Some(1)),
+        ("limbo_decided", &keys.outcome_limbo_decided, Some(1)),
+        ("limbo_pending", &keys.outcome_limbo_pending, None),
+        ("missing", &keys.outcome_missing, None),
+    ] {
+        assert!(!samples.is_empty(), "empty outcome cohort: {name}");
+        for (action_hash, op_type) in samples {
+            let actual = db
+                .as_ref()
+                .op_validation_outcome(action_hash, *op_type)
+                .await
+                .expect("outcome cohort lookup");
+            assert_eq!(actual, expected, "incorrect outcome cohort: {name}");
+        }
+    }
 
     apply_extra_sql(&db).await;
 
