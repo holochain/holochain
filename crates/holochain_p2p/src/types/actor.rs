@@ -272,6 +272,10 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Publish data to the correct neighborhood.
+    ///
+    /// Success indicates admission for publication, not remote delivery.
+    /// A nonempty batch returns [`HolochainP2pError::NoPeersForLocation`] when
+    /// no eligible remote destinations are available.
     fn publish(
         &self,
         dna_hash: DnaHash,
