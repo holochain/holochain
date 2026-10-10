@@ -4886,6 +4886,110 @@ mod tests {
         }
     }
 
+    fn make_activity_with_repeated_sequence(author: &AgentPubKey) -> [SignedActionHashed; 3] {
+        let ancestor = make_scratch_create(author, 9, &ActionHash::from_raw_36(vec![8u8; 36]), 1);
+        // Exercise the hash tie-breaker with content-derived hashes, not random fixtures.
+        let predecessor = (2..u8::MAX)
+            .map(|seed| make_scratch_create(author, 9, ancestor.as_hash(), seed))
+            .find(|candidate| candidate.as_hash() < ancestor.as_hash())
+            .expect("fixture requires the ancestor to sort ahead of its child");
+        let top = make_scratch_create(author, 10, predecessor.as_hash(), u8::MAX);
+        [top, predecessor, ancestor]
+    }
+
+    async fn integrate_rejected_activity(
+        store: &crate::dht_store::DhtStore<DbWrite<Dht>>,
+        actions: &[&SignedActionHashed],
+    ) {
+        let ops: Vec<_> = actions
+            .iter()
+            .map(|action| {
+                DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::AgentActivity(
+                    SignedAction::new(action.action().clone(), action.signature().clone()),
+                ))))
+            })
+            .collect();
+        let outcomes = ops
+            .iter()
+            .map(|op| (op.as_hash().clone(), SysOutcome::Rejected))
+            .collect();
+        store
+            .record_incoming_ops(ops.into_iter().map(|op| (op, false)).collect())
+            .await
+            .unwrap();
+        store
+            .record_chain_op_sys_validation_outcomes(outcomes)
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(Timestamp::from_micros(10_000_000))
+            .await
+            .unwrap();
+    }
+
+    // Regression for #6025: top(10) -> predecessor(9) -> ancestor(9).
+    #[tokio::test]
+    async fn must_get_agent_activity_take_preserves_predecessor_with_repeated_sequence() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![75u8; 36]);
+        let [top, predecessor, ancestor] = make_activity_with_repeated_sequence(&author);
+        integrate_rejected_activity(&store, &[&top, &predecessor, &ancestor]).await;
+
+        let filter = ChainFilter::take(top.as_hash().clone(), 2);
+        let response = store
+            .as_read()
+            .must_get_agent_activity(&author, &filter)
+            .await
+            .unwrap();
+        let MustGetAgentActivityResponse::Activity { activity, .. } = response else {
+            panic!("expected the available two-action ancestry, got {response:?}");
+        };
+        let hashes: Vec<_> = activity
+            .iter()
+            .map(|a| a.action.hashed.hash.clone())
+            .collect();
+        assert_eq!(
+            hashes,
+            vec![top.as_hash().clone(), predecessor.as_hash().clone()],
+            "complete activity must retain the immediate predecessor, not its same-sequence ancestor"
+        );
+    }
+
+    #[tokio::test]
+    async fn must_get_agent_activity_with_scratch_take_preserves_predecessor_with_repeated_sequence(
+    ) {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![75u8; 36]);
+        let [top, predecessor, ancestor] = make_activity_with_repeated_sequence(&author);
+        integrate_rejected_activity(&store, &[&predecessor, &ancestor]).await;
+        let expected = vec![top.as_hash().clone(), predecessor.as_hash().clone()];
+        let filter = ChainFilter::take(top.as_hash().clone(), 2);
+        let mut scratch = crate::scratch::Scratch::new();
+        scratch.add_action(top, ChainTopOrdering::Relaxed);
+        let scratch = scratch.into_sync();
+
+        let response = store
+            .as_read()
+            .must_get_agent_activity_with_scratch(&author, &filter, &scratch)
+            .await
+            .unwrap();
+        let MustGetAgentActivityResponse::Activity { activity, .. } = response else {
+            panic!("expected the available two-action ancestry, got {response:?}");
+        };
+        let hashes: Vec<_> = activity
+            .iter()
+            .map(|a| a.action.hashed.hash.clone())
+            .collect();
+        assert_eq!(
+            hashes, expected,
+            "complete scratch/store activity must retain the immediate predecessor, not its same-sequence ancestor"
+        );
+    }
+
     #[tokio::test]
     async fn must_get_agent_activity_take_zero_errors() {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
