@@ -141,6 +141,10 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
     ) -> HolochainP2pResult<()>;
 
     /// Publish data to the correct neighborhood.
+    ///
+    /// Success indicates admission for publication, not remote delivery.
+    /// A nonempty batch returns [`HolochainP2pError::NoPeersForLocation`] when
+    /// no eligible remote destinations are available.
     #[allow(clippy::ptr_arg)]
     async fn publish(
         &self,

@@ -429,6 +429,25 @@ fn test_dht_op(
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn publish_without_remote_storage_peers_is_not_admitted() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
+    let (agent, hc, _) = spawn_test(dna_hash.clone(), Arc::new(Handler::default()), &addr).await;
+    let network = HolochainP2pDna::new(hc, dna_hash);
+    let op = test_dht_op(holochain_types::prelude::Timestamp::now());
+    let basis = op.dht_basis();
+
+    let result = network
+        .publish(basis.clone(), agent, vec![op.to_hash()], None)
+        .await;
+
+    assert!(
+        matches!(result, Err(HolochainP2pError::NoPeersForLocation(_, loc)) if loc == basis.get_loc()),
+        "a nonempty batch without remote storage destinations must remain retryable: {result:?}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_publish() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let space = dna_hash.to_k2_space();
@@ -440,6 +459,7 @@ async fn test_publish() {
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
+    wait_for_peers(&hc2, dna_hash.clone(), 2).await;
 
     let op = test_dht_op(holochain_types::prelude::Timestamp::now());
     let op_hash = op.to_hash();
