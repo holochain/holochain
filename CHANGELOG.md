@@ -14,6 +14,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20261012.035633
+
+## [hcterm-0.8.0-dev.11](crates/hcterm/CHANGELOG.md#0.8.0-dev.11)
+
+## [holochain\_cli-0.8.0-dev.11](crates/holochain_cli/CHANGELOG.md#0.8.0-dev.11)
+
+## [holochain\_cli\_client-0.8.0-dev.11](crates/holochain_cli_client/CHANGELOG.md#0.8.0-dev.11)
+
+## [holochain\_cli\_sandbox-0.8.0-dev.11](crates/holochain_cli_sandbox/CHANGELOG.md#0.8.0-dev.11)
+
+## [holochain\_client-0.10.0-dev.11](crates/holochain_client/CHANGELOG.md#0.10.0-dev.11)
+
+## [holochain-0.8.0-dev.11](crates/holochain/CHANGELOG.md#0.8.0-dev.11)
+
+- Fix an op received through publish or gossip whose entry does not match its action’s entry hash being dropped on its own while the rest of the batch was stored. The whole batch is now dropped, just like for an op with an invalid signature, because an honest peer never sends such an op. \#5994
+- Fix authored ops being marked as published when no eligible remote storage peers are available, so they remain eligible for publication after peer discovery. \#6020
+- Add indexes on `Action(author, seq)` and `ChainOp(action_hash, op_type)` to the DHT database, so agent activity walks, record lookups and op integration no longer scan every op held. \#6007
+- `must_get_agent_activity` with `ChainFilter::take(n)` now reads only the `n` actions below the chain top instead of the author’s whole chain. \#6007
+- Fix network-received entries being stored without checking that they hash to the entry hash named by their action. An op received through publish or gossip, and a `get` response fetched from a peer, are now dropped when the entry does not match the action, before anything is written. The action’s author is not warranted, since only the entry hash is covered by the action signature, so raw entry bytes may have been swapped by a third party and a signature verification would not catch it. \#5994
+
+## [holochain\_cascade-0.8.0-dev.11](crates/holochain_cascade/CHANGELOG.md#0.8.0-dev.11)
+
+## [holochain\_p2p-0.8.0-dev.11](crates/holochain_p2p/CHANGELOG.md#0.8.0-dev.11)
+
+## [holochain\_state-0.8.0-dev.11](crates/holochain_state/CHANGELOG.md#0.8.0-dev.11)
+
+## [holochain\_data-0.8.0-dev.11](crates/holochain_data/CHANGELOG.md#0.8.0-dev.11)
+
 # 20261006.093133
 
 ## [hcterm-0.8.0-dev.10](crates/hcterm/CHANGELOG.md#0.8.0-dev.10)
