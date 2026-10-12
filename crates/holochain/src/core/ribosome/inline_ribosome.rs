@@ -4,7 +4,6 @@ use crate::core::ribosome::{CallContext, Invocation, Ribosome, RibosomeImplT};
 use crate::prelude::{ExternIO, FunctionName, ZomeName};
 use futures::future::BoxFuture;
 use holo_hash::{DnaHash, HasHash, InlineHash};
-use holochain_zome_types::clone::ClonedCell;
 use holochain_zome_types::dna_def::DnaDefHashed;
 use holochain_zome_types::prelude::{DynInlineZome, Zome, ZomeDef};
 use opentelemetry::KeyValue;
@@ -94,10 +93,10 @@ impl InlineZomeStore {
     /// Notify the store that a clone cell was created.
     ///
     /// This requires the store to know to look up zomes under another DNA hash.
-    pub fn handle_clone_created(&self, clone: &ClonedCell) {
+    pub fn handle_clone_created(&self, original_dna_hash: &DnaHash, clone_dna_hash: &DnaHash) {
         let mut write_lock = self.inner.write().unwrap_or_else(|e| e.into_inner());
-        if let Some(content) = write_lock.get(&clone.original_dna_hash).cloned() {
-            write_lock.insert(clone.cell_id.dna_hash().clone(), content);
+        if let Some(content) = write_lock.get(original_dna_hash).cloned() {
+            write_lock.insert(clone_dna_hash.clone(), content);
         } else {
             tracing::error!("No source registered to clone");
         }

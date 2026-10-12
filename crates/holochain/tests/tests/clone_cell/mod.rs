@@ -1,6 +1,6 @@
+use holochain::conductor::error::ConductorError;
 use holochain::sweettest::*;
 use holochain_conductor_api::CellInfo;
-use holochain::conductor::error::ConductorError;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 
@@ -379,9 +379,9 @@ async fn conductor_restarts_after_clone_cell_genesis_failure() {
             CreateCloneCellPayload {
                 role_name: dna_file.dna_hash().to_string(),
                 modifiers: DnaModifiersOpt::none().with_network_seed("clone 1".to_string()),
-                membrane_proof: Some(MembraneProof::new(SerializedBytes::from(UnsafeBytes::from(
-                    vec![0],
-                )))),
+                membrane_proof: Some(MembraneProof::new(SerializedBytes::from(
+                    UnsafeBytes::from(vec![0]),
+                ))),
                 name: Some("Clone 1".to_string()),
             },
         )
@@ -397,4 +397,80 @@ async fn conductor_restarts_after_clone_cell_genesis_failure() {
     conductor.startup().await;
 
     assert_eq!(1, conductor.list_apps(None).await.unwrap().len());
+}
+
+// Two simultaneous `create_clone_cell` calls for the identical clone cell must
+// create exactly one clone cell with one valid source chain, and the conductor
+// must be able to restart.
+#[tokio::test(flavor = "multi_thread")]
+async fn create_identical_clone_cell_concurrently() {
+    holochain_trace::test_run();
+
+    let zomes = SweetInlineZomes::new(vec![], 0)
+        // Slow genesis down, so that both calls are in progress at the same time.
+        .integrity_function("genesis_self_check_2", |_api, _: GenesisSelfCheckDataV2| {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            Ok(ValidateCallbackResult::Valid)
+        })
+        .function("chain", |api, _: ()| {
+            api.query(ChainQueryFilter::new()).map_err(Into::into)
+        });
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+
+    let mut conductor = SweetConductor::standard().await;
+    let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
+    let (cell,) = app.into_tuple();
+
+    let payload = CreateCloneCellPayload {
+        role_name: dna_file.dna_hash().to_string(),
+        modifiers: DnaModifiersOpt::none().with_network_seed("clone 1".to_string()),
+        membrane_proof: None,
+        name: Some("Clone 1".to_string()),
+    };
+    let create = |payload: CreateCloneCellPayload| {
+        let handle = conductor.raw_handle();
+        tokio::spawn(async move { handle.create_clone_cell(&"app".to_string(), payload).await })
+    };
+    let (result_1, result_2) = tokio::join!(create(payload.clone()), create(payload));
+    let (created, failed): (Vec<_>, Vec<_>) = [result_1.unwrap(), result_2.unwrap()]
+        .into_iter()
+        .partition(|result| result.is_ok());
+    assert_eq!(1, created.len(), "expected one call to succeed: {failed:?}");
+    assert_eq!(1, failed.len());
+    let cloned_cell = created.into_iter().next().unwrap().unwrap();
+
+    let clone_zome = SweetZome::new(
+        cloned_cell.cell_id.clone(),
+        SweetInlineZomes::COORDINATOR.into(),
+    );
+    let base_zome = cell.zome(SweetInlineZomes::COORDINATOR);
+
+    for _ in 0..2 {
+        let apps = conductor.list_apps(None).await.unwrap();
+        let cell_infos = apps[0]
+            .cell_info
+            .get(&dna_file.dna_hash().to_string())
+            .unwrap();
+        assert_eq!(
+            1,
+            cell_infos
+                .iter()
+                .filter(|c| matches!(c, CellInfo::Cloned(_)))
+                .count()
+        );
+
+        // The source chain of the clone cell has one record for each sequence
+        // number, and the same length as the source chain of the base cell.
+        let base_chain: Vec<Record> = conductor.call(&base_zome, "chain", ()).await;
+        let clone_chain: Vec<Record> = conductor.call(&clone_zome, "chain", ()).await;
+        let seqs: Vec<u32> = clone_chain
+            .iter()
+            .map(|r| r.action().action_seq())
+            .collect();
+        assert_eq!((0..base_chain.len() as u32).collect::<Vec<_>>(), seqs);
+
+        // Do the same checks again after a restart.
+        conductor.shutdown().await;
+        conductor.startup().await;
+    }
 }
