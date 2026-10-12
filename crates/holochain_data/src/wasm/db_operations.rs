@@ -4,7 +4,7 @@
 
 use crate::handles::{DbRead, DbWrite};
 use crate::kind::Wasm;
-use holo_hash::{AgentPubKey, WasmHash};
+use holo_hash::{AgentPubKey, DnaHash, WasmHash, ZomeHash};
 use holochain_types::prelude::{CellId, DnaDef, DnaWasmHashed, EntryDef};
 use holochain_zome_types::dna_def::DnaDefHashed;
 
@@ -60,6 +60,12 @@ impl DbRead<Wasm> {
     pub async fn get_all_dna_defs(&self) -> sqlx::Result<Vec<(CellId, DnaDefHashed)>> {
         reads::get_all_dna_defs(self.pool()).await
     }
+
+    /// Check whether any integrity or coordinator zome of a stored DNA
+    /// definition still references `zome_hash`.
+    pub async fn zome_hash_referenced(&self, zome_hash: &ZomeHash) -> sqlx::Result<bool> {
+        reads::zome_hash_referenced(self.pool(), zome_hash).await
+    }
 }
 
 impl DbWrite<Wasm> {
@@ -88,6 +94,32 @@ impl DbWrite<Wasm> {
     pub async fn put_entry_def(&self, key: Vec<u8>, entry_def: &EntryDef) -> sqlx::Result<()> {
         writes::put_entry_def(self.pool(), key, entry_def).await
     }
+
+    /// Delete every DNA definition with this hash, for every agent.
+    ///
+    /// The zome rows of those definitions are removed with them. Returns the
+    /// number of DNA definitions removed. WASM code and entry definitions are
+    /// left in place; see [`Self::delete_wasm_if_unreferenced`] and
+    /// [`Self::delete_entry_def`].
+    pub async fn delete_dna_defs(&self, dna_hash: &DnaHash) -> sqlx::Result<u64> {
+        writes::delete_dna_defs(self.pool(), dna_hash).await
+    }
+
+    /// Delete the WASM code with this hash unless a stored DNA definition
+    /// still references it.
+    ///
+    /// The compiled form is removed with it. Returns `true` if a row was
+    /// deleted.
+    pub async fn delete_wasm_if_unreferenced(&self, hash: &WasmHash) -> sqlx::Result<bool> {
+        writes::delete_wasm_if_unreferenced(self.pool(), hash).await
+    }
+
+    /// Delete the entry definition stored under `key`.
+    ///
+    /// Returns `true` if a row was deleted.
+    pub async fn delete_entry_def(&self, key: &[u8]) -> sqlx::Result<bool> {
+        writes::delete_entry_def(self.pool(), key).await
+    }
 }
 
 #[cfg(test)]
@@ -95,7 +127,7 @@ mod tests {
     use crate::kind::Wasm;
     use crate::test_open_db;
     use holo_hash::{
-        blake2b_256, HasHash, HashableContentExtAsync, HashableContentExtSync, InlineHash,
+        blake2b_256, HasHash, HashableContentExtAsync, HashableContentExtSync, InlineHash, ZomeHash,
     };
     use holochain_integrity_types::prelude::{EntryDefId, EntryVisibility, ZomeName};
     use holochain_serialized_bytes::SerializedBytes;
@@ -739,5 +771,185 @@ mod tests {
             .coordinator_zomes
             .iter()
             .any(|(name, _)| name == &ZomeName::from("inline_coordinator_zome")));
+    }
+
+    /// Build a stored WASM blob from the given bytes and return its hash.
+    async fn put_test_wasm(db: &DbWrite<Wasm>, code: Vec<u8>) -> WasmHash {
+        let wasm = DnaWasm { code: code.into() };
+        let hash = wasm.to_hash().await;
+        db.put_wasm(DnaWasmHashed::with_pre_hashed(wasm, hash.clone()))
+            .await
+            .unwrap();
+        hash
+    }
+
+    /// Build a DnaDef with one integrity and one coordinator zome.
+    fn test_dna_def(name: &str, integrity: &WasmHash, coordinator: &WasmHash) -> DnaDef {
+        DnaDef {
+            name: name.to_string(),
+            modifiers: DnaModifiers {
+                network_seed: format!("seed-{name}"),
+                properties: SerializedBytes::default(),
+            },
+            integrity_zomes: vec![(
+                ZomeName::from("integrity"),
+                IntegrityZomeDef::from_hash(integrity.clone()),
+            )],
+            coordinator_zomes: vec![(
+                ZomeName::from("coordinator"),
+                CoordinatorZomeDef::from_hash(coordinator.clone()),
+            )],
+            #[cfg(feature = "unstable-migration")]
+            lineage: std::collections::HashSet::new(),
+        }
+    }
+
+    async fn count(db: &DbWrite<Wasm>, sql: &'static str) -> i64 {
+        sqlx::query_scalar(sql).fetch_one(db.pool()).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn delete_dna_defs_removes_rows_for_every_agent() {
+        let db = test_db().await;
+        let integrity = put_test_wasm(&db, vec![0x00, 0x61, 0x73, 0x6d, 1, 0, 0, 0]).await;
+        let coordinator = put_test_wasm(&db, vec![0x00, 0x61, 0x73, 0x6d, 2, 0, 0, 0]).await;
+
+        // Two agents share dna_a, one agent has dna_b.
+        let dna_a = test_dna_def("a", &integrity, &coordinator);
+        let dna_b = test_dna_def("b", &integrity, &coordinator);
+        let agent_1 = AgentPubKey::from_raw_32(vec![1u8; 32]);
+        let agent_2 = AgentPubKey::from_raw_32(vec![2u8; 32]);
+        db.put_dna_def(&agent_1, &dna_a).await.unwrap();
+        db.put_dna_def(&agent_2, &dna_a).await.unwrap();
+        db.put_dna_def(&agent_1, &dna_b).await.unwrap();
+
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM DnaDef").await, 3);
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM IntegrityZome").await, 3);
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM CoordinatorZome").await, 3);
+
+        let deleted = db.delete_dna_defs(&dna_a.to_hash()).await.unwrap();
+        assert_eq!(deleted, 2);
+
+        // Only dna_b is left, with its zome rows; dna_a's zome rows cascaded.
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM DnaDef").await, 1);
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM IntegrityZome").await, 1);
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM CoordinatorZome").await, 1);
+        let cell_b = CellId::new(dna_b.to_hash(), agent_1.clone());
+        assert!(db.as_ref().dna_def_exists(&cell_b).await.unwrap());
+        let cell_a = CellId::new(dna_a.to_hash(), agent_1);
+        assert!(!db.as_ref().dna_def_exists(&cell_a).await.unwrap());
+
+        // WASM is untouched by this call.
+        assert!(db.as_ref().wasm_exists(&integrity).await.unwrap());
+        assert!(db.as_ref().wasm_exists(&coordinator).await.unwrap());
+
+        // Unknown DNA: nothing to delete, no error.
+        let unknown = DnaHash::from_raw_32(vec![9u8; 32]);
+        assert_eq!(db.delete_dna_defs(&unknown).await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn zome_hash_referenced_reflects_both_zome_tables() {
+        let db = test_db().await;
+        let integrity = put_test_wasm(&db, vec![0x00, 0x61, 0x73, 0x6d, 1, 0, 0, 0]).await;
+        let coordinator = put_test_wasm(&db, vec![0x00, 0x61, 0x73, 0x6d, 2, 0, 0, 0]).await;
+        let unused = put_test_wasm(&db, vec![0x00, 0x61, 0x73, 0x6d, 3, 0, 0, 0]).await;
+
+        let integrity_zome: ZomeHash = integrity.clone().into();
+        let coordinator_zome: ZomeHash = coordinator.clone().into();
+        let unused_zome: ZomeHash = unused.clone().into();
+
+        // Nothing references anything yet.
+        assert!(!db
+            .as_ref()
+            .zome_hash_referenced(&integrity_zome)
+            .await
+            .unwrap());
+
+        let dna = test_dna_def("a", &integrity, &coordinator);
+        let agent = AgentPubKey::from_raw_32(vec![1u8; 32]);
+        db.put_dna_def(&agent, &dna).await.unwrap();
+
+        assert!(db
+            .as_ref()
+            .zome_hash_referenced(&integrity_zome)
+            .await
+            .unwrap());
+        assert!(db
+            .as_ref()
+            .zome_hash_referenced(&coordinator_zome)
+            .await
+            .unwrap());
+        assert!(!db
+            .as_ref()
+            .zome_hash_referenced(&unused_zome)
+            .await
+            .unwrap());
+
+        db.delete_dna_defs(&dna.to_hash()).await.unwrap();
+        assert!(!db
+            .as_ref()
+            .zome_hash_referenced(&integrity_zome)
+            .await
+            .unwrap());
+        assert!(!db
+            .as_ref()
+            .zome_hash_referenced(&coordinator_zome)
+            .await
+            .unwrap());
+    }
+
+    #[tokio::test]
+    async fn delete_wasm_if_unreferenced_keeps_wasm_in_use() {
+        let db = test_db().await;
+        let integrity = put_test_wasm(&db, vec![0x00, 0x61, 0x73, 0x6d, 1, 0, 0, 0]).await;
+        let coordinator = put_test_wasm(&db, vec![0x00, 0x61, 0x73, 0x6d, 2, 0, 0, 0]).await;
+        db.put_compiled_wasm(integrity.clone(), bytes::Bytes::from_static(b"compiled"))
+            .await
+            .unwrap();
+
+        let dna = test_dna_def("a", &integrity, &coordinator);
+        let agent = AgentPubKey::from_raw_32(vec![1u8; 32]);
+        db.put_dna_def(&agent, &dna).await.unwrap();
+
+        // Referenced by a DnaDef: kept, including the compiled form.
+        assert!(!db.delete_wasm_if_unreferenced(&integrity).await.unwrap());
+        assert!(!db.delete_wasm_if_unreferenced(&coordinator).await.unwrap());
+        assert!(db.as_ref().wasm_exists(&integrity).await.unwrap());
+        assert!(db.as_ref().compiled_wasm_exists(&integrity).await.unwrap());
+
+        db.delete_dna_defs(&dna.to_hash()).await.unwrap();
+
+        // No longer referenced: deleted, and the compiled form cascades.
+        assert!(db.delete_wasm_if_unreferenced(&integrity).await.unwrap());
+        assert!(db.delete_wasm_if_unreferenced(&coordinator).await.unwrap());
+        assert!(!db.as_ref().wasm_exists(&integrity).await.unwrap());
+        assert!(!db.as_ref().compiled_wasm_exists(&integrity).await.unwrap());
+        assert!(!db.as_ref().wasm_exists(&coordinator).await.unwrap());
+
+        // Deleting again reports that nothing was deleted.
+        assert!(!db.delete_wasm_if_unreferenced(&integrity).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn delete_entry_def_removes_only_that_key() {
+        let db = test_db().await;
+        let entry_def = EntryDef {
+            id: EntryDefId::App("test_entry".into()),
+            visibility: EntryVisibility::Public,
+            required_validations: 5u8.into(),
+            cache_at_agent_activity: false,
+        };
+        let key1 = vec![1, 2, 3, 4];
+        let key2 = vec![5, 6, 7, 8];
+        db.put_entry_def(key1.clone(), &entry_def).await.unwrap();
+        db.put_entry_def(key2.clone(), &entry_def).await.unwrap();
+
+        assert!(db.delete_entry_def(&key1).await.unwrap());
+        assert!(!db.as_ref().entry_def_exists(&key1).await.unwrap());
+        assert!(db.as_ref().entry_def_exists(&key2).await.unwrap());
+
+        // Missing key: nothing deleted, no error.
+        assert!(!db.delete_entry_def(&key1).await.unwrap());
     }
 }

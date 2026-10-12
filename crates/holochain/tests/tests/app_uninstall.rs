@@ -77,3 +77,75 @@ async fn space_removed_on_uninstall() {
 
     assert_eq!(conductor_state.conductor.running_cells.len(), 0);
 }
+
+/// Names of files in `dir` whose name contains `needle`, sorted.
+fn files_containing(dir: &std::path::Path, needle: &str) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|name| name.contains(needle))
+        .collect();
+    names.sort();
+    names
+}
+
+/// Uninstalling the only app using a DNA removes its database files and permits reinstall.
+#[tokio::test(flavor = "multi_thread")]
+async fn database_files_removed_on_uninstall_and_reinstall_succeeds() {
+    holochain_trace::test_run();
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let dna_hash = dna_file.dna_hash().clone();
+    let dna = dna_hash.to_string();
+    let mut conductor = SweetConductor::standard().await;
+    let app_id = "test_app".to_string();
+    let app = conductor.setup_app(&app_id, [&dna_file]).await.unwrap();
+    let agent = app.agent().clone();
+    let db_dir = conductor.db_path().join("databases");
+
+    let dht_file = format!("dht-{dna}.db");
+    let peer_meta_file = format!("p2p-peer-meta-{dna}.db");
+    let files = files_containing(&db_dir, &dna);
+    assert!(files.contains(&dht_file));
+    assert!(files.contains(&peer_meta_file));
+    assert!(conductor
+        .list_dna_hashes()
+        .await
+        .unwrap()
+        .contains(&dna_hash));
+
+    conductor
+        .clone()
+        .uninstall_app(&app_id, false)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        files_containing(&db_dir, &dna),
+        Vec::<String>::new(),
+        "every per-DNA database file, including -wal and -shm, must be removed"
+    );
+    assert!(!conductor
+        .list_dna_hashes()
+        .await
+        .unwrap()
+        .contains(&dna_hash));
+
+    // Reinstall the same DNA for the same agent: it must register the DNA
+    // again and the cell must be callable.
+    let app = conductor
+        .setup_app_for_agent(&app_id, agent, [&dna_file])
+        .await
+        .unwrap();
+    let zome = app.cells()[0].zome(TestWasm::Create.coordinator_zome_name());
+    let _: ActionHash = conductor.call(&zome, "create_entry", ()).await;
+
+    assert!(conductor
+        .list_dna_hashes()
+        .await
+        .unwrap()
+        .contains(&dna_hash));
+    let files = files_containing(&db_dir, &dna);
+    assert!(files.contains(&dht_file));
+    assert!(files.contains(&peer_meta_file));
+}

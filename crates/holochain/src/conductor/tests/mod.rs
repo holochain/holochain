@@ -8,3 +8,4 @@ mod network_seed_regression;
 mod peer_meta_info;
 mod request_dna_def;
 mod signed_zome_call;
+mod uninstall_cleanup;

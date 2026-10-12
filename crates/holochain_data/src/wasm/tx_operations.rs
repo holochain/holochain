@@ -4,7 +4,7 @@
 
 use crate::handles::{TxRead, TxWrite};
 use crate::kind::Wasm;
-use holo_hash::{AgentPubKey, WasmHash};
+use holo_hash::{AgentPubKey, DnaHash, WasmHash, ZomeHash};
 use holochain_types::prelude::{CellId, DnaDef, DnaWasmHashed, EntryDef};
 use holochain_zome_types::prelude::DnaDefHashed;
 
@@ -61,7 +61,15 @@ impl TxRead<Wasm> {
 
     /// Get all DNA definitions with their associated cell IDs.
     pub async fn get_all_dna_defs(&mut self) -> sqlx::Result<Vec<(CellId, DnaDefHashed)>> {
-        reads::get_all_dna_defs(self.tx_mut()).await
+        reads::get_all_dna_defs_on_connection(self.conn_mut()).await
+    }
+
+    /// Check whether any stored DNA references this zome hash.
+    ///
+    /// # Errors
+    /// Returns an error if the reference query fails.
+    pub async fn zome_hash_referenced(&mut self, hash: &ZomeHash) -> sqlx::Result<bool> {
+        reads::zome_hash_referenced(self.conn_mut(), hash).await
     }
 }
 
@@ -91,5 +99,29 @@ impl TxWrite<Wasm> {
     /// Store an entry definition.
     pub async fn put_entry_def(&mut self, key: Vec<u8>, entry_def: &EntryDef) -> sqlx::Result<()> {
         writes::put_entry_def(self.conn_mut(), key, entry_def).await
+    }
+
+    /// Delete every agent's definition of this DNA and its associated zome rows.
+    ///
+    /// # Errors
+    /// Returns an error if deletion fails.
+    pub async fn delete_dna_defs(&mut self, hash: &DnaHash) -> sqlx::Result<u64> {
+        writes::delete_dna_defs(self.conn_mut(), hash).await
+    }
+
+    /// Delete WASM and its compiled form if no stored DNA references it.
+    ///
+    /// # Errors
+    /// Returns an error if deletion fails.
+    pub async fn delete_wasm_if_unreferenced(&mut self, hash: &WasmHash) -> sqlx::Result<bool> {
+        writes::delete_wasm_if_unreferenced(self.conn_mut(), hash).await
+    }
+
+    /// Delete an entry definition by its serialized key.
+    ///
+    /// # Errors
+    /// Returns an error if deletion fails.
+    pub async fn delete_entry_def(&mut self, key: &[u8]) -> sqlx::Result<bool> {
+        writes::delete_entry_def(self.conn_mut(), key).await
     }
 }

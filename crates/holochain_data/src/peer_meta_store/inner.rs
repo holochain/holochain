@@ -123,3 +123,15 @@ where
 
     Ok(result.rows_affected())
 }
+
+/// Delete every entry, expired or not. Returns the number of rows removed.
+pub(super) async fn purge_all<'e, E>(executor: E) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result = sqlx::query("DELETE FROM peer_meta")
+        .execute(executor)
+        .await?;
+
+    Ok(result.rows_affected())
+}

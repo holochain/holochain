@@ -154,3 +154,55 @@ where
 
     Ok(())
 }
+
+/// Delete every DnaDef row with this DNA hash, for every agent.
+///
+/// IntegrityZome and CoordinatorZome rows cascade. Returns the number of
+/// DnaDef rows removed.
+pub(super) async fn delete_dna_defs<'e, E>(executor: E, dna_hash: &[u8]) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result = sqlx::query("DELETE FROM DnaDef WHERE hash = ?")
+        .bind(dna_hash)
+        .execute(executor)
+        .await?;
+
+    Ok(result.rows_affected())
+}
+
+/// Delete the WASM row with this hash unless a zome row still references it.
+///
+/// CompiledWasm cascades. Returns the number of Wasm rows removed (0 or 1).
+pub(super) async fn delete_wasm_if_unreferenced<'e, E>(
+    executor: E,
+    hash: &[u8],
+) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result = sqlx::query(
+        "DELETE FROM Wasm
+         WHERE hash = ?1
+         AND NOT EXISTS (SELECT 1 FROM IntegrityZome WHERE zome_hash = ?1)
+         AND NOT EXISTS (SELECT 1 FROM CoordinatorZome WHERE zome_hash = ?1)",
+    )
+    .bind(hash)
+    .execute(executor)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
+/// Delete the entry definition stored under `key`. Returns the rows removed.
+pub(super) async fn delete_entry_def<'e, E>(executor: E, key: &[u8]) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result = sqlx::query("DELETE FROM EntryDef WHERE key = ?")
+        .bind(key)
+        .execute(executor)
+        .await?;
+
+    Ok(result.rows_affected())
+}

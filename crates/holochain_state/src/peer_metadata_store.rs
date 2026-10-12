@@ -89,6 +89,11 @@ impl PeerMetaStore<holochain_data::DbWrite<holochain_data::kind::PeerMetaStore>>
     pub async fn prune(&self) -> StateMutationResult<u64> {
         self.db.prune().await.map_err(StateMutationError::from)
     }
+
+    /// Delete every entry, expired or not. Returns the number of rows removed.
+    pub async fn purge_all(&self) -> StateMutationResult<u64> {
+        self.db.purge_all().await.map_err(StateMutationError::from)
+    }
 }
 
 impl From<PeerMetaStore<holochain_data::DbWrite<holochain_data::kind::PeerMetaStore>>>
