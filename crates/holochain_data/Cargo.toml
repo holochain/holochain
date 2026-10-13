@@ -35,9 +35,14 @@ indexmap = { version = "2.6.0", features = ["serde"] }
 bytes = "1"
 
 [dev-dependencies]
+criterion = { version = "0.6", features = ["async_tokio"] }
 holochain_data = { path = ".", features = ["test-utils", "encryption"] }
-
+rand = "0.9"
 tempfile = "3.3"
+
+[[bench]]
+name = "dht_queries"
+harness = false
 
 [lints]
 workspace = true
