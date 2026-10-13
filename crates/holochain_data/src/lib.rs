@@ -385,4 +385,36 @@ mod tests {
         assert!(!tables.contains(&"Conductor".to_string()));
         assert!(!tables.contains(&"Wasm".to_string()));
     }
+
+    #[tokio::test]
+    async fn dht_hot_read_path_indexes_exist() {
+        let db = test_open_db(TestDhtDbId)
+            .await
+            .expect("Failed to set up test database");
+
+        let indexes = sqlx::query_scalar::<_, String>(
+            "SELECT name FROM sqlite_master WHERE type='index' ORDER BY name",
+        )
+        .fetch_all(db.pool())
+        .await
+        .expect("Failed to query sqlite_master");
+
+        for expected in [
+            "Action_prev_hash",
+            "ChainOp_basis_hash_op_type",
+            "ChainOp_when_integrated_locally_validated",
+            "DeletedLink_create_link_hash",
+            "DeletedRecord_deletes_action_hash",
+            "DeletedRecord_deletes_entry_hash",
+            "Link_base_hash",
+            "UpdatedRecord_original_action_hash",
+            "UpdatedRecord_original_entry_hash",
+            "ValidationReceipt_op_hash",
+        ] {
+            assert!(
+                indexes.iter().any(|i| i == expected),
+                "missing index {expected}; have: {indexes:?}"
+            );
+        }
+    }
 }

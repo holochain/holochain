@@ -3219,6 +3219,7 @@ version = "0.7.1-rc.1"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "criterion",
  "holo_hash",
  "holochain_conductor_api",
  "holochain_data",
@@ -3231,6 +3232,7 @@ dependencies = [
  "indexmap 2.14.1",
  "libsqlite3-sys",
  "opentelemetry 0.31.0",
+ "rand 0.9.5",
  "serde_json",
  "sodoken",
  "sqlx",
