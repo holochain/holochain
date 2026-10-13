@@ -1,0 +1,10 @@
+DROP INDEX ValidationReceipt_op_hash;
+DROP INDEX DeletedRecord_deletes_entry_hash;
+DROP INDEX DeletedRecord_deletes_action_hash;
+DROP INDEX UpdatedRecord_original_entry_hash;
+DROP INDEX UpdatedRecord_original_action_hash;
+DROP INDEX DeletedLink_create_link_hash;
+DROP INDEX Link_base_hash;
+DROP INDEX ChainOp_when_integrated_locally_validated;
+DROP INDEX ChainOp_basis_hash_op_type;
+DROP INDEX Action_prev_hash;
