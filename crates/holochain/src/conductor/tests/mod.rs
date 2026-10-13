@@ -2,6 +2,7 @@ mod agent_info;
 mod app_info;
 mod cell;
 mod cell_cloning;
+mod genesis_failure_cleanup;
 mod install_app_bundle;
 mod network_info;
 mod network_seed_regression;
