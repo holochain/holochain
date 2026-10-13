@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix the conductor rejecting wasm built against hdk 0.7.0 that commits a capability grant, and failing to read source chains that hold one, both with `missing field constraint`. Grant entries now carry both the 0.7.0 keys and the 0.7.1 keys, so wasm built against either hdk commits and reads them, and chains written by 0.7.0, by 0.7.1-rc.2 and by this version all open. The admin `GrantZomeCallCapability` call accepts the 0.7.0 payload layout as well. A direct signal grant has no `functions` key, so only that grant needs an hdk built for it.
+
 ## 0.7.1-rc.2
 
 - Add indexes to the DHT database so link, record update and delete, chain, entry, gossip and validation receipt reads stay fast as the database grows. Existing databases gain the indexes on the next conductor start. \#5726

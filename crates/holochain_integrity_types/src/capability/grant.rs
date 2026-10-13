@@ -10,7 +10,14 @@ use std::collections::{BTreeSet, HashSet};
 /// This data is committed to the callee's source chain as a private entry. The remote calling
 /// agent must provide a secret and we source their pubkey from the active network connection.
 /// This must match the strictness of the [`GrantConstraint`].
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+///
+/// On the wire a grant carries both the keys that Holochain 0.7.0 wrote, `access` and
+/// `functions`, and the keys `constraint` and `capability`, so that wasm built against
+/// hdk 0.7.0 and wasm built against hdk 0.7.1 both read it, each ignoring the keys it does
+/// not know. `functions` is present for a zome call grant only. Decoding accepts any of
+/// the three layouts: `{ tag, access, functions }`, `{ tag, constraint, capability }`, or
+/// the union of the two.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
@@ -19,6 +26,69 @@ pub struct CapGrant {
     pub constraint: GrantConstraint,
     /// The capability to be granted.
     pub capability: Capability,
+}
+
+/// The wire layout of a [`CapGrant`] when encoding.
+#[derive(Serialize)]
+struct CapGrantWire<'a> {
+    tag: &'a str,
+    access: &'a GrantConstraint,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    functions: Option<&'a GrantedFunctions>,
+    constraint: &'a GrantConstraint,
+    capability: &'a Capability,
+}
+
+impl Serialize for CapGrant {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let functions = match &self.capability {
+            Capability::ZomeCall(ZomeCallGrant { functions }) => Some(functions),
+            Capability::DirectSignal => None,
+        };
+        CapGrantWire {
+            tag: &self.tag,
+            access: &self.constraint,
+            functions,
+            constraint: &self.constraint,
+            capability: &self.capability,
+        }
+        .serialize(serializer)
+    }
+}
+
+/// Every wire layout a [`CapGrant`] can be decoded from.
+#[derive(Deserialize)]
+struct CapGrantWireOwned {
+    tag: String,
+    #[serde(default)]
+    access: Option<GrantConstraint>,
+    #[serde(default)]
+    functions: Option<GrantedFunctions>,
+    #[serde(default)]
+    constraint: Option<GrantConstraint>,
+    #[serde(default)]
+    capability: Option<Capability>,
+}
+
+impl<'de> Deserialize<'de> for CapGrant {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let wire = CapGrantWireOwned::deserialize(deserializer)?;
+        let constraint = match (wire.constraint, wire.access) {
+            (Some(constraint), _) => constraint,
+            (None, Some(access)) => access,
+            (None, None) => return Err(serde::de::Error::missing_field("constraint")),
+        };
+        let capability = match (wire.functions, wire.capability) {
+            (_, Some(capability)) => capability,
+            (Some(functions), None) => Capability::ZomeCall(ZomeCallGrant { functions }),
+            (None, None) => return Err(serde::de::Error::missing_field("capability")),
+        };
+        Ok(CapGrant {
+            tag: wire.tag,
+            constraint,
+            capability,
+        })
+    }
 }
 
 /// The capability to grant in a [`CapGrant`].
@@ -529,5 +599,153 @@ mod tests {
         for (constraint, expected) in cases {
             assert_eq!(i64::from(GrantConstraintType::from(&constraint)), expected);
         }
+    }
+
+    /// The entry shape that hdk 0.7.0 wasm and 0.7.0 conductors write and read.
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct LegacyZomeCallCapGrant {
+        tag: String,
+        access: GrantConstraint,
+        functions: GrantedFunctions,
+    }
+
+    /// The entry shape that 0.7.1-rc.2 wrote before the wire format was made compatible.
+    #[derive(Serialize, Debug)]
+    struct NestedCapGrant {
+        tag: String,
+        constraint: GrantConstraint,
+        capability: Capability,
+    }
+
+    fn sample_constraint() -> GrantConstraint {
+        GrantConstraint::Assigned {
+            secret: [7; 64].into(),
+            assignees: [AgentPubKey::from_raw_36(vec![9; 36])]
+                .into_iter()
+                .collect(),
+        }
+    }
+
+    fn sample_functions() -> GrantedFunctions {
+        let mut fns = HashSet::new();
+        fns.insert((ZomeName::from("z"), FunctionName::from("f")));
+        GrantedFunctions::Listed(fns)
+    }
+
+    /// The entry shape that stock hdk 0.7.1-rc.2 wasm reads, with serde's default of
+    /// ignoring unknown keys.
+    #[derive(Deserialize, Debug, PartialEq)]
+    struct Rc2CapGrant {
+        tag: String,
+        constraint: GrantConstraint,
+        capability: Capability,
+    }
+
+    #[test]
+    fn zome_call_grant_bytes_decode_with_the_0_7_0_layout() {
+        let grant =
+            CapGrant::new_zome_call_grant("tag".into(), sample_constraint(), sample_functions());
+        let legacy: LegacyZomeCallCapGrant = holochain_serialized_bytes::decode(
+            &holochain_serialized_bytes::encode(&grant).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            legacy,
+            LegacyZomeCallCapGrant {
+                tag: "tag".into(),
+                access: sample_constraint(),
+                functions: sample_functions(),
+            }
+        );
+    }
+
+    #[test]
+    fn zome_call_grant_bytes_decode_with_the_rc2_layout() {
+        let grant =
+            CapGrant::new_zome_call_grant("tag".into(), sample_constraint(), sample_functions());
+        let rc2: Rc2CapGrant = holochain_serialized_bytes::decode(
+            &holochain_serialized_bytes::encode(&grant).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            rc2,
+            Rc2CapGrant {
+                tag: "tag".into(),
+                constraint: sample_constraint(),
+                capability: Capability::ZomeCall(ZomeCallGrant {
+                    functions: sample_functions()
+                }),
+            }
+        );
+    }
+
+    #[test]
+    fn direct_signal_grant_bytes_decode_with_the_rc2_layout() {
+        let grant = CapGrant::new_direct_signal_grant("tag".into(), sample_constraint());
+        let rc2: Rc2CapGrant = holochain_serialized_bytes::decode(
+            &holochain_serialized_bytes::encode(&grant).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            rc2,
+            Rc2CapGrant {
+                tag: "tag".into(),
+                constraint: sample_constraint(),
+                capability: Capability::DirectSignal,
+            }
+        );
+    }
+
+    #[test]
+    fn legacy_zome_call_grant_bytes_decode_to_a_cap_grant() {
+        let legacy = LegacyZomeCallCapGrant {
+            tag: "tag".into(),
+            access: sample_constraint(),
+            functions: sample_functions(),
+        };
+        let decoded: CapGrant = holochain_serialized_bytes::decode(
+            &holochain_serialized_bytes::encode(&legacy).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            decoded,
+            CapGrant::new_zome_call_grant("tag".into(), sample_constraint(), sample_functions())
+        );
+    }
+
+    #[test]
+    fn nested_capability_bytes_decode_to_a_cap_grant() {
+        let nested = NestedCapGrant {
+            tag: "tag".into(),
+            constraint: sample_constraint(),
+            capability: Capability::DirectSignal,
+        };
+        let decoded: CapGrant = holochain_serialized_bytes::decode(
+            &holochain_serialized_bytes::encode(&nested).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            decoded,
+            CapGrant::new_direct_signal_grant("tag".into(), sample_constraint())
+        );
+    }
+
+    #[test]
+    fn direct_signal_grant_round_trips() {
+        let grant = CapGrant::new_direct_signal_grant("tag".into(), sample_constraint());
+        let decoded: CapGrant = holochain_serialized_bytes::decode(
+            &holochain_serialized_bytes::encode(&grant).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(decoded, grant);
+    }
+
+    #[test]
+    fn direct_signal_grant_bytes_are_not_a_legacy_zome_call_grant() {
+        let grant = CapGrant::new_direct_signal_grant("tag".into(), sample_constraint());
+        let legacy: Result<LegacyZomeCallCapGrant, _> = holochain_serialized_bytes::decode(
+            &holochain_serialized_bytes::encode(&grant).unwrap(),
+        );
+        assert!(legacy.is_err());
     }
 }

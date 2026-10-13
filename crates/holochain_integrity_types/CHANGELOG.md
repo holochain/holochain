@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Make capability grant entries readable by wasm built against hdk 0.7.0 and by wasm built against hdk 0.7.1. A `CapGrant` now encodes with both the keys that Holochain 0.7.0 wrote, `access` and `functions`, and the keys `constraint` and `capability`. Each hdk reads the keys it knows and ignores the rest. Decoding accepts the `{ tag, access, functions }` layout, the `{ tag, constraint, capability }` layout, and their union, so chains written by 0.7.0 and by 0.7.1-rc.2 both read. The Rust types and constructors are unchanged.
+
 ## 0.7.1-rc.2
 
 ## 0.7.1-rc.1

@@ -45,7 +45,10 @@ pub struct GrantZomeCallCapabilityPayload {
 }
 
 /// Part of a [`GrantZomeCallCapabilityPayload`] payload to be translated to a [`CapGrant`] internally.
-#[derive(Debug, Deserialize, Serialize)]
+///
+/// Decoding also accepts the flat `{ tag, access, functions }` layout that clients built
+/// for Holochain 0.7.0 send.
+#[derive(Debug, Serialize)]
 pub struct GrantZomeCallCapabilityGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
@@ -54,6 +57,46 @@ pub struct GrantZomeCallCapabilityGrant {
     pub constraint: GrantConstraint,
     /// Grant access to zome calls with a [`ZomeCallGrant`].
     pub grant: ZomeCallGrant,
+}
+
+/// Every wire layout a [`GrantZomeCallCapabilityGrant`] can be decoded from.
+#[derive(Deserialize)]
+struct GrantZomeCallCapabilityGrantWire {
+    tag: String,
+    #[serde(default)]
+    constraint: Option<GrantConstraint>,
+    #[serde(default)]
+    access: Option<GrantConstraint>,
+    #[serde(default)]
+    grant: Option<ZomeCallGrant>,
+    #[serde(default)]
+    functions: Option<holochain_integrity_types::capability::GrantedFunctions>,
+}
+
+impl<'de> Deserialize<'de> for GrantZomeCallCapabilityGrant {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let wire = GrantZomeCallCapabilityGrantWire::deserialize(deserializer)?;
+        let constraint = match (wire.constraint, wire.access) {
+            (Some(constraint), _) => constraint,
+            (None, Some(access)) => access,
+            (None, None) => return Err(serde::de::Error::missing_field("constraint")),
+        };
+        let grant = match (wire.grant, wire.functions) {
+            (Some(grant), None) => grant,
+            (None, Some(functions)) => ZomeCallGrant { functions },
+            (None, None) => return Err(serde::de::Error::missing_field("grant")),
+            (Some(_), Some(_)) => {
+                return Err(serde::de::Error::custom(
+                    "a zome call grant carries either `grant` or `functions`, not both",
+                ))
+            }
+        };
+        Ok(GrantZomeCallCapabilityGrant {
+            tag: wire.tag,
+            constraint,
+            grant,
+        })
+    }
 }
 
 impl From<GrantZomeCallCapabilityGrant> for CapGrant {
@@ -84,4 +127,60 @@ pub struct CapGrantInfo {
     pub created_at: Timestamp,
     /// Timestamp of capability revocation if revoked.
     pub revoked_at: Option<Timestamp>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use holochain_integrity_types::capability::GrantedFunctions;
+
+    fn expected() -> CapGrant {
+        CapGrant::new_zome_call_grant(
+            "tag".into(),
+            GrantConstraint::Unrestricted,
+            GrantedFunctions::All,
+        )
+    }
+
+    #[test]
+    fn flat_0_7_0_grant_payload_decodes() {
+        #[derive(Serialize, Debug)]
+        struct Legacy {
+            tag: String,
+            access: GrantConstraint,
+            functions: GrantedFunctions,
+        }
+        let legacy = Legacy {
+            tag: "tag".into(),
+            access: GrantConstraint::Unrestricted,
+            functions: GrantedFunctions::All,
+        };
+        let grant: GrantZomeCallCapabilityGrant = holochain_serialized_bytes::decode(
+            &holochain_serialized_bytes::encode(&legacy).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(CapGrant::from(grant), expected());
+    }
+
+    #[test]
+    fn nested_grant_payload_decodes() {
+        #[derive(Serialize, Debug)]
+        struct Nested {
+            tag: String,
+            constraint: GrantConstraint,
+            grant: ZomeCallGrant,
+        }
+        let nested = Nested {
+            tag: "tag".into(),
+            constraint: GrantConstraint::Unrestricted,
+            grant: ZomeCallGrant {
+                functions: GrantedFunctions::All,
+            },
+        };
+        let grant: GrantZomeCallCapabilityGrant = holochain_serialized_bytes::decode(
+            &holochain_serialized_bytes::encode(&nested).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(CapGrant::from(grant), expected());
+    }
 }
