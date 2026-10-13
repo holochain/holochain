@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Add indexes to the DHT database so link, record update and delete, chain, entry, gossip and validation receipt reads stay fast as the database grows. Existing databases gain the indexes on the next conductor start. \#5726
+
 ## 0.8.0-dev.11
 
 - Fix an op received through publish or gossip whose entry does not match its action’s entry hash being dropped on its own while the rest of the batch was stored. The whole batch is now dropped, just like for an op with an invalid signature, because an honest peer never sends such an op. \#5994

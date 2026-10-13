@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
@@ -67,7 +67,7 @@ jobs:
             target: wasmer-sys-cranelift
     steps:
       - name: checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
@@ -84,13 +84,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
 
       - name: ts-bindings-test
         run: make ts-bindings-test
+
+      - name: "Common Test Teardown Actions"
+        uses: ./.github/actions/common-post
+
+  bench-data:
+    name: bench (holochain_data)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: "Common Test Setup Actions"
+        uses: ./.github/actions/common-pre
+
+      - name: bench-data
+        run: make bench-data
+
+      - name: upload criterion report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: criterion-report
+          path: target/criterion/
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: "Common Test Teardown Actions"
         uses: ./.github/actions/common-post
@@ -104,11 +133,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
-        
+
       - name: "Build workspace and run tests"
         uses: ./.github/actions/common-test
         with:
@@ -125,6 +154,7 @@ jobs:
       - test-wasmer-sys-cranelift
       - test-wasmer-wasmi
       - ts-bindings
+      - bench-data
     steps:
       - name: check status
         uses: re-actors/alls-green@release/v1

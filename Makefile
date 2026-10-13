@@ -9,7 +9,7 @@ UNSTABLE_FEATURES=unstable-sharding,unstable-functions,unstable-migration,$(DEFA
 	static-all static-fmt static-toml static-clippy static-clippy-unstable \
 	static-doc build-workspace-wasmer-sys-cranelift build-workspace-wasmer-wasmi \
 	build-workspace-wasmer-sys-llvm test-workspace-wasmer-sys-cranelift \
-	test-workspace-wasmer-sys-llvm test-workspace-wasmer-wasmi \
+	bench-data test-workspace-wasmer-sys-llvm test-workspace-wasmer-wasmi \
 	build-workspace-wasmer-sys-cranelift-unstable \
 	test-workspace-wasmer-sys-cranelift-unstable \
 	toml-fix ts-bindings ts-bindings-test
@@ -41,6 +41,10 @@ toml-fix:
 	cargo install taplo-cli@0.10.0 --locked
 	taplo format ./*.toml
 	taplo format ./crates/**/*.toml
+
+# run the holochain_data query benchmarks (CI runs this on Linux only)
+bench-data:
+	cargo bench -p holochain_data --bench dht_queries
 
 # ensure our chosen style lints are followed
 static-clippy:
