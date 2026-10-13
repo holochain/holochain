@@ -109,6 +109,11 @@ jobs:
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
 
+      # rust-cache can restore the criterion directory tree without its files,
+      # which makes criterion fail on a missing `base/sample.json`.
+      - name: clear stale criterion data
+        run: rm -rf target/criterion
+
       - name: bench-data
         run: make bench-data
 
