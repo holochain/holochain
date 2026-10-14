@@ -1,5 +1,5 @@
 use super::inner_reads;
-use holo_hash::WasmHash;
+use holo_hash::{WasmHash, ZomeHash};
 use holochain_types::prelude::{CellId, DnaWasmHashed, EntryDef};
 use holochain_zome_types::dna_def::DnaDefHashed;
 use sqlx::{Acquire, Executor, Sqlite};
@@ -139,9 +139,14 @@ pub(super) async fn get_all_dna_defs<'c, A>(conn: A) -> sqlx::Result<Vec<(CellId
 where
     A: Acquire<'c, Database = Sqlite>,
 {
-    // Acquires a connection for all the per-row zome queries.
     let mut conn = conn.acquire().await?;
+    get_all_dna_defs_on_connection(&mut conn).await
+}
 
+/// Read DNA definitions and their zomes on an already acquired connection.
+pub(super) async fn get_all_dna_defs_on_connection(
+    conn: &mut sqlx::SqliteConnection,
+) -> sqlx::Result<Vec<(CellId, DnaDefHashed)>> {
     let dna_models = inner_reads::get_all_dna_defs(&mut *conn).await?;
 
     let mut results = Vec::with_capacity(dna_models.len());
@@ -161,4 +166,14 @@ where
     }
 
     Ok(results)
+}
+
+pub(super) async fn zome_hash_referenced<'e, E>(
+    executor: E,
+    zome_hash: &ZomeHash,
+) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    inner_reads::zome_hash_referenced(executor, zome_hash.get_raw_39()).await
 }

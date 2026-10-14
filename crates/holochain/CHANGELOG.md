@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix uninstalling an app, or deleting a clone cell, leaving the DNA's peer metadata database on disk and its DNA definition, entry definitions and WASM code in `wasm.db`. When the last cell of a DNA is removed those are now deleted too; WASM code and entry definitions still used by another installed DNA are kept.
 - Bump kitsune2 to v0.5.2
 
 ## 0.7.1
