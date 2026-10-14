@@ -4060,15 +4060,16 @@ impl Conductor {
     ///
     /// The caller must hold the `dna_resource_lock` write guard.
     async fn purge_dna_resources(&self, dna_hash: &DnaHash) -> ConductorResult<()> {
-        // Keep handles to the stores: if a file cannot be unlinked, its
-        // rows are purged through them instead.
         let dht_store = self.spaces.dht_store(dna_hash)?;
         let peer_meta_store = self.spaces.peer_meta_store(dna_hash)?;
 
-        // Drop the cached space before unlinking, so no pool is left
-        // pointing at the deleted files and a reinstall of this DNA opens
-        // fresh, migrated databases.
+        // Drop the cached space so a reinstall of this DNA opens fresh,
+        // migrated databases, then close the pools still held by the store
+        // handles. Platforms that cannot unlink open files, such as Windows,
+        // need every connection closed before the files can be removed.
         self.spaces.remove_space(dna_hash);
+        dht_store.close().await;
+        peer_meta_store.close().await;
 
         let db_dir: &Path = self.spaces.db_dir.as_ref().as_ref();
         let dna_hash_arc = Arc::new(dna_hash.clone());
@@ -4081,7 +4082,12 @@ impl Conductor {
                 ?err,
                 "Could not remove DhtStore DB file, probably because it is still in use. Purging all data instead."
             );
-            dht_store.purge_all().await.map_err(ConductorError::other)?;
+            // The closed pool cannot run queries; reopen the database to purge it.
+            self.spaces
+                .dht_store(dna_hash)?
+                .purge_all()
+                .await
+                .map_err(ConductorError::other)?;
         }
 
         let peer_meta_store_path =
@@ -4093,7 +4099,7 @@ impl Conductor {
                 ?err,
                 "Could not remove PeerMetaStore DB file, probably because it is still in use. Purging all data instead."
             );
-            peer_meta_store.purge_all().await?;
+            self.spaces.peer_meta_store(dna_hash)?.purge_all().await?;
         }
 
         self.delete_dna_definitions(dna_hash).await?;

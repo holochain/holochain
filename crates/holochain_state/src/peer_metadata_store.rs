@@ -51,6 +51,15 @@ impl PeerMetaStore<holochain_data::DbRead<holochain_data::kind::PeerMetaStore>> 
 }
 
 impl PeerMetaStore<holochain_data::DbWrite<holochain_data::kind::PeerMetaStore>> {
+    /// Close the connection pool shared by every clone of this store.
+    ///
+    /// Must be called before the database file is deleted, because some
+    /// platforms cannot unlink a file that is still open. The store and its
+    /// clones are unusable afterwards.
+    pub async fn close(&self) {
+        self.db.close().await;
+    }
+
     /// Downgrade this writable store to a read-only store.
     pub fn as_read(&self) -> PeerMetaStoreRead {
         PeerMetaStoreRead::new(self.db.as_ref().clone())
