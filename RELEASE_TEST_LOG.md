@@ -2,6 +2,12 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2026-10-14: v0.7.1-rc.2
+
+*Success*
+- Ran a standard smoke test with 5 nodes.
+- All checks passed
+
 ## 2026-07-23: v0.7.0-rc.3
 
 *Success*
