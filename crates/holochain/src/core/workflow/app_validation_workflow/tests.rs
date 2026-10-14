@@ -1482,14 +1482,16 @@ async fn skip_issuing_warrant_if_one_found() {
         )
         .await;
 
+    // Wait until Bob's warrant against Alice is integrated. This is the same
+    // query Bob uses to serve warrants in agent activity responses, and Carol
+    // asks him only once.
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             let warrants = conductors[1]
-                .get_spaces()
-                .dht_store(dna_file.dna_hash())
+                .get_dht_store(dna_file.dna_hash())
                 .unwrap()
                 .as_read()
-                .warrants_by_author(_bob.agent_pubkey().clone())
+                .get_warrants_by_warrantee(alice.agent_pubkey().clone())
                 .await
                 .unwrap();
 
