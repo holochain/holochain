@@ -63,6 +63,17 @@ impl RibosomeStore {
         None
     }
 
+    /// Drop every ribosome whose cell runs the given DNA.
+    ///
+    /// Called when the last cell of a DNA is removed and its definition is
+    /// deleted from the database, so a later install of the same DNA for the
+    /// same agent registers it from scratch instead of reusing a cached
+    /// ribosome whose definition no longer exists on disk.
+    pub fn remove_ribosomes_for_dna(&mut self, dna_hash: &DnaHash) {
+        self.ribosomes
+            .retain(|cell_id, _| cell_id.dna_hash() != dna_hash);
+    }
+
     /// Add a single [`EntryDef`] to the store.
     pub fn add_entry_def(&mut self, k: EntryDefBufferKey, entry_def: EntryDef) {
         self.entry_defs.insert(k, entry_def);

@@ -1,5 +1,5 @@
 use crate::models::wasm::{CoordinatorZomeModel, DnaDefModel, EntryDefModel, IntegrityZomeModel};
-use holo_hash::{AgentPubKey, HashableContentExtSync, WasmHash};
+use holo_hash::{AgentPubKey, DnaHash, HashableContentExtSync, WasmHash};
 use holochain_types::prelude::{DnaDef, DnaWasmHashed, EntryDef, WasmZomeDef, ZomeDef};
 use holochain_zome_types::zome::InlineZomeDef;
 use sqlx::{Acquire, Executor, Sqlite};
@@ -114,6 +114,30 @@ where
 {
     let model = EntryDefModel::from_entry_def(key, entry_def);
     inner_writes::put_entry_def(executor, &model).await
+}
+
+pub(super) async fn delete_dna_defs<'e, E>(executor: E, dna_hash: &DnaHash) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    inner_writes::delete_dna_defs(executor, dna_hash.get_raw_32()).await
+}
+
+pub(super) async fn delete_wasm_if_unreferenced<'e, E>(
+    executor: E,
+    hash: &WasmHash,
+) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    Ok(inner_writes::delete_wasm_if_unreferenced(executor, hash.get_raw_39()).await? > 0)
+}
+
+pub(super) async fn delete_entry_def<'e, E>(executor: E, key: &[u8]) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    Ok(inner_writes::delete_entry_def(executor, key).await? > 0)
 }
 
 fn extract_dependencies(zome_def: &ZomeDef) -> Vec<String> {

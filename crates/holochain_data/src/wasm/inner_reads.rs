@@ -170,3 +170,20 @@ where
         .fetch_all(executor)
         .await
 }
+
+/// Check whether any integrity or coordinator zome row references `zome_hash`.
+pub(super) async fn zome_hash_referenced<'e, E>(executor: E, zome_hash: &[u8]) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_scalar(
+        "SELECT EXISTS(
+            SELECT 1 FROM IntegrityZome WHERE zome_hash = ?1
+            UNION ALL
+            SELECT 1 FROM CoordinatorZome WHERE zome_hash = ?1
+        )",
+    )
+    .bind(zome_hash)
+    .fetch_one(executor)
+    .await
+}
