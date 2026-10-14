@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- `GrantZomeCallCapabilityPayload.cap_grant` also decodes from the flat `{ tag, access, functions }` layout that clients built for Holochain 0.7.0 send, in addition to the nested `{ tag, constraint, grant }` layout.
+
 ## 0.7.1-rc.2
 
 ## 0.7.1-rc.1
