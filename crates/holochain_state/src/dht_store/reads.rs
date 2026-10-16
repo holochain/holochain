@@ -4870,6 +4870,7 @@ mod tests {
         for (i, op) in ops.into_iter().enumerate() {
             integrate_activity(&store, op, AppOutcome::Accepted, 10 + i as i64).await;
         }
+        let expected = [&hashes[2], &hashes[1]];
         let filter = ChainFilter::take(hashes[2].clone(), 2);
         let resp = store
             .as_read()
@@ -4878,12 +4879,83 @@ mod tests {
             .unwrap();
         match resp {
             MustGetAgentActivityResponse::Activity { activity, .. } => {
-                assert_eq!(activity.len(), 2);
-                assert_eq!(activity[0].action.action().action_seq(), 2);
-                assert_eq!(activity[1].action.action().action_seq(), 1);
+                assert!(
+                    activity
+                        .iter()
+                        .map(|a| &a.action.hashed.hash)
+                        .eq(expected.iter().copied()),
+                    "take must retain the immediate predecessor: expected {expected:?}, got {activity:?}"
+                );
             }
             other => panic!("expected Activity, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn must_get_agent_activity_take_preserves_predecessor_with_repeated_sequence() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![75u8; 36]);
+        let [top, predecessor, ancestor] = make_activity_with_repeated_sequence(&author);
+        integrate_rejected_activity(&store, &[&top, &predecessor, &ancestor]).await;
+
+        let expected = [top.as_hash(), predecessor.as_hash()];
+        let filter = ChainFilter::take(top.as_hash().clone(), 2);
+        let response = store
+            .as_read()
+            .must_get_agent_activity(&author, &filter)
+            .await
+            .unwrap();
+        let MustGetAgentActivityResponse::Activity { activity, .. } = response else {
+            panic!("expected the available two-action ancestry, got {response:?}");
+        };
+        assert!(
+            activity.iter().map(|a| &a.action.hashed.hash).eq(expected),
+            "take must retain the immediate predecessor: expected {expected:?}, got {activity:?}"
+        );
+    }
+
+    // Regression for #6025: top(10) -> predecessor(9) -> ancestor(9).
+    fn make_activity_with_repeated_sequence(author: &AgentPubKey) -> [SignedActionHashed; 3] {
+        let ancestor = make_scratch_create(author, 9, &ActionHash::from_raw_36(vec![8u8; 36]), 1);
+        // Exercise the hash tie-breaker with content-derived hashes, not random fixtures.
+        let predecessor = (2..u8::MAX)
+            .map(|seed| make_scratch_create(author, 9, ancestor.as_hash(), seed))
+            .find(|candidate| candidate.as_hash() < ancestor.as_hash())
+            .expect("fixture requires the ancestor to sort ahead of its child");
+        let top = make_scratch_create(author, 10, predecessor.as_hash(), u8::MAX);
+        [top, predecessor, ancestor]
+    }
+
+    async fn integrate_rejected_activity(
+        store: &crate::dht_store::DhtStore<DbWrite<Dht>>,
+        actions: &[&SignedActionHashed],
+    ) {
+        let ops: Vec<_> = actions
+            .iter()
+            .map(|action| {
+                DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::AgentActivity(
+                    SignedAction::new(action.action().clone(), action.signature().clone()),
+                ))))
+            })
+            .collect();
+        let outcomes = ops
+            .iter()
+            .map(|op| (op.as_hash().clone(), SysOutcome::Rejected))
+            .collect();
+        store
+            .record_incoming_ops(ops.into_iter().map(|op| (op, false)).collect())
+            .await
+            .unwrap();
+        store
+            .record_chain_op_sys_validation_outcomes(outcomes)
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(Timestamp::from_micros(10_000_000))
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -4973,23 +5045,18 @@ mod tests {
             .await
             .unwrap();
         let author = AgentPubKey::from_raw_36(vec![151u8; 36]);
-
-        // Build a 3-action chain (seqs 0..=2) in the store.
         let (ops, hashes) = make_activity_chain(&author, 3);
         for (i, op) in ops.into_iter().enumerate() {
             integrate_activity(&store, op, AppOutcome::Accepted, 10 + i as i64).await;
         }
-
-        // Scratch action at seq 3, linked to the store action at seq 2 (hashes[2]).
-        // The scratch action's content-derived hash becomes the chain_top for the filter.
-        let scratch_sah = make_scratch_create(&author, 3, &hashes[2], 151);
-        let scratch_hash = scratch_sah.as_hash().clone();
+        let top = make_scratch_create(&author, 3, &hashes[2], 151);
+        let chain_top = top.as_hash().clone();
+        let expected = [&chain_top, &hashes[2], &hashes[1], &hashes[0]];
+        let filter = ChainFilter::new(chain_top.clone());
         let mut scratch = crate::scratch::Scratch::new();
-        scratch.add_action(scratch_sah, ChainTopOrdering::Relaxed);
+        scratch.add_action(top, ChainTopOrdering::Relaxed);
         let sync_scratch = scratch.into_sync();
 
-        // Use the scratch action's hash as chain_top so chain_top_seq == 3.
-        let filter = ChainFilter::new(scratch_hash.clone());
         let resp = store
             .as_read()
             .must_get_agent_activity_with_scratch(&author, &filter, &sync_scratch)
@@ -4998,21 +5065,49 @@ mod tests {
 
         match resp {
             MustGetAgentActivityResponse::Activity { activity, .. } => {
-                let seqs: Vec<u32> = activity
-                    .iter()
-                    .map(|a| a.action.action().action_seq())
-                    .collect();
                 assert!(
-                    seqs.contains(&3),
-                    "scratch action at seq 3 should be in merged activity; got {seqs:?}"
-                );
-                assert!(
-                    seqs.contains(&2),
-                    "store action at seq 2 should be in merged activity; got {seqs:?}"
+                    activity
+                        .iter()
+                        .map(|a| &a.action.hashed.hash)
+                        .eq(expected.iter().copied()),
+                    "scratch/store activity must preserve hash-linked ancestry: expected {expected:?}, got {activity:?}"
                 );
             }
             other => panic!("expected Activity, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn must_get_agent_activity_with_scratch_take_preserves_predecessor_with_repeated_sequence(
+    ) {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![75u8; 36]);
+        let [top, predecessor, ancestor] = make_activity_with_repeated_sequence(&author);
+        integrate_rejected_activity(&store, &[&predecessor, &ancestor]).await;
+        let chain_top = top.as_hash().clone();
+        let expected = [&chain_top, predecessor.as_hash()];
+        let filter = ChainFilter::take(chain_top.clone(), 2);
+        let mut scratch = crate::scratch::Scratch::new();
+        scratch.add_action(top, ChainTopOrdering::Relaxed);
+        let scratch = scratch.into_sync();
+
+        let response = store
+            .as_read()
+            .must_get_agent_activity_with_scratch(&author, &filter, &scratch)
+            .await
+            .unwrap();
+        let MustGetAgentActivityResponse::Activity { activity, .. } = response else {
+            panic!("expected the available two-action ancestry, got {response:?}");
+        };
+        assert!(
+            activity
+                .iter()
+                .map(|a| &a.action.hashed.hash)
+                .eq(expected),
+            "scratch/store activity must retain the immediate predecessor: expected {expected:?}, got {activity:?}"
+        );
     }
 
     /// Store-only `must_get_agent_activity` ignores a populated scratch.
