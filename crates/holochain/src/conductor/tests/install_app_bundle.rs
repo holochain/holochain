@@ -92,6 +92,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
                         ))),
                     membrane_proof: None,
                     name: Some("Johnny".into()),
+                    init_properties: None,
                 },
             )
             .await
@@ -117,6 +118,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
                         ))),
                     membrane_proof: None,
                     name: None,
+                    init_properties: None,
                 },
             )
             .await

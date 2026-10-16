@@ -103,7 +103,9 @@ impl ConductorStore<holochain_data::DbRead<Conductor>> {
         Ok(self.db.get_installed_app(app_id).await?)
     }
 
-    /// Get the init properties for a role of an installed app.
+    /// Get the init properties for a role or clone cell of an installed app.
+    ///
+    /// For a clone cell, `role_name` is the clone id, e.g. `role.0`.
     pub async fn get_init_properties(
         &self,
         app_id: &str,
@@ -168,9 +170,9 @@ impl ConductorStore<holochain_data::DbRead<Conductor>> {
 }
 
 impl ConductorStore<holochain_data::DbWrite<Conductor>> {
-    /// Atomically update the persisted conductor state, optionally writing
-    /// `init_properties` rows for `app_id` in the same transaction.
-    /// When `init_properties` is empty the `app_id` is not used.
+    /// Atomically update the persisted conductor state, optionally writing the
+    /// `init_properties` rows returned by `f` for `app_id` in the same transaction.
+    /// When the returned `init_properties` are empty the `app_id` is not used.
     ///
     /// Loads the current state (if any), applies `f`, and saves the
     /// result, all within a single database transaction. An internal
@@ -180,14 +182,9 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
     /// The closure receives `None` when the conductor has no persisted
     /// state yet (the tag is unset); it must produce a new state to
     /// persist.
-    pub async fn update_state<F, O, E>(
-        &self,
-        f: F,
-        app_id: &str,
-        init_properties: &InitPropertiesMap,
-    ) -> Result<O, E>
+    pub async fn update_state<F, O, E>(&self, f: F, app_id: &str) -> Result<O, E>
     where
-        F: FnOnce(Option<ConductorState>) -> Result<(ConductorState, O), E>,
+        F: FnOnce(Option<ConductorState>) -> Result<(ConductorState, O, InitPropertiesMap), E>,
         E: From<StateMutationError>,
     {
         let _guard = self.update_lock.lock().await;
@@ -198,12 +195,12 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
             .map(state_from_rows)
             .transpose()
             .map_err(StateMutationError::from)?;
-        let (new_state, output) = f(current)?;
+        let (new_state, output, init_properties) = f(current)?;
         let new_rows = state_to_rows(&new_state)?;
         save_rows_in_tx(&mut tx, &new_rows)
             .await
             .map_err(StateMutationError::from)?;
-        for (role_name, properties) in init_properties {
+        for (role_name, properties) in &init_properties {
             tx.put_init_properties(app_id, role_name.as_str(), properties)
                 .await
                 .map_err(StateMutationError::from)?;
@@ -228,7 +225,9 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
         Ok(self.db.block(input).await?)
     }
 
-    /// Insert or update the init properties for a role of an installed app.
+    /// Insert or update the init properties for a role or clone cell of an installed app.
+    ///
+    /// For a clone cell, `role_name` is the clone id, e.g. `role.0`.
     pub async fn put_init_properties(
         &self,
         app_id: &str,
@@ -241,7 +240,9 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
             .await?)
     }
 
-    /// Delete the init properties for a role of an installed app.
+    /// Delete the init properties for a role or clone cell of an installed app.
+    ///
+    /// For a clone cell, `role_name` is the clone id, e.g. `role.0`.
     pub async fn delete_init_properties(
         &self,
         app_id: &str,
@@ -548,9 +549,8 @@ mod tests {
     ) -> StateMutationResult<ConductorState> {
         store
             .update_state(
-                |_| -> StateMutationResult<_> { Ok((state, ())) },
+                |_| -> StateMutationResult<_> { Ok((state, (), InitPropertiesMap::new())) },
                 "",
-                &InitPropertiesMap::new(),
             )
             .await?;
         Ok(store.as_read().load_state().await?.unwrap())
@@ -616,9 +616,8 @@ mod tests {
         }
         let result: Result<(), Boom> = store
             .update_state(
-                |_| -> Result<(ConductorState, ()), Boom> { Err(Boom) },
+                |_| -> Result<(ConductorState, (), InitPropertiesMap), Boom> { Err(Boom) },
                 "",
-                &InitPropertiesMap::new(),
             )
             .await;
         assert!(result.is_err());
@@ -653,10 +652,9 @@ mod tests {
                                     None,
                                 ),
                             );
-                            Ok((state, ()))
+                            Ok((state, (), InitPropertiesMap::new()))
                         },
                         "",
-                        &InitPropertiesMap::new(),
                     )
                     .await
                     .unwrap();
@@ -696,9 +694,8 @@ mod tests {
 
         store
             .update_state(
-                move |_| -> StateMutationResult<_> { Ok((state, ())) },
+                move |_| -> StateMutationResult<_> { Ok((state, (), props)) },
                 app_id,
-                &props,
             )
             .await
             .unwrap();
@@ -738,9 +735,8 @@ mod tests {
 
         let result: StateMutationResult<()> = store
             .update_state(
-                |_| -> StateMutationResult<_> { Ok((state_with_tag("changed"), ())) },
+                move |_| -> StateMutationResult<_> { Ok((state_with_tag("changed"), (), props)) },
                 "nonexistent-app",
-                &props,
             )
             .await;
 

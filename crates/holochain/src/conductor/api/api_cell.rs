@@ -168,7 +168,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
         cell_id: &CellId,
     ) -> ConductorResult<Option<InstalledApp>>;
 
-    /// Read the init properties supplied for this cell's role at install time.
+    /// Read the init properties supplied for this cell at install or clone time.
     async fn get_init_properties(&self) -> ConductorResult<Option<InitProperties>>;
 
     /// Expose create_clone_cell functionality to zomes.

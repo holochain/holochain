@@ -36,6 +36,7 @@ async fn app_info_returns_all_cells_with_info() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seed numero uno".to_string()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await
@@ -52,6 +53,7 @@ async fn app_info_returns_all_cells_with_info() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seed numero dos".to_string()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await

@@ -2252,6 +2252,7 @@ mod clone_cell_impls {
                 modifiers,
                 membrane_proof,
                 name,
+                init_properties,
             } = payload;
 
             if !modifiers.has_some_option_set() {
@@ -2281,6 +2282,7 @@ mod clone_cell_impls {
                     role_name.clone(),
                     modifiers.serialized()?,
                     name,
+                    init_properties,
                 )
                 .await?;
 
@@ -2382,7 +2384,7 @@ mod clone_cell_impls {
                 clone_cell_id,
             }: &DeleteCloneCellPayload,
         ) -> ConductorResult<()> {
-            let (_, cell_id) = self
+            let (_, (cell_id, clone_id)) = self
                 .update_state_prime({
                     let app_id = app_id.clone();
                     let clone_cell_id = clone_cell_id.clone();
@@ -2398,11 +2400,20 @@ mod clone_cell_impls {
                             .1;
                         let clone_id = app.get_clone_id(&clone_cell_id)?;
                         app.delete_clone_cell(&clone_id)?;
-                        Ok((state, cell_id))
+                        Ok((state, (cell_id, clone_id)))
                     }
                 })
                 .await?;
-            self.delete_cell_databases(vec![cell_id]).await?;
+            // The clone is already gone from the state, so neither cleanup can be retried
+            // through it. Attempt both and report the first error.
+            let databases_result = self.delete_cell_databases(vec![cell_id]).await;
+            let init_properties_result = self
+                .spaces
+                .conductor_store
+                .delete_init_properties(app_id, &clone_id.to_string())
+                .await;
+            databases_result?;
+            init_properties_result?;
             Ok(())
         }
     }
@@ -2645,10 +2656,9 @@ mod app_status_impls {
                 .update_state_prime_and_init_properties(
                     move |mut state| {
                         let disabled_app = state.add_app(app)?;
-                        Ok((state, disabled_app))
+                        Ok((state, disabled_app, init_properties))
                     },
                     &app_id,
-                    &init_properties,
                 )
                 .await?;
             Ok(disabled_app)
@@ -2711,9 +2721,9 @@ mod state_impls {
         }
 
         /// Update the internal state with a pure function mapping old state to new,
-        /// optionally writing `init_properties` rows for `app_id` in the same transaction.
+        /// writing the `init_properties` rows returned by `f` for `app_id` in the same transaction.
         ///
-        /// When `init_properties` is empty the `app_id` is not used. Callers
+        /// When the returned `init_properties` are empty the `app_id` is not used. Callers
         /// that do not need to persist init properties should use [`Self::update_state_prime`].
         ///
         /// Any value produced by the state change will be the output of this function.
@@ -2721,16 +2731,15 @@ mod state_impls {
             &self,
             f: F,
             app_id: &str,
-            init_properties: &InitPropertiesMap,
         ) -> ConductorResult<(ConductorState, O)>
         where
-            F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
+            F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O, InitPropertiesMap)>
+                + Send
+                + 'static,
             O: Send + 'static,
         {
             self.check_running()?;
-            self.spaces
-                .update_state_prime(f, app_id, init_properties)
-                .await
+            self.spaces.update_state_prime(f, app_id).await
         }
 
         /// Convenience wrapper around [`Self::update_state_prime_and_init_properties`] for callers
@@ -2743,8 +2752,14 @@ mod state_impls {
             F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
             O: Send + 'static,
         {
-            self.update_state_prime_and_init_properties(f, "", &InitPropertiesMap::new())
-                .await
+            self.update_state_prime_and_init_properties(
+                move |state| {
+                    let (state, output) = f(state)?;
+                    Ok((state, output, InitPropertiesMap::new()))
+                },
+                "",
+            )
+            .await
         }
     }
 }
@@ -3762,12 +3777,30 @@ mod accessor_impls {
                 .cloned())
         }
 
-        /// Read the init properties supplied at install time for the role that
-        /// the given cell is provisioned for.
+        /// The key under which a cell's init properties are stored.
         ///
-        /// Returns `None` if no app contains the cell, the cell is not a
-        /// provisioned cell of any role, or no init properties were supplied
-        /// for that role.
+        /// This is the role name of a provisioned cell, or the clone id of a clone cell,
+        /// enabled or disabled. Role names cannot contain the clone id delimiter, so the
+        /// two never collide.
+        fn init_properties_key_for_cell(app: &InstalledApp, cell_id: &CellId) -> Option<String> {
+            if let Some((role_name, _)) = app
+                .provisioned_cells()
+                .find(|(_, provisioned_cell_id)| provisioned_cell_id == cell_id)
+            {
+                return Some(role_name.clone());
+            }
+            app.clone_cells()
+                .chain(app.disabled_clone_cells())
+                .find(|(_, clone_cell_id)| clone_cell_id == cell_id)
+                .map(|(clone_id, _)| clone_id.to_string())
+        }
+
+        /// Read the init properties supplied for the role that the given cell is
+        /// provisioned for, or for the clone id of a clone cell, enabled or disabled.
+        ///
+        /// Returns `None` if no app contains the cell, the cell is neither a
+        /// provisioned cell nor a clone cell, or no init properties were
+        /// supplied for it.
         pub async fn get_init_properties_for_cell(
             &self,
             cell_id: &CellId,
@@ -3776,23 +3809,20 @@ mod accessor_impls {
             let Some(app) = state.find_app_containing_cell(cell_id) else {
                 return Ok(None);
             };
-            let Some((role_name, _)) = app
-                .provisioned_cells()
-                .find(|(_, provisioned_cell_id)| provisioned_cell_id == cell_id)
-            else {
+            let Some(key) = Self::init_properties_key_for_cell(app, cell_id) else {
                 return Ok(None);
             };
             let app_id = app.id().clone();
-            let role_name = role_name.clone();
             Ok(self
                 .spaces
                 .conductor_store
                 .as_read()
-                .get_init_properties(&app_id, &role_name)
+                .get_init_properties(&app_id, &key)
                 .await?)
         }
 
-        /// Remove the init properties for the role that the given cell is provisioned for.
+        /// Remove the init properties for the role that the given cell is provisioned for,
+        /// or for the clone id of a clone cell, enabled or disabled.
         /// Called after a successful `init` so the seed material does not remain past its use.
         pub async fn delete_init_properties_for_cell(
             &self,
@@ -3802,17 +3832,13 @@ mod accessor_impls {
             let Some(app) = state.find_app_containing_cell(cell_id) else {
                 return Ok(());
             };
-            let Some((role_name, _)) = app
-                .provisioned_cells()
-                .find(|(_, provisioned_cell_id)| provisioned_cell_id == cell_id)
-            else {
+            let Some(key) = Self::init_properties_key_for_cell(app, cell_id) else {
                 return Ok(());
             };
             let app_id = app.id().clone();
-            let role_name = role_name.clone();
             self.spaces
                 .conductor_store
-                .delete_init_properties(&app_id, &role_name)
+                .delete_init_properties(&app_id, &key)
                 .await?;
             Ok(())
         }
@@ -4148,6 +4174,7 @@ impl Conductor {
         role_name: RoleName,
         dna_modifiers: DnaModifiersOpt,
         name: Option<String>,
+        init_properties: Option<InitProperties>,
     ) -> ConductorResult<ClonedCell> {
         let ribosome_store = &self.ribosome_store;
         // retrieve base cell DNA hash from conductor
@@ -4189,35 +4216,42 @@ impl Conductor {
         let clone_cell_id = CellId::new(clone_dna_hash, agent_key);
 
         let clone_cell_id_move = clone_cell_id.clone();
+        let app_id_move = app_id.clone();
         // add clone cell to app and instantiate resulting clone cell
         let (_, installed_clone_cell) = self
-            .update_state_prime(move |mut state| {
-                let state_copy = state.clone();
-                let app = state.get_app_mut(&app_id)?;
+            .update_state_prime_and_init_properties(
+                move |mut state| {
+                    let state_copy = state.clone();
+                    let app = state.get_app_mut(&app_id_move)?;
 
-                // if cell id of new clone cell already exists, reject as duplicate
-                if state_copy
-                    .installed_apps()
-                    .iter()
-                    .flat_map(|(_, app)| app.all_cells())
-                    .any(|cell_id| cell_id == clone_cell_id_move)
-                {
-                    return Err(ConductorError::AppError(AppError::DuplicateCellId(
-                        clone_cell_id_move,
-                    )));
-                }
+                    // if cell id of new clone cell already exists, reject as duplicate
+                    if state_copy
+                        .installed_apps()
+                        .iter()
+                        .flat_map(|(_, app)| app.all_cells())
+                        .any(|cell_id| cell_id == clone_cell_id_move)
+                    {
+                        return Err(ConductorError::AppError(AppError::DuplicateCellId(
+                            clone_cell_id_move,
+                        )));
+                    }
 
-                let clone_id = app.add_clone(&role_name, clone_cell_id_move.dna_hash())?;
-                let installed_clone_cell = ClonedCell {
-                    cell_id: clone_cell_id_move,
-                    clone_id,
-                    original_dna_hash,
-                    dna_modifiers,
-                    name,
-                    enabled: true,
-                };
-                Ok((state, installed_clone_cell))
-            })
+                    let clone_id = app.add_clone(&role_name, clone_cell_id_move.dna_hash())?;
+                    let init_properties = init_properties
+                        .map(|p| InitPropertiesMap::from([(clone_id.to_string(), p)]))
+                        .unwrap_or_default();
+                    let installed_clone_cell = ClonedCell {
+                        cell_id: clone_cell_id_move,
+                        clone_id,
+                        original_dna_hash,
+                        dna_modifiers,
+                        name,
+                        enabled: true,
+                    };
+                    Ok((state, installed_clone_cell, init_properties))
+                },
+                &app_id,
+            )
             .await?;
 
         #[cfg(feature = "test_utils")]

@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Add an optional `init_properties` field to `CreateCloneCellPayload` so bytes passed when creating a clone cell are readable by the clone's `init` callback through `get_init_properties`, the same way `InstallApp` already supports it for provisioned cells. \#6000
 - Fix uninstalling an app, or deleting a clone cell, leaving the DNA's peer metadata database on disk and its DNA definition, entry definitions and WASM code in `wasm.db`. When the last cell of a DNA is removed those are now deleted too; WASM code and entry definitions still used by another installed DNA are kept. \#5992
 - Add indexes to the DHT database so link, record update and delete, chain, entry, gossip and validation receipt reads stay fast as the database grows. Existing databases gain the indexes on the next conductor start. \#5726
 
