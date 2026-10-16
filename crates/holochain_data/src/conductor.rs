@@ -281,11 +281,11 @@ where
     Ok(())
 }
 
-/// Insert the init properties for a role of an installed app.
+/// Insert the init properties for a role or clone cell of an installed app.
 async fn put_init_properties<'e, E>(
     executor: E,
     app_id: &str,
-    role_name: &str,
+    key: &str,
     properties: &InitProperties,
 ) -> sqlx::Result<()>
 where
@@ -293,18 +293,18 @@ where
 {
     sqlx::query("INSERT INTO InitProperties (app_id, role_name, properties) VALUES (?, ?, ?)")
         .bind(app_id)
-        .bind(role_name)
+        .bind(key)
         .bind(properties.0.bytes())
         .execute(executor)
         .await?;
     Ok(())
 }
 
-/// Get the init properties for a role of an installed app.
+/// Get the init properties for a role or clone cell of an installed app.
 async fn get_init_properties<'e, E>(
     executor: E,
     app_id: &str,
-    role_name: &str,
+    key: &str,
 ) -> sqlx::Result<Option<InitProperties>>
 where
     E: Executor<'e, Database = Sqlite>,
@@ -313,7 +313,7 @@ where
         "SELECT properties FROM InitProperties WHERE app_id = ? AND role_name = ?",
     )
     .bind(app_id)
-    .bind(role_name)
+    .bind(key)
     .fetch_optional(executor)
     .await?;
 
@@ -324,18 +324,14 @@ where
     }))
 }
 
-/// Delete the init properties for a role of an installed app.
-async fn delete_init_properties<'e, E>(
-    executor: E,
-    app_id: &str,
-    role_name: &str,
-) -> sqlx::Result<()>
+/// Delete the init properties for a role or clone cell of an installed app.
+async fn delete_init_properties<'e, E>(executor: E, app_id: &str, key: &str) -> sqlx::Result<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query("DELETE FROM InitProperties WHERE app_id = ? AND role_name = ?")
         .bind(app_id)
-        .bind(role_name)
+        .bind(key)
         .execute(executor)
         .await?;
     Ok(())
@@ -609,13 +605,13 @@ impl DbRead<Conductor> {
         get_all_installed_apps(self.pool()).await
     }
 
-    /// Get the init properties for a role of an installed app.
+    /// Get the init properties for a role or clone cell of an installed app.
     pub async fn get_init_properties(
         &self,
         app_id: &str,
-        role_name: &str,
+        key: &str,
     ) -> sqlx::Result<Option<InitProperties>> {
-        get_init_properties(self.pool(), app_id, role_name).await
+        get_init_properties(self.pool(), app_id, key).await
     }
 
     /// Check if a nonce has already been seen
@@ -715,19 +711,19 @@ impl DbWrite<Conductor> {
         delete_installed_app(self.pool(), app_id).await
     }
 
-    /// Insert the init properties for a role of an installed app.
+    /// Insert the init properties for a role or clone cell of an installed app.
     pub async fn put_init_properties(
         &self,
         app_id: &str,
-        role_name: &str,
+        key: &str,
         properties: &InitProperties,
     ) -> sqlx::Result<()> {
-        put_init_properties(self.pool(), app_id, role_name, properties).await
+        put_init_properties(self.pool(), app_id, key, properties).await
     }
 
-    /// Delete the init properties for a role of an installed app.
-    pub async fn delete_init_properties(&self, app_id: &str, role_name: &str) -> sqlx::Result<()> {
-        delete_init_properties(self.pool(), app_id, role_name).await
+    /// Delete the init properties for a role or clone cell of an installed app.
+    pub async fn delete_init_properties(&self, app_id: &str, key: &str) -> sqlx::Result<()> {
+        delete_init_properties(self.pool(), app_id, key).await
     }
 
     /// Witness a nonce (check if it's fresh and record it)
@@ -782,13 +778,13 @@ impl TxRead<Conductor> {
         get_all_installed_apps(self.conn_mut()).await
     }
 
-    /// Get the init properties for a role of an installed app.
+    /// Get the init properties for a role or clone cell of an installed app.
     pub async fn get_init_properties(
         &mut self,
         app_id: &str,
-        role_name: &str,
+        key: &str,
     ) -> sqlx::Result<Option<InitProperties>> {
-        get_init_properties(self.conn_mut(), app_id, role_name).await
+        get_init_properties(self.conn_mut(), app_id, key).await
     }
 
     /// Check if a nonce has already been seen.
@@ -888,23 +884,19 @@ impl TxWrite<Conductor> {
         delete_installed_app(self.conn_mut(), app_id).await
     }
 
-    /// Insert the init properties for a role of an installed app.
+    /// Insert the init properties for a role or clone cell of an installed app.
     pub async fn put_init_properties(
         &mut self,
         app_id: &str,
-        role_name: &str,
+        key: &str,
         properties: &InitProperties,
     ) -> sqlx::Result<()> {
-        put_init_properties(self.conn_mut(), app_id, role_name, properties).await
+        put_init_properties(self.conn_mut(), app_id, key, properties).await
     }
 
-    /// Delete the init properties for a role of an installed app.
-    pub async fn delete_init_properties(
-        &mut self,
-        app_id: &str,
-        role_name: &str,
-    ) -> sqlx::Result<()> {
-        delete_init_properties(self.conn_mut(), app_id, role_name).await
+    /// Delete the init properties for a role or clone cell of an installed app.
+    pub async fn delete_init_properties(&mut self, app_id: &str, key: &str) -> sqlx::Result<()> {
+        delete_init_properties(self.conn_mut(), app_id, key).await
     }
 
     /// Witness a nonce (check if it's fresh and record it).

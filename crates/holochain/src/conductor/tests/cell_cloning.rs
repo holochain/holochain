@@ -2,14 +2,19 @@ use crate::{
     conductor::{
         api::error::ConductorApiError,
         error::{CellUnavailableReason, ConductorError},
+        CellError,
     },
+    core::ribosome::guest_callback::init::InitResult,
     sweettest::*,
 };
 use holo_hash::ActionHash;
-use holochain_conductor_api::CellInfo;
+use holochain_conductor_api::{AppRequest, AppResponse, CellInfo};
+use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::init::InitProperties;
 use matches::matches;
+use std::sync::{Arc, Mutex};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_without_modifiers_fails() {
@@ -23,6 +28,7 @@ async fn create_clone_cell_without_modifiers_fails() {
                 modifiers: DnaModifiersOpt::none(),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await;
@@ -48,6 +54,7 @@ async fn create_clone_cell_with_wrong_app_or_role_name_fails() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await;
@@ -62,6 +69,7 @@ async fn create_clone_cell_with_wrong_app_or_role_name_fails() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await;
@@ -88,6 +96,7 @@ async fn create_clone_cell_creates_callable_cell() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
                 membrane_proof: None,
                 name: Some(clone_name.clone()),
+                init_properties: None,
             },
         )
         .await
@@ -124,6 +133,7 @@ async fn create_clone_cell_run_twice_returns_correct_clones() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await
@@ -140,6 +150,7 @@ async fn create_clone_cell_run_twice_returns_correct_clones() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seed_2".to_string()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await
@@ -165,6 +176,7 @@ async fn create_identical_clone_cell_twice_fails() {
         modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
         membrane_proof: None,
         name: None,
+        init_properties: None,
     };
 
     let alice_clone_cell = conductor
@@ -237,6 +249,7 @@ async fn clone_cell_deletion() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await
@@ -375,6 +388,7 @@ async fn conductor_can_startup_with_cloned_cell() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await
@@ -453,5 +467,315 @@ async fn conductor_can_startup_with_cloned_cell() {
             ))) if *cell_id == clone_cell.cell_id
         ),
         "expected CloneCellDisabled after restart, got: {zome_call_response:?}"
+    );
+}
+
+/// A DNA whose `init` records the value `get_init_properties` returned.
+async fn init_recording_dna(seen: Arc<Mutex<Vec<Option<InitProperties>>>>) -> DnaFile {
+    let zome = SweetInlineZomes::new(vec![], 0)
+        .function("init", move |api, _: ()| {
+            let props = api.get_init_properties(())?;
+            seen.lock().unwrap().push(props);
+            Ok(InitCallbackResult::Pass)
+        })
+        .function("touch", |_api, _: ()| Ok(()));
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
+    dna
+}
+
+fn init_props(bytes: Vec<u8>) -> InitProperties {
+    InitProperties(SerializedBytes::from(UnsafeBytes::from(bytes)))
+}
+
+/// Init properties sent with a `CreateCloneCell` request over the app interface
+/// are readable by the clone's `init`, are not visible to the provisioned cell,
+/// and are removed once `init` has passed.
+#[tokio::test(flavor = "multi_thread")]
+async fn create_clone_cell_with_init_properties_makes_them_available_in_init() {
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let dna = init_recording_dna(seen.clone()).await;
+    let role_name: RoleName = "dna_1".to_string();
+    let mut conductor = SweetConductor::standard().await;
+    let app = conductor
+        .setup_app("app", [&(role_name.clone(), dna)])
+        .await
+        .unwrap();
+    let props = init_props(vec![1, 2, 3]);
+
+    let (app_ws, _app_ws_rx) = conductor
+        .app_ws_client::<AppResponse>(app.installed_app_id().clone())
+        .await;
+    let response: AppResponse = app_ws
+        .request(AppRequest::CreateCloneCell(Box::new(
+            CreateCloneCellPayload {
+                role_name: role_name.clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
+                membrane_proof: None,
+                name: None,
+                init_properties: Some(props.clone()),
+            },
+        )))
+        .await
+        .unwrap();
+    let AppResponse::CloneCellCreated(clone_cell) = response else {
+        panic!("expected CloneCellCreated, got: {response:?}");
+    };
+
+    // Trigger init on the clone cell.
+    let clone_zome = SweetZome::new(
+        clone_cell.cell_id.clone(),
+        SweetInlineZomes::COORDINATOR.into(),
+    );
+    let _: () = conductor.call(&clone_zome, "touch", ()).await;
+    assert_eq!(seen.lock().unwrap().as_slice(), &[Some(props)]);
+
+    // The row is removed once init has passed.
+    let stored = conductor
+        .raw_handle()
+        .spaces
+        .conductor_store
+        .as_read()
+        .get_init_properties(app.installed_app_id(), &clone_cell.clone_id.to_string())
+        .await
+        .unwrap();
+    assert_eq!(stored, None);
+
+    // The provisioned cell of the same role sees nothing.
+    let base_zome = SweetZome::new(
+        app.cells()[0].cell_id().clone(),
+        SweetInlineZomes::COORDINATOR.into(),
+    );
+    let _: () = conductor.call(&base_zome, "touch", ()).await;
+    assert_eq!(
+        seen.lock().unwrap().as_slice(),
+        &[Some(init_props(vec![1, 2, 3])), None]
+    );
+}
+
+/// Clones of the same role keep their init properties apart: each clone's `init`
+/// sees only its own value, and deleting one clone leaves the others' rows intact.
+#[tokio::test(flavor = "multi_thread")]
+async fn clone_cell_init_properties_are_isolated_per_clone() {
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let dna = init_recording_dna(seen.clone()).await;
+    let role_name: RoleName = "dna_1".to_string();
+    let mut conductor = SweetConductor::standard().await;
+    let app = conductor
+        .setup_app("app", [&(role_name.clone(), dna)])
+        .await
+        .unwrap();
+    let app_id = app.installed_app_id().clone();
+    let props_a = init_props(vec![13, 14, 15]);
+    let props_c = init_props(vec![16, 17, 18]);
+
+    let mut clones = Vec::new();
+    for (seed, init_properties) in [
+        ("a", Some(props_a.clone())),
+        ("b", None),
+        ("c", Some(props_c)),
+    ] {
+        let clone_cell = conductor
+            .clone()
+            .create_clone_cell(
+                &app_id,
+                CreateCloneCellPayload {
+                    role_name: role_name.clone(),
+                    modifiers: DnaModifiersOpt::none().with_network_seed(seed.to_string()),
+                    membrane_proof: None,
+                    name: None,
+                    init_properties,
+                },
+            )
+            .await
+            .unwrap();
+        clones.push(clone_cell);
+    }
+    let [clone_a, clone_b, clone_c] = clones.try_into().unwrap();
+
+    // The clone created without init properties sees none, despite its siblings having some.
+    let clone_b_zome = SweetZome::new(clone_b.cell_id, SweetInlineZomes::COORDINATOR.into());
+    let _: () = conductor.call(&clone_b_zome, "touch", ()).await;
+    assert_eq!(seen.lock().unwrap().as_slice(), &[None]);
+
+    // Deleting clone C before its init ran removes only its own row.
+    let clone_c_id = CloneCellId::CloneId(clone_c.clone_id.clone());
+    conductor
+        .clone()
+        .disable_clone_cell(
+            &app_id,
+            &DisableCloneCellPayload {
+                clone_cell_id: clone_c_id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    conductor
+        .raw_handle()
+        .delete_clone_cell(&DeleteCloneCellPayload {
+            app_id: app_id.clone(),
+            clone_cell_id: clone_c_id,
+        })
+        .await
+        .unwrap();
+    let store = conductor.raw_handle().spaces.conductor_store.as_read();
+    assert_eq!(
+        store
+            .get_init_properties(&app_id, &clone_c.clone_id.to_string())
+            .await
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        store
+            .get_init_properties(&app_id, &clone_a.clone_id.to_string())
+            .await
+            .unwrap(),
+        Some(props_a.clone())
+    );
+
+    // Clone A's init still receives its own value.
+    let clone_a_zome = SweetZome::new(clone_a.cell_id, SweetInlineZomes::COORDINATOR.into());
+    let _: () = conductor.call(&clone_a_zome, "touch", ()).await;
+    assert_eq!(seen.lock().unwrap().as_slice(), &[None, Some(props_a)]);
+}
+
+/// When the clone's `init` fails, the init properties stay persisted so the
+/// retried `init` on the next zome call still receives them.
+#[tokio::test(flavor = "multi_thread")]
+async fn clone_cell_init_properties_survive_failed_init() {
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let seen_in_zome = seen.clone();
+    let zome = SweetInlineZomes::new(vec![], 0)
+        .function("init", move |api, _: ()| {
+            let props = api.get_init_properties(())?;
+            let mut seen = seen_in_zome.lock().unwrap();
+            seen.push(props);
+            if seen.len() == 1 {
+                return Ok(InitCallbackResult::Fail("first init fails".into()));
+            }
+            Ok(InitCallbackResult::Pass)
+        })
+        .function("touch", |_api, _: ()| Ok(()));
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
+    let role_name: RoleName = "dna_1".to_string();
+    let mut conductor = SweetConductor::standard().await;
+    let app = conductor
+        .setup_app("app", [&(role_name.clone(), dna)])
+        .await
+        .unwrap();
+    let app_id = app.installed_app_id().clone();
+    let props = init_props(vec![7, 8, 9]);
+
+    let clone_cell = conductor
+        .clone()
+        .create_clone_cell(
+            &app_id,
+            CreateCloneCellPayload {
+                role_name: role_name.clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
+                membrane_proof: None,
+                name: None,
+                init_properties: Some(props.clone()),
+            },
+        )
+        .await
+        .unwrap();
+    let clone_key = clone_cell.clone_id.to_string();
+    let clone_zome = SweetZome::new(
+        clone_cell.cell_id.clone(),
+        SweetInlineZomes::COORDINATOR.into(),
+    );
+    let store = conductor.raw_handle().spaces.conductor_store.as_read();
+
+    let first: Result<(), _> = conductor.call_fallible(&clone_zome, "touch", ()).await;
+    assert!(
+        matches!(
+            &first,
+            Err(ConductorApiError::CellError(CellError::InitFailed(result)))
+                if matches!(result.as_ref(), InitResult::Fail(_, reason) if reason == "first init fails")
+        ),
+        "expected the first init to fail, got: {first:?}"
+    );
+    assert_eq!(
+        store
+            .get_init_properties(&app_id, &clone_key)
+            .await
+            .unwrap(),
+        Some(props.clone())
+    );
+
+    let _: () = conductor.call(&clone_zome, "touch", ()).await;
+    assert_eq!(
+        seen.lock().unwrap().as_slice(),
+        &[Some(props.clone()), Some(props)]
+    );
+}
+
+/// Clone init properties are keyed by the clone id, and stay readable and removable
+/// while the clone is disabled, so an `init` that was already running when the clone
+/// was disabled still receives them.
+#[tokio::test(flavor = "multi_thread")]
+async fn clone_cell_init_properties_resolve_while_disabled() {
+    let (dna, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(SweetInlineZomes::new(vec![], 0)).await;
+    let role_name: RoleName = "dna_1".to_string();
+    let mut conductor = SweetConductor::standard().await;
+    let app = conductor
+        .setup_app("app", [&(role_name.clone(), dna)])
+        .await
+        .unwrap();
+    let app_id = app.installed_app_id().clone();
+    let props = init_props(vec![10, 11, 12]);
+
+    let clone_cell = conductor
+        .clone()
+        .create_clone_cell(
+            &app_id,
+            CreateCloneCellPayload {
+                role_name: role_name.clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
+                membrane_proof: None,
+                name: None,
+                init_properties: Some(props.clone()),
+            },
+        )
+        .await
+        .unwrap();
+
+    // The row key is the clone id in its `role.index` form.
+    assert_eq!(clone_cell.clone_id.to_string(), "dna_1.0");
+
+    conductor
+        .clone()
+        .disable_clone_cell(
+            &app_id,
+            &DisableCloneCellPayload {
+                clone_cell_id: CloneCellId::CloneId(clone_cell.clone_id.clone()),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        conductor
+            .raw_handle()
+            .get_init_properties_for_cell(&clone_cell.cell_id)
+            .await
+            .unwrap(),
+        Some(props)
+    );
+
+    conductor
+        .raw_handle()
+        .delete_init_properties_for_cell(&clone_cell.cell_id)
+        .await
+        .unwrap();
+    assert_eq!(
+        conductor
+            .raw_handle()
+            .get_init_properties_for_cell(&clone_cell.cell_id)
+            .await
+            .unwrap(),
+        None
     );
 }

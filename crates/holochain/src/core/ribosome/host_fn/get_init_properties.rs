@@ -4,11 +4,12 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-/// Read the init properties supplied for this cell's role at install time.
+/// Read the init properties supplied for this cell at install or clone time.
 ///
 /// Restricted to the `init` callback. The properties are resolved from the
-/// conductor database for the app and role that this cell is provisioned for.
-/// Returns `None` when no init properties were supplied for the role.
+/// conductor database for the app and the role that this cell is provisioned
+/// for, or the clone id of a clone cell. Returns `None` when no init properties
+/// were supplied for the cell.
 pub fn get_init_properties(
     _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,

@@ -94,6 +94,13 @@ pub struct CreateCloneCellPayload {
     /// Optionally a name for the DNA clone
     #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
     pub name: Option<String>,
+    /// Opaque, app-defined bytes made available to the clone cell during `init`.
+    ///
+    /// Not interpreted by the conductor and never written to the DHT. The bytes are persisted
+    /// by the conductor alongside the app when the clone is created and read back during the
+    /// clone cell's `init` via the `hdk::migrate::get_init_properties` host function.
+    #[cfg_attr(feature = "ts_rs", ts(optional = nullable))]
+    pub init_properties: Option<InitProperties>,
 }
 
 /// Parameters to specify the clone cell to be disabled.

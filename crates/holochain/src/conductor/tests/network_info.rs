@@ -59,6 +59,7 @@ async fn network_metrics() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("test_seed".to_string()),
                 membrane_proof: None,
                 name: Some("disabled_clone".into()),
+                init_properties: None,
             },
         )
         .await
