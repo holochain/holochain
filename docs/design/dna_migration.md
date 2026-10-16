@@ -231,7 +231,12 @@ process. The app alone decides how to decode them.
 `init_properties` is per role because `init` runs per cell and each role is a
 single DNA — the carried state is specific to the DNA being migrated into. They
 must be supplied at install time if they are wanted; there is no path to provide
-them later.
+them later for a provisioned cell.
+
+Clone cells get the same channel through `CreateCloneCellPayload`, which carries
+an optional `init_properties` field. Since every clone runs its own `init`, the
+properties are per clone rather than per role, and must be supplied when the
+clone is created.
 
 This is a distinct channel from the two existing ones, deliberately:
 
@@ -251,9 +256,14 @@ database. It is conductor-local seed material; keeping it out of the DHT avoids
 polluting shared state with per-agent migration payloads.
 
 A dedicated table holds the opaque blob, keyed by `(installed_app_id,
-role_name)`. The entry is written when the app is installed.
+role_name)`. The entry is written when the app is installed. For a clone cell
+the clone id (for example `role.0`) takes the place of the role name, and the
+entry is written in the same transaction that adds the clone to the app. Role
+names cannot contain the clone id delimiter, so the two kinds of key never
+collide.
 
-The entry is cleared on a successful `init`, and on app uninstall. Once `init`
+The entry is cleared on a successful `init`, and on app uninstall. A clone
+cell's entry is also cleared when the clone is deleted. Once `init`
 has succeeded the seed material has served its purpose, and removing it keeps
 per-agent payloads from lingering at rest in the conductor.
 
@@ -262,8 +272,9 @@ per-agent payloads from lingering at rest in the conductor.
 A host function exposes the persisted bytes to the running zome:
 
 ```rust
-/// Look up the opaque init properties supplied to `install_app` for this cell,
-/// if any. Returns `None` if none were provided.
+/// Look up the opaque init properties supplied to `install_app` or
+/// `create_clone_cell` for this cell, if any. Returns `None` if none were
+/// provided.
 ///
 /// Callable only from `init`. The bytes are app-defined. The caller is
 /// responsible for decoding them.

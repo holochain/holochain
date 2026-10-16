@@ -318,6 +318,7 @@ async fn name_has_no_effect_on_dna_hash() {
                 modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await
@@ -331,6 +332,7 @@ async fn name_has_no_effect_on_dna_hash() {
                 modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
                 membrane_proof: None,
                 name: Some("Rumpelstiltskin".to_string()),
+                init_properties: None,
             },
         )
         .await
@@ -344,6 +346,7 @@ async fn name_has_no_effect_on_dna_hash() {
                 modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
                 membrane_proof: None,
                 name: Some("Chara".to_string()),
+                init_properties: None,
             },
         )
         .await
@@ -554,6 +557,7 @@ async fn test_deferred_memproof_provisioning() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seeeeed".into()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await
@@ -597,6 +601,7 @@ async fn test_deferred_memproof_provisioning() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seeeeed".into()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await

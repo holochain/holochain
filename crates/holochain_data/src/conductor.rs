@@ -281,7 +281,7 @@ where
     Ok(())
 }
 
-/// Insert the init properties for a role of an installed app.
+/// Insert the init properties for a role or clone cell of an installed app.
 async fn put_init_properties<'e, E>(
     executor: E,
     app_id: &str,
@@ -300,7 +300,7 @@ where
     Ok(())
 }
 
-/// Get the init properties for a role of an installed app.
+/// Get the init properties for a role or clone cell of an installed app.
 async fn get_init_properties<'e, E>(
     executor: E,
     app_id: &str,
@@ -324,7 +324,7 @@ where
     }))
 }
 
-/// Delete the init properties for a role of an installed app.
+/// Delete the init properties for a role or clone cell of an installed app.
 async fn delete_init_properties<'e, E>(
     executor: E,
     app_id: &str,
@@ -609,7 +609,7 @@ impl DbRead<Conductor> {
         get_all_installed_apps(self.pool()).await
     }
 
-    /// Get the init properties for a role of an installed app.
+    /// Get the init properties for a role or clone cell of an installed app.
     pub async fn get_init_properties(
         &self,
         app_id: &str,
@@ -715,7 +715,7 @@ impl DbWrite<Conductor> {
         delete_installed_app(self.pool(), app_id).await
     }
 
-    /// Insert the init properties for a role of an installed app.
+    /// Insert the init properties for a role or clone cell of an installed app.
     pub async fn put_init_properties(
         &self,
         app_id: &str,
@@ -725,7 +725,7 @@ impl DbWrite<Conductor> {
         put_init_properties(self.pool(), app_id, role_name, properties).await
     }
 
-    /// Delete the init properties for a role of an installed app.
+    /// Delete the init properties for a role or clone cell of an installed app.
     pub async fn delete_init_properties(&self, app_id: &str, role_name: &str) -> sqlx::Result<()> {
         delete_init_properties(self.pool(), app_id, role_name).await
     }
@@ -782,7 +782,7 @@ impl TxRead<Conductor> {
         get_all_installed_apps(self.conn_mut()).await
     }
 
-    /// Get the init properties for a role of an installed app.
+    /// Get the init properties for a role or clone cell of an installed app.
     pub async fn get_init_properties(
         &mut self,
         app_id: &str,
@@ -888,7 +888,7 @@ impl TxWrite<Conductor> {
         delete_installed_app(self.conn_mut(), app_id).await
     }
 
-    /// Insert the init properties for a role of an installed app.
+    /// Insert the init properties for a role or clone cell of an installed app.
     pub async fn put_init_properties(
         &mut self,
         app_id: &str,
@@ -898,7 +898,7 @@ impl TxWrite<Conductor> {
         put_init_properties(self.conn_mut(), app_id, role_name, properties).await
     }
 
-    /// Delete the init properties for a role of an installed app.
+    /// Delete the init properties for a role or clone cell of an installed app.
     pub async fn delete_init_properties(
         &mut self,
         app_id: &str,
