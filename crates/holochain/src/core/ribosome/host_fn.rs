@@ -237,7 +237,7 @@ host_fn_api_impls! {
     // Open your chain, pointing to the previous DNA
     fn open_chain(zt::prelude::OpenChainInput) -> holo_hash::ActionHash;
 
-    // Read the init properties supplied for this cell's role at install time.
+    // Read the init properties supplied for this cell at install or clone time.
     fn get_init_properties(()) -> Option<zt::prelude::InitProperties>;
 
     // Get validation receipts for an action

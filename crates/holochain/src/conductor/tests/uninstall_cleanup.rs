@@ -373,6 +373,7 @@ async fn clone_cell_deletion_removes_clone_databases() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("clone".to_string()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await
@@ -518,6 +519,7 @@ async fn lifecycle_operation_holds_resources_with_cleanup_queued(operation: &str
         modifiers: DnaModifiersOpt::none().with_network_seed("clone".into()),
         membrane_proof: None,
         name: None,
+        init_properties: None,
     };
     let clone = if operation == "enable_clone_cell" {
         let clone = handle

@@ -406,6 +406,7 @@ mod slow_tests {
                         .with_network_seed("anything else".to_string()),
                     membrane_proof: None,
                     name: Some("cloned".to_string()),
+                    init_properties: None,
                 },
             )
             .await
