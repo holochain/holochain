@@ -14,6 +14,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20261019.025510
+
+## [hcterm-0.8.0-dev.12](crates/hcterm/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_cli-0.8.0-dev.12](crates/holochain_cli/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_cli\_client-0.8.0-dev.12](crates/holochain_cli_client/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_cli\_sandbox-0.8.0-dev.12](crates/holochain_cli_sandbox/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_client-0.10.0-dev.12](crates/holochain_client/CHANGELOG.md#0.10.0-dev.12)
+
+## [holochain-0.8.0-dev.12](crates/holochain/CHANGELOG.md#0.8.0-dev.12)
+
+- Fix uninstalling an app, or deleting a clone cell, leaving the DNA’s peer metadata database on disk and its DNA definition, entry definitions and WASM code in `wasm.db`. When the last cell of a DNA is removed those are now deleted too; WASM code and entry definitions still used by another installed DNA are kept. \#5992
+- Add indexes to the DHT database so link, record update and delete, chain, entry, gossip and validation receipt reads stay fast as the database grows. Existing databases gain the indexes on the next conductor start. \#5726
+
+## [holochain\_cascade-0.8.0-dev.12](crates/holochain_cascade/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_p2p-0.8.0-dev.12](crates/holochain_p2p/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_state-0.8.0-dev.12](crates/holochain_state/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_data-0.8.0-dev.12](crates/holochain_data/CHANGELOG.md#0.8.0-dev.12)
+
 # 20261012.035633
 
 ## [hcterm-0.8.0-dev.11](crates/hcterm/CHANGELOG.md#0.8.0-dev.11)

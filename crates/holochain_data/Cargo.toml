@@ -1,6 +1,6 @@
 [package]
 name = "holochain_data"
-version = "0.8.0-dev.11"
+version = "0.8.0-dev.12"
 description = "Database abstraction layer for Holochain using sqlx"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"

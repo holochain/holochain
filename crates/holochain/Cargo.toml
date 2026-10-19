@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.8.0-dev.11"
+version = "0.8.0-dev.12"
 description = "Holochain, a framework for distributed applications"
 license = "CAL-1.0"
 repository = "https://github.com/holochain/holochain"
@@ -27,12 +27,12 @@ derive_more = { version = "2.0", features = ["display", "index"] }
 either = "1.5.0"
 futures = "0.3"
 getrandom = "0.3"
-holochain_cascade = { version = "^0.8.0-dev.11", default-features = false, path = "../holochain_cascade" }
+holochain_cascade = { version = "^0.8.0-dev.12", default-features = false, path = "../holochain_cascade" }
 holochain_conductor_api = { version = "^0.8.0-dev.10", path = "../holochain_conductor_api", default-features = false }
 holochain_keystore = { version = "^0.8.0-dev.10", path = "../holochain_keystore", default-features = false }
-holochain_p2p = { version = "^0.8.0-dev.11", default-features = false, path = "../holochain_p2p" }
+holochain_p2p = { version = "^0.8.0-dev.12", default-features = false, path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.57"
-holochain_state = { version = "^0.8.0-dev.11", path = "../holochain_state" }
+holochain_state = { version = "^0.8.0-dev.12", path = "../holochain_state" }
 holochain_types = { version = "^0.8.0-dev.10", path = "../holochain_types" }
 holochain_util = { version = "0.9.0-dev.7" }
 holo_hash = { version = "0.9.0-dev.7", features = ["full"] }
@@ -109,7 +109,7 @@ holochain = { path = ".", default-features = false, features = [
   "test_utils",
   "slow_tests",
 ] }
-holochain_state = { version = "^0.8.0-dev.11", path = "../holochain_state", features = [
+holochain_state = { version = "^0.8.0-dev.12", path = "../holochain_state", features = [
   "test_utils",
 ] }
 
