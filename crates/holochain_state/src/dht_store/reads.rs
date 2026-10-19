@@ -208,14 +208,15 @@ impl DhtStore<DbRead<Dht>> {
             .collect()
     }
 
-    /// Integrated warrants authored by `author` (the warrant issuer),
-    /// reconstructed as `WarrantOp`s.
-    pub async fn warrants_by_author(
+    /// Get warrants issued by `author`, of any validation status,
+    /// whether in limbo or integrated. The result is reconstructed as `WarrantOp`s and
+    /// ordered by timestamp descending.
+    pub async fn warrants_by_author_any_status(
         &self,
         author: AgentPubKey,
     ) -> StateQueryResult<Vec<holochain_types::warrant::WarrantOp>> {
         self.db()
-            .get_warrants_by_author(author)
+            .get_warrants_by_author_any_status(author)
             .await?
             .into_iter()
             .map(warrant_row_to_signed_warrant)
@@ -2075,7 +2076,7 @@ impl DhtStore<DbRead<Dht>> {
             .collect())
     }
 
-    /// Warrants held against `warrantee`'s chain, as signed warrants.
+    /// Return valid integrated warrants against `warrantee`'s chain.
     ///
     /// Used by the get authorities to pair a warrant with any `Rejected`
     /// record they serve, so the receiver can verify the rejection without

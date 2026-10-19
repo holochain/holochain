@@ -118,6 +118,7 @@ where
     Ok(rows.into_iter().map(|(proof,)| proof).collect())
 }
 
+/// Get a valid integrated warrant by hash.
 pub(crate) async fn get_warrant<'e, E>(
     executor: E,
     hash: DhtOpHash,
@@ -131,13 +132,14 @@ where
                 op.serialized_size
          FROM Warrant w
          JOIN WarrantOp op ON op.hash = w.hash
-         WHERE w.hash = ?",
+         WHERE w.hash = ? AND op.validation_status = 1",
     )
     .bind(hash.get_raw_36())
     .fetch_optional(executor)
     .await
 }
 
+/// Get valid integrated warrants against `warrantee`, ordered by datetime descending.
 pub(crate) async fn get_warrants_by_warrantee<'e, E>(
     executor: E,
     warrantee: AgentPubKey,
@@ -151,7 +153,7 @@ where
                 op.serialized_size
          FROM Warrant w
          JOIN WarrantOp op ON op.hash = w.hash
-         WHERE w.warrantee = ?
+         WHERE w.warrantee = ? AND op.validation_status = 1
          ORDER BY w.timestamp DESC",
     )
     .bind(warrantee.get_raw_36())
@@ -159,12 +161,12 @@ where
     .await
 }
 
-/// Warrants authored by `author` (the warrant issuer), whether still in limbo
-/// or integrated. The shared `Warrant` table holds the content; op metadata
-/// comes from `WarrantOp` (integrated) or `LimboWarrantOp` (in validation),
+/// Warrants authored by `author` (the warrant issuer), of any validation status,
+/// whether still in limbo or integrated. The shared `Warrant` table holds the content; \
+/// op metadata comes from `WarrantOp` (integrated) or `LimboWarrantOp` (in validation),
 /// with `when_integrated` defaulted to `0` for limbo warrants. Ordered by
 /// timestamp descending.
-pub(crate) async fn get_warrants_by_author<'e, E>(
+pub(crate) async fn get_warrants_by_author_any_status<'e, E>(
     executor: E,
     author: AgentPubKey,
 ) -> sqlx::Result<Vec<WarrantRow>>

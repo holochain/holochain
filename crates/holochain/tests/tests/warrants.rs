@@ -3,7 +3,7 @@ use hdk::prelude::{
     EntryVisibility, GetAgentActivityInput, MustGetAgentActivityInput, Op, SerializedBytes,
     ValidateCallbackResult,
 };
-use holo_hash::{ActionHash, DnaHash};
+use holo_hash::{ActionHash, DnaHash, HasHash};
 use holochain::{
     prelude::{DisabledAppReason, InlineZomeSet},
     sweettest::{
@@ -17,7 +17,8 @@ use holochain_timestamp::Timestamp;
 use holochain_types::op::{DhtOp, DhtOpHashed};
 use holochain_types::prelude::WarrantOp;
 use holochain_zome_types::prelude::{
-    ChainIntegrityWarrant, ChainOpType, Entry, SignedActionHashed, Warrant, WarrantProof,
+    ChainIntegrityWarrant, ChainOpType, Entry, SignedActionHashed, ValidationStatus, Warrant,
+    WarrantProof,
 };
 use serde::{Deserialize, Serialize};
 
@@ -57,7 +58,7 @@ async fn warranted_agent_is_blocked() {
                 .dht_store(&dna_hash)
                 .unwrap()
                 .as_read()
-                .warrants_by_author(bob_cell.agent_pubkey().clone())
+                .warrants_by_author_any_status(bob_cell.agent_pubkey().clone())
                 .await
                 .unwrap();
 
@@ -249,6 +250,7 @@ async fn author_of_invalid_warrant_is_blocked() {
         .unwrap();
 
     let warrant_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from((*warrant_op).clone()));
+    let warrant_op_hash = warrant_op_hashed.as_hash().clone();
 
     // Seed the warrant in Bob's DhtStore so K2 gossip can find and serve it.
     // Use the test-only helper instead of `record_locally_validated_warrants`:
@@ -269,21 +271,15 @@ async fn author_of_invalid_warrant_is_blocked() {
 
     tokio::time::timeout(std::time::Duration::from_secs(30), async {
         loop {
-            tracing::error!("Looping to check for warrant and block...");
-
-            let alice_pubkey = alice.agent_pubkey().clone();
-            let warrants = conductors[0]
+            let status = conductors[0]
                 .get_dht_store(dna_file.dna_hash())
                 .unwrap()
                 .as_read()
-                .get_warrants_by_warrantee(alice_pubkey)
+                .warrant_validation_status(&warrant_op_hash)
                 .await
                 .unwrap();
 
-            tracing::warn!("Warrants: {:#?}", warrants);
-
-            // Alice should have stored the warrant against herself.
-            if !warrants.is_empty() {
+            if status == Some(ValidationStatus::Rejected) {
                 break;
             }
 

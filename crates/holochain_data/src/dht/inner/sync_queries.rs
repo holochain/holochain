@@ -348,8 +348,10 @@ where
         .await
 }
 
-/// Fetch full warrant rows for the given op hashes (integrated warrants
-/// only — joined with `WarrantOp`).
+/// Fetch integrated warrant content for transport, including rejected warrants.
+///
+/// Discovery advertises both validation outcomes. Receivers must validate the
+/// signed content independently; the sender's validation status is not sent.
 pub(crate) async fn get_warrants_for_wire<'e, E>(
     executor: E,
     op_hashes: &[Vec<u8>],

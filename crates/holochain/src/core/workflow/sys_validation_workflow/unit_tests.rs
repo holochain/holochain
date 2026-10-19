@@ -707,7 +707,7 @@ async fn avoid_duplicate_warrant() {
         .space
         .dht_store
         .as_read()
-        .warrants_by_author(other_warrant_agent.clone())
+        .warrants_by_author_any_status(other_warrant_agent.clone())
         .await
         .unwrap();
     assert_eq!(
@@ -722,7 +722,7 @@ async fn avoid_duplicate_warrant() {
         .space
         .dht_store
         .as_read()
-        .warrants_by_author(warrant_agent.clone())
+        .warrants_by_author_any_status(warrant_agent.clone())
         .await
         .unwrap();
     assert_eq!(

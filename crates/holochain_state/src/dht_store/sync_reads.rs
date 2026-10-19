@@ -81,7 +81,7 @@ where
             .map_err(crate::query::StateQueryError::Sqlx)
     }
 
-    /// Warrant rows for wire reconstruction.
+    /// Get integrated warrants for wire reconstruction, of any validation status.
     pub async fn get_warrants_for_wire(
         &self,
         op_hashes: &[Vec<u8>],

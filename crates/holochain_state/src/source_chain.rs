@@ -2724,7 +2724,7 @@ mod tests {
         // back via the DhtStore (limbo + integrated).
         let actual_warrants = dht_store
             .as_read()
-            .warrants_by_author(agent_key.clone())
+            .warrants_by_author_any_status(agent_key.clone())
             .await
             .unwrap();
         assert_eq!(actual_warrants.len(), 0);
@@ -2747,7 +2747,7 @@ mod tests {
         // Check the DHT store
         let actual_warrants = dht_store
             .as_read()
-            .warrants_by_author(agent_key.clone())
+            .warrants_by_author_any_status(agent_key.clone())
             .await
             .unwrap();
         assert_eq!(actual_warrants, vec![WarrantOp::from(signed_warrant)]);
@@ -2783,7 +2783,7 @@ mod tests {
         // Check the DHT store
         let actual_warrants = dht_store
             .as_read()
-            .warrants_by_author(agent_key.clone())
+            .warrants_by_author_any_status(agent_key.clone())
             .await
             .unwrap();
         assert_eq!(
@@ -2807,7 +2807,7 @@ mod tests {
         // Check the DHT store again
         let actual_warrants = dht_store
             .as_read()
-            .warrants_by_author(agent_key.clone())
+            .warrants_by_author_any_status(agent_key.clone())
             .await
             .unwrap();
         assert_eq!(actual_warrants, vec![WarrantOp::from(signed_warrant)]);
@@ -2852,7 +2852,7 @@ mod tests {
         // Check the DHT store — the counterfeit warrant must not be present.
         let actual_warrants = dht_store
             .as_read()
-            .warrants_by_author(agent_key.clone())
+            .warrants_by_author_any_status(agent_key.clone())
             .await
             .unwrap();
         assert!(actual_warrants.is_empty());

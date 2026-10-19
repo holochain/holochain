@@ -1347,7 +1347,7 @@ async fn app_validation_produces_warrants() {
         .dht_store(dna_hash)
         .unwrap()
         .as_read()
-        .warrants_by_author(bob.agent_pubkey().clone())
+        .warrants_by_author_any_status(bob.agent_pubkey().clone())
         .await
         .unwrap();
     // 3 warrants, one for each op
