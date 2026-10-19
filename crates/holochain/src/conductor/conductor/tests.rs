@@ -17,9 +17,7 @@ use holochain_keystore::test_keystore;
 use holochain_types::{app::AppStatus, inline_zome::InlineZomeSet};
 use holochain_wasm_test_utils::TestWasm;
 use matches::assert_matches;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::AtomicU32;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Mutex;
 use tokio::sync::mpsc;
 
