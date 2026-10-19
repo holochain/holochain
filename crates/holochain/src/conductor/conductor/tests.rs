@@ -17,8 +17,7 @@ use holochain_keystore::test_keystore;
 use holochain_types::{app::AppStatus, inline_zome::InlineZomeSet};
 use holochain_wasm_test_utils::TestWasm;
 use matches::assert_matches;
-use std::sync::atomic::AtomicU32;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Mutex;
 use tokio::sync::mpsc;
 
@@ -318,6 +317,7 @@ async fn name_has_no_effect_on_dna_hash() {
                 modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await
@@ -331,6 +331,7 @@ async fn name_has_no_effect_on_dna_hash() {
                 modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
                 membrane_proof: None,
                 name: Some("Rumpelstiltskin".to_string()),
+                init_properties: None,
             },
         )
         .await
@@ -344,6 +345,7 @@ async fn name_has_no_effect_on_dna_hash() {
                 modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
                 membrane_proof: None,
                 name: Some("Chara".to_string()),
+                init_properties: None,
             },
         )
         .await
@@ -554,6 +556,7 @@ async fn test_deferred_memproof_provisioning() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seeeeed".into()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await
@@ -597,6 +600,7 @@ async fn test_deferred_memproof_provisioning() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seeeeed".into()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await
@@ -701,6 +705,40 @@ async fn init_properties_persist_and_clear_on_uninstall() {
         .await
         .unwrap();
     assert_eq!(stored, None);
+}
+
+/// A failing cleanup does not skip the next one, and the first error is reported.
+#[tokio::test]
+async fn run_both_cleanups_runs_both_and_reports_first_error() {
+    fn outcome(err: Option<&'static str>) -> ConductorResult<()> {
+        err.map_or(Ok(()), |msg| Err(ConductorError::other(msg)))
+    }
+
+    let cases = [
+        (None, None, None),
+        (Some("first"), None, Some("first")),
+        (None, Some("second"), Some("second")),
+        (Some("first"), Some("second"), Some("first")),
+    ];
+    for (first_err, second_err, expected) in cases {
+        let second_ran = AtomicBool::new(false);
+        let result = run_both_cleanups(async { outcome(first_err) }, async {
+            second_ran.store(true, Ordering::SeqCst);
+            outcome(second_err)
+        })
+        .await;
+
+        assert!(
+            second_ran.load(Ordering::SeqCst),
+            "second cleanup skipped for {first_err:?}, {second_err:?}"
+        );
+        let reported = match result {
+            Ok(()) => None,
+            Err(ConductorError::Other(err)) => Some(err.to_string()),
+            Err(err) => panic!("unexpected error variant: {err:?}"),
+        };
+        assert_eq!(reported.as_deref(), expected);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
