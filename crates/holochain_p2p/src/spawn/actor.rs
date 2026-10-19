@@ -2875,6 +2875,9 @@ impl actor::HcP2p for HolochainP2pActor {
 }
 
 #[cfg(test)]
+mod preflight_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
