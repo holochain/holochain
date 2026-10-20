@@ -33,6 +33,9 @@ impl DbRead<Dht> {
     }
 
     /// Get all warrants issued by `author`, of any validation status, ordered by datetime descending.
+    ///
+    /// Available in tests or with the `inspection` feature enabled.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn get_warrants_by_author_any_status(
         &self,
         author: AgentPubKey,

@@ -211,6 +211,9 @@ impl DhtStore<DbRead<Dht>> {
     /// Get warrants issued by `author`, of any validation status,
     /// whether in limbo or integrated. The result is reconstructed as `WarrantOp`s and
     /// ordered by timestamp descending.
+    ///
+    /// Available in tests or with the `inspection` feature enabled.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn warrants_by_author_any_status(
         &self,
         author: AgentPubKey,

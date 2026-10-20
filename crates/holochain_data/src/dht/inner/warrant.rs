@@ -166,6 +166,7 @@ where
 /// op metadata comes from `WarrantOp` (integrated) or `LimboWarrantOp` (in validation),
 /// with `when_integrated` defaulted to `0` for limbo warrants. Ordered by
 /// timestamp descending.
+#[cfg(any(test, feature = "inspection"))]
 pub(crate) async fn get_warrants_by_author_any_status<'e, E>(
     executor: E,
     author: AgentPubKey,
