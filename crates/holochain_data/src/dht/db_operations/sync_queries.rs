@@ -75,8 +75,7 @@ impl DbRead<Dht> {
         let mut conn = self.timed_conn().await?;
         sync_queries::get_chain_ops_for_wire(&mut *conn, op_hashes).await
     }
-
-    /// Full warrant rows for the given op hashes.
+    /// Full warrant rows for the given op hashes, including rejected warrants.
     pub async fn get_warrants_for_wire(
         &self,
         op_hashes: &[Vec<u8>],
