@@ -13,10 +13,12 @@ impl TxWrite<Dht> {
 }
 
 impl TxRead<Dht> {
+    /// Return a valid integrated warrant by hash.
     pub async fn get_warrant(&mut self, hash: DhtOpHash) -> sqlx::Result<Option<WarrantRow>> {
         warrant::get_warrant(self.conn_mut(), hash).await
     }
 
+    /// Return valid integrated warrants against `warrantee`, newest first.
     pub async fn get_warrants_by_warrantee(
         &mut self,
         warrantee: AgentPubKey,

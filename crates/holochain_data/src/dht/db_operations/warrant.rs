@@ -17,11 +17,13 @@ impl DbWrite<Dht> {
 }
 
 impl DbRead<Dht> {
+    /// Get a valid integrated warrant by hash.
     pub async fn get_warrant(&self, hash: DhtOpHash) -> sqlx::Result<Option<WarrantRow>> {
         let mut conn = self.timed_conn().await?;
         warrant::get_warrant(&mut *conn, hash).await
     }
 
+    /// Get valid integrated warrants against `warrantee`, ordered by datetime descending.
     pub async fn get_warrants_by_warrantee(
         &self,
         warrantee: AgentPubKey,
@@ -30,13 +32,16 @@ impl DbRead<Dht> {
         warrant::get_warrants_by_warrantee(&mut *conn, warrantee).await
     }
 
-    /// Warrants authored by `author` (the warrant issuer).
-    pub async fn get_warrants_by_author(
+    /// Get all warrants issued by `author`, of any validation status, ordered by datetime descending.
+    ///
+    /// Available in tests or with the `inspection` feature enabled.
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn get_warrants_by_author_any_status(
         &self,
         author: AgentPubKey,
     ) -> sqlx::Result<Vec<WarrantRow>> {
         let mut conn = self.timed_conn().await?;
-        warrant::get_warrants_by_author(&mut *conn, author).await
+        warrant::get_warrants_by_author_any_status(&mut *conn, author).await
     }
 
     /// Terminal validation status of an integrated warrant op, or `None`.

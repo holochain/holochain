@@ -71,7 +71,7 @@ async fn invalid_op_warrant_issuance_can_be_disabled() {
         .dht_store(dna_hash)
         .unwrap()
         .as_read()
-        .warrants_by_author(bob.agent_pubkey().clone())
+        .warrants_by_author_any_status(bob.agent_pubkey().clone())
         .await
         .unwrap();
     assert!(warrants.is_empty());
@@ -147,7 +147,7 @@ async fn skip_self_validation_to_cause_warrant() {
         .dht_store(dna_file.dna_hash())
         .unwrap()
         .as_read()
-        .warrants_by_author(bob.agent_pubkey().clone())
+        .warrants_by_author_any_status(bob.agent_pubkey().clone())
         .await
         .unwrap();
 

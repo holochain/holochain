@@ -89,7 +89,7 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
                 .dht_store(dna.dna_hash())
                 .unwrap()
                 .as_read()
-                .warrants_by_author(warrant_author.clone())
+                .warrants_by_author_any_status(warrant_author.clone())
                 .await
                 .unwrap()
                 .len();
@@ -241,7 +241,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
             .dht_store(dna.dna_hash())
             .unwrap()
             .as_read()
-            .warrants_by_author(bob_pubkey.clone())
+            .warrants_by_author_any_status(bob_pubkey.clone())
             .await
             .unwrap();
 
@@ -417,7 +417,7 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
             .dht_store(dna.dna_hash())
             .unwrap()
             .as_read()
-            .warrants_by_author(bob_pubkey.clone())
+            .warrants_by_author_any_status(bob_pubkey.clone())
             .await
             .unwrap();
 

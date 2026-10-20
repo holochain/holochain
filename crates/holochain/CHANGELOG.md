@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix warrants that failed validation being returned in local queries through `get_agent_activity`, `must_get_agent_activity`. \#6013
 - Add an optional `init_properties` field to `CreateCloneCellPayload` so bytes passed when creating a clone cell are readable by the clone's `init` callback through `get_init_properties`, the same way `InstallApp` already supports it for provisioned cells. \#6000
 
 ## 0.8.0-dev.12

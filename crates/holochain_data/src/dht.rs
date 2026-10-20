@@ -987,51 +987,84 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn warrant_roundtrip() {
+    async fn warrant_reads_only_return_valid_integrated_warrants() {
         let db = test_open_db(dht_db_id()).await.unwrap();
-        let hash = DhtOpHash::from_raw_36(vec![0xAB; 36]);
         let author = AgentPubKey::from_raw_36(vec![3u8; 36]);
         let warrantee = AgentPubKey::from_raw_36(vec![4u8; 36]);
+        let other_warrantee = AgentPubKey::from_raw_36(vec![5u8; 36]);
+        let older = DhtOpHash::from_raw_36(vec![0xA1; 36]);
+        let rejected = DhtOpHash::from_raw_36(vec![0xA2; 36]);
+        let newer = DhtOpHash::from_raw_36(vec![0xA3; 36]);
+        let other = DhtOpHash::from_raw_36(vec![0xA4; 36]);
 
-        db.insert_warrant(InsertWarrant {
-            hash: &hash,
-            author: &author,
-            timestamp: Timestamp::from_micros(1),
-            warrantee: &warrantee,
-            proof: &[9u8; 32],
-            signature: &[8u8; 64],
-            reason: Some("rejected by app validation"),
-            storage_center_loc: 88,
-            when_received: Timestamp::from_micros(40),
-            when_integrated: Timestamp::from_micros(50),
-            validation_status: 1,
-            serialized_size: 128,
-        })
-        .await
-        .unwrap();
-
-        let row = db
-            .as_ref()
-            .get_warrant(hash.clone())
+        for (hash, target, status, timestamp) in [
+            (&older, &warrantee, 1, 1),
+            (&rejected, &warrantee, 2, 4),
+            (&newer, &warrantee, 1, 3),
+            (&other, &other_warrantee, 1, 2),
+        ] {
+            db.insert_warrant(InsertWarrant {
+                hash,
+                author: &author,
+                timestamp: Timestamp::from_micros(timestamp),
+                warrantee: target,
+                proof: &[9u8; 32],
+                signature: &[8u8; 64],
+                reason: None,
+                storage_center_loc: 0,
+                when_received: Timestamp::from_micros(40),
+                when_integrated: Timestamp::from_micros(50),
+                validation_status: status,
+                serialized_size: 128,
+            })
             .await
-            .unwrap()
-            .expect("missing");
-        assert_eq!(row.warrantee, warrantee.get_raw_36().to_vec());
-        assert_eq!(row.when_received, 40);
-        assert_eq!(row.when_integrated, 50);
-        assert_eq!(row.serialized_size, 128);
-        assert_eq!(row.reason.as_deref(), Some("rejected by app validation"));
+            .unwrap();
+
+            let row = db.as_ref().get_warrant(hash.clone()).await.unwrap();
+            assert_eq!(
+                row.map(|row| row.hash),
+                (status == 1).then(|| hash.get_raw_36().to_vec())
+            );
+        }
+
+        for (index, status) in [None, Some(1), Some(2)].into_iter().enumerate() {
+            let hash = DhtOpHash::from_raw_36(vec![0xB0 + index as u8; 36]);
+            db.insert_limbo_warrant(InsertLimboWarrant {
+                hash: &hash,
+                author: &author,
+                timestamp: Timestamp::from_micros(5),
+                warrantee: &warrantee,
+                proof: &[9u8; 32],
+                signature: &[8u8; 64],
+                reason: None,
+                storage_center_loc: 0,
+                when_received: Timestamp::from_micros(40),
+                serialized_size: 128,
+            })
+            .await
+            .unwrap();
+            db.set_limbo_warrant_sys_validation_status(&hash, status)
+                .await
+                .unwrap();
+            assert!(db.as_ref().get_warrant(hash).await.unwrap().is_none());
+        }
 
         let by_warrantee = db
             .as_ref()
             .get_warrants_by_warrantee(warrantee)
             .await
             .unwrap();
-        assert_eq!(by_warrantee.len(), 1);
+        assert_eq!(
+            by_warrantee
+                .into_iter()
+                .map(|row| row.hash)
+                .collect::<Vec<_>>(),
+            vec![newer.get_raw_36().to_vec(), older.get_raw_36().to_vec()]
+        );
     }
 
     #[tokio::test]
-    async fn warrants_by_author_and_op_validation_status() {
+    async fn warrants_by_author_any_status_and_op_validation_status() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let author_a = AgentPubKey::from_raw_36(vec![3u8; 36]);
         let author_b = AgentPubKey::from_raw_36(vec![5u8; 36]);
@@ -1060,7 +1093,7 @@ mod tests {
 
         let by_a = db
             .as_ref()
-            .get_warrants_by_author(author_a.clone())
+            .get_warrants_by_author_any_status(author_a.clone())
             .await
             .unwrap();
         assert_eq!(by_a.len(), 1);
@@ -1128,7 +1161,7 @@ mod tests {
         // listed.
         let by_a = db
             .as_ref()
-            .get_warrants_by_author(author_a.clone())
+            .get_warrants_by_author_any_status(author_a.clone())
             .await
             .unwrap();
         assert_eq!(by_a.len(), 2);
