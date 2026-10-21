@@ -22,7 +22,6 @@ impl PreflightHarness {
         let actor = Arc::downcast::<HolochainP2pActor>(actor).unwrap();
         let builder = Builder {
             bootstrap: Arc::new(BootWrapFact {
-                compat: actor.compat.clone(),
                 preflight: actor.preflight.clone(),
                 orig,
             }),
@@ -134,6 +133,8 @@ async fn two_spaces_contribute_to_one_preflight() {
     .unwrap();
 
     bootstrap_a.put(info_a.clone());
+    assert_eq!(harness.outgoing_infos().await, vec![info_a.clone()]);
+
     // Creating another wrapper must not reset the first space's contribution.
     let bootstrap_b = harness.bootstrap(&space_b).await;
     bootstrap_b.put(info_b.clone());
@@ -205,9 +206,13 @@ async fn refreshing_one_space_replaces_its_info_without_removing_another_space()
     .await
     .unwrap();
 
-    // Publish both spaces, then refresh only A.
-    bootstrap_a.put(original_a);
+    // Cache both spaces' infos, then refresh only A.
+    bootstrap_a.put(original_a.clone());
     bootstrap_b.put(info_b.clone());
+    assert_eq!(
+        harness.outgoing_infos().await,
+        vec![original_a, info_b.clone()]
+    );
     bootstrap_a.put(refreshed_a.clone());
 
     // Replace A's old info while retaining B's unchanged info.
@@ -435,7 +440,7 @@ async fn concurrent_publications_keep_both_spaces_in_preflight() {
     // Start both put calls together.
     start.wait();
 
-    // Both calls have published their preflight but cannot return until released.
+    // Both calls have updated the agent cache but cannot return until released.
     let first_entered = entered_rx.recv_timeout(WAIT_TIMEOUT);
     let second_entered = entered_rx.recv_timeout(WAIT_TIMEOUT);
     let outgoing = harness.outgoing_infos().await;
