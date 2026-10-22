@@ -30,6 +30,14 @@ AI is useful when communicating as a non-native English speaker. If you are
 using AI to edit your comments for this purpose, please take the time to ensure
 it reflects your own voice and ideas.
 
+## Concise text
+
+Issue and PR descriptions must be concise and to the point. State the problem
+or change and anything reviewers need to know succinctly.
+Long-winded descriptions and AI-typical walls of text (redundant summaries,
+excessive headings and bullet lists, restating the diff, explanation of related
+topics or technical background) will be rejected.
+
 ## Provenance and licensing
 
 You are responsible for the provenance of anything you submit. AI tools can
