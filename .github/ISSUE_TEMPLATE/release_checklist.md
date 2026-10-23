@@ -237,10 +237,8 @@ Assigned to @
   - Update nix flake.
   - Update to use new holochain version.
   - Update npm deps.
-  - Bump version.
   - `[optional]` Create new branch `main-X`.
-  - Add tag `vY` for new version Y.
-  - Manually create a github release at tag with changelog.
+  - Add tag `vY` for new version Y and push it.
 
 - [ ] Documentation (`docs-pages` repo)
   - Write or update App Upgrade Guide for new holochain version.
