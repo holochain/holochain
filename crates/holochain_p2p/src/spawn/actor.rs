@@ -284,7 +284,7 @@ pub(crate) struct HolochainP2pActor {
     this: Weak<Self>,
     target_arc_factor: u32,
     compat: NetworkCompatParams,
-    preflight: Arc<Mutex<bytes::Bytes>>,
+    preflight: Arc<Mutex<Preflight>>,
     evt_sender: Arc<std::sync::OnceLock<WrapEvtSender>>,
     lair_client: holochain_keystore::MetaLairClient,
     kitsune: DynKitsune,
@@ -381,7 +381,13 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
     }
 
     fn preflight_gather_outgoing(&self, _peer_url: Url) -> BoxFut<'_, K2Result<bytes::Bytes>> {
-        Box::pin(async move { Ok(self.preflight.lock().unwrap().clone()) })
+        Box::pin(async move {
+            self.preflight
+                .lock()
+                .unwrap()
+                .encode(&self.compat)
+                .map_err(|err| K2Error::other_src("Failed to encode outgoing preflight", err))
+        })
     }
 
     fn preflight_validate_incoming(
@@ -433,68 +439,65 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
     }
 }
 
+/// Local agent infos across all spaces and their lazily encoded outgoing preflight.
+#[derive(Debug, Default)]
+struct Preflight {
+    agents: Vec<Arc<AgentInfoSigned>>,
+    encoded: Option<bytes::Bytes>,
+}
+
+impl Preflight {
+    fn update(&mut self, info: &Arc<AgentInfoSigned>) {
+        let now = kitsune2_api::Timestamp::now();
+        self.agents.retain(|cached| {
+            cached.expires_at >= now && (cached.agent != info.agent || cached.space != info.space)
+        });
+        self.agents.push(info.clone());
+        self.encoded = None;
+    }
+
+    fn encode(&mut self, compat: &NetworkCompatParams) -> HolochainP2pResult<bytes::Bytes> {
+        if let Some(encoded) = &self.encoded {
+            return Ok(encoded.clone());
+        }
+
+        let mut agents = Vec::with_capacity(self.agents.len());
+        for info in &self.agents {
+            agents.push(info.encode().inspect_err(|err| {
+                tracing::warn!(
+                    ?err,
+                    agent = ?info.agent,
+                    space = ?info.space,
+                    "Failed to encode agent info for outgoing preflight"
+                );
+            })?);
+        }
+        let encoded = crate::wire::WirePreflightMessage {
+            compat: compat.clone(),
+            agents,
+        }
+        .encode()
+        .inspect_err(|err| {
+            tracing::warn!(?err, "Failed to encode outgoing preflight");
+        })?;
+
+        self.encoded = Some(encoded.clone());
+        Ok(encoded)
+    }
+}
+
 /// A wrapper for the default Bootstrap K2 module, so we can capture
 /// the generated agent infos for publishing in the preflight.
 #[derive(Debug)]
 struct BootWrap {
-    compat: NetworkCompatParams,
-    preflight: Arc<std::sync::Mutex<bytes::Bytes>>,
+    preflight: Arc<std::sync::Mutex<Preflight>>,
     orig: kitsune2_api::DynBootstrap,
-    cache: std::sync::Mutex<Vec<Arc<AgentInfoSigned>>>,
 }
 
 impl kitsune2_api::Bootstrap for BootWrap {
     fn put(&self, info: Arc<AgentInfoSigned>) {
-        let Self {
-            compat,
-            preflight,
-            orig,
-            cache,
-        } = self;
-
-        let agents = {
-            let mut cache = cache.lock().unwrap();
-
-            // remove expired infos and previous infos that match the
-            // one that was generated
-            let now = kitsune2_api::Timestamp::now();
-            cache.retain(|cache_info| {
-                if cache_info.expires_at < now {
-                    return false;
-                }
-                if cache_info.agent == info.agent && cache_info.space == info.space {
-                    return false;
-                }
-                true
-            });
-
-            // add the one that was generated
-            cache.push(info.clone());
-
-            let mut agents = Vec::new();
-
-            // string encoding
-            for agent in cache.iter() {
-                if let Ok(encoded) = agent.encode() {
-                    agents.push(encoded);
-                }
-            }
-
-            agents
-        };
-
-        // encode the preflight message and cache
-        if let Ok(encoded) = (crate::wire::WirePreflightMessage {
-            compat: compat.clone(),
-            agents,
-        })
-        .encode()
-        {
-            *preflight.lock().unwrap() = encoded;
-        }
-
-        // don't forget to invoke the original bootstrap handler
-        orig.put(info);
+        self.preflight.lock().unwrap().update(&info);
+        self.orig.put(info);
     }
 }
 
@@ -502,8 +505,7 @@ impl kitsune2_api::Bootstrap for BootWrap {
 /// original bootstrap instances, and wrapping them with our wrapper.
 #[derive(Debug)]
 struct BootWrapFact {
-    compat: NetworkCompatParams,
-    preflight: Arc<std::sync::Mutex<bytes::Bytes>>,
+    preflight: Arc<std::sync::Mutex<Preflight>>,
     orig: kitsune2_api::DynBootstrapFactory,
 }
 
@@ -522,17 +524,11 @@ impl kitsune2_api::BootstrapFactory for BootWrapFact {
         peer_store: DynPeerStore,
         space: SpaceId,
     ) -> BoxFut<'static, K2Result<DynBootstrap>> {
-        let compat = self.compat.clone();
         let preflight = self.preflight.clone();
         let orig_fut = self.orig.create(builder, peer_store, space);
         Box::pin(async move {
             let orig = orig_fut.await?;
-            let out: DynBootstrap = Arc::new(BootWrap {
-                compat,
-                preflight,
-                orig,
-                cache: Default::default(),
-            });
+            let out: DynBootstrap = Arc::new(BootWrap { preflight, orig });
             Ok(out)
         })
     }
@@ -589,18 +585,11 @@ impl HolochainP2pActor {
             getter: config.get_dht_store.clone(),
             handler: evt_sender.clone(),
         });
-        let preflight = Arc::new(Mutex::new(
-            crate::wire::WirePreflightMessage {
-                compat: config.compat.clone(),
-                agents: Vec::new(),
-            }
-            .encode()?,
-        ));
+        let preflight = Arc::new(Mutex::new(Preflight::default()));
 
         // build with whatever bootstrap module is configured,
         // but wrap it in our bootstrap wrapper.
         builder.bootstrap = Arc::new(BootWrapFact {
-            compat: config.compat.clone(),
             preflight: preflight.clone(),
             orig: builder.bootstrap,
         });
@@ -2873,6 +2862,9 @@ impl actor::HcP2p for HolochainP2pActor {
         })
     }
 }
+
+#[cfg(test)]
+mod preflight_tests;
 
 #[cfg(test)]
 mod tests {

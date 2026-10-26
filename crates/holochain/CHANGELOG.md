@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix publishing agent info for one space overwriting the connection preflight's infos for all other spaces. \#5962
+
 ## 0.8.0-dev.13
 
 - Fix warrants that failed validation being returned in local queries through `get_agent_activity`, `must_get_agent_activity`. \#6013
