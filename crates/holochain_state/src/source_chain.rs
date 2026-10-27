@@ -3166,4 +3166,89 @@ mod tests {
             author.sign(keystore, warrant).await.unwrap(),
         )
     }
+
+    /// Writes `n` app entries to `author`'s chain in batches of 100.
+    async fn write_app_entries(
+        dht_store: &crate::dht_store::DhtStore,
+        keystore: &MetaLairClient,
+        author: &AgentPubKey,
+        n: usize,
+    ) {
+        let mut written = 0usize;
+        while written < n {
+            let sc = SourceChain::new(dht_store.clone(), keystore.clone(), author.clone())
+                .await
+                .unwrap();
+            for _ in 0..100 {
+                let entry = Entry::App(fixt!(AppEntryBytes));
+                let create = ActionData::Create(CreateData {
+                    entry_type: EntryType::App(fixt!(AppEntryDef)),
+                    entry_hash: EntryHash::with_data_sync(&entry),
+                });
+                sc.put(create, Some(entry), ChainTopOrdering::default())
+                    .await
+                    .unwrap();
+            }
+            sc.flush(vec![DhtArc::Empty]).await.unwrap();
+            written += 100;
+        }
+    }
+
+    /// Best-of-5 wall time of `zomes_initialized()` on a freshly constructed
+    /// `SourceChain` over a chain of `n` app entries. A fresh `SourceChain` is
+    /// what `Cell::check_or_run_zome_init` builds on every root zome call, so
+    /// this is the per-zome-call cost of the init check.
+    async fn time_zomes_initialized(n: usize) -> std::time::Duration {
+        let keystore = test_keystore();
+        let dna_hash = fixt!(DnaHash);
+        let dht_store = crate::test_utils::test_dht_store(dna_hash.clone()).await;
+        let author = keystore.new_sign_keypair_random().await.unwrap();
+        genesis(
+            dht_store.clone(),
+            keystore.clone(),
+            dna_hash,
+            author.clone(),
+            None,
+        )
+        .await
+        .unwrap();
+        write_app_entries(&dht_store, &keystore, &author, n).await;
+
+        let mut best = std::time::Duration::MAX;
+        for _ in 0..5 {
+            let sc = SourceChain::new(dht_store.clone(), keystore.clone(), author.clone())
+                .await
+                .unwrap();
+            let start = std::time::Instant::now();
+            let initialized = sc.zomes_initialized().await.unwrap();
+            best = best.min(start.elapsed());
+            assert!(!initialized, "no InitZomesComplete action was written");
+        }
+        best
+    }
+
+    /// The init check that runs before every root zome call must not cost
+    /// time proportional to the length of the source chain.
+    ///
+    /// `zomes_initialized()` asks `query()` for `InitZomesComplete` actions.
+    /// `query()` loads and deserializes every action the author has committed
+    /// before applying the action-type filter in memory, so the check takes
+    /// O(chain length) on every zome call. On a chain of a few thousand
+    /// actions this is tens of milliseconds per call in a debug build.
+    ///
+    /// The ratio bound is deliberately loose: with the filter applied in SQL
+    /// the two timings are within a small constant of each other, while the
+    /// full-chain load gives a ratio of roughly 25 for these chain lengths.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn zomes_initialized_cost_does_not_scale_with_chain_length() {
+        let short = time_zomes_initialized(100).await;
+        let long = time_zomes_initialized(3000).await;
+        eprintln!("zomes_initialized: 100 entries = {short:?}, 3000 entries = {long:?}");
+
+        let slack = std::time::Duration::from_millis(1);
+        assert!(
+            long <= short * 5 + slack,
+            "zomes_initialized scales with chain length: 100 entries = {short:?}, 3000 entries = {long:?}"
+        );
+    }
 }
