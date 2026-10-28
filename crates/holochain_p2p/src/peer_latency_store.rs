@@ -236,8 +236,8 @@ struct PeerWorkState {
 /// Active latency-estimation service.
 ///
 /// Owns a single background Tokio task that pings peers on a schedule.
-/// The actor interacts only through [`touch`](Self::touch) and
-/// [`store`](Self::store).
+/// The actor interacts only through [`touch`](Self::touch),
+/// [`store`](Self::store) and [`close`](Self::close).
 pub(crate) struct PeerLatencyService {
     touch_tx: mpsc::UnboundedSender<TouchRequest>,
     store: Arc<Mutex<LatencyData>>,
@@ -272,11 +272,27 @@ impl PeerLatencyService {
     pub(crate) fn store(&self) -> Arc<Mutex<LatencyData>> {
         Arc::clone(&self.store)
     }
+
+    /// Aborts the background worker.
+    ///
+    /// The spaces it holds are released once the runtime drops the
+    /// aborted task, not necessarily before this method returns.
+    ///
+    /// Safe to call more than once.
+    pub(crate) fn close(&self) {
+        self.abort_handle.abort();
+    }
+
+    /// Returns `true` once the background worker has stopped.
+    #[cfg(test)]
+    pub(crate) fn is_worker_finished(&self) -> bool {
+        self.abort_handle.is_finished()
+    }
 }
 
 impl Drop for PeerLatencyService {
     fn drop(&mut self) {
-        self.abort_handle.abort();
+        self.close();
     }
 }
 
@@ -811,6 +827,36 @@ mod tests {
             final_calls <= initial_calls + (PING_SAMPLE_COUNT as u32),
             "expected pinging to stop, but calls went from {initial_calls} to {final_calls}"
         );
+    }
+
+    #[tokio::test]
+    async fn service_close_releases_held_spaces() {
+        let ping_fn: PingFn =
+            Arc::new(|_space, _url| Box::pin(async { Some(Duration::from_millis(42)) }));
+
+        let service = PeerLatencyService::new(ping_fn);
+        let space = mock_space::stub_space();
+        service.touch(test_url("held"), space.clone());
+
+        // Wait until the worker holds its own clone of the space.
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while Arc::strong_count(&space) < 2 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("worker never took the space");
+
+        service.close();
+
+        // The aborted worker drops its state, releasing the space.
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while Arc::strong_count(&space) > 1 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("worker still holds the space after close");
     }
 
     #[tokio::test]

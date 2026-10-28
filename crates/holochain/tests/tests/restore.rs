@@ -1958,7 +1958,7 @@ async fn restore_retries_on_head_disagreement_then_converges() {
     conductor_c2
         .declare_full_storage_arcs(cell_c2.dna_hash())
         .await;
-    await_consistency([&cell_a, &cell_c2]).await.unwrap();
+    await_consistency_s(180, [&cell_a, &cell_c2]).await.unwrap();
 
     let chain_on_a = conductor_a
         .raw_handle()
@@ -2000,6 +2000,11 @@ async fn restore_retries_on_head_disagreement_then_converges() {
         .unwrap();
 
     SweetConductor::exchange_peer_info([&conductor_d, &conductor_c1, &conductor_c2]).await;
+
+    // Wait for C1 to converge with C2; D keeps retrying the restore until they agree.
+    await_consistency_s(180, [&cell_c1, &cell_c2])
+        .await
+        .unwrap();
 
     assert_eq!(
         next_restore_signal(&mut signal_rx).await,
