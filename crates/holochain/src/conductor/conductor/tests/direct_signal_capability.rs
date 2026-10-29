@@ -20,6 +20,23 @@ async fn direct_signal_grants(conductor: &SweetConductor, cell_id: &CellId) -> V
         .collect()
 }
 
+/// Whether `sender` currently holds a valid direct signal grant on `cell_id`.
+async fn sender_is_granted(
+    conductor: &SweetConductor,
+    cell_id: &CellId,
+    sender: &AgentPubKey,
+) -> bool {
+    conductor
+        .raw_handle()
+        .get_or_create_dht_store(cell_id.dna_hash())
+        .unwrap()
+        .as_read()
+        .valid_direct_signal_grant(cell_id.agent_pubkey(), sender, None)
+        .await
+        .unwrap()
+        .is_some()
+}
+
 /// A DNA with no zomes has no coordinator to commit a grant from, so the conductor is the only
 /// way for such a DNA to get one.
 #[tokio::test(flavor = "multi_thread")]
@@ -128,23 +145,6 @@ async fn grant_direct_signal_capability_for_app_rejects_an_unknown_app() {
         direct_signal_grants(&conductor, &cell_id).await.is_empty(),
         "a rejected grant must not be committed"
     );
-}
-
-/// Whether `sender` currently holds a valid direct signal grant on `cell_id`.
-async fn sender_is_granted(
-    conductor: &SweetConductor,
-    cell_id: &CellId,
-    sender: &AgentPubKey,
-) -> bool {
-    conductor
-        .raw_handle()
-        .get_or_create_dht_store(cell_id.dna_hash())
-        .unwrap()
-        .as_read()
-        .valid_direct_signal_grant(cell_id.agent_pubkey(), sender, None)
-        .await
-        .unwrap()
-        .is_some()
 }
 
 #[tokio::test(flavor = "multi_thread")]
