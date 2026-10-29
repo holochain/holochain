@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix revoking a capability grant also invalidating any later grant with identical content, which made a re-created grant (e.g. a restored direct signal grant) unusable. \#6009
+
 - Fix publishing agent info for one space overwriting the connection preflight's infos for all other spaces. \#5962
 
 ## 0.8.0-dev.13

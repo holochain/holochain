@@ -2349,7 +2349,7 @@ impl DhtStore<DbRead<Dht>> {
     ///   considered.
     ///
     /// Candidates are restricted to grants authored by `author` (the `CapGrant`
-    /// index join filters on `Action.author`) and dropped when their entry has
+    /// index join filters on `Action.author`) and dropped when their action has
     /// been updated or deleted by the author.
     ///
     /// The granted [`Capability`](holochain_zome_types::prelude::Capability) is not
@@ -2379,24 +2379,25 @@ impl DhtStore<DbRead<Dht>> {
                 .await?;
 
             // Resolve each grant's entry hash (from its create/update action),
-            // drop grants whose entry was updated or deleted by the author, and
-            // read the grant itself through the private-only query. Cap-grant
+            // drop grants whose own action was updated or deleted by the author,
+            // and read the grant itself through the private-only query. Cap-grant
             // counts are small, so the per-grant round trips are acceptable.
             for row in rows {
                 let action_hash = ActionHash::from_raw_36(row.action_hash);
+                // Matched by action hash: identical grants share an entry hash, so
+                // retiring one grant must not retire the others (#6009).
+                if self
+                    .action_updated_or_deleted_by_author(&action_hash, author)
+                    .await?
+                {
+                    continue;
+                }
                 let Some(sah) = self.db().get_action(action_hash).await? else {
                     continue;
                 };
                 let Some(entry_hash) = sah.hashed.content.data.entry_hash().cloned() else {
                     continue;
                 };
-                // Skip grants whose entry was updated or deleted by the author.
-                if self
-                    .entry_updated_or_deleted_by_author(&entry_hash, author)
-                    .await?
-                {
-                    continue;
-                }
                 if let Some(grant) = self.get_cap_grant(&entry_hash, author).await? {
                     grants.push(CapAccess::RemoteAgent(Box::new(grant)));
                 }
@@ -2438,9 +2439,33 @@ impl DhtStore<DbRead<Dht>> {
             .find(|grant| grant.is_valid_for_direct_signal(from_agent, check_secret)))
     }
 
-    /// `true` if `entry_hash` has been updated or deleted by `author` — the
-    /// "not updated/deleted" exclusion shared by the agent-key and cap-grant
-    /// validity reads.
+    /// `true` if the action at `action_hash` has been updated or deleted by `author`.
+    ///
+    /// Matching on the action hash keeps a retirement scoped to the one grant it
+    /// names. Identical grants share an entry hash, so an entry-level check would
+    /// retire every such grant (#6009). Reads `UpdatedRecord.original_action_hash`
+    /// and `DeletedRecord.deletes_action_hash`, with the same author filter as
+    /// [`entry_updated_or_deleted_by_author`](Self::entry_updated_or_deleted_by_author).
+    async fn action_updated_or_deleted_by_author(
+        &self,
+        action_hash: &ActionHash,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<bool> {
+        let updates = self.db().get_update_actions_for_record(action_hash).await?;
+        if updates
+            .iter()
+            .any(|sah| &sah.hashed.content.header.author == author)
+        {
+            return Ok(true);
+        }
+        let deletes = self.db().get_delete_actions_for_record(action_hash).await?;
+        Ok(deletes
+            .iter()
+            .any(|sah| &sah.hashed.content.header.author == author))
+    }
+
+    /// `true` if `entry_hash` has been updated or deleted by `author`, the
+    /// "not updated/deleted" exclusion of the agent-key validity read.
     ///
     /// The `UpdatedRecord` / `DeletedRecord` indexes are keyed on the original /
     /// deleted *entry* hash (see
@@ -7199,5 +7224,172 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(grants, vec![CapAccess::RemoteAgent(Box::new(grant))]);
+    }
+
+    /// How a grant is retired by its author in `revoking_a_grant_leaves_identical_grant_valid`.
+    #[derive(Clone, Copy, Debug)]
+    enum Retire {
+        Delete,
+        Update,
+    }
+
+    /// Regression for #6009: identical grants share an entry hash, so
+    /// retiring one by its author must not retire the others. Only the grant
+    /// whose action is targeted is dropped from `valid_cap_grants`.
+    #[test_case::test_case(Retire::Delete; "delete")]
+    #[test_case::test_case(Retire::Update; "update")]
+    #[tokio::test]
+    async fn revoking_a_grant_leaves_identical_grant_valid(retire: Retire) {
+        use holochain_data::dht::{InsertDeletedRecord, InsertUpdatedRecord};
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let alice = AgentPubKey::from_raw_36(vec![1u8; 36]);
+
+        let grant = CapGrant::new_zome_call_grant(
+            "tag".into(),
+            GrantConstraint::Unrestricted,
+            GrantedFunctions::All,
+        );
+        let entry = Entry::CapGrant(grant.clone());
+        let entry_hash = EntryHash::with_data_sync(&entry);
+        store
+            .db()
+            .insert_private_entry(&entry_hash, &alice, &entry)
+            .await
+            .unwrap();
+
+        let signed = |seq: u32, micros: i64, data: ActionData| {
+            let action = Action {
+                header: ActionHeader {
+                    author: alice.clone(),
+                    timestamp: Timestamp::from_micros(micros),
+                    action_seq: seq,
+                    prev_action: Some(ActionHash::from_raw_36(vec![2u8; 36])),
+                },
+                data,
+            };
+            SignedActionHashed::with_presigned(
+                HoloHashed::from_content_sync(action),
+                Signature::from([7u8; 64]),
+            )
+        };
+        let create = CreateData {
+            entry_type: EntryType::CapGrant,
+            entry_hash: entry_hash.clone(),
+        };
+
+        // Two identical grants, committed before and after the retirement below.
+        let first = signed(3, 1000, ActionData::Create(create.clone()));
+        let second = signed(5, 3000, ActionData::Create(create));
+        for sah in [&first, &second] {
+            store.db().insert_action(sah, None).await.unwrap();
+            store
+                .db()
+                .insert_cap_grant(
+                    sah.as_hash(),
+                    GrantConstraintType::Unrestricted.into(),
+                    Some("tag"),
+                )
+                .await
+                .unwrap();
+        }
+
+        // Alice retires only `first`, by a Delete or an Update of its action.
+        let retiring = match retire {
+            Retire::Delete => signed(
+                4,
+                2000,
+                ActionData::Delete(DeleteData {
+                    deletes_address: first.as_hash().clone(),
+                    deletes_entry_address: entry_hash.clone(),
+                }),
+            ),
+            Retire::Update => {
+                let other = Entry::CapGrant(CapGrant::new_zome_call_grant(
+                    "other".into(),
+                    GrantConstraint::Unrestricted,
+                    GrantedFunctions::All,
+                ));
+                signed(
+                    4,
+                    2000,
+                    ActionData::Update(UpdateData {
+                        original_action_address: first.as_hash().clone(),
+                        original_entry_address: entry_hash.clone(),
+                        entry_type: EntryType::CapGrant,
+                        entry_hash: EntryHash::with_data_sync(&other),
+                    }),
+                )
+            }
+        };
+        store.db().insert_action(&retiring, None).await.unwrap();
+        match retire {
+            Retire::Delete => {
+                store
+                    .db()
+                    .insert_deleted_record_index(InsertDeletedRecord {
+                        action_hash: retiring.as_hash(),
+                        deletes_action_hash: first.as_hash(),
+                        deletes_entry_hash: &entry_hash,
+                    })
+                    .await
+                    .unwrap();
+            }
+            Retire::Update => {
+                store
+                    .db()
+                    .insert_updated_record_index(InsertUpdatedRecord {
+                        action_hash: retiring.as_hash(),
+                        original_action_hash: first.as_hash(),
+                        original_entry_hash: &entry_hash,
+                    })
+                    .await
+                    .unwrap();
+            }
+        }
+
+        let grants = store
+            .as_read()
+            .valid_cap_grants(&alice, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            grants,
+            vec![CapAccess::RemoteAgent(Box::new(grant.clone()))],
+            "only the retired grant's action is dropped; the identical later grant stays valid"
+        );
+
+        // Retiring `second` as well leaves no valid grant.
+        let retiring_second = signed(
+            6,
+            4000,
+            ActionData::Delete(DeleteData {
+                deletes_address: second.as_hash().clone(),
+                deletes_entry_address: entry_hash.clone(),
+            }),
+        );
+        store
+            .db()
+            .insert_action(&retiring_second, None)
+            .await
+            .unwrap();
+        store
+            .db()
+            .insert_deleted_record_index(InsertDeletedRecord {
+                action_hash: retiring_second.as_hash(),
+                deletes_action_hash: second.as_hash(),
+                deletes_entry_hash: &entry_hash,
+            })
+            .await
+            .unwrap();
+
+        let grants = store
+            .as_read()
+            .valid_cap_grants(&alice, None)
+            .await
+            .unwrap();
+        assert!(grants.is_empty(), "both grants retired: {grants:?}");
     }
 }
