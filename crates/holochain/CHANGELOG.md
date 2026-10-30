@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix revoking or updating a capability grant also invalidating other grants with identical content, including a grant created after the revoked one. Revoking or updating now affects only the grant it names, so other grants with the same content stay valid and must be revoked or updated separately. \#6009
 - Fix publishing agent info for one space overwriting the connection preflight's infos for all other spaces. \#5962
 
 ## 0.8.0-dev.13

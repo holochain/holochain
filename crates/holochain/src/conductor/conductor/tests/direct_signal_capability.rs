@@ -20,6 +20,23 @@ async fn direct_signal_grants(conductor: &SweetConductor, cell_id: &CellId) -> V
         .collect()
 }
 
+/// Whether `sender` currently holds a valid direct signal grant on `cell_id`.
+async fn sender_is_granted(
+    conductor: &SweetConductor,
+    cell_id: &CellId,
+    sender: &AgentPubKey,
+) -> bool {
+    conductor
+        .raw_handle()
+        .get_or_create_dht_store(cell_id.dna_hash())
+        .unwrap()
+        .as_read()
+        .valid_direct_signal_grant(cell_id.agent_pubkey(), sender, None)
+        .await
+        .unwrap()
+        .is_some()
+}
+
 /// A DNA with no zomes has no coordinator to commit a grant from, so the conductor is the only
 /// way for such a DNA to get one.
 #[tokio::test(flavor = "multi_thread")]
@@ -127,5 +144,46 @@ async fn grant_direct_signal_capability_for_app_rejects_an_unknown_app() {
     assert!(
         direct_signal_grants(&conductor, &cell_id).await.is_empty(),
         "a rejected grant must not be committed"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn regranting_a_revoked_direct_signal_capability_makes_it_valid_again() {
+    let mut conductor = SweetConductor::standard().await;
+    let dna = SweetDnaFile::unique_empty().await;
+    let app = conductor.setup_app("app", [&dna]).await.unwrap();
+    let cell_id = app.cells()[0].cell_id().clone();
+    let sender = AgentPubKey::from_raw_36(vec![9; 36]);
+
+    let first = conductor
+        .raw_handle()
+        .grant_direct_signal_capability(
+            cell_id.clone(),
+            "direct-signal".into(),
+            GrantConstraint::Unrestricted,
+        )
+        .await
+        .unwrap();
+    assert!(sender_is_granted(&conductor, &cell_id, &sender).await);
+
+    conductor
+        .raw_handle()
+        .revoke_zome_call_capability(cell_id.clone(), first)
+        .await
+        .unwrap();
+    assert!(!sender_is_granted(&conductor, &cell_id, &sender).await);
+
+    conductor
+        .raw_handle()
+        .grant_direct_signal_capability(
+            cell_id.clone(),
+            "direct-signal".into(),
+            GrantConstraint::Unrestricted,
+        )
+        .await
+        .unwrap();
+    assert!(
+        sender_is_granted(&conductor, &cell_id, &sender).await,
+        "a grant committed after the previous identical grant was revoked must be valid"
     );
 }
