@@ -1632,6 +1632,16 @@ impl actor::HcP2p for HolochainP2pActor {
         &self.kitsune
     }
 
+    fn close(&self) -> BoxFut<'_, ()> {
+        Box::pin(async move {
+            // Background tasks go first so nothing keeps a space alive
+            // once kitsune releases them.
+            self.pruning_task_abort_handle.abort();
+            self.latency_service.close();
+            self.kitsune.close().await;
+        })
+    }
+
     fn peer_store(&self, dna_hash: DnaHash) -> BoxFut<'_, HolochainP2pResult<DynPeerStore>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
@@ -4076,6 +4086,56 @@ mod tests {
                 .available_permits(),
             0
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn close_shuts_down_kitsune_and_background_tasks() {
+        let harness = TestP2pActorHarness::new(10).await;
+        let transport = harness.actor.kitsune.transport().await.unwrap();
+        assert!(!harness.actor.latency_service.is_worker_finished());
+        assert!(!harness.actor.pruning_task_abort_handle.is_finished());
+
+        harness.actor.close().await;
+        // A second close is a no-op and returns promptly.
+        tokio::time::timeout(Duration::from_secs(5), harness.actor.close())
+            .await
+            .expect("second close did not return");
+
+        let err = harness.actor.kitsune.transport().await.unwrap_err();
+        assert!(
+            err.to_string().contains(kitsune2_api::KITSUNE_CLOSED_ERR),
+            "unexpected error: {err}"
+        );
+
+        let err = transport
+            .send_module(
+                Url::from_str("ws://test:80/1").unwrap(),
+                DnaHash::from_raw_32(vec![0; 32]).to_k2_space(),
+                "mod".to_string(),
+                bytes::Bytes::new(),
+            )
+            .await
+            .unwrap_err();
+        assert!(
+            err.to_string().contains(kitsune2_api::TRANSPORT_CLOSED_ERR),
+            "unexpected error: {err}"
+        );
+
+        retry_fn_until_timeout(
+            || async { harness.actor.pruning_task_abort_handle.is_finished() },
+            Some(5_000),
+            None,
+        )
+        .await
+        .expect("pruning task still running after close");
+
+        retry_fn_until_timeout(
+            || async { harness.actor.latency_service.is_worker_finished() },
+            Some(5_000),
+            None,
+        )
+        .await
+        .expect("peer latency worker still running after close");
     }
 
     #[tokio::test(flavor = "multi_thread")]

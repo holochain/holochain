@@ -1,8 +1,9 @@
 use holo_hash::ActionHash;
 use holochain::{
     retry_until_timeout,
-    sweettest::{SweetConductor, SweetDnaFile},
+    sweettest::{SweetConductor, SweetDnaFile, SweetInlineZomes},
 };
+use holochain_p2p::HolochainP2pError;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 
@@ -46,10 +47,12 @@ async fn space_not_recreated_after_shutdown() {
             agent_key.clone(),
             vec![],
             None,
-            None,
         )
         .await;
-    assert!(result.is_err());
+    assert!(
+        matches!(result, Err(HolochainP2pError::K2SpaceNotFound(_))),
+        "unexpected result: {result:?}"
+    );
 
     // call_remote should error
     let result = holochain_p2p
@@ -61,7 +64,10 @@ async fn space_not_recreated_after_shutdown() {
             None,
         )
         .await;
-    assert!(result.is_err());
+    assert!(
+        matches!(result, Err(HolochainP2pError::K2SpaceNotFound(_))),
+        "unexpected result: {result:?}"
+    );
 
     // send_remote_signal should error
     let result = holochain_p2p
@@ -70,7 +76,10 @@ async fn space_not_recreated_after_shutdown() {
             vec![(agent_key.clone(), ExternIO(vec![]), Signature([0; 64]))],
         )
         .await;
-    assert!(result.is_err());
+    assert!(
+        matches!(result, Err(HolochainP2pError::K2SpaceNotFound(_))),
+        "unexpected result: {result:?}"
+    );
 
     // get should error
     let result = holochain_p2p
@@ -81,7 +90,10 @@ async fn space_not_recreated_after_shutdown() {
             None,
         )
         .await;
-    assert!(result.is_err());
+    assert!(
+        matches!(result, Err(HolochainP2pError::K2SpaceNotFound(_))),
+        "unexpected result: {result:?}"
+    );
 
     // get_links should error
     let result = holochain_p2p
@@ -99,7 +111,10 @@ async fn space_not_recreated_after_shutdown() {
             None,
         )
         .await;
-    assert!(result.is_err());
+    assert!(
+        matches!(result, Err(HolochainP2pError::K2SpaceNotFound(_))),
+        "unexpected result: {result:?}"
+    );
 
     // count_links should error
     let result = holochain_p2p
@@ -117,7 +132,10 @@ async fn space_not_recreated_after_shutdown() {
             None,
         )
         .await;
-    assert!(result.is_err());
+    assert!(
+        matches!(result, Err(HolochainP2pError::K2SpaceNotFound(_))),
+        "unexpected result: {result:?}"
+    );
 
     // get_agent_activity should error
     let result = holochain_p2p
@@ -129,7 +147,10 @@ async fn space_not_recreated_after_shutdown() {
             None,
         )
         .await;
-    assert!(result.is_err());
+    assert!(
+        matches!(result, Err(HolochainP2pError::K2SpaceNotFound(_))),
+        "unexpected result: {result:?}"
+    );
 
     // must_get_agent_activity should error
     let result = holochain_p2p
@@ -141,7 +162,10 @@ async fn space_not_recreated_after_shutdown() {
             None,
         )
         .await;
-    assert!(result.is_err());
+    assert!(
+        matches!(result, Err(HolochainP2pError::K2SpaceNotFound(_))),
+        "unexpected result: {result:?}"
+    );
 
     // send_validation_receipts should error
     let result = holochain_p2p
@@ -151,7 +175,10 @@ async fn space_not_recreated_after_shutdown() {
             vec![].into(), // Using From trait
         )
         .await;
-    assert!(result.is_err());
+    assert!(
+        matches!(result, Err(HolochainP2pError::K2SpaceNotFound(_))),
+        "unexpected result: {result:?}"
+    );
 
     // authority_for_hash should error
     let result = holochain_p2p
@@ -160,9 +187,48 @@ async fn space_not_recreated_after_shutdown() {
             ActionHash::from_raw_36(vec![0; 36]).into(),
         )
         .await;
-    assert!(result.is_err());
+    assert!(
+        matches!(result, Err(HolochainP2pError::K2SpaceNotFound(_))),
+        "unexpected result: {result:?}"
+    );
 
     // 0 spaces should exist
     let spaces = holochain_p2p.test_kitsune().list_spaces();
     assert_eq!(spaces.len(), 0);
+}
+
+/// Regression test for #6010: shutting down a conductor closes its network.
+///
+/// Previously the kitsune2 transport kept running after shutdown.
+#[tokio::test(flavor = "multi_thread")]
+async fn network_closed_after_shutdown() {
+    holochain_trace::test_run();
+
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(SweetInlineZomes::new(vec![], 0)).await;
+    let mut conductor = SweetConductor::standard().await;
+    conductor.setup_app("app", [&dna_file]).await.unwrap();
+    let holochain_p2p = conductor.holochain_p2p().clone();
+    let transport = holochain_p2p.test_kitsune().transport().await.unwrap();
+
+    conductor.shutdown().await;
+
+    let err = transport
+        .send_module(
+            kitsune2_api::Url::from_str("ws://test:80/1").unwrap(),
+            dna_file.dna_hash().to_k2_space(),
+            "mod".to_string(),
+            bytes::Bytes::new(),
+        )
+        .await
+        .unwrap_err();
+    assert!(
+        err.to_string().contains(kitsune2_api::TRANSPORT_CLOSED_ERR),
+        "unexpected error: {err}"
+    );
+    let err = holochain_p2p.test_kitsune().transport().await.unwrap_err();
+    assert!(
+        err.to_string().contains(kitsune2_api::KITSUNE_CLOSED_ERR),
+        "unexpected error: {err}"
+    );
 }

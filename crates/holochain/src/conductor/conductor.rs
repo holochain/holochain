@@ -341,16 +341,19 @@ mod startup_shutdown_impls {
             let mut tm = self.task_manager();
             let task = self.detach_task_management().expect("Attempting to shut down after already detaching task management or previous shutdown");
 
-            let self2 = self.clone();
             tokio::task::spawn(async move {
                 // Shutdown conductor tasks
-                let running_cell_ids: Vec<_> = self2
+                let running_cell_ids: Vec<_> = self
                     .running_cells
                     .share_mut(|c| c.keys().cloned().collect());
-                let remove_cells_task = self2.remove_cells(&running_cell_ids);
+                let remove_cells_task = self.remove_cells(&running_cell_ids);
 
                 tracing::info!("Sending shutdown signal to all managed tasks and removing cells.");
                 let (.., result) = futures::join!(remove_cells_task, tm.shutdown().boxed(), task,);
+
+                // Cells are removed and tasks stopped, so nothing new uses the network.
+                tracing::info!("Closing the network.");
+                self.holochain_p2p.close().await;
 
                 result?
             })

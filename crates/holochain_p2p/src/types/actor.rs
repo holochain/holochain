@@ -421,6 +421,15 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
 
     /// Get the conductor store getter.
     fn conductor_store_getter(&self) -> crate::GetConductorStore;
+
+    /// Close the network stack.
+    ///
+    /// Stops the background tasks, then closes kitsune: all spaces are
+    /// dropped, the transport is closed and kitsune releases its handler
+    /// (this actor). The conductor handler registered via
+    /// [`HcP2p::register_handler`] is retained. Network calls fail
+    /// afterwards. Calling this again is a no-op.
+    fn close(&self) -> BoxFut<'_, ()>;
 }
 
 /// Trait-object HcP2p
