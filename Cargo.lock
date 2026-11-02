@@ -2681,7 +2681,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.8.0-dev.13"
+version = "0.8.0-dev.14"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2827,7 +2827,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.8.0-dev.13"
+version = "0.8.0-dev.14"
 dependencies = [
  "anyhow",
  "assert2",
@@ -2922,7 +2922,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.8.0-dev.13"
+version = "0.8.0-dev.14"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2947,7 +2947,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.8.0-dev.13"
+version = "0.8.0-dev.14"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2966,7 +2966,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.8.0-dev.11"
+version = "0.8.0-dev.12"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2988,7 +2988,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_client"
-version = "0.8.0-dev.13"
+version = "0.8.0-dev.14"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3015,7 +3015,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.8.0-dev.13"
+version = "0.8.0-dev.14"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3043,7 +3043,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_client"
-version = "0.10.0-dev.13"
+version = "0.10.0-dev.14"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3074,7 +3074,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.8.0-dev.11"
+version = "0.8.0-dev.12"
 dependencies = [
  "derive_more",
  "fixt",
@@ -3112,7 +3112,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_config"
-version = "0.8.0-dev.11"
+version = "0.8.0-dev.12"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3130,7 +3130,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_data"
-version = "0.8.0-dev.13"
+version = "0.8.0-dev.14"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -3180,7 +3180,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.8.0-dev.11"
+version = "0.8.0-dev.12"
 dependencies = [
  "assert_cmd",
  "async-trait",
@@ -3251,7 +3251,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.8.0-dev.13"
+version = "0.8.0-dev.14"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -3335,7 +3335,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.8.0-dev.13"
+version = "0.8.0-dev.14"
 dependencies = [
  "async-recursion",
  "base64 0.22.1",
@@ -3423,7 +3423,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.8.0-dev.11"
+version = "0.8.0-dev.12"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -3450,7 +3450,7 @@ dependencies = [
  "nanoid 0.4.0",
  "parking_lot",
  "proptest",
- "proptest-derive 0.8.0",
+ "proptest-derive 0.5.1",
  "rand 0.10.2",
  "regex",
  "rmp-serde",
@@ -3492,7 +3492,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.8.0-dev.11"
+version = "0.8.0-dev.12"
 dependencies = [
  "holochain_types",
  "strum 0.27.2",
@@ -3547,7 +3547,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.8.0-dev.11"
+version = "0.8.0-dev.12"
 dependencies = [
  "async-trait",
  "bytes",

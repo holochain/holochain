@@ -14,6 +14,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20261102.035837
+
+## [hcterm-0.8.0-dev.14](crates/hcterm/CHANGELOG.md#0.8.0-dev.14)
+
+## [holochain\_cli-0.8.0-dev.14](crates/holochain_cli/CHANGELOG.md#0.8.0-dev.14)
+
+## [holochain\_cli\_bundle-0.8.0-dev.12](crates/holochain_cli_bundle/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_cli\_client-0.8.0-dev.14](crates/holochain_cli_client/CHANGELOG.md#0.8.0-dev.14)
+
+## [holochain\_cli\_sandbox-0.8.0-dev.14](crates/holochain_cli_sandbox/CHANGELOG.md#0.8.0-dev.14)
+
+## [holochain\_client-0.10.0-dev.14](crates/holochain_client/CHANGELOG.md#0.10.0-dev.14)
+
+## [holochain-0.8.0-dev.14](crates/holochain/CHANGELOG.md#0.8.0-dev.14)
+
+- Fix shutting down a conductor leaving its network transport and background network tasks running, so a conductor shut down in a process that keeps running no longer stays reachable by peers. \#6010
+- Fix revoking or updating a capability grant also invalidating other grants with identical content, including a grant created after the revoked one. Revoking or updating now affects only the grant it names, so other grants with the same content stay valid and must be revoked or updated separately. \#6009
+- Fix publishing agent info for one space overwriting the connection preflight’s infos for all other spaces. \#5962
+
+## [holochain\_cascade-0.8.0-dev.14](crates/holochain_cascade/CHANGELOG.md#0.8.0-dev.14)
+
+## [holochain\_conductor\_config-0.8.0-dev.12](crates/holochain_conductor_config/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_wasm\_test\_utils-0.8.0-dev.12](crates/holochain_wasm_test_utils/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_websocket-0.8.0-dev.12](crates/holochain_websocket/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_p2p-0.8.0-dev.14](crates/holochain_p2p/CHANGELOG.md#0.8.0-dev.14)
+
+## [holochain\_state-0.8.0-dev.14](crates/holochain_state/CHANGELOG.md#0.8.0-dev.14)
+
+## [holochain\_data-0.8.0-dev.14](crates/holochain_data/CHANGELOG.md#0.8.0-dev.14)
+
+## [holochain\_conductor\_api-0.8.0-dev.12](crates/holochain_conductor_api/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_keystore-0.8.0-dev.12](crates/holochain_keystore/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_types-0.8.0-dev.12](crates/holochain_types/CHANGELOG.md#0.8.0-dev.12)
+
 # 20261026.124756
 
 ## [hcterm-0.8.0-dev.13](crates/hcterm/CHANGELOG.md#0.8.0-dev.13)
