@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_sandbox"
-version = "0.8.0-dev.14"
+version = "0.8.0-dev.15"
 repository = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_sandbox"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]

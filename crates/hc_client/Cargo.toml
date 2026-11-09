@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_client"
-version = "0.8.0-dev.14"
+version = "0.8.0-dev.15"
 edition = "2021"
 description = "CLI utilities for interacting with Holochain conductors"
 license = "Apache-2.0"

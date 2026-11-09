@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20261109.041421
+
+## [holochain\_cli-0.8.0-dev.15](crates/holochain_cli/CHANGELOG.md#0.8.0-dev.15)
+
+## [holochain\_cli\_client-0.8.0-dev.15](crates/holochain_cli_client/CHANGELOG.md#0.8.0-dev.15)
+
+## [holochain\_cli\_sandbox-0.8.0-dev.15](crates/holochain_cli_sandbox/CHANGELOG.md#0.8.0-dev.15)
+
 # 20261102.035837
 
 ## [hcterm-0.8.0-dev.14](crates/hcterm/CHANGELOG.md#0.8.0-dev.14)
