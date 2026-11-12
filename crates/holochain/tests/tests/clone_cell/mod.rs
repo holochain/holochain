@@ -348,10 +348,8 @@ async fn create_clone_of_another_cell_in_same_app() {
     );
 }
 
-// Reproduction: `create_clone_cell` adds the clone cell to the conductor state
-// before it runs genesis, and does not remove it again when genesis fails.
-// The conductor state then contains a cell without genesis records, and every
-// later conductor startup fails with `CellWithoutGenesis`.
+// Ensure that a failed genesis in `create_clone_cell` must not
+// leave the clone cell in the conductor state.
 #[tokio::test(flavor = "multi_thread")]
 async fn conductor_restarts_after_clone_cell_genesis_failure() {
     holochain_trace::test_run();
