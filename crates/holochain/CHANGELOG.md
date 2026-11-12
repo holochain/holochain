@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix a failed `create_clone_cell` call leaving the clone cell in the conductor state without genesis, which made every later conductor startup fail with `CellWithoutGenesis`. Genesis now runs before the clone cell is added to the app, as it does when an app is installed, and clone cell creation runs one call at a time. \#6035
+
 ## 0.8.0-dev.14
 
 - Fix shutting down a conductor leaving its network transport and background network tasks running, so a conductor shut down in a process that keeps running no longer stays reachable by peers. \#6010
