@@ -83,6 +83,12 @@ pub struct CreateCloneCellPayload {
     pub membrane_proof: Option<MembraneProof>,
     /// Optionally a name for the DNA clone
     pub name: Option<String>,
+    /// Opaque, app-defined bytes made available to the clone cell during `init`.
+    ///
+    /// Not interpreted by the conductor and never written to the DHT. The bytes are persisted
+    /// by the conductor alongside the app when the clone is created and read back during the
+    /// clone cell's `init` via the `hdk::migrate::get_init_properties` host function.
+    pub init_properties: Option<InitProperties>,
 }
 
 /// Parameters to specify the clone cell to be disabled.

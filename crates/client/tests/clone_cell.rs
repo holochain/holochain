@@ -68,6 +68,7 @@ async fn clone_cell_management() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("seed".into()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             })
             .await
             .unwrap();
@@ -223,6 +224,7 @@ pub async fn app_info_refresh() {
             modifiers: DnaModifiersOpt::none().with_network_seed("test seed".into()),
             membrane_proof: None,
             name: None,
+            init_properties: None,
         })
         .await
         .unwrap();

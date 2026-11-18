@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix a failed `create_clone_cell` call leaving the clone cell in the conductor state without genesis, which made every later conductor startup fail with `CellWithoutGenesis`. Genesis now runs before the clone cell is added to the app, as it does when an app is installed, and clone cell creation runs one call at a time.
+- Fix warrants that failed validation being returned in local queries through `get_agent_activity`, `must_get_agent_activity`.
+- Fix publishing agent info for one space overwriting the connection preflight's infos for all other spaces.
+- Add an optional `init_properties` field to `CreateCloneCellPayload` so bytes passed when creating a clone cell are readable by the clone's `init` callback through `get_init_properties`, the same way `InstallApp` already supports it for provisioned cells.
+- Fix uninstalling an app, or deleting a clone cell, leaving the DNA's peer metadata database on disk and its DNA definition, entry definitions and WASM code in `wasm.db`. When the last cell of a DNA is removed those are now deleted too; WASM code and entry definitions still used by another installed DNA are kept.
 - Bump kitsune2 to v0.5.2
 
 ## 0.7.1

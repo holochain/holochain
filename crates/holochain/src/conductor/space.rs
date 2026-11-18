@@ -272,15 +272,16 @@ impl Spaces {
         F: Send + FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
     {
         let (state, _) = self
-            .update_state_prime(|s| Ok((f(s)?, ())), "", &InitPropertiesMap::new())
+            .update_state_prime(|s| Ok((f(s)?, (), InitPropertiesMap::new())), "")
             .await?;
         Ok(state)
     }
 
     /// Update the internal state with a pure function mapping old state
     /// to new, and atomically persist the result alongside any `init_properties`
-    /// for `app_id`. This may also produce an output value which will be the output
-    /// of this function. When `init_properties` is empty the `app_id` is not used.
+    /// returned by `f` for `app_id`. This may also produce an output value which will be the
+    /// output of this function. When the returned `init_properties` are empty the `app_id` is not
+    /// used.
     ///
     /// The load, transform, and save steps run atomically inside a single
     /// database transaction on the conductor store, and concurrent callers
@@ -291,10 +292,11 @@ impl Spaces {
         &self,
         f: F,
         app_id: &str,
-        init_properties: &InitPropertiesMap,
     ) -> ConductorResult<(ConductorState, O)>
     where
-        F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
+        F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O, InitPropertiesMap)>
+            + Send
+            + 'static,
         O: Send + 'static,
     {
         timed!([1, 10, 1000], "update_state_prime", {
@@ -302,11 +304,10 @@ impl Spaces {
                 .update_state(
                     move |state| -> ConductorResult<_> {
                         let state = state.unwrap_or_default();
-                        let (new_state, output) = f(state)?;
-                        Ok((new_state.clone(), (new_state, output)))
+                        let (new_state, output, init_properties) = f(state)?;
+                        Ok((new_state.clone(), (new_state, output), init_properties))
                     },
                     app_id,
-                    init_properties,
                 )
                 .await
         })

@@ -46,6 +46,14 @@ impl DbWrite<PeerMetaStore> {
     pub async fn prune(&self) -> sqlx::Result<u64> {
         inner::prune(self.pool()).await
     }
+
+    /// Delete every entry, expired or not. Returns the number of rows removed.
+    ///
+    /// Used when the conductor removes the last cell of a DNA but cannot
+    /// unlink the database file.
+    pub async fn purge_all(&self) -> sqlx::Result<u64> {
+        inner::purge_all(self.pool()).await
+    }
 }
 
 #[cfg(test)]
@@ -354,5 +362,34 @@ mod tests {
                 expires_at: None,
             },]
         );
+    }
+
+    #[tokio::test]
+    async fn purge_all_removes_every_entry() {
+        let db = test_open_db(test_db_id()).await.unwrap();
+
+        // One expired, one that never expires, one that expires far in the
+        // future: purge_all must not care about expiry.
+        db.put("wss://peer-a.example", "expired", b"1", Some(1))
+            .await
+            .unwrap();
+        db.put("wss://peer-a.example", "live", b"2", None)
+            .await
+            .unwrap();
+        db.put("wss://peer-b.example", "future", b"3", Some(i64::MAX))
+            .await
+            .unwrap();
+
+        let purged = db.purge_all().await.unwrap();
+        assert_eq!(purged, 3);
+
+        let remaining: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM peer_meta")
+            .fetch_one(db.pool())
+            .await
+            .unwrap();
+        assert_eq!(remaining, 0);
+
+        // Purging an empty store is a no-op that reports zero rows.
+        assert_eq!(db.purge_all().await.unwrap(), 0);
     }
 }

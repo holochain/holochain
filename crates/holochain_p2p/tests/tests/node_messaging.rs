@@ -381,6 +381,180 @@ async fn test_call_remote() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn preflight_discovers_both_spaces_over_one_connection() {
+    let dna_a = DnaHash::from_raw_32(vec![1; 32]);
+    let dna_b = DnaHash::from_raw_32(vec![2; 32]);
+    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
+    let mut nodes = Vec::new();
+
+    for _ in 0..2 {
+        let mut peer_meta_stores = std::collections::HashMap::new();
+        let mut dht_stores = std::collections::HashMap::new();
+        for dna in [&dna_a, &dna_b] {
+            peer_meta_stores.insert(
+                dna.clone(),
+                holochain_state::peer_metadata_store::PeerMetaStore::new(
+                    holochain_state::data::test_open_db(PeerMetaStore::new(Arc::new(dna.clone())))
+                        .await
+                        .unwrap(),
+                ),
+            );
+            dht_stores.insert(
+                dna.clone(),
+                holochain_state::DhtStore::new_test(holochain_state::data::Dht::new(Arc::new(
+                    dna.clone(),
+                )))
+                .await
+                .unwrap(),
+            );
+        }
+        let conductor_store = holochain_state::conductor::ConductorStore::new_test()
+            .await
+            .unwrap();
+        let keystore = test_keystore();
+        let agent = keystore.new_sign_keypair_random().await.unwrap();
+        let node = spawn_holochain_p2p(
+            HolochainP2pConfig {
+                get_db_peer_meta: Arc::new(move |dna| {
+                    let store = peer_meta_stores.get(&dna).unwrap().clone();
+                    Box::pin(async move { Ok(store) })
+                }),
+                get_dht_store: Arc::new(move |dna| {
+                    let store = dht_stores.get(&dna).unwrap().clone();
+                    Box::pin(async move { Ok(store) })
+                }),
+                get_conductor_store: Arc::new(move || {
+                    let store = conductor_store.clone();
+                    Box::pin(async move { store })
+                }),
+                network_config: Some(serde_json::json!({
+                    "irohTransport": {
+                        "relayUrl": format!("http://{addr}"),
+                        "relayAllowPlainText": true,
+                    }
+                })),
+                // The server supplies the relay, but discovery must come only from preflight.
+                disable_bootstrap: true,
+                disable_gossip: true,
+                disable_publish: true,
+                request_timeout: Duration::from_secs(10),
+                ..Default::default()
+            },
+            keystore,
+        )
+        .await
+        .unwrap();
+        node.register_handler(Arc::new(Handler::default()))
+            .await
+            .unwrap();
+
+        // Both spaces must exist before the connection exchanges its single preflight.
+        for dna in [&dna_b, &dna_a] {
+            node.join(dna.clone(), agent.clone(), None, None)
+                .await
+                .unwrap();
+            retry_fn_until_timeout(
+                || async {
+                    node.peer_store(dna.clone())
+                        .await
+                        .unwrap()
+                        .get(agent.to_k2_agent())
+                        .await
+                        .unwrap()
+                        .is_some_and(|info| info.url.is_some())
+                },
+                Some(20_000),
+                None,
+            )
+            .await
+            .expect("local agent info was not published");
+        }
+        nodes.push((agent, node));
+    }
+    let (bob, node_b) = nodes.pop().unwrap();
+    let (alice, node_a) = nodes.pop().unwrap();
+
+    // Neither node can already know the other's agents through another discovery path.
+    for (node, remote) in [(&node_a, &bob), (&node_b, &alice)] {
+        for dna in [&dna_a, &dna_b] {
+            assert!(node
+                .peer_store(dna.clone())
+                .await
+                .unwrap()
+                .get(remote.to_k2_agent())
+                .await
+                .unwrap()
+                .is_none());
+        }
+    }
+
+    let bob_a = node_b
+        .peer_store(dna_a.clone())
+        .await
+        .unwrap()
+        .get(bob.to_k2_agent())
+        .await
+        .unwrap()
+        .unwrap();
+    let bob_b = node_b
+        .peer_store(dna_b.clone())
+        .await
+        .unwrap()
+        .get(bob.to_k2_agent())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(bob_a.url, bob_b.url, "both spaces must share a peer URL");
+
+    // Seed only space A so its first call establishes the shared connection.
+    node_a
+        .peer_store(dna_a.clone())
+        .await
+        .unwrap()
+        .insert(vec![bob_a])
+        .await
+        .unwrap();
+    let response = node_a
+        .call_remote(
+            dna_a,
+            bob.clone(),
+            ExternIO(b"space A".to_vec()),
+            Signature([0; 64]),
+            None,
+        )
+        .await
+        .expect("space A call must establish the connection");
+    let response: Vec<u8> = UnsafeBytes::from(response).into();
+    assert_eq!(response, b"got_call_remote: space A");
+
+    // Space B was never seeded: both peers must have learned it from preflight.
+    for (node, remote) in [(&node_a, &bob), (&node_b, &alice)] {
+        assert!(
+            node.peer_store(dna_b.clone())
+                .await
+                .unwrap()
+                .get(remote.to_k2_agent())
+                .await
+                .unwrap()
+                .is_some(),
+            "preflight did not discover the remote agent in space B"
+        );
+        let response = node
+            .call_remote(
+                dna_b.clone(),
+                remote.clone(),
+                ExternIO(b"space B".to_vec()),
+                Signature([0; 64]),
+                None,
+            )
+            .await
+            .expect("space B call must reuse the connection in both directions");
+        let response: Vec<u8> = UnsafeBytes::from(response).into();
+        assert_eq!(response, b"got_call_remote: space B");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_remote_signal() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());

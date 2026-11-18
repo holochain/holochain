@@ -103,7 +103,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use kitsune2_api::AgentInfoSigned;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Instant;
@@ -156,6 +156,10 @@ pub struct Conductor {
     /// The map of dna hash spaces.
     pub(crate) spaces: Spaces,
 
+    /// Keeps resources alive during DNA registration, updates, and app/cell
+    /// lifecycle operations while excluding final cleanup.
+    pub(super) dna_resource_lock: tokio::sync::RwLock<()>,
+
     /// Set to true when `conductor.shutdown()` has been called, so that other
     /// tasks can check on the shutdown status
     shutting_down: Arc<AtomicBool>,
@@ -203,6 +207,10 @@ pub struct Conductor {
     pub(crate) wasmer_module_cache: Arc<ModuleCache>,
 
     app_auth_token_store: RwShare<AppAuthTokenStore>,
+
+    /// Held while a clone cell is created, so that two simultaneous calls cannot run genesis
+    /// for the identical clone cell.
+    create_clone_cell_lock: tokio::sync::Mutex<()>,
 
     /// Container to connect app signals to app interfaces, by installed app id.
     app_broadcast: AppBroadcast,
@@ -286,6 +294,7 @@ mod startup_shutdown_impls {
 
             Self {
                 spaces,
+                dna_resource_lock: tokio::sync::RwLock::new(()),
                 running_cells: RwShare::new(IndexMap::new()),
                 restoring_cells: RwShare::new(HashSet::new()),
                 config,
@@ -304,6 +313,7 @@ mod startup_shutdown_impls {
                 wasm_backend,
                 wasmer_module_cache,
                 app_auth_token_store: RwShare::default(),
+                create_clone_cell_lock: Default::default(),
                 app_broadcast: AppBroadcast::default(),
             }
         }
@@ -642,18 +652,30 @@ mod dna_impls {
         }
 
         pub(crate) async fn load_wasms_into_ribosomes(&self) -> ConductorResult<()> {
+            let _resource_guard = self.dna_resource_lock.read().await;
             // Get all installed cells from conductor state
             let state = self.get_state().await?;
 
             let enabled_apps: Vec<_> = state.enabled_apps().map(|(_, app)| app.clone()).collect();
             for enabled_app in enabled_apps {
-                self.load_wasms_into_ribosome_for_app(&enabled_app).await?;
+                self.load_wasms_into_ribosome_for_app_inner(&enabled_app)
+                    .await?;
             }
 
             Ok(())
         }
 
         pub(crate) async fn load_wasms_into_ribosome_for_app(
+            &self,
+            installed_app: &InstalledApp,
+        ) -> ConductorResult<()> {
+            let _resource_guard = self.dna_resource_lock.read().await;
+            self.load_wasms_into_ribosome_for_app_inner(installed_app)
+                .await
+        }
+
+        /// Load an app's resources while the caller holds the DNA resource lock.
+        pub(super) async fn load_wasms_into_ribosome_for_app_inner(
             &self,
             installed_app: &InstalledApp,
         ) -> ConductorResult<()> {
@@ -790,6 +812,16 @@ mod dna_impls {
         /// Install a [`DnaFile`] in this Conductor
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn register_dna_file(
+            &self,
+            cell_id: CellId,
+            dna_file: DnaFile,
+        ) -> ConductorResult<()> {
+            let _resource_guard = self.dna_resource_lock.read().await;
+            self.register_dna_file_inner(cell_id, dna_file).await
+        }
+
+        /// Register resources while the caller holds the DNA resource lock.
+        pub(super) async fn register_dna_file_inner(
             &self,
             cell_id: CellId,
             dna_file: DnaFile,
@@ -1240,6 +1272,10 @@ mod app_impls {
             flags: InstallAppCommonFlags,
             init_properties: InitPropertiesMap,
         ) -> ConductorResult<InstalledApp> {
+            // Keep registered resources alive through genesis until the app is
+            // persisted and cleanup can see its DNA references.
+            let _resource_guard = self.dna_resource_lock.read().await;
+
             if flags.restore_from_dht {
                 if agent_key.is_none() {
                     return Err(ConductorError::InvalidInstallAppPayload(
@@ -1294,7 +1330,7 @@ mod app_impls {
 
             for (dna, _) in ops.dnas_to_register {
                 let cell_id = CellId::new(dna.dna_hash().clone(), agent_key.clone());
-                self.clone().register_dna_file(cell_id, dna).await?;
+                self.register_dna_file_inner(cell_id, dna).await?;
             }
 
             if flags.restore_from_dht {
@@ -1497,8 +1533,7 @@ mod app_impls {
                 self.remove_cells(&cells_to_remove).await;
 
                 // Delete the cells' databases and drop the now-unused spaces.
-                self.delete_cell_databases(app.id(), cells_to_remove.clone())
-                    .await?;
+                self.delete_cell_databases(cells_to_remove.clone()).await?;
 
                 // Remove the app's signal broadcast from conductor.
                 let installed_app_ids = self
@@ -1641,6 +1676,7 @@ mod app_impls {
             installed_app_id: &InstalledAppId,
             mut memproofs: MemproofMap,
         ) -> ConductorResult<()> {
+            let _resource_guard = self.dna_resource_lock.read().await;
             let state = self.get_state().await?;
 
             let app = state.get_app(installed_app_id)?;
@@ -1654,7 +1690,7 @@ mod app_impls {
                 })
                 .collect();
 
-            self.load_wasms_into_ribosome_for_app(app).await?;
+            self.load_wasms_into_ribosome_for_app_inner(app).await?;
 
             crate::conductor::conductor::genesis_cells(self.clone(), cells_to_genesis).await?;
 
@@ -2215,11 +2251,13 @@ mod clone_cell_impls {
             installed_app_id: &InstalledAppId,
             payload: CreateCloneCellPayload,
         ) -> ConductorResult<ClonedCell> {
+            let _resource_guard = self.dna_resource_lock.read().await;
             let CreateCloneCellPayload {
                 role_name,
                 modifiers,
                 membrane_proof,
                 name,
+                init_properties,
             } = payload;
 
             if !modifiers.has_some_option_set() {
@@ -2227,6 +2265,12 @@ mod clone_cell_impls {
                     "neither network_seed nor properties provided for clone cell".to_string(),
                 ));
             }
+
+            // The duplicate cell check, genesis and the state update are not atomic. Without this
+            // lock, two simultaneous calls for the identical clone cell both run genesis and fork
+            // the source chain of the clone cell.
+            let conductor = self.clone();
+            let _create_clone_cell_guard = conductor.create_clone_cell_lock.lock().await;
 
             let state = self.get_state().await?;
             let app = state.get_app(installed_app_id)?;
@@ -2241,28 +2285,44 @@ mod clone_cell_impls {
                 .await?;
                 source_chain.valid_create_agent_key_action().await?;
             }
-            // add cell to app
-            let clone_cell = self
-                .add_clone_cell_to_app(
-                    installed_app_id.clone(),
+            // Register the clone cell DNA and run genesis before the clone cell is added to the
+            // app, as `install_app_common` does. A failed genesis must not leave a cell without
+            // genesis in the conductor state, because the conductor cannot start with such a cell.
+            let (clone_cell_id, original_dna_hash, name, dna_modifiers) = self
+                .register_clone_cell_dna(
+                    installed_app_id,
                     app.agent_key.clone(),
-                    role_name.clone(),
+                    &role_name,
                     modifiers.serialized()?,
                     name,
                 )
                 .await?;
 
             // run genesis on cloned cell
-            let cells = vec![(clone_cell.cell_id.clone(), membrane_proof)];
+            let cells = vec![(clone_cell_id.clone(), membrane_proof)];
             crate::conductor::conductor::genesis_cells(self.clone(), cells).await?;
+
+            // add cell to app
+            let clone_cell = self
+                .add_clone_cell_to_app(
+                    installed_app_id.clone(),
+                    role_name.clone(),
+                    clone_cell_id,
+                    original_dna_hash,
+                    name,
+                    dna_modifiers,
+                    init_properties,
+                )
+                .await?;
             let state = self.get_state().await?;
             let app = state.get_app(installed_app_id)?;
             let p2p_config_override = Self::p2p_config_overrides(&app.manifest);
-            self.create_cells_and_startup(
-                [clone_cell.cell_id.clone()].into_iter(),
-                p2p_config_override,
-            )
-            .await?;
+            self.clone()
+                .create_cells_and_startup_inner(
+                    [clone_cell.cell_id.clone()].into_iter(),
+                    p2p_config_override,
+                )
+                .await?;
             Ok(clone_cell)
         }
 
@@ -2298,6 +2358,7 @@ mod clone_cell_impls {
             installed_app_id: &InstalledAppId,
             payload: &EnableCloneCellPayload,
         ) -> ConductorResult<ClonedCell> {
+            let _resource_guard = self.dna_resource_lock.read().await;
             let conductor = self.clone();
             let (_, enabled_cell) = self
                 .update_state_prime({
@@ -2330,11 +2391,12 @@ mod clone_cell_impls {
             let app = state.get_app(installed_app_id)?;
             let p2p_config_override = Self::p2p_config_overrides(&app.manifest);
 
-            self.create_cells_and_startup(
-                [enabled_cell.cell_id.clone()].into_iter(),
-                p2p_config_override,
-            )
-            .await?;
+            self.clone()
+                .create_cells_and_startup_inner(
+                    [enabled_cell.cell_id.clone()].into_iter(),
+                    p2p_config_override,
+                )
+                .await?;
             Ok(enabled_cell)
         }
 
@@ -2347,7 +2409,7 @@ mod clone_cell_impls {
                 clone_cell_id,
             }: &DeleteCloneCellPayload,
         ) -> ConductorResult<()> {
-            let (_, cell_id) = self
+            let (_, (cell_id, clone_id)) = self
                 .update_state_prime({
                     let app_id = app_id.clone();
                     let clone_cell_id = clone_cell_id.clone();
@@ -2363,12 +2425,20 @@ mod clone_cell_impls {
                             .1;
                         let clone_id = app.get_clone_id(&clone_cell_id)?;
                         app.delete_clone_cell(&clone_id)?;
-                        Ok((state, cell_id))
+                        Ok((state, (cell_id, clone_id)))
                     }
                 })
                 .await?;
-            self.delete_cell_databases(app_id, vec![cell_id]).await?;
-            Ok(())
+            // The clone is already gone from the state, so neither cleanup can be retried
+            // through it. Attempt both and report the first error.
+            run_both_cleanups(
+                self.delete_cell_databases(vec![cell_id]),
+                self.spaces
+                    .conductor_store
+                    .delete_init_properties(app_id, &clone_id.to_string())
+                    .map_err(ConductorError::from),
+            )
+            .await
         }
     }
 }
@@ -2382,6 +2452,18 @@ mod app_status_impls {
     impl Conductor {
         /// Instantiate cells, add them to the conductor's state, then initialize them.
         pub(crate) async fn create_cells_and_startup(
+            self: Arc<Self>,
+            cell_ids: impl Iterator<Item = CellId>,
+            config_override: Option<CellConfigOverrides>,
+        ) -> ConductorResult<()> {
+            let _resource_guard = self.dna_resource_lock.read().await;
+            self.clone()
+                .create_cells_and_startup_inner(cell_ids, config_override)
+                .await
+        }
+
+        /// Start cells while the caller holds the DNA resource lock.
+        pub(super) async fn create_cells_and_startup_inner(
             self: Arc<Self>,
             cell_ids: impl Iterator<Item = CellId>,
             config_override: Option<CellConfigOverrides>,
@@ -2505,6 +2587,7 @@ mod app_status_impls {
             self: Arc<Self>,
             app_id: InstalledAppId,
         ) -> ConductorResult<InstalledApp> {
+            let _resource_guard = self.dna_resource_lock.read().await;
             // Check if app can be enabled.
             let state = self.clone().get_state().await?;
             let app = state.get_app(&app_id)?;
@@ -2531,7 +2614,7 @@ mod app_status_impls {
                 AppStatus::Disabled(_) => {}
             }
 
-            self.load_wasms_into_ribosome_for_app(app).await?;
+            self.load_wasms_into_ribosome_for_app_inner(app).await?;
 
             // Prepare module config overrides from app manifest
             let config_override = Self::p2p_config_overrides(&app.manifest);
@@ -2539,7 +2622,7 @@ mod app_status_impls {
             // Determine cells to create
             let cell_ids_in_app = app.all_enabled_cells();
             self.clone()
-                .create_cells_and_startup(cell_ids_in_app, config_override)
+                .create_cells_and_startup_inner(cell_ids_in_app, config_override)
                 .await?;
 
             // Set app status to enabled in conductor state.
@@ -2597,10 +2680,9 @@ mod app_status_impls {
                 .update_state_prime_and_init_properties(
                     move |mut state| {
                         let disabled_app = state.add_app(app)?;
-                        Ok((state, disabled_app))
+                        Ok((state, disabled_app, init_properties))
                     },
                     &app_id,
-                    &init_properties,
                 )
                 .await?;
             Ok(disabled_app)
@@ -2663,9 +2745,9 @@ mod state_impls {
         }
 
         /// Update the internal state with a pure function mapping old state to new,
-        /// optionally writing `init_properties` rows for `app_id` in the same transaction.
+        /// writing the `init_properties` rows returned by `f` for `app_id` in the same transaction.
         ///
-        /// When `init_properties` is empty the `app_id` is not used. Callers
+        /// When the returned `init_properties` are empty the `app_id` is not used. Callers
         /// that do not need to persist init properties should use [`Self::update_state_prime`].
         ///
         /// Any value produced by the state change will be the output of this function.
@@ -2673,16 +2755,15 @@ mod state_impls {
             &self,
             f: F,
             app_id: &str,
-            init_properties: &InitPropertiesMap,
         ) -> ConductorResult<(ConductorState, O)>
         where
-            F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
+            F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O, InitPropertiesMap)>
+                + Send
+                + 'static,
             O: Send + 'static,
         {
             self.check_running()?;
-            self.spaces
-                .update_state_prime(f, app_id, init_properties)
-                .await
+            self.spaces.update_state_prime(f, app_id).await
         }
 
         /// Convenience wrapper around [`Self::update_state_prime_and_init_properties`] for callers
@@ -2695,8 +2776,14 @@ mod state_impls {
             F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
             O: Send + 'static,
         {
-            self.update_state_prime_and_init_properties(f, "", &InitPropertiesMap::new())
-                .await
+            self.update_state_prime_and_init_properties(
+                move |state| {
+                    let (state, output) = f(state)?;
+                    Ok((state, output, InitPropertiesMap::new()))
+                },
+                "",
+            )
+            .await
         }
     }
 }
@@ -3454,6 +3541,8 @@ mod misc_impls {
             coordinator_zomes: CoordinatorZomes,
             wasms: Vec<DnaWasmHashed>,
         ) -> ConductorResult<()> {
+            let _resource_guard = self.dna_resource_lock.read().await;
+
             // Check if any WASMs are missing, that needs to block proceeding
             let required_wasms: HashSet<ZomeHash> = coordinator_zomes
                 .iter()
@@ -3676,12 +3765,30 @@ mod accessor_impls {
                 .cloned())
         }
 
-        /// Read the init properties supplied at install time for the role that
-        /// the given cell is provisioned for.
+        /// The key under which a cell's init properties are stored.
         ///
-        /// Returns `None` if no app contains the cell, the cell is not a
-        /// provisioned cell of any role, or no init properties were supplied
-        /// for that role.
+        /// This is the role name of a provisioned cell, or the clone id of a clone cell,
+        /// enabled or disabled. Role names cannot contain the clone id delimiter, so the
+        /// two never collide.
+        fn init_properties_key_for_cell(app: &InstalledApp, cell_id: &CellId) -> Option<String> {
+            if let Some((role_name, _)) = app
+                .provisioned_cells()
+                .find(|(_, provisioned_cell_id)| provisioned_cell_id == cell_id)
+            {
+                return Some(role_name.clone());
+            }
+            app.clone_cells()
+                .chain(app.disabled_clone_cells())
+                .find(|(_, clone_cell_id)| clone_cell_id == cell_id)
+                .map(|(clone_id, _)| clone_id.to_string())
+        }
+
+        /// Read the init properties supplied for the role that the given cell is
+        /// provisioned for, or for the clone id of a clone cell, enabled or disabled.
+        ///
+        /// Returns `None` if no app contains the cell, the cell is neither a
+        /// provisioned cell nor a clone cell, or no init properties were
+        /// supplied for it.
         pub async fn get_init_properties_for_cell(
             &self,
             cell_id: &CellId,
@@ -3690,23 +3797,20 @@ mod accessor_impls {
             let Some(app) = state.find_app_containing_cell(cell_id) else {
                 return Ok(None);
             };
-            let Some((role_name, _)) = app
-                .provisioned_cells()
-                .find(|(_, provisioned_cell_id)| provisioned_cell_id == cell_id)
-            else {
+            let Some(key) = Self::init_properties_key_for_cell(app, cell_id) else {
                 return Ok(None);
             };
             let app_id = app.id().clone();
-            let role_name = role_name.clone();
             Ok(self
                 .spaces
                 .conductor_store
                 .as_read()
-                .get_init_properties(&app_id, &role_name)
+                .get_init_properties(&app_id, &key)
                 .await?)
         }
 
-        /// Remove the init properties for the role that the given cell is provisioned for.
+        /// Remove the init properties for the role that the given cell is provisioned for,
+        /// or for the clone id of a clone cell, enabled or disabled.
         /// Called after a successful `init` so the seed material does not remain past its use.
         pub async fn delete_init_properties_for_cell(
             &self,
@@ -3716,17 +3820,13 @@ mod accessor_impls {
             let Some(app) = state.find_app_containing_cell(cell_id) else {
                 return Ok(());
             };
-            let Some((role_name, _)) = app
-                .provisioned_cells()
-                .find(|(_, provisioned_cell_id)| provisioned_cell_id == cell_id)
-            else {
+            let Some(key) = Self::init_properties_key_for_cell(app, cell_id) else {
                 return Ok(());
             };
             let app_id = app.id().clone();
-            let role_name = role_name.clone();
             self.spaces
                 .conductor_store
-                .delete_init_properties(&app_id, &role_name)
+                .delete_init_properties(&app_id, &key)
                 .await?;
             Ok(())
         }
@@ -3899,6 +3999,39 @@ mod countersigning_impls {
     }
 }
 
+/// Run two cleanups in order, running the second even when the first fails.
+///
+/// Returns the first error, or the second cleanup's error if only that one failed.
+async fn run_both_cleanups<F, S>(first: F, second: S) -> ConductorResult<()>
+where
+    F: std::future::Future<Output = ConductorResult<()>>,
+    S: std::future::Future<Output = ConductorResult<()>>,
+{
+    let first = first.await;
+    let second = second.await;
+    first.and(second)
+}
+
+/// Remove a SQLite database file together with its `-shm` and `-wal` files.
+///
+/// Returns the error of the main file if it cannot be removed; failures on
+/// the support files are only logged, since they may legitimately not exist.
+async fn remove_database_files(path: &Path) -> Result<(), ffs::IoError> {
+    ffs::remove_file(path).await?;
+    tracing::info!("Deleted DB file {path}", path = path.display());
+    let stem = path.to_string_lossy();
+    for ext in ["shm", "wal"] {
+        let support_path = PathBuf::from(format!("{stem}-{ext}"));
+        if let Err(err) = ffs::remove_file(&support_path).await {
+            let err = err.remove_backtrace();
+            tracing::warn!(?err, "Failed to remove DB support file");
+        } else {
+            tracing::info!("Deleted file {path}", path = support_path.display());
+        }
+    }
+    Ok(())
+}
+
 /// Private methods, only used within the Conductor, never called from outside.
 impl Conductor {
     fn add_admin_port(&self, port: u16) {
@@ -3907,66 +4040,113 @@ impl Conductor {
 
     /// Delete cell databases.
     ///
-    /// All DHT data for a DNA no longer used by any installed app is deleted.
+    /// For every DNA no longer used by any installed app, delete its DHT and
+    /// peer-meta databases, its DNA definition, and the entry definitions and
+    /// WASM code no other stored DNA definition references.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    async fn delete_cell_databases(
-        &self,
-        app_id: &InstalledAppId,
-        cell_ids: Vec<CellId>,
-    ) -> ConductorResult<()> {
-        // Find DNAs of this app which are not used by any other app or agent.
+    async fn delete_cell_databases(&self, cell_ids: Vec<CellId>) -> ConductorResult<()> {
+        let _resource_guard = self.dna_resource_lock.write().await;
+
+        // The removed cells are already absent from state. Count every
+        // remaining app, including a concurrent reinstall with the same ID.
         let remaining_dnas = self
             .get_state()
             .await?
             .installed_apps()
-            .iter()
-            .filter(|(id, _)| *id != app_id)
-            .flat_map(|(_, app)| app.all_cells().map(|cell_id| cell_id.dna_hash().clone()))
+            .values()
+            .flat_map(|app| app.all_cells().map(|cell_id| cell_id.dna_hash().clone()))
             .collect::<Vec<_>>();
-        let dnas_to_purge = cell_ids
-            .iter()
-            .map(|cell_id| cell_id.dna_hash())
-            .filter(|dna| !remaining_dnas.contains(dna))
-            .collect::<Vec<_>>();
+        // One hash per DNA to purge; every agent-specific definition is read
+        // to learn which zomes belong to the DNA.
+        let mut dnas_to_purge = HashSet::new();
+        for cell_id in &cell_ids {
+            if !remaining_dnas.contains(cell_id.dna_hash()) {
+                dnas_to_purge.insert(cell_id.dna_hash().clone());
+            }
+        }
 
         if !dnas_to_purge.is_empty() {
-            tracing::info!(?dnas_to_purge, "Purging DNAs");
+            let dnas = dnas_to_purge.iter().collect::<Vec<_>>();
+            tracing::info!(?dnas, "Purging DNAs");
         }
 
-        // For any DNAs no longer represented in any installed app, delete the
-        // per-DNA store so a reinstall doesn't inherit stale rows from the
-        // previous installation.
-        for dna_hash in dnas_to_purge {
-            let dht_store = self.spaces.dht_store(dna_hash)?;
-            let dht_store_id = holochain_state::data::Dht::new(Arc::new(dna_hash.clone()));
-            let dht_store_path = self.spaces.db_dir.as_ref().as_ref().join(
-                holochain_state::data::DatabaseIdentifier::database_id(&dht_store_id),
+        // Purge each DNA independently: the cells are already gone from
+        // state, so a DNA skipped here could not be cleaned up later.
+        let mut first_err = None;
+        for dna_hash in &dnas_to_purge {
+            if let Err(err) = self.purge_dna_resources(dna_hash).await {
+                tracing::error!(?err, ?dna_hash, "Failed to purge DNA resources");
+                first_err.get_or_insert(err);
+            }
+        }
+
+        first_err.map_or(Ok(()), Err)
+    }
+
+    /// Delete the databases, definitions and ribosomes of a single DNA.
+    ///
+    /// The caller must hold the `dna_resource_lock` write guard.
+    async fn purge_dna_resources(&self, dna_hash: &DnaHash) -> ConductorResult<()> {
+        let dht_store = self.spaces.dht_store(dna_hash)?;
+        let peer_meta_store = self.spaces.peer_meta_store(dna_hash)?;
+
+        // Drop the cached space so a reinstall of this DNA opens fresh,
+        // migrated databases, then close the pools still held by the store
+        // handles. Platforms that cannot unlink open files, such as Windows,
+        // need every connection closed before the files can be removed.
+        self.spaces.remove_space(dna_hash);
+        dht_store.close().await;
+        peer_meta_store.close().await;
+
+        let db_dir: &Path = self.spaces.db_dir.as_ref().as_ref();
+        let dna_hash_arc = Arc::new(dna_hash.clone());
+
+        let dht_store_path = db_dir.join(holochain_state::data::DatabaseIdentifier::database_id(
+            &holochain_state::data::Dht::new(dna_hash_arc.clone()),
+        ));
+        if let Err(err) = remove_database_files(&dht_store_path).await {
+            tracing::warn!(
+                ?err,
+                "Could not remove DhtStore DB file, probably because it is still in use. Purging all data instead."
             );
-            if let Err(err) = ffs::remove_file(&dht_store_path).await {
-                tracing::warn!(
-                    ?err,
-                    "Could not remove DhtStore DB file, probably because it is still in use. Purging all data instead."
-                );
-                dht_store.purge_all().await.map_err(ConductorError::other)?;
-            } else {
-                tracing::info!("Deleted DhtStore DB file {}", dht_store_path.display());
-            }
-            let stem = dht_store_path.to_string_lossy();
-            for ext in ["shm", "wal"] {
-                let support_path = PathBuf::from(format!("{stem}-{ext}"));
-                if let Err(err) = ffs::remove_file(&support_path).await {
-                    let err = err.remove_backtrace();
-                    tracing::warn!(?err, "Failed to remove DhtStore DB support file");
-                } else {
-                    tracing::info!("Deleted file {}", support_path.display());
-                }
-            }
-
-            // Drop the cached space now its databases are gone, so a reinstall
-            // of this DNA opens fresh, migrated databases rather than reusing
-            // pools that point at the deleted files.
-            self.spaces.remove_space(dna_hash);
+            // The closed pool cannot run queries; reopen the database to purge it.
+            self.spaces
+                .dht_store(dna_hash)?
+                .purge_all()
+                .await
+                .map_err(ConductorError::other)?;
         }
+
+        let peer_meta_store_path =
+            db_dir.join(holochain_state::data::DatabaseIdentifier::database_id(
+                &holochain_state::data::PeerMetaStore::new(dna_hash_arc),
+            ));
+        if let Err(err) = remove_database_files(&peer_meta_store_path).await {
+            tracing::warn!(
+                ?err,
+                "Could not remove PeerMetaStore DB file, probably because it is still in use. Purging all data instead."
+            );
+            self.spaces.peer_meta_store(dna_hash)?.purge_all().await?;
+        }
+
+        self.delete_dna_definitions(dna_hash).await?;
+        self.ribosome_store
+            .share_mut(|store| store.remove_ribosomes_for_dna(dna_hash));
+
+        Ok(())
+    }
+
+    /// Delete a DNA's definition and whatever it alone referenced.
+    ///
+    /// Removes the `DnaDef` rows of the DNA for every agent, then the entry
+    /// definitions of its integrity zomes and the WASM code of all its zomes,
+    /// skipping any zome hash another stored DNA definition still uses.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    async fn delete_dna_definitions(&self, dna_hash: &DnaHash) -> ConductorResult<()> {
+        self.spaces
+            .dna_def_store
+            .delete_with_resources(dna_hash)
+            .await?;
 
         Ok(())
     }
@@ -3986,41 +4166,31 @@ impl Conductor {
         Ok(app)
     }
 
-    /// Associate a new clone cell with an existing app.
+    /// Create the DNA of a new clone cell from the DNA of its base cell and register it in the
+    /// ribosome store. The conductor state does not change.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    async fn add_clone_cell_to_app(
+    async fn register_clone_cell_dna(
         &self,
-        app_id: InstalledAppId,
+        app_id: &InstalledAppId,
         agent_key: AgentPubKey,
-        role_name: RoleName,
+        role_name: &RoleName,
         dna_modifiers: DnaModifiersOpt,
         name: Option<String>,
-    ) -> ConductorResult<ClonedCell> {
-        let ribosome_store = &self.ribosome_store;
+    ) -> ConductorResult<(CellId, DnaHash, String, DnaModifiers)> {
         // retrieve base cell DNA hash from conductor
-        let (_, base_cell_dna_hash) = self
-            .update_state_prime({
-                let app_id = app_id.clone();
-                let role_name = role_name.clone();
-                move |mut state| {
-                    let app = state.get_app_mut(&app_id)?;
-                    let app_role = app.primary_role(&role_name)?;
-                    if app_role.is_clone_limit_reached() {
-                        return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
-                            app_role.clone_limit(),
-                            Box::new(app_role.clone()),
-                        )));
-                    }
-                    let original_dna_hash = app_role.dna_hash().clone();
-                    Ok((state, original_dna_hash))
-                }
-            })
-            .await?;
-        let original_dna_hash = base_cell_dna_hash.clone();
+        let state = self.get_state().await?;
+        let app_role = state.get_app(app_id)?.primary_role(role_name)?;
+        if app_role.is_clone_limit_reached() {
+            return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
+                app_role.clone_limit(),
+                Box::new(app_role.clone()),
+            )));
+        }
+        let original_dna_hash = app_role.dna_hash().clone();
 
         // clone cell from base cell DNA
-        let clone_dna = ribosome_store.share_ref(|rs| {
-            let base_cell_id = CellId::new(base_cell_dna_hash, agent_key.clone());
+        let clone_dna = self.ribosome_store.share_ref(|rs| {
+            let base_cell_id = CellId::new(original_dna_hash.clone(), agent_key.clone());
             let mut dna_file = rs
                 .get_dna_def(&base_cell_id)
                 .ok_or(ConductorError::CellMissing(base_cell_id))?
@@ -4035,47 +4205,82 @@ impl Conductor {
         let clone_dna_hash = clone_dna.to_hash().to_owned();
         let clone_cell_id = CellId::new(clone_dna_hash, agent_key);
 
-        let clone_cell_id_move = clone_cell_id.clone();
-        // add clone cell to app and instantiate resulting clone cell
-        let (_, installed_clone_cell) = self
-            .update_state_prime(move |mut state| {
-                let state_copy = state.clone();
-                let app = state.get_app_mut(&app_id)?;
-
-                // if cell id of new clone cell already exists, reject as duplicate
-                if state_copy
-                    .installed_apps()
-                    .iter()
-                    .flat_map(|(_, app)| app.all_cells())
-                    .any(|cell_id| cell_id == clone_cell_id_move)
-                {
-                    return Err(ConductorError::AppError(AppError::DuplicateCellId(
-                        clone_cell_id_move,
-                    )));
-                }
-
-                let clone_id = app.add_clone(&role_name, clone_cell_id_move.dna_hash())?;
-                let installed_clone_cell = ClonedCell {
-                    cell_id: clone_cell_id_move,
-                    clone_id,
-                    original_dna_hash,
-                    dna_modifiers,
-                    name,
-                    enabled: true,
-                };
-                Ok((state, installed_clone_cell))
-            })
-            .await?;
+        // if cell id of new clone cell already exists, reject as duplicate
+        if state
+            .installed_apps()
+            .iter()
+            .flat_map(|(_, app)| app.all_cells())
+            .any(|cell_id| cell_id == clone_cell_id)
+        {
+            return Err(ConductorError::AppError(AppError::DuplicateCellId(
+                clone_cell_id,
+            )));
+        }
 
         #[cfg(feature = "test_utils")]
         self.inline_zome_store
-            .handle_clone_created(&installed_clone_cell);
+            .handle_clone_created(&original_dna_hash, clone_cell_id.dna_hash());
 
         // register clone cell dna in ribosome store
         // Note: No WASMs provided in the DnaFile because they should already have been stored
         //       when the cell being cloned was installed.
-        self.register_dna_file(clone_cell_id, DnaFile::new(clone_dna, []).await)
+        self.register_dna_file_inner(clone_cell_id.clone(), DnaFile::new(clone_dna, []).await)
             .await?;
+
+        Ok((clone_cell_id, original_dna_hash, name, dna_modifiers))
+    }
+
+    /// Associate a new clone cell with an existing app.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    #[allow(clippy::too_many_arguments)]
+    async fn add_clone_cell_to_app(
+        &self,
+        app_id: InstalledAppId,
+        role_name: RoleName,
+        clone_cell_id: CellId,
+        original_dna_hash: DnaHash,
+        name: String,
+        dna_modifiers: DnaModifiers,
+        init_properties: Option<InitProperties>,
+    ) -> ConductorResult<ClonedCell> {
+        let app_id_move = app_id.clone();
+        // add clone cell to app and instantiate resulting clone cell
+        let (_, installed_clone_cell) = self
+            .update_state_prime_and_init_properties(
+                move |mut state| {
+                    let state_copy = state.clone();
+                    let app = state.get_app_mut(&app_id_move)?;
+
+                    // if cell id of new clone cell already exists, reject as duplicate
+                    if state_copy
+                        .installed_apps()
+                        .iter()
+                        .flat_map(|(_, app)| app.all_cells())
+                        .any(|cell_id| cell_id == clone_cell_id)
+                    {
+                        return Err(ConductorError::AppError(AppError::DuplicateCellId(
+                            clone_cell_id,
+                        )));
+                    }
+
+                    let clone_id = app.add_clone(&role_name, clone_cell_id.dna_hash())?;
+                    let init_properties = init_properties
+                        .map(|p| InitPropertiesMap::from([(clone_id.to_string(), p)]))
+                        .unwrap_or_default();
+                    let installed_clone_cell = ClonedCell {
+                        cell_id: clone_cell_id,
+                        clone_id,
+                        original_dna_hash,
+                        dna_modifiers,
+                        name,
+                        enabled: true,
+                    };
+                    Ok((state, installed_clone_cell, init_properties))
+                },
+                &app_id,
+            )
+            .await?;
+
         Ok(installed_clone_cell)
     }
 

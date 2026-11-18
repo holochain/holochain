@@ -168,6 +168,15 @@ impl DhtStore<DbWrite<Dht>> {
         self.db.identifier().dna_hash()
     }
 
+    /// Close the connection pool shared by every clone of this store.
+    ///
+    /// Must be called before the database file is deleted, because some
+    /// platforms cannot unlink a file that is still open. The store and its
+    /// clones are unusable afterwards.
+    pub async fn close(&self) {
+        self.db.close().await;
+    }
+
     /// Maximum number of connections in this store's underlying pool. Used by
     /// tests that assert the configured reader limit reaches the DB pool.
     #[cfg(any(test, feature = "inspection"))]

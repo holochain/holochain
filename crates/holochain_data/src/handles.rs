@@ -108,6 +108,17 @@ impl<I: DatabaseIdentifier> DbWrite<I> {
         self.0.pool()
     }
 
+    /// Close the connection pool, releasing the database file.
+    ///
+    /// Waits for in-use connections to be returned, then closes every
+    /// connection. The pool is shared by all clones of this handle, so they
+    /// all fail with a pool-closed error afterwards. Closing is required
+    /// before the database file can be deleted on platforms that refuse to
+    /// unlink open files.
+    pub async fn close(&self) {
+        self.pool().close().await;
+    }
+
     /// Begin a read-write transaction.
     ///
     /// The returned [`TxWrite`] exposes the same operations as this

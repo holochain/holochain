@@ -34,6 +34,7 @@ pub fn create_clone_cell(
                         modifiers: input.modifiers,
                         membrane_proof: input.membrane_proof,
                         name: input.name,
+                        init_properties: None,
                     })
                     .await
             })

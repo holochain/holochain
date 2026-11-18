@@ -84,6 +84,18 @@ impl WasmStore<holochain_data::DbWrite<holochain_data::kind::Wasm>> {
             .map_err(StateMutationError::from)
     }
 
+    /// Delete the WASM module with this hash unless a stored DNA definition
+    /// still references it.
+    ///
+    /// Its compiled form is removed with it. Returns `true` if the module was
+    /// deleted.
+    pub async fn delete_if_unreferenced(&self, hash: &WasmHash) -> StateMutationResult<bool> {
+        self.db
+            .delete_wasm_if_unreferenced(hash)
+            .await
+            .map_err(StateMutationError::from)
+    }
+
     /// Downgrade this writable store to a read-only store.
     pub fn as_read(&self) -> WasmStoreRead {
         WasmStore::new(self.db.as_ref().clone())

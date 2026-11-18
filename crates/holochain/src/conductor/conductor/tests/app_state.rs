@@ -286,6 +286,7 @@ async fn delete_clone_cell_deletes_cell_databases() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("1".to_string()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await
@@ -298,6 +299,7 @@ async fn delete_clone_cell_deletes_cell_databases() {
                 modifiers: DnaModifiersOpt::none().with_network_seed("2".to_string()),
                 membrane_proof: None,
                 name: None,
+                init_properties: None,
             },
         )
         .await
@@ -419,6 +421,7 @@ async fn disabled_clone_cell_cannot_be_called() {
                     modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
                     membrane_proof: None,
                     name: None,
+                    init_properties: None,
                 },
             )
             .await

@@ -208,8 +208,12 @@ impl DhtStore<DbRead<Dht>> {
             .collect()
     }
 
-    /// Integrated warrants authored by `author` (the warrant issuer),
-    /// reconstructed as `WarrantOp`s.
+    /// Get warrants issued by `author`, of any validation status,
+    /// whether in limbo or integrated. The result is reconstructed as `WarrantOp`s and
+    /// ordered by timestamp descending.
+    ///
+    /// Available in tests or with the `inspection` feature enabled.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn warrants_by_author(
         &self,
         author: AgentPubKey,
@@ -2051,7 +2055,7 @@ impl DhtStore<DbRead<Dht>> {
             .collect())
     }
 
-    /// Warrants held against `warrantee`'s chain, as signed warrants.
+    /// Return valid integrated warrants against `warrantee`'s chain.
     ///
     /// Used by the get authorities to pair a warrant with any `Rejected`
     /// record they serve, so the receiver can verify the rejection without
