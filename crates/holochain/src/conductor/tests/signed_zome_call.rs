@@ -1,4 +1,4 @@
-use crate::fixt::AgentPubKeyFixturator;
+use crate::fixt::{ActionHashFixturator, AgentPubKeyFixturator};
 use crate::sweettest::{SweetConductor, SweetDnaFile};
 use crate::test_utils::retry_fn_until_timeout;
 use ::fixt::fixt;
@@ -788,6 +788,28 @@ async fn cap_grant_info_excludes_only_revoked_grants() {
         .find(|g| g.action_hash == live_grant_hash)
         .expect("grant that was not revoked should be listed");
     assert!(live_grant.revoked_at.is_none());
+}
+
+/// Revoking a grant whose action hash is not a cap grant on the cell's chain
+/// fails instead of committing a dangling `Delete`.
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "test_utils")]
+async fn revoke_zome_call_capability_rejects_unknown_action_hash() {
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let mut conductor = SweetConductor::standard().await;
+    let app = conductor.setup_app("app", [&dna]).await.unwrap();
+    let cell_id = app.cells()[0].cell_id().clone();
+
+    let unknown = fixt!(ActionHash);
+    let err = conductor
+        .revoke_zome_call_capability(cell_id, unknown)
+        .await
+        .expect_err("revoke of an unknown action hash must fail");
+    assert!(
+        err.to_string()
+            .contains("No cap grant found for action hash"),
+        "unexpected error: {err}"
+    );
 }
 
 /// Get the capability grants a conductor reports for a single cell.
