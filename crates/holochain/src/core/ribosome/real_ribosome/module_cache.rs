@@ -1,7 +1,7 @@
 use crate::core::ribosome::real_ribosome::WasmBackend;
 use holo_hash::WasmHash;
 use holochain_state::wasm::WasmStore;
-use holochain_wasmer_host::module::ModuleBuilder;
+use holochain_wasmer_host::module::{ModuleBuilder, ModuleWithEngine};
 use std::fmt::Debug;
 use std::sync::Arc;
 use wasmer::Engine;
@@ -29,7 +29,7 @@ pub(crate) fn make_module_cache(backend: WasmBackend, wasm_store: WasmStore) -> 
 #[derive(Debug)]
 pub struct ModuleCache {
     /// In memory cache for WASM modules.
-    cache: moka::future::Cache<WasmHash, Arc<wasmer::Module>>,
+    cache: moka::future::Cache<WasmHash, Arc<ModuleWithEngine>>,
 
     /// The WASM store for source code and serialized modules.
     wasm_store: WasmStore,
@@ -78,7 +78,7 @@ impl ModuleCache {
     pub(super) async fn get(
         &self,
         wasm_hash: &WasmHash,
-    ) -> Result<Arc<wasmer::Module>, wasmer::RuntimeError> {
+    ) -> Result<Arc<ModuleWithEngine>, wasmer::RuntimeError> {
         self.cache.try_get_with(wasm_hash.clone(), async {
             if let Some(builder) = self.builder.clone() {
                 // Wasm is not cached in memory, so try to load an already built module from the database
@@ -93,12 +93,12 @@ impl ModuleCache {
                     })?;
                 if let Some(serialized) = maybe_serialized {
                     match builder.from_serialized_module(serialized) {
-                        Ok(module) => {
+                        Ok(module_with_engine) => {
                             // The serialized module was found, but is not currently cached, so add it to the
                             // in memory cache.
-                            self.cache.insert(wasm_hash.clone(), module.clone()).await;
+                            self.cache.insert(wasm_hash.clone(), module_with_engine.clone()).await;
 
-                            return Ok(module);
+                            return Ok(module_with_engine);
                         }
                         Err(err) => {
                             tracing::info!(?err, ?wasm_hash, "Invalid compiled, serialized module found in the database. Attempting recovery");
@@ -179,7 +179,7 @@ impl ModuleCache {
     async fn get_from_source(
         &self,
         wasm_hash: &WasmHash,
-    ) -> Result<Arc<wasmer::Module>, wasmer::RuntimeError> {
+    ) -> Result<Arc<ModuleWithEngine>, wasmer::RuntimeError> {
         // Read the original source code for this WASM from the database.
         let maybe_code = self
             .wasm_store
@@ -281,6 +281,89 @@ mod tests {
     use holochain_types::prelude::{DnaWasm, DnaWasmHashed};
     use holochain_wasm_test_utils::TestWasm;
 
+    mod engine_tracking {
+        use super::*;
+        use std::{
+            ptr::NonNull,
+            sync::atomic::{AtomicUsize, Ordering},
+        };
+        use wasmer::{
+            sys::{
+                vm::{VMMemory, VMMemoryDefinition, VMTable, VMTableDefinition},
+                BaseTunables, Tunables,
+            },
+            MemoryError, MemoryStyle, MemoryType, TableStyle, TableType,
+        };
+
+        pub(super) static RUNTIME_ENGINES_DROPPED: AtomicUsize = AtomicUsize::new(0);
+
+        struct DropCounter {
+            tunables: BaseTunables,
+        }
+
+        impl Tunables for DropCounter {
+            fn memory_style(&self, memory: &MemoryType) -> MemoryStyle {
+                self.tunables.memory_style(memory)
+            }
+
+            fn table_style(&self, table: &TableType) -> TableStyle {
+                self.tunables.table_style(table)
+            }
+
+            fn create_host_memory(
+                &self,
+                ty: &MemoryType,
+                style: &MemoryStyle,
+            ) -> Result<VMMemory, MemoryError> {
+                self.tunables.create_host_memory(ty, style)
+            }
+
+            unsafe fn create_vm_memory(
+                &self,
+                ty: &MemoryType,
+                style: &MemoryStyle,
+                vm_definition_location: NonNull<VMMemoryDefinition>,
+            ) -> Result<VMMemory, MemoryError> {
+                self.tunables
+                    .create_vm_memory(ty, style, vm_definition_location)
+            }
+
+            fn create_host_table(
+                &self,
+                ty: &TableType,
+                style: &TableStyle,
+            ) -> Result<VMTable, String> {
+                self.tunables.create_host_table(ty, style)
+            }
+
+            unsafe fn create_vm_table(
+                &self,
+                ty: &TableType,
+                style: &TableStyle,
+                vm_definition_location: NonNull<VMTableDefinition>,
+            ) -> Result<VMTable, String> {
+                self.tunables
+                    .create_vm_table(ty, style, vm_definition_location)
+            }
+        }
+
+        impl Drop for DropCounter {
+            fn drop(&mut self) {
+                RUNTIME_ENGINES_DROPPED.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+
+        pub(super) fn make_runtime_engine() -> Engine {
+            use wasmer::sys::NativeEngineExt;
+            let mut engine = Engine::headless();
+            let drop_counter = DropCounter {
+                tunables: BaseTunables::for_target(engine.target()),
+            };
+            engine.set_tunables(drop_counter);
+            engine
+        }
+    }
+
     #[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
     #[tokio::test(flavor = "multi_thread")]
     async fn cache_real_wasm() {
@@ -357,6 +440,44 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(!compiled.is_empty());
+    }
+
+    #[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn engine_is_dropped_with_module_when_evicted_from_cache() {
+        use std::sync::atomic::Ordering;
+
+        let store = WasmStore::test_new();
+        let dna_wasm: DnaWasm = TestWasm::Foo.into();
+        let dna_wasm = DnaWasmHashed::from_content(dna_wasm).await;
+        let wasm_hash = dna_wasm.as_hash().clone();
+        // Save the test DNA into the database.
+        store.put(dna_wasm).await.unwrap();
+
+        let cache = ModuleCache::new(
+            store,
+            holochain_wasmer_host::module::sys::make_engine,
+            engine_tracking::make_runtime_engine,
+        );
+
+        let counter_before = engine_tracking::RUNTIME_ENGINES_DROPPED.load(Ordering::SeqCst);
+        assert!(
+            counter_before == 0,
+            "runtime engines dropped counter should be 0"
+        );
+
+        let module = cache.get(&wasm_hash).await.unwrap();
+        drop(module);
+
+        cache.evict_from_memory_cache(&wasm_hash).await;
+        cache.cache.run_pending_tasks().await;
+        assert!(!cache.is_in_memory_cache(&wasm_hash));
+
+        assert_eq!(
+            engine_tracking::RUNTIME_ENGINES_DROPPED.load(Ordering::SeqCst),
+            counter_before + 1,
+            "the runtime engine should be dropped with the evicted module"
+        );
     }
 
     // Note that caching modules was previously judged to be low value because it's fast to
