@@ -68,7 +68,7 @@ use futures::FutureExt;
 use holochain_state::prelude::WasmStore;
 use holochain_types::prelude::*;
 use holochain_util::timed;
-use holochain_wasmer_host::module::InstanceWithStore;
+use holochain_wasmer_host::module::{InstanceWithStore, ModuleWithEngine};
 use holochain_wasmer_host::prelude::*;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use once_cell::sync::Lazy;
@@ -83,7 +83,6 @@ use wasmer::FunctionEnv;
 use wasmer::FunctionEnvMut;
 use wasmer::Imports;
 use wasmer::Instance;
-use wasmer::Module;
 use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
@@ -238,7 +237,10 @@ impl RealRibosome {
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    async fn get_from_cache_or_build(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
+    async fn get_from_cache_or_build(
+        &self,
+        zome_name: &ZomeName,
+    ) -> RibosomeResult<Arc<ModuleWithEngine>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
 
         Ok(timed!([1, 1000, 10_000], self.wasmer_module_cache.get(&cache_key)).await?)
@@ -252,7 +254,10 @@ impl RealRibosome {
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    pub async fn get_module_for_zome(&self, zome: &Zome<ZomeDef>) -> RibosomeResult<Arc<Module>> {
+    pub async fn get_module_for_zome(
+        &self,
+        zome: &Zome<ZomeDef>,
+    ) -> RibosomeResult<Arc<ModuleWithEngine>> {
         match &zome.def {
             ZomeDef::Wasm(_) => self.get_from_cache_or_build(zome.zome_name()).await,
             _ => RibosomeResult::Err(RibosomeError::DnaError(DnaError::ZomeError(
@@ -265,7 +270,7 @@ impl RealRibosome {
     pub fn build_instance_with_store(
         &self,
         ribosome: Arc<Ribosome>,
-        module: Arc<Module>,
+        module_with_engine: Arc<ModuleWithEngine>,
         context_key: u64,
         name: &str,
     ) -> RibosomeResult<Arc<InstanceWithStore>> {
@@ -284,11 +289,13 @@ impl RealRibosome {
         {
             let mut store = store.lock();
             let mut store_mut = store.as_store_mut();
-            instance = Arc::new(Instance::new(&mut store_mut, &module, &imports).map_err(
-                |e| -> RuntimeError {
-                    wasm_error!(WasmErrorInner::ModuleBuild(format!("{name}: {e}"))).into()
-                },
-            )?);
+            instance = Arc::new(
+                Instance::new(&mut store_mut, &module_with_engine, &imports).map_err(
+                    |e| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::ModuleBuild(format!("{name}: {e}"))).into()
+                    },
+                )?,
+            );
         }
 
         // It is only possible to initialize the function env after the instance is created.

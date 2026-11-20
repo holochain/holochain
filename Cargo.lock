@@ -1398,7 +1398,7 @@ dependencies = [
  "bitflags 2.13.2",
  "crossterm_winapi",
  "mio",
- "parking_lot",
+ "parking_lot 0.12.5",
  "rustix 0.38.44",
  "signal-hook",
  "signal-hook-mio",
@@ -1416,7 +1416,7 @@ dependencies = [
  "derive_more",
  "document-features",
  "mio",
- "parking_lot",
+ "parking_lot 0.12.5",
  "rustix 1.1.6",
  "signal-hook",
  "signal-hook-mio",
@@ -1650,9 +1650,9 @@ dependencies = [
  "cfg-if",
  "crossbeam-utils",
  "hashbrown 0.14.5",
- "lock_api",
+ "lock_api 0.4.14",
  "once_cell",
- "parking_lot_core",
+ "parking_lot_core 0.9.12",
 ]
 
 [[package]]
@@ -2202,13 +2202,13 @@ checksum = "5905ec755cc8386d7928353e4d356d2be3e89e81e5ca01fe630a1ca4d08dc175"
 
 [[package]]
 name = "fixt"
-version = "0.9.0-dev.9"
+version = "0.9.0-dev.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c05a60e4c73cfaf8e278f9ae93cc6b4e1d2a9ef36a55f447e7feaf50eb1989dd"
+checksum = "263c52dc0f4d970c1322ead7512a0fcd660ed6ce3b7ab2b57f05140ee43e3874"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
- "parking_lot",
+ "parking_lot 0.13.0",
  "paste",
  "rand 0.10.3",
  "serde",
@@ -2383,8 +2383,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d930c203dd0b6ff06e0201a4a2fe9149b43c684fd4420555b26d21b1a02956f"
 dependencies = [
  "futures-core",
- "lock_api",
- "parking_lot",
+ "lock_api 0.4.14",
+ "parking_lot 0.12.5",
 ]
 
 [[package]]
@@ -2702,9 +2702,9 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.9.0-dev.9"
+version = "0.9.0-dev.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08a9a548e9509d83e01482772bae232b7bb62bae82c51bd16fdb23c4346f7d20"
+checksum = "5d78b0ac8b61e714946ae753522687b26e3d487180e8b1037bcd182bf3010c67"
 dependencies = [
  "getrandom 0.3.4",
  "hdk_derive",
@@ -2722,9 +2722,9 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.9.0-dev.4"
+version = "0.9.0-dev.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "176cfe2f7d119ef3f27591f656955635ca77ce5e71d19471da6bfb1523f15d8b"
+checksum = "57f14ffa21cb6ce2604f4bb77ad438c78b324500575c4036de4ef6840549287a"
 dependencies = [
  "getrandom 0.3.4",
  "hdi",
@@ -2740,9 +2740,9 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.9.0-dev.9"
+version = "0.9.0-dev.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "734991940800043d28edb7dda69c85ce3905af80a03fd2e8510ed45788464683"
+checksum = "c947bb79d70a14604ff74d8a714290d380810635950463eaea3c7292091c7484"
 dependencies = [
  "darling 0.24.1",
  "heck",
@@ -2798,9 +2798,9 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.9.0-dev.9"
+version = "0.9.0-dev.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12d55f6c33ff16de2b127c214b40c073bec9e2746b1c6a0d06ba543337fc12f2"
+checksum = "12588e5ff1ae8a3e68d71eab390c4c72dde3b6ad7ff3b832cde8409a5e7e1551"
 dependencies = [
  "base64 0.23.1",
  "blake2b_simd",
@@ -2885,7 +2885,7 @@ dependencies = [
  "once_cell",
  "one_err",
  "opentelemetry 0.31.0",
- "parking_lot",
+ "parking_lot 0.12.5",
  "predicates",
  "pretty_assertions",
  "rand 0.8.8",
@@ -2938,7 +2938,7 @@ dependencies = [
  "kitsune2_api",
  "mockall",
  "opentelemetry 0.31.0",
- "parking_lot",
+ "parking_lot 0.12.5",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -3063,7 +3063,7 @@ dependencies = [
  "kitsune2_test_utils",
  "lair_keystore_api",
  "mr_bundle",
- "parking_lot",
+ "parking_lot 0.12.5",
  "rand 0.8.8",
  "serde",
  "thiserror 2.0.21",
@@ -3156,9 +3156,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.9.0-dev.9"
+version = "0.9.0-dev.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31e1e91dd1b6b5e8a36261c453560de7db394c2203220f18d156868a0dea7aeb"
+checksum = "63bbdfe100fa8122715f4b463652c352ff615ff288c3eec04676ea13a66d3883"
 dependencies = [
  "derive_builder",
  "holo_hash",
@@ -3198,7 +3198,7 @@ dependencies = [
  "nanoid 0.4.0",
  "one_err",
  "opentelemetry 0.31.0",
- "parking_lot",
+ "parking_lot 0.12.5",
  "schemars 1.2.3",
  "serde",
  "shrinkwraprs",
@@ -3237,9 +3237,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_nonce"
-version = "0.9.0-dev.4"
+version = "0.9.0-dev.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "876a7d81396d1384ee1ffed188d4a012ea3b5d7e97ec981ba25de35bf4db4bdd"
+checksum = "9baf7115fb05793da4884b1187d53e1537960e77c0cf5f7c5df54827d948c032"
 dependencies = [
  "getrandom 0.3.4",
  "holochain_secure_primitive",
@@ -3275,7 +3275,7 @@ dependencies = [
  "kitsune2_transport_iroh",
  "mockall",
  "opentelemetry 0.31.0",
- "parking_lot",
+ "parking_lot 0.12.5",
  "quinn-proto",
  "rand 0.9.5",
  "rmp-serde",
@@ -3295,9 +3295,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_secure_primitive"
-version = "0.9.0-dev.9"
+version = "0.9.0-dev.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0de5b16370e5a3acb759f832130beb2353bc883518cc64ff4ee794516455dfe7"
+checksum = "6c92577bf949c381ba7deebc440c10e33369e00aeb64e74fd37de7938081834e"
 dependencies = [
  "paste",
  "serde",
@@ -3394,9 +3394,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_timestamp"
-version = "0.9.0-dev.9"
+version = "0.9.0-dev.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbd3280f6e3ef79c95c4348416505f90b7b6f9160d377b1dbda7de89cd8edbbf"
+checksum = "b0b4afad91148d9d75e1068e8c252449ad175f94b2da93378b29cba1b740b7c7"
 dependencies = [
  "chrono",
  "serde",
@@ -3447,9 +3447,9 @@ dependencies = [
  "mr_bundle",
  "must_future",
  "nanoid 0.4.0",
- "parking_lot",
+ "parking_lot 0.12.5",
  "proptest",
- "proptest-derive 0.5.1",
+ "proptest-derive 0.9.0",
  "rand 0.10.3",
  "regex",
  "rmp-serde",
@@ -3473,9 +3473,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.9.0-dev.9"
+version = "0.9.0-dev.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7caa4d8b4b5bfa1173bdacaba623b2c283f13a1818288190634f5e9400775c77"
+checksum = "4ca572b3bac04a98211de8e21d7a99417a17896c882fba8b89f2b105bdba8c7a"
 dependencies = [
  "backtrace",
  "cfg-if",
@@ -3502,9 +3502,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.103"
+version = "0.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a93124f0a5de9d23b1af395b508dee7423c4f66090033fdef461ec4a39603b17"
+checksum = "3edc24c5b93b0e51ec891cf7a0064d2c8b39fffc0ce89470c81e4b38d430feff"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -3514,9 +3514,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.103"
+version = "0.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61240928f47ade6f74289c9a07c0ff0bad95d6d3ea92a34edaee1cd7f5cb9246"
+checksum = "20b89d6213424ffddf558064eac5f2a30c67388ec7d448338e61485f46335c30"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -3527,16 +3527,16 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_host"
-version = "0.0.103"
+version = "0.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b001f44c15dfe13c3306d40f4652e6513303c2051a5a63586a68c97751a3808b"
+checksum = "93d938d217ce8a8879d56883bf283a0734c22342d7572aeec5c33f9d1dacc460"
 dependencies = [
  "bimap",
  "bytes",
  "hex",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
- "parking_lot",
+ "parking_lot 0.12.5",
  "serde",
  "thiserror 2.0.21",
  "tracing",
@@ -3565,9 +3565,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.9.0-dev.4"
+version = "0.9.0-dev.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f4cdc3431d6f1596903e5352e3b5cf71c982021f199c7f49f49f880721b3da0"
+checksum = "0f778265e6e0754681d1d83513a41c75a6bafe59260c5e4fa32501baf1461a54"
 dependencies = [
  "derive_builder",
  "derive_more",
@@ -4859,6 +4859,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lock_api"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65d91b22da179613dcf4d6ec8349563f52a363f6849e03b00dd0a185ec4a59af"
+dependencies = [
+ "scopeguard",
+]
+
+[[package]]
 name = "log"
 version = "0.4.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5094,7 +5103,7 @@ dependencies = [
  "equivalent",
  "event-listener",
  "futures-util",
- "parking_lot",
+ "parking_lot 0.12.5",
  "portable-atomic",
  "smallvec",
  "tagptr",
@@ -6014,8 +6023,18 @@ version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93857453250e3077bd71ff98b6a65ea6621a19bb0f559a85248955ac12c45a1a"
 dependencies = [
- "lock_api",
- "parking_lot_core",
+ "lock_api 0.4.14",
+ "parking_lot_core 0.9.12",
+]
+
+[[package]]
+name = "parking_lot"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9cf937ca4e1d0b7578784559063422fc39ae7c5a00f02471f2614d5486fd226"
+dependencies = [
+ "lock_api 0.5.0",
+ "parking_lot_core 0.10.0",
 ]
 
 [[package]]
@@ -6026,7 +6045,19 @@ checksum = "2621685985a2ebf1c516881c026032ac7deafcda1a2c9b7850dc81e3dfcb64c1"
 dependencies = [
  "cfg-if",
  "libc",
- "redox_syscall",
+ "redox_syscall 0.5.18",
+ "smallvec",
+ "windows-link 0.2.1",
+]
+
+[[package]]
+name = "parking_lot_core"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9cfff060068cc18aa7815010fcaf80c68c7fb9e85fc7f5c0f9bf142c21d19826"
+dependencies = [
+ "libc",
+ "redox_syscall 0.9.5",
  "smallvec",
  "windows-link 0.2.1",
 ]
@@ -6831,6 +6862,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "redox_syscall"
+version = "0.9.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "580c875845b41ecb1564ad1ae4703044cef774145e3d7a94dc2b3fa7c97868fd"
+dependencies = [
+ "bitflags 2.13.2",
+]
+
+[[package]]
 name = "redox_users"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6870,7 +6910,7 @@ dependencies = [
  "fluent-uri",
  "getrandom 0.3.4",
  "hashbrown 0.16.1",
- "parking_lot",
+ "parking_lot 0.12.5",
  "percent-encoding",
  "serde_json",
 ]
@@ -7912,7 +7952,7 @@ version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
 dependencies = [
- "lock_api",
+ "lock_api 0.4.14",
 ]
 
 [[package]]
@@ -8379,7 +8419,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7228e85537ffb5943539a46bf561786323f6112114005ba055e496192a6f8f41"
 dependencies = [
  "futures",
- "parking_lot",
+ "parking_lot 0.12.5",
  "tokio",
  "tracing",
 ]
@@ -8570,7 +8610,7 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
- "parking_lot",
+ "parking_lot 0.12.5",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2",
@@ -9571,7 +9611,7 @@ dependencies = [
  "mach2 0.6.0",
  "memoffset",
  "more-asserts",
- "parking_lot",
+ "parking_lot 0.12.5",
  "region",
  "rustversion",
  "scopeguard",
