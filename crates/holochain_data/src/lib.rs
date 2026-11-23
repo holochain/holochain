@@ -417,4 +417,23 @@ mod tests {
             );
         }
     }
+
+    #[tokio::test]
+    async fn dht_time_slice_arc_indexes_exist() {
+        let db = test_open_db(TestDhtDbId)
+            .await
+            .expect("Failed to set up test database");
+
+        let indexes = sqlx::query_scalar::<_, String>(
+            "SELECT name FROM sqlite_master WHERE type='index' ORDER BY name",
+        )
+        .fetch_all(db.pool())
+        .await
+        .expect("Failed to query sqlite_master");
+
+        assert!(
+            indexes.iter().any(|i| i == "ChainOp_storage_center_loc"),
+            "missing index ChainOp_storage_center_loc; have: {indexes:?}"
+        );
+    }
 }

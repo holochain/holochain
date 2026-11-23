@@ -35,6 +35,13 @@
 //!
 //! `count_integrated_ops` counts every integrated op (`ChainOp` +
 //! `WarrantOp`) to report the total observed DHT size.
+//!
+//! The two time-partition reads (op-hash and earliest-timestamp) express the
+//! arc as up to two inclusive location ranges — a wrapping arc (`start > end`)
+//! is `[start, u32::MAX]` plus `[0, end]` — and read them through
+//! `ChainOp_storage_center_loc`. For a non-wrapping arc the second range is
+//! empty, so one statement serves every arc shape and the plan is indexed
+//! regardless of the bound values.
 
 use crate::models::dht::{
     DumpChainOpRow, DumpOpCursorRow, DumpOpPage, DumpOpRow, DumpOpState, DumpOpWireRow,
@@ -63,7 +70,69 @@ impl ArcBounds {
     fn end_i64(self) -> i64 {
         self.end as i64
     }
+    /// The arc as up to two inclusive location ranges, for binding into a
+    /// `(loc >= ? AND loc <= ?) OR (loc >= ? AND loc <= ?)` predicate.
+    ///
+    /// A non-wrapping arc is its own range followed by an empty one
+    /// (`1..=0`, which cannot match a location); a wrapping arc is
+    /// `[start, u32::MAX]` plus `[0, end]`. Binding both shapes the same way
+    /// keeps one statement valid for every arc.
+    fn ranges(self) -> [(i64, i64); 2] {
+        if self.start <= self.end {
+            [(self.start_i64(), self.end_i64()), (1, 0)]
+        } else {
+            [(self.start_i64(), u32::MAX as i64), (0, self.end_i64())]
+        }
+    }
 }
+
+/// Time-slice read over an arc, expressed as two inclusive location ranges
+/// (the second is empty for a non-wrapping arc, see [`ArcBounds::ranges`]).
+/// The chain-op branch reads through `ChainOp_storage_center_loc`; the warrant
+/// branch scans `WarrantOp`, which is small enough to make an index not worth
+/// maintaining.
+const OP_HASHES_IN_TIME_SLICE_SQL: &str = "
+    SELECT op_hash AS hash, basis_hash, serialized_size, sort_ts FROM (
+        SELECT
+            ChainOp.hash AS op_hash,
+            ChainOp.basis_hash AS basis_hash,
+            ChainOp.serialized_size AS serialized_size,
+            Action.timestamp AS sort_ts
+        FROM ChainOp
+        JOIN Action ON ChainOp.action_hash = Action.hash
+        WHERE
+            (
+                (ChainOp.storage_center_loc >= ?
+                        AND ChainOp.storage_center_loc <= ?)
+                OR
+                (ChainOp.storage_center_loc >= ?
+                        AND ChainOp.storage_center_loc <= ?)
+            )
+            AND Action.timestamp >= ?
+            AND Action.timestamp <  ?
+            AND ChainOp.locally_validated = 1
+            AND (ChainOp.op_type != 2 OR Action.private_entry = 0)
+        UNION ALL
+        SELECT
+            Warrant.hash AS op_hash,
+            Warrant.warrantee AS basis_hash,
+            WarrantOp.serialized_size AS serialized_size,
+            Warrant.timestamp AS sort_ts
+        FROM Warrant
+        JOIN WarrantOp ON WarrantOp.hash = Warrant.hash
+        WHERE
+            (
+                (WarrantOp.storage_center_loc >= ?
+                        AND WarrantOp.storage_center_loc <= ?)
+                OR
+                (WarrantOp.storage_center_loc >= ?
+                        AND WarrantOp.storage_center_loc <= ?)
+            )
+            AND Warrant.timestamp >= ?
+            AND Warrant.timestamp <  ?
+    )
+    ORDER BY sort_ts ASC
+";
 
 /// Return `(hash, basis, size)` for every integrated, locally-validated op
 /// whose authored timestamp falls in `[t_start_micros, t_end_micros)`.
@@ -80,75 +149,20 @@ pub(crate) async fn op_hashes_in_time_slice<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    // Two arc-filter shapes: non-wrapping (start <= end) keeps everything
-    // inside the range; wrapping (start > end) keeps everything outside.
-    // We bind the same arc values twice (once per UNION branch).
-    let sql = "
-        SELECT op_hash AS hash, basis_hash, serialized_size, sort_ts FROM (
-            SELECT
-                ChainOp.hash AS op_hash,
-                ChainOp.basis_hash AS basis_hash,
-                ChainOp.serialized_size AS serialized_size,
-                Action.timestamp AS sort_ts
-            FROM ChainOp
-            JOIN Action ON ChainOp.action_hash = Action.hash
-            WHERE
-                (
-                    (? <= ? AND ChainOp.storage_center_loc >= ?
-                            AND ChainOp.storage_center_loc <= ?)
-                    OR
-                    (? >  ? AND (ChainOp.storage_center_loc <= ?
-                              OR ChainOp.storage_center_loc >= ?))
-                )
-                AND Action.timestamp >= ?
-                AND Action.timestamp <  ?
-                AND ChainOp.locally_validated = 1
-                AND (ChainOp.op_type != 2 OR Action.private_entry = 0)
-            UNION ALL
-            SELECT
-                Warrant.hash AS op_hash,
-                Warrant.warrantee AS basis_hash,
-                WarrantOp.serialized_size AS serialized_size,
-                Warrant.timestamp AS sort_ts
-            FROM Warrant
-            JOIN WarrantOp ON WarrantOp.hash = Warrant.hash
-            WHERE
-                (
-                    (? <= ? AND WarrantOp.storage_center_loc >= ?
-                            AND WarrantOp.storage_center_loc <= ?)
-                    OR
-                    (? >  ? AND (WarrantOp.storage_center_loc <= ?
-                              OR WarrantOp.storage_center_loc >= ?))
-                )
-                AND Warrant.timestamp >= ?
-                AND Warrant.timestamp <  ?
-        )
-        ORDER BY sort_ts ASC
-    ";
-
-    let s = arc.start_i64();
-    let e = arc.end_i64();
-    sqlx::query_as::<_, K2OpHashRow>(sql)
+    let [(s0, e0), (s1, e1)] = arc.ranges();
+    sqlx::query_as::<_, K2OpHashRow>(OP_HASHES_IN_TIME_SLICE_SQL)
         // chain-op branch
-        .bind(s)
-        .bind(e)
-        .bind(s)
-        .bind(e)
-        .bind(s)
-        .bind(e)
-        .bind(e)
-        .bind(s)
+        .bind(s0)
+        .bind(e0)
+        .bind(s1)
+        .bind(e1)
         .bind(t_start_micros)
         .bind(t_end_micros)
         // warrant branch
-        .bind(s)
-        .bind(e)
-        .bind(s)
-        .bind(e)
-        .bind(s)
-        .bind(e)
-        .bind(e)
-        .bind(s)
+        .bind(s0)
+        .bind(e0)
+        .bind(s1)
+        .bind(e1)
         .bind(t_start_micros)
         .bind(t_end_micros)
         .fetch_all(executor)
@@ -828,6 +842,39 @@ async fn warrants_for_dump_by_hashes(
         .await
 }
 
+/// Earliest-timestamp read over an arc, expressed as two inclusive location
+/// ranges like [`OP_HASHES_IN_TIME_SLICE_SQL`]. The chain-op branch reads
+/// through `ChainOp_storage_center_loc`; the warrant branch scans `WarrantOp`.
+const EARLIEST_TIMESTAMP_IN_ARC_SQL: &str = "
+    SELECT MIN(ts) FROM (
+        SELECT Action.timestamp AS ts
+        FROM ChainOp
+        JOIN Action ON ChainOp.action_hash = Action.hash
+        WHERE
+            (
+                (ChainOp.storage_center_loc >= ?
+                        AND ChainOp.storage_center_loc <= ?)
+                OR
+                (ChainOp.storage_center_loc >= ?
+                        AND ChainOp.storage_center_loc <= ?)
+            )
+            AND ChainOp.locally_validated = 1
+            AND (ChainOp.op_type != 2 OR Action.private_entry = 0)
+        UNION ALL
+        SELECT Warrant.timestamp AS ts
+        FROM Warrant
+        JOIN WarrantOp ON WarrantOp.hash = Warrant.hash
+        WHERE
+            (
+                (WarrantOp.storage_center_loc >= ?
+                        AND WarrantOp.storage_center_loc <= ?)
+                OR
+                (WarrantOp.storage_center_loc >= ?
+                        AND WarrantOp.storage_center_loc <= ?)
+            )
+    )
+";
+
 /// Minimum authored timestamp across both `ChainOp` (joined with `Action`)
 /// and integrated warrants (`Warrant` joined with `WarrantOp`), filtered
 /// to `arc` and (for chain ops) `locally_validated = 1` with private
@@ -840,56 +887,18 @@ pub(crate) async fn earliest_authored_timestamp_in_arc<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let sql = "
-        SELECT MIN(ts) FROM (
-            SELECT Action.timestamp AS ts
-            FROM ChainOp
-            JOIN Action ON ChainOp.action_hash = Action.hash
-            WHERE
-                (
-                    (? <= ? AND ChainOp.storage_center_loc >= ?
-                            AND ChainOp.storage_center_loc <= ?)
-                    OR
-                    (? >  ? AND (ChainOp.storage_center_loc <= ?
-                              OR ChainOp.storage_center_loc >= ?))
-                )
-                AND ChainOp.locally_validated = 1
-                AND (ChainOp.op_type != 2 OR Action.private_entry = 0)
-            UNION ALL
-            SELECT Warrant.timestamp AS ts
-            FROM Warrant
-            JOIN WarrantOp ON WarrantOp.hash = Warrant.hash
-            WHERE
-                (
-                    (? <= ? AND WarrantOp.storage_center_loc >= ?
-                            AND WarrantOp.storage_center_loc <= ?)
-                    OR
-                    (? >  ? AND (WarrantOp.storage_center_loc <= ?
-                              OR WarrantOp.storage_center_loc >= ?))
-                )
-        )
-    ";
-    let s = arc.start_i64();
-    let e = arc.end_i64();
-    let row: Option<(Option<i64>,)> = sqlx::query_as(sql)
+    let [(s0, e0), (s1, e1)] = arc.ranges();
+    let row: Option<(Option<i64>,)> = sqlx::query_as(EARLIEST_TIMESTAMP_IN_ARC_SQL)
         // chain-op branch
-        .bind(s)
-        .bind(e)
-        .bind(s)
-        .bind(e)
-        .bind(s)
-        .bind(e)
-        .bind(e)
-        .bind(s)
+        .bind(s0)
+        .bind(e0)
+        .bind(s1)
+        .bind(e1)
         // warrant branch
-        .bind(s)
-        .bind(e)
-        .bind(s)
-        .bind(e)
-        .bind(s)
-        .bind(e)
-        .bind(e)
-        .bind(s)
+        .bind(s0)
+        .bind(e0)
+        .bind(s1)
+        .bind(e1)
         .fetch_optional(executor)
         .await?;
     Ok(row.and_then(|(v,)| v))
@@ -1160,6 +1169,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::handles::DbWrite;
     use crate::kind::Dht;
     use crate::models::dht::{DumpOpCursorRow, DumpOpRow, DumpOpState, DumpOpWireRow, OpTimingRow};
@@ -1179,7 +1189,7 @@ mod tests {
         Dht::new(Arc::new(DnaHash::from_raw_36(vec![0u8; 36])))
     }
 
-    /// Insert one integrated, locally-validated chain op with its action, at
+    /// Insert one integrated, locally-validated chain op with its action at
     /// storage location 0 so it falls inside a full arc. `op_tag` makes the
     /// op/action/basis hashes unique; `private_entry` is the action's
     /// private-entry flag; `timestamp` is used for both the authored timestamp
@@ -1190,6 +1200,18 @@ mod tests {
         op_type: i64,
         private_entry: i64,
         timestamp: i64,
+    ) -> Vec<u8> {
+        seed_op_at(pool, op_tag, op_type, private_entry, timestamp, 0).await
+    }
+
+    /// [`seed_op`] at an explicit storage location, for arc-boundary tests.
+    async fn seed_op_at(
+        pool: &Pool<Sqlite>,
+        op_tag: u8,
+        op_type: i64,
+        private_entry: i64,
+        timestamp: i64,
+        storage_center_loc: u32,
     ) -> Vec<u8> {
         let op_hash = vec![op_tag; 36];
         let action_hash = vec![op_tag + 10; 36];
@@ -1216,12 +1238,13 @@ mod tests {
                 (hash, op_type, action_hash, basis_hash, storage_center_loc,
                  validation_status, locally_validated, require_receipt,
                  when_received, when_integrated, serialized_size)
-             VALUES (?, ?, ?, ?, 0, 1, 1, 0, ?, ?, 10)",
+             VALUES (?, ?, ?, ?, ?, 1, 1, 0, ?, ?, 10)",
         )
         .bind(&op_hash)
         .bind(op_type)
         .bind(&action_hash)
         .bind(&basis_hash)
+        .bind(i64::from(storage_center_loc))
         .bind(timestamp)
         .bind(timestamp)
         .execute(pool)
@@ -1279,6 +1302,18 @@ mod tests {
         when_received: i64,
         state: DumpOpState,
     ) -> Vec<u8> {
+        seed_warrant_op_at(pool, op_tag, when_received, state, 0).await
+    }
+
+    /// [`seed_warrant_op`] at an explicit storage location, for arc-boundary
+    /// tests.
+    async fn seed_warrant_op_at(
+        pool: &Pool<Sqlite>,
+        op_tag: u8,
+        when_received: i64,
+        state: DumpOpState,
+        storage_center_loc: u32,
+    ) -> Vec<u8> {
         let hash = vec![op_tag; 36];
         sqlx::query(
             "INSERT INTO Warrant
@@ -1300,9 +1335,10 @@ mod tests {
                     "INSERT INTO WarrantOp
                         (hash, storage_center_loc, when_received, when_integrated,
                          validation_status, serialized_size)
-                     VALUES (?, 0, ?, ?, 1, 10)",
+                     VALUES (?, ?, ?, ?, 1, 10)",
                 )
                 .bind(&hash)
+                .bind(i64::from(storage_center_loc))
                 .bind(when_received)
                 .bind(when_received + 1_000)
                 .execute(pool)
@@ -1314,9 +1350,10 @@ mod tests {
                     "INSERT INTO LimboWarrantOp
                         (hash, storage_center_loc, sys_validation_status,
                          when_received, serialized_size)
-                     VALUES (?, 0, ?, ?, 10)",
+                     VALUES (?, ?, ?, ?, 10)",
                 )
                 .bind(&hash)
+                .bind(i64::from(storage_center_loc))
                 .bind((state == DumpOpState::IntegrationLimbo).then_some(1_i64))
                 .bind(when_received)
                 .execute(pool)
@@ -1774,5 +1811,191 @@ mod tests {
         assert_eq!(warrant.when_received, 300);
         assert_eq!(warrant.when_integrated, Some(1_300));
         assert_eq!(warrant.locally_validated, None);
+    }
+
+    #[test]
+    fn arc_ranges_cover_the_arc() {
+        let max = i64::from(u32::MAX);
+
+        // A non-wrapping arc is its own range, then an empty one.
+        assert_eq!(
+            ArcBounds {
+                start: 1_000,
+                end: 2_000,
+            }
+            .ranges(),
+            [(1_000, 2_000), (1, 0)]
+        );
+        assert_eq!(
+            ArcBounds {
+                start: 0,
+                end: u32::MAX,
+            }
+            .ranges(),
+            [(0, max), (1, 0)]
+        );
+
+        // A wrapping arc is [start, MAX] plus [0, end].
+        assert_eq!(
+            ArcBounds {
+                start: 3_000,
+                end: 10,
+            }
+            .ranges(),
+            [(3_000, max), (0, 10)]
+        );
+    }
+
+    #[tokio::test]
+    async fn time_slice_reads_the_arc_bounds_only() {
+        let db = test_open_db(dht_id()).await.unwrap();
+        // Outside on both sides, plus both inclusive bounds.
+        let before = seed_op_at(db.pool(), 1, STORE_RECORD, 0, 1_000, 999).await;
+        let start = seed_op_at(db.pool(), 2, STORE_RECORD, 0, 1_100, 1_000).await;
+        let end = seed_op_at(db.pool(), 3, STORE_RECORD, 0, 1_900, 2_000).await;
+        let after = seed_op_at(db.pool(), 4, STORE_RECORD, 0, 2_000, 2_001).await;
+        let arc = ArcBounds {
+            start: 1_000,
+            end: 2_000,
+        };
+
+        let rows = op_hashes_in_time_slice(db.pool(), arc, 0, i64::MAX)
+            .await
+            .unwrap();
+        let hashes: Vec<Vec<u8>> = rows.into_iter().map(|row| row.hash).collect();
+        assert_eq!(hashes, vec![start, end.clone()]);
+        assert!(!hashes.contains(&before) && !hashes.contains(&after));
+
+        // The time bound is half-open on the authored timestamp.
+        let rows = op_hashes_in_time_slice(db.pool(), arc, 1_500, 1_950)
+            .await
+            .unwrap();
+        let hashes: Vec<Vec<u8>> = rows.into_iter().map(|row| row.hash).collect();
+        assert_eq!(hashes, vec![end]);
+
+        assert_eq!(
+            earliest_authored_timestamp_in_arc(db.pool(), arc)
+                .await
+                .unwrap(),
+            Some(1_100)
+        );
+    }
+
+    #[tokio::test]
+    async fn time_slice_applies_the_serving_filters() {
+        let (db, public, private, record) = seed_filter_fixture().await;
+        let cached = seed_op_at(db.pool(), 9, STORE_RECORD, 0, 500, 0).await;
+        sqlx::query("UPDATE ChainOp SET locally_validated = 0 WHERE hash = ?")
+            .bind(&cached)
+            .execute(db.pool())
+            .await
+            .unwrap();
+        let arc = ArcBounds { start: 0, end: 0 };
+
+        let hashes: Vec<Vec<u8>> = op_hashes_in_time_slice(db.pool(), arc, 0, i64::MAX)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| row.hash)
+            .collect();
+        assert!(hashes.contains(&public));
+        assert!(hashes.contains(&record));
+        assert!(!hashes.contains(&private));
+        assert!(!hashes.contains(&cached));
+
+        // The private op is authored earliest and the cached op is not
+        // integrated; neither may set the advertised boundary.
+        assert_eq!(
+            earliest_authored_timestamp_in_arc(db.pool(), arc)
+                .await
+                .unwrap(),
+            Some(2_000)
+        );
+    }
+
+    #[tokio::test]
+    async fn time_slice_includes_warrants_in_the_arc() {
+        let db = test_open_db(dht_id()).await.unwrap();
+        let inside_chain = seed_op_at(db.pool(), 1, STORE_RECORD, 0, 1_500, 1_000).await;
+        let inside_warrant =
+            seed_warrant_op_at(db.pool(), 2, 1_200, DumpOpState::Integrated, 1_200).await;
+        let outside_warrant =
+            seed_warrant_op_at(db.pool(), 3, 1_100, DumpOpState::Integrated, 3_000).await;
+        let arc = ArcBounds {
+            start: 1_000,
+            end: 2_000,
+        };
+
+        let hashes: Vec<Vec<u8>> = op_hashes_in_time_slice(db.pool(), arc, 0, i64::MAX)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| row.hash)
+            .collect();
+        assert!(hashes.contains(&inside_chain));
+        assert!(hashes.contains(&inside_warrant));
+        assert!(!hashes.contains(&outside_warrant));
+
+        assert_eq!(
+            earliest_authored_timestamp_in_arc(db.pool(), arc)
+                .await
+                .unwrap(),
+            Some(1_200),
+            "the warrant inside the arc is the earliest matching op"
+        );
+    }
+
+    #[tokio::test]
+    async fn wrapping_arc_returns_rows_outside_the_gap() {
+        let db = test_open_db(dht_id()).await.unwrap();
+        let low = seed_op_at(db.pool(), 1, STORE_RECORD, 0, 100, 10).await;
+        let gap = seed_op_at(db.pool(), 2, STORE_RECORD, 0, 200, 100).await;
+        let high = seed_op_at(db.pool(), 3, STORE_RECORD, 0, 300, 3_000).await;
+
+        let arc = ArcBounds {
+            start: 3_000,
+            end: 10,
+        };
+
+        let hashes: Vec<Vec<u8>> = db
+            .as_ref()
+            .op_hashes_in_time_slice(arc.start, arc.end, 0, i64::MAX)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| row.hash)
+            .collect();
+        assert!(hashes.contains(&low));
+        assert!(hashes.contains(&high));
+        assert!(!hashes.contains(&gap));
+    }
+
+    /// Run `EXPLAIN QUERY PLAN` for a statement, binding `binds` placeholders.
+    async fn query_plan(pool: &Pool<Sqlite>, sql: &str, binds: usize) -> String {
+        use sqlx::Row;
+        let mut q = sqlx::query(sqlx::AssertSqlSafe(format!("EXPLAIN QUERY PLAN {sql}")));
+        for _ in 0..binds {
+            q = q.bind(0_i64);
+        }
+        q.fetch_all(pool)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| row.get::<String, _>("detail"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[tokio::test]
+    async fn time_slice_queries_read_through_the_location_index() {
+        let db = test_open_db(dht_id()).await.unwrap();
+
+        let plan = query_plan(db.pool(), OP_HASHES_IN_TIME_SLICE_SQL, 12).await;
+        assert!(plan.contains("ChainOp_storage_center_loc"), "plan: {plan}");
+        assert!(!plan.contains("SCAN ChainOp"), "plan: {plan}");
+
+        let plan = query_plan(db.pool(), EARLIEST_TIMESTAMP_IN_ARC_SQL, 8).await;
+        assert!(plan.contains("ChainOp_storage_center_loc"), "plan: {plan}");
+        assert!(!plan.contains("SCAN ChainOp"), "plan: {plan}");
     }
 }

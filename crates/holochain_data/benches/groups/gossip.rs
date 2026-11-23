@@ -18,6 +18,10 @@ pub fn gossip(c: &mut Criterion) {
         // middle of the fixture's time range.
         let arc_start = u32::MAX / 4;
         let arc_end = u32::MAX / 2;
+        // One `HashPartition` sector (1/512 of the location space), the arc
+        // kitsune2 asks about on every time-partition update.
+        let sector_start = u32::MAX / 2;
+        let sector_end = sector_start + u32::MAX / 512;
         let mid = (fx.keys.min_timestamp + fx.keys.max_timestamp) / 2;
         let slice = (mid, mid + 3_600_000_000);
         let raw: Vec<Vec<u8>> = fx
@@ -58,6 +62,30 @@ pub fn gossip(c: &mut Criterion) {
             |b, _| {
                 b.to_async(rt).iter(|| async {
                     db.earliest_authored_timestamp_in_arc(arc_start, arc_end)
+                        .await
+                        .unwrap()
+                })
+            },
+        );
+        // The same two reads over one sector: the arc kitsune2 actually asks
+        // about on every time-partition update.
+        g.bench_with_input(
+            BenchmarkId::new("op_hashes_in_time_slice_sector", fx.size),
+            &fx.size,
+            |b, _| {
+                b.to_async(rt).iter(|| async {
+                    db.op_hashes_in_time_slice(sector_start, sector_end, slice.0, slice.1)
+                        .await
+                        .unwrap()
+                })
+            },
+        );
+        g.bench_with_input(
+            BenchmarkId::new("earliest_authored_timestamp_in_arc_sector", fx.size),
+            &fx.size,
+            |b, _| {
+                b.to_async(rt).iter(|| async {
+                    db.earliest_authored_timestamp_in_arc(sector_start, sector_end)
                         .await
                         .unwrap()
                 })

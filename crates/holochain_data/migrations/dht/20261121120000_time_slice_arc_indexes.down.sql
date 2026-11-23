@@ -1,0 +1,1 @@
+DROP INDEX ChainOp_storage_center_loc;
