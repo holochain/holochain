@@ -1,0 +1,13 @@
+-- Index for the per-sector time-slice reads kitsune2 issues on every DHT
+-- update (holochain#5726 follow-up).
+--
+-- `op_hashes_in_time_slice` and `earliest_authored_timestamp_in_arc` filter
+-- `storage_center_loc` to a `HashPartition` sector (1/512 of the location
+-- space) but had no index to read it through. Once those reads express the
+-- arc as inclusive location ranges instead of the old
+-- `(? <= ? AND ...) OR (? > ? ...)` shape, the planner reads them through this.
+--
+-- The warrant branches keep their table scan on purpose: warrants are rare, so
+-- `WarrantOp` is small enough that scanning it is cheaper than maintaining a
+-- second index.
+CREATE INDEX ChainOp_storage_center_loc ON ChainOp(storage_center_loc);

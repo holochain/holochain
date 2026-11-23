@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix the time-slice and earliest-timestamp op-store reads, which kitsune2 issues for every sector on each 15-minute DHT update and when a space is created, scanning every action in the DHT. They now express the arc as location ranges and read them through a new `ChainOp(storage_center_loc)` index, so an idle conductor no longer keeps a core busy after each update and cell startup no longer stalls as the store grows. Existing databases gain the index on the next conductor start. \#5726
+
 ## 0.8.0-dev.16
 
 - Cache the Wasm module together with the engine it was compiled with to prevent memory leaks. Dropping a module does not remove the executable code from memory, until the engine is dropped.
