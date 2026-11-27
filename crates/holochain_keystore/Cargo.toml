@@ -22,7 +22,7 @@ holochain_types = { version = "^0.8.0-dev.14", path = "../holochain_types" }
 holochain_zome_types = { version = "0.9.0-dev.5" }
 holochain_secure_primitive = { version = "0.9.0-dev.10" }
 holochain_util = { version = "0.9.0-dev.10" }
-lair_keystore = { version = "0.7.1", default-features = false, features = [
+lair_keystore = { version = "0.9.0", default-features = false, features = [
   "rusqlite-bundled-sqlcipher-vendored-openssl",
 ] }
 must_future = "0.1.2"

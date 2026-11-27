@@ -2,7 +2,7 @@
 
 use crate::*;
 use ::lair_keystore::dependencies::lair_keystore_api;
-use ::lair_keystore::server::StandaloneServer;
+use ::lair_keystore::InProcKeystore;
 use lair_keystore_api::prelude::*;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -23,19 +23,14 @@ pub async fn spawn_lair_keystore_in_proc(
     passphrase: SharedLockedArray,
 ) -> LairResult<MetaLairClient> {
     let config = get_config(config_path, passphrase.clone()).await?;
-    let connection_url = config.connection_url.clone();
 
-    // rather than using the in-proc server directly,
-    // use the actual standalone server so we get the pid-checks, etc
-    let mut server = StandaloneServer::new(config).await?;
+    // use the persistent in-proc keystore rather than a standalone server:
+    // no unix domain socket is bound, so this works on platforms whose app
+    // data paths exceed `sun_path` (e.g. iOS)
+    let keystore = InProcKeystore::new(config, passphrase.clone()).await?;
+    let keystore_client = keystore.new_client().await?;
 
-    server.run(passphrase.clone()).await?;
-
-    // just incase a Drop gets impld at some point...
-    std::mem::forget(server);
-
-    // now, just connect to it : )
-    spawn_lair_keystore(connection_url.into(), passphrase).await
+    MetaLairClient::from_client(keystore_client).await
 }
 
 async fn get_config(

@@ -2640,9 +2640,9 @@ dependencies = [
 
 [[package]]
 name = "hc_seed_bundle"
-version = "0.7.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73b9f72723fd080d50b9660cac618edff928a533e1c7e12dfd41017aadff5e0d"
+checksum = "00cc94233bd4ef9b2f33a0967b0eed9349c8af952d3469b7e951075c0efea058"
 dependencies = [
  "futures",
  "one_err",
@@ -3437,7 +3437,7 @@ dependencies = [
  "nanoid 0.4.0",
  "parking_lot 0.12.5",
  "proptest",
- "proptest-derive 0.5.1",
+ "proptest-derive 0.9.0",
  "rand 0.10.4",
  "regex",
  "rmp-serde",
@@ -4680,9 +4680,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore"
-version = "0.7.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a04faca57c47cf2c233f65acff450dbc2efbce2fdbae1bb86f85cb4d76461cf5"
+checksum = "6a5ed8244b41298f99ff782e7e839aa5d5d349bbff4ba1e602d3482d03fc9599"
 dependencies = [
  "clap",
  "lair_keystore_api",
@@ -4690,15 +4690,14 @@ dependencies = [
  "rpassword",
  "rusqlite",
  "sqlformat",
- "sysinfo",
  "tracing-subscriber",
 ]
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.7.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad5c2a6ab008de723eab991d548a6823b8a51371ecec26910721e987b7ece1de"
+checksum = "034b7668179eb525ce13ca7891c1df4ebd85c6dc02625b208471e10cc9d384ea"
 dependencies = [
  "base64 0.22.1",
  "dunce",
