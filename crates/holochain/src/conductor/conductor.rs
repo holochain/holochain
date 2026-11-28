@@ -360,6 +360,10 @@ mod startup_shutdown_impls {
                 tracing::info!("Closing the network.");
                 self.holochain_p2p.close().await;
 
+                if let Err(err) = self.keystore.shutdown().await {
+                    tracing::warn!(?err, "Error shutting down keystore");
+                }
+
                 result?
             })
         }

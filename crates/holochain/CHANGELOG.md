@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix the conductor failing to start with an in-process lair keystore when the lair root path is too long for a unix domain socket, which prevented Holochain from booting on iOS. \#5977
+- Fix `hc sandbox generate --run` failing to start the conductor with `StoreAlreadyOwned` when the sandbox uses an in-process lair keystore, by waiting for the conductor that installs the app to exit before starting another one on the same sandbox. \#5977
+- Fix in-process lair keystore option to actually start it in-process. Formerly it was started as a standalone process counter to what the variant said.
 - Fix the time-slice and earliest-timestamp op-store reads, which kitsune2 issues for every sector on each 15-minute DHT update and when a space is created, scanning every action in the DHT. They now express the arc as location ranges and read them through a new `ChainOp(storage_center_loc)` index, so an idle conductor no longer keeps a core busy after each update and cell startup no longer stalls as the store grows. Existing databases gain the index on the next conductor start. \#5726
 
 ## 0.8.0-dev.16

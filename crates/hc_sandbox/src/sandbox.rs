@@ -104,8 +104,9 @@ pub async fn default_with_network(
         in_process_lair,
         0,
     )?;
-    let conductor = run_async(holochain_path, config_path.clone(), None, structured).await?;
-    let mut client = AdminWebsocket::connect(format!("localhost:{}", conductor.0), None).await?;
+    let (admin_port, mut conductor, maybe_keystore) =
+        run_async(holochain_path, config_path.clone(), None, structured).await?;
+    let mut client = AdminWebsocket::connect(format!("localhost:{admin_port}"), None).await?;
     let install_bundle = InstallApp {
         app_id: Some(app_id),
         agent_key: None,
@@ -114,6 +115,15 @@ pub async fn default_with_network(
         roles_settings,
     };
     install_app_bundle(&mut client, install_bundle).await?;
+
+    // Shut down Holochain and Lair
+    let _ = conductor.kill().await;
+    conductor.wait().await?;
+    if let Some(mut keystore) = maybe_keystore {
+        let _ = keystore.kill().await;
+        keystore.wait().await?;
+    }
+
     Ok(config_path)
 }
 
